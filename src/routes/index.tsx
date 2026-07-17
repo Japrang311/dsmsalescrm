@@ -113,6 +113,63 @@ function Dashboard() {
   });
   const ytdPct = ytdTgt > 0 ? Math.round((ytdAch / ytdTgt) * 100) : 0;
 
+  const [ytdMode, setYtdMode] = useState<"total" | "customer" | "product">("total");
+
+  const SEGMENT_COLORS = [
+    "var(--color-primary)",
+    "var(--color-teal)",
+    "var(--color-info)",
+    "var(--color-success)",
+    "var(--color-warning)",
+  ];
+  const OTHERS_COLOR = "var(--color-muted-foreground)";
+
+  const { breakdownData, segments } = useMemo(() => {
+    if (ytdMode === "total") {
+      return { breakdownData: [] as Array<Record<string, number | string>>, segments: [] as Array<{ key: string; color: string }> };
+    }
+    const scopedRev = ownerFilter ? revenue.filter((r) => r.ownerId === ownerFilter) : revenue;
+    const keyOf = (r: (typeof revenue)[number]) =>
+      ytdMode === "customer" ? findClient(r.clientId)?.name ?? "Unknown" : r.description;
+
+    const totals = new Map<string, number>();
+    for (const r of scopedRev) {
+      totals.set(keyOf(r), (totals.get(keyOf(r)) ?? 0) + r.total);
+    }
+    const sorted = [...totals.entries()].sort((a, b) => b[1] - a[1]);
+    const topKeys = sorted.slice(0, 5).map(([k]) => k);
+    const othersKeys = new Set(sorted.slice(5).map(([k]) => k));
+    const hasOthers = sorted.slice(5).some(([, v]) => v > 0);
+
+    const segs: Array<{ key: string; color: string }> = topKeys.map((k, i) => ({
+      key: k,
+      color: SEGMENT_COLORS[i % SEGMENT_COLORS.length],
+    }));
+    if (hasOthers) segs.push({ key: "Others", color: OTHERS_COLOR });
+
+    const cum = new Map<string, number>(segs.map((s) => [s.key, 0]));
+    let cTgt = 0;
+    const data = monthlyTargets.map((m) => {
+      const t = role === "sales" ? m.target * 0.25 : m.target;
+      cTgt += t;
+      const monthRev = scopedRev.filter((r) => r.month === m.month);
+      for (const r of monthRev) {
+        const k = keyOf(r);
+        const bucket = othersKeys.has(k) ? "Others" : k;
+        if (!cum.has(bucket)) continue;
+        cum.set(bucket, (cum.get(bucket) ?? 0) + r.total);
+      }
+      const row: Record<string, number | string> = {
+        month: m.month.slice(5),
+        "Target YTD": Math.round(cTgt / 1_000_000),
+      };
+      for (const s of segs) row[s.key] = Math.round((cum.get(s.key) ?? 0) / 1_000_000);
+      return row;
+    });
+    return { breakdownData: data, segments: segs };
+  }, [ytdMode, ownerFilter, role]);
+
+
   const ppnData = [
     { name: "PPN", value: ppn },
     { name: "Non-PPN", value: non },
