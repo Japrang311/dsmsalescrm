@@ -38,6 +38,13 @@ import {
   Download,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { KpiCard } from "@/components/app/kpi-card";
 import { PageHeader } from "@/components/app/page-header";
 import {
@@ -208,6 +215,7 @@ function Dashboard() {
 
   const [ytdYear, setYtdYear] = useState<"2024" | "2025" | "2026">("2026");
   const [ytdMode, setYtdMode] = useState<"total" | "customer" | "product">("total");
+  const [drillKey, setDrillKey] = useState<string | null>(null);
 
   // Scale factors to synthesize prior-year data from 2026 mock.
   const yearScale: Record<typeof ytdYear, number> = {
@@ -326,6 +334,64 @@ function Dashboard() {
     return { breakdownData: data, segments: segs };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ytdMode, ownerFilter, role, ytdYear]);
+
+  const drillDetail = useMemo(() => {
+    if (!drillKey || ytdMode === "total") return null;
+    const scopedRev = ownerFilter ? revenue.filter((r) => r.ownerId === ownerFilter) : revenue;
+    const keyOf = (r: (typeof revenue)[number]) =>
+      ytdMode === "customer" ? findClient(r.clientId)?.name ?? "Unknown" : r.description;
+
+    // Which raw keys map into this bucket? "Others" = every key not in top-5.
+    const topKeys = new Set(segments.filter((s) => s.key !== "Others").map((s) => s.key));
+    const inBucket = (k: string) =>
+      drillKey === "Others" ? !topKeys.has(k) : k === drillKey;
+
+    const filtered = scopedRev.filter((r) => inBucket(keyOf(r)));
+    const totalScopedYtd = scopedRev.reduce((s, r) => s + r.total * scale, 0);
+    const segYtd = filtered.reduce((s, r) => s + r.total * scale, 0);
+    const share = totalScopedYtd > 0 ? segYtd / totalScopedYtd : 0;
+
+    let cum = 0;
+    const rows = yearMonthly.map((m, idx) => {
+      const baseMonth = monthlyTargets[idx % monthlyTargets.length].month;
+      const monthAch =
+        filtered
+          .filter((r) => r.month === baseMonth)
+          .reduce((s, r) => s + r.total * scale, 0);
+      cum += monthAch;
+      const monthTgt = role === "sales" ? m.target * 0.25 : m.target;
+      const monthTgtShare = monthTgt * share;
+      return {
+        month: m.month,
+        achievement: monthAch / 1_000_000,
+        cumAchievement: cum / 1_000_000,
+        targetShare: monthTgtShare / 1_000_000,
+        pctOfMonth: monthTgtShare > 0 ? (monthAch / monthTgtShare) * 100 : 0,
+      };
+    });
+
+    const ytdAchJt = segYtd / 1_000_000;
+    const ytdTargetShareJt = rows.reduce((s, r) => s + r.targetShare, 0);
+    const totalPct = ytdTargetShareJt > 0 ? (ytdAchJt / ytdTargetShareJt) * 100 : 0;
+
+    // Contributors (only meaningful for customer mode — show top products for
+    // that customer; for product mode — show top customers for that product).
+    const contribMap = new Map<string, number>();
+    for (const r of filtered) {
+      const label =
+        ytdMode === "customer" ? r.description : findClient(r.clientId)?.name ?? "Unknown";
+      contribMap.set(label, (contribMap.get(label) ?? 0) + r.total * scale);
+    }
+    const contributors = [...contribMap.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6)
+      .map(([label, v]) => ({ label, value: v / 1_000_000, pct: segYtd > 0 ? (v / segYtd) * 100 : 0 }));
+
+    return { rows, ytdAchJt, ytdTargetShareJt, totalPct, share, contributors };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drillKey, ytdMode, ownerFilter, role, ytdYear, segments]);
+
+
 
 
   const ppnData = [
@@ -559,9 +625,13 @@ function Dashboard() {
                   cursor={{ stroke: "var(--color-border)" }}
                 />
                 <Legend
-                  wrapperStyle={{ fontSize: 12, paddingTop: 8 }}
+                  wrapperStyle={{ fontSize: 12, paddingTop: 8, cursor: "pointer" }}
                   iconType="circle"
                   verticalAlign="bottom"
+                  onClick={(e) => {
+                    const k = String((e as { dataKey?: unknown })?.dataKey ?? "");
+                    if (k && k !== "Target YTD") setDrillKey(k);
+                  }}
                 />
                 {segments.map((s) => (
                   <Area
@@ -571,8 +641,10 @@ function Dashboard() {
                     stackId="ach"
                     stroke={s.color}
                     fill={s.color}
-                    fillOpacity={0.55}
+                    fillOpacity={drillKey && drillKey !== s.key ? 0.2 : 0.55}
                     strokeWidth={1}
+                    style={{ cursor: "pointer" }}
+                    onClick={() => setDrillKey(s.key)}
                   />
                 ))}
                 <Line
@@ -589,6 +661,116 @@ function Dashboard() {
         </CardContent>
 
       </Card>
+
+      <Dialog open={!!drillKey} onOpenChange={(o) => !o && setDrillKey(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-base">
+              {ytdMode === "customer" ? "Customer" : "Produk"}: {drillKey}
+            </DialogTitle>
+            <DialogDescription>
+              Detail Target vs Achievement bulanan · FY {ytdYear}
+              {drillDetail
+                ? ` · ${Math.round(drillDetail.share * 100)}% dari total YTD`
+                : ""}
+            </DialogDescription>
+          </DialogHeader>
+          {drillDetail ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-3 gap-3 text-xs">
+                <div className="rounded-md border border-border bg-muted/30 p-2.5">
+                  <div className="text-muted-foreground">Achievement YTD</div>
+                  <div className="mt-0.5 text-sm font-semibold text-primary">
+                    {formatFullJt(drillDetail.ytdAchJt)}
+                  </div>
+                </div>
+                <div className="rounded-md border border-border bg-muted/30 p-2.5">
+                  <div className="text-muted-foreground">Target YTD (share)</div>
+                  <div className="mt-0.5 text-sm font-semibold">
+                    {formatFullJt(drillDetail.ytdTargetShareJt)}
+                  </div>
+                </div>
+                <div className="rounded-md border border-border bg-muted/30 p-2.5">
+                  <div className="text-muted-foreground">Pencapaian</div>
+                  <div
+                    className={
+                      "mt-0.5 text-sm font-semibold " +
+                      (drillDetail.totalPct >= 100 ? "text-emerald-600" : "text-rose-600")
+                    }
+                  >
+                    {Math.round(drillDetail.totalPct)}%
+                  </div>
+                </div>
+              </div>
+
+              <div className="max-h-64 overflow-auto rounded-md border border-border">
+                <table className="w-full text-xs">
+                  <thead className="sticky top-0 bg-muted/50 text-muted-foreground">
+                    <tr>
+                      <th className="px-3 py-2 text-left">Bulan</th>
+                      <th className="px-3 py-2 text-right">Achievement</th>
+                      <th className="px-3 py-2 text-right">Target (share)</th>
+                      <th className="px-3 py-2 text-right">Cum. Ach</th>
+                      <th className="px-3 py-2 text-right">%</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {drillDetail.rows.map((r) => (
+                      <tr key={r.month} className="border-t border-border">
+                        <td className="px-3 py-1.5">{r.month}</td>
+                        <td className="px-3 py-1.5 text-right">{formatFullJt(r.achievement)}</td>
+                        <td className="px-3 py-1.5 text-right text-muted-foreground">
+                          {formatFullJt(r.targetShare)}
+                        </td>
+                        <td className="px-3 py-1.5 text-right font-medium">
+                          {formatFullJt(r.cumAchievement)}
+                        </td>
+                        <td
+                          className={
+                            "px-3 py-1.5 text-right " +
+                            (r.pctOfMonth >= 100 ? "text-emerald-600" : "text-muted-foreground")
+                          }
+                        >
+                          {r.achievement > 0 ? `${Math.round(r.pctOfMonth)}%` : "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {drillDetail.contributors.length > 0 && (
+                <div>
+                  <div className="mb-2 text-xs font-medium text-muted-foreground">
+                    Top {ytdMode === "customer" ? "produk" : "customer"} kontributor
+                  </div>
+                  <div className="space-y-1.5">
+                    {drillDetail.contributors.map((c) => (
+                      <div key={c.label} className="flex items-center gap-2 text-xs">
+                        <span className="w-52 truncate" title={c.label}>
+                          {c.label}
+                        </span>
+                        <div className="relative h-2 flex-1 overflow-hidden rounded bg-muted">
+                          <div
+                            className="absolute inset-y-0 left-0 bg-primary/70"
+                            style={{ width: `${Math.min(100, c.pct)}%` }}
+                          />
+                        </div>
+                        <span className="w-24 text-right font-medium">{formatFullJt(c.value)}</span>
+                        <span className="w-10 text-right text-muted-foreground">
+                          {Math.round(c.pct)}%
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+
 
 
       {/* Charts row */}
