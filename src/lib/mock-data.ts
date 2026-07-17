@@ -334,6 +334,75 @@ export const salesOrders: SalesOrder[] = Array.from({ length: 12 }, (_, i) => {
   };
 });
 
+// ---------------- Prototypes ----------------
+export interface PrototypeLine {
+  id: string;
+  description: string;
+  qty: number;
+  unitPrice?: number;
+  total?: number;
+}
+
+export interface Prototype {
+  id: string;
+  protoNo: string;
+  refNo?: string;
+  clientId: string;
+  ownerId: string;
+  releaseDate: string;
+  expectedDeliveryDate: string;
+  lines: PrototypeLine[];
+  totalAmount: number;
+  chargeable: boolean;
+  ppn: boolean;
+}
+
+export const prototypes: Prototype[] = Array.from({ length: 6 }, (_, i) => {
+  const client = clients[(i * 3 + 1) % clients.length];
+  const release = daysAgo(((i * 5) % 30) + 2);
+  const expected = addDays(release, 10 + ((i * 4) % 14));
+  const lineCount = (i % 3) + 1;
+  // Free samples for i=1,4 (unitPrice kosong); sisanya chargeable
+  const isFree = i === 1 || i === 4;
+  const lines: PrototypeLine[] = Array.from({ length: lineCount }, (_, j) => {
+    const qty = 2 + ((i * 5 + j * 3) % 15);
+    if (isFree) {
+      return {
+        id: `ptl-${i + 1}-${j + 1}`,
+        description: descriptions[(i * 2 + j + 4) % descriptions.length],
+        qty,
+      };
+    }
+    const unitPrice = 350_000 + (((i + j) * 7) % 20) * 50_000;
+    return {
+      id: `ptl-${i + 1}-${j + 1}`,
+      description: descriptions[(i * 2 + j + 4) % descriptions.length],
+      qty,
+      unitPrice,
+      total: qty * unitPrice,
+    };
+  });
+  const totalAmount = lines.reduce((s, l) => s + (l.total ?? 0), 0);
+  return {
+    id: `pt${i + 1}`,
+    protoNo: `PT-2026-${String(50 + i).padStart(3, "0")}`,
+    refNo: i % 3 === 0 ? undefined : `REF-${1200 + i}`,
+    clientId: client.id,
+    ownerId: client.ownerId,
+    releaseDate: release,
+    expectedDeliveryDate: expected,
+    lines,
+    totalAmount,
+    chargeable: !isFree,
+    ppn: i % 2 === 0,
+  };
+});
+
+export function prototypeRevenue(ownerId?: string) {
+  const rows = ownerId ? prototypes.filter((p) => p.ownerId === ownerId) : prototypes;
+  return rows.filter((p) => p.chargeable).reduce((s, p) => s + p.totalAmount, 0);
+}
+
 // ---------------- Tasks ----------------
 const results: FollowUpResult[] = [
   "No Response",
