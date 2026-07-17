@@ -29,10 +29,10 @@ export function CommercialList({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Reference No</TableHead>
+                <TableHead>So - No</TableHead>
                 <TableHead>Client</TableHead>
                 <TableHead>Description</TableHead>
-                <TableHead>Type</TableHead>
+                <TableHead>Qty</TableHead>
                 <TableHead>Stage</TableHead>
                 <TableHead>Owner</TableHead>
                 <TableHead className="text-right">Amount</TableHead>
