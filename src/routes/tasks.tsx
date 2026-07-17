@@ -175,9 +175,8 @@ function TasksPage() {
         </SheetContent>
       </Sheet>
 
-      {/* dummy usage to keep component alive */}
-      <TabsContent value="__" />
     </>
+
   );
 }
 

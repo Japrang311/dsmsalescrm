@@ -90,7 +90,7 @@ function PipelinePage() {
           </div>
         }
       />
-      <TabsContent value="__" />
+      
 
       {view === "board" ? (
         <div className="overflow-x-auto">
