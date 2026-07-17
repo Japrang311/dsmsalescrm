@@ -628,8 +628,8 @@ function Dashboard() {
                   wrapperStyle={{ fontSize: 12, paddingTop: 8, cursor: "pointer" }}
                   iconType="circle"
                   verticalAlign="bottom"
-                  onClick={(e: { dataKey?: string | number }) => {
-                    const k = String(e?.dataKey ?? "");
+                  onClick={(e) => {
+                    const k = String((e as { dataKey?: unknown })?.dataKey ?? "");
                     if (k && k !== "Target YTD") setDrillKey(k);
                   }}
                 />
