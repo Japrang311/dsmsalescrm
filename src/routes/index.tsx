@@ -66,6 +66,110 @@ import {
   findUser,
 } from "@/lib/mock-data";
 
+// Values are in Rp Juta (millions). 1000 Jt = 1 M (miliar).
+function formatCompactJt(v: number): string {
+  const abs = Math.abs(v);
+  if (abs >= 1000) return `${(v / 1000).toLocaleString("id-ID", { maximumFractionDigits: 2 })} M`;
+  if (abs >= 1) return `${Math.round(v).toLocaleString("id-ID")} Jt`;
+  return `${(v * 1000).toLocaleString("id-ID", { maximumFractionDigits: 0 })} Rb`;
+}
+
+function formatFullJt(v: number): string {
+  return `Rp ${Math.round(v).toLocaleString("id-ID")} Jt`;
+}
+
+type YtdTooltipProps = {
+  active?: boolean;
+  label?: string;
+  payload?: Array<{ name: string; value: number; color: string; dataKey: string }>;
+  mode: "total" | "customer" | "product";
+  segmentKeys?: string[];
+};
+
+function YtdTooltip({ active, label, payload, mode, segmentKeys }: YtdTooltipProps) {
+  if (!active || !payload || !payload.length) return null;
+  const target = payload.find((p) => p.dataKey === "Target YTD")?.value ?? 0;
+  const ach =
+    mode === "total"
+      ? payload.find((p) => p.dataKey === "Achievement YTD")?.value ?? 0
+      : (segmentKeys ?? []).reduce(
+          (sum, k) => sum + (payload.find((p) => p.dataKey === k)?.value ?? 0),
+          0,
+        );
+  const pct = target > 0 ? Math.round((ach / target) * 100) : 0;
+  const delta = ach - target;
+  const segRows = payload
+    .filter((p) => p.dataKey !== "Target YTD" && p.dataKey !== "Achievement YTD")
+    .slice()
+    .sort((a, b) => b.value - a.value);
+
+  return (
+    <div className="rounded-md border border-border bg-card px-3 py-2 text-xs shadow-md min-w-[220px]">
+      <div className="mb-1.5 font-semibold text-foreground">{label}</div>
+      {mode === "total" ? (
+        <div className="space-y-1">
+          <Row color="var(--color-primary)" name="Achievement YTD" value={ach} />
+          <Row color="var(--color-muted-foreground)" name="Target YTD" value={target} dashed />
+        </div>
+      ) : (
+        <div className="space-y-1">
+          {segRows.map((p) => {
+            const share = ach > 0 ? Math.round((p.value / ach) * 100) : 0;
+            return (
+              <Row key={p.dataKey} color={p.color} name={p.name} value={p.value} suffix={`${share}%`} />
+            );
+          })}
+          <div className="my-1 border-t border-border" />
+          <Row color="var(--color-primary)" name="Total Achievement" value={ach} bold />
+          <Row color="var(--color-muted-foreground)" name="Target YTD" value={target} dashed />
+        </div>
+      )}
+      <div className="mt-2 flex items-center justify-between border-t border-border pt-1.5">
+        <span className="text-muted-foreground">vs Target</span>
+        <span className={delta >= 0 ? "font-semibold text-emerald-600" : "font-semibold text-rose-600"}>
+          {delta >= 0 ? "+" : "−"}
+          {formatFullJt(Math.abs(delta))} · {pct}%
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function Row({
+  color,
+  name,
+  value,
+  dashed,
+  bold,
+  suffix,
+}: {
+  color: string;
+  name: string;
+  value: number;
+  dashed?: boolean;
+  bold?: boolean;
+  suffix?: string;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <span className="flex items-center gap-1.5 text-muted-foreground">
+        <span
+          className="inline-block h-2 w-2 rounded-full"
+          style={{
+            background: dashed ? "transparent" : color,
+            border: dashed ? `1.5px dashed ${color}` : "none",
+          }}
+        />
+        <span className={bold ? "font-medium text-foreground" : ""}>{name}</span>
+      </span>
+      <span className={bold ? "font-semibold text-foreground" : "text-foreground"}>
+        {formatFullJt(value)}
+        {suffix ? <span className="ml-1 text-muted-foreground">({suffix})</span> : null}
+      </span>
+    </div>
+  );
+}
+
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [{ title: "Dashboard · DSM Sales Execution" }],
