@@ -208,6 +208,7 @@ function Dashboard() {
 
   const [ytdYear, setYtdYear] = useState<"2024" | "2025" | "2026">("2026");
   const [ytdMode, setYtdMode] = useState<"total" | "customer" | "product">("total");
+  const [drillKey, setDrillKey] = useState<string | null>(null);
 
   // Scale factors to synthesize prior-year data from 2026 mock.
   const yearScale: Record<typeof ytdYear, number> = {
