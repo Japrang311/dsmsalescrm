@@ -328,6 +328,64 @@ function Dashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ytdMode, ownerFilter, role, ytdYear]);
 
+  const drillDetail = useMemo(() => {
+    if (!drillKey || ytdMode === "total") return null;
+    const scopedRev = ownerFilter ? revenue.filter((r) => r.ownerId === ownerFilter) : revenue;
+    const keyOf = (r: (typeof revenue)[number]) =>
+      ytdMode === "customer" ? findClient(r.clientId)?.name ?? "Unknown" : r.description;
+
+    // Which raw keys map into this bucket? "Others" = every key not in top-5.
+    const topKeys = new Set(segments.filter((s) => s.key !== "Others").map((s) => s.key));
+    const inBucket = (k: string) =>
+      drillKey === "Others" ? !topKeys.has(k) : k === drillKey;
+
+    const filtered = scopedRev.filter((r) => inBucket(keyOf(r)));
+    const totalScopedYtd = scopedRev.reduce((s, r) => s + r.total * scale, 0);
+    const segYtd = filtered.reduce((s, r) => s + r.total * scale, 0);
+    const share = totalScopedYtd > 0 ? segYtd / totalScopedYtd : 0;
+
+    let cum = 0;
+    const rows = yearMonthly.map((m, idx) => {
+      const baseMonth = monthlyTargets[idx % monthlyTargets.length].month;
+      const monthAch =
+        filtered
+          .filter((r) => r.month === baseMonth)
+          .reduce((s, r) => s + r.total * scale, 0);
+      cum += monthAch;
+      const monthTgt = role === "sales" ? m.target * 0.25 : m.target;
+      const monthTgtShare = monthTgt * share;
+      return {
+        month: m.month,
+        achievement: monthAch / 1_000_000,
+        cumAchievement: cum / 1_000_000,
+        targetShare: monthTgtShare / 1_000_000,
+        pctOfMonth: monthTgtShare > 0 ? (monthAch / monthTgtShare) * 100 : 0,
+      };
+    });
+
+    const ytdAchJt = segYtd / 1_000_000;
+    const ytdTargetShareJt = rows.reduce((s, r) => s + r.targetShare, 0);
+    const totalPct = ytdTargetShareJt > 0 ? (ytdAchJt / ytdTargetShareJt) * 100 : 0;
+
+    // Contributors (only meaningful for customer mode — show top products for
+    // that customer; for product mode — show top customers for that product).
+    const contribMap = new Map<string, number>();
+    for (const r of filtered) {
+      const label =
+        ytdMode === "customer" ? r.description : findClient(r.clientId)?.name ?? "Unknown";
+      contribMap.set(label, (contribMap.get(label) ?? 0) + r.total * scale);
+    }
+    const contributors = [...contribMap.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6)
+      .map(([label, v]) => ({ label, value: v / 1_000_000, pct: segYtd > 0 ? (v / segYtd) * 100 : 0 }));
+
+    return { rows, ytdAchJt, ytdTargetShareJt, totalPct, share, contributors };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drillKey, ytdMode, ownerFilter, role, ytdYear, segments]);
+
+
+
 
   const ppnData = [
     { name: "PPN", value: ppn },
