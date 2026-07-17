@@ -15,6 +15,7 @@ import { Route as RfqRouteImport } from './routes/rfq'
 import { Route as RevenueRouteImport } from './routes/revenue'
 import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as QuotationsRouteImport } from './routes/quotations'
+import { Route as PrototypeRouteImport } from './routes/prototype'
 import { Route as PipelineRouteImport } from './routes/pipeline'
 import { Route as OrdersRouteImport } from './routes/orders'
 import { Route as ClientsRouteImport } from './routes/clients'
@@ -50,6 +51,11 @@ const ReportsRoute = ReportsRouteImport.update({
 const QuotationsRoute = QuotationsRouteImport.update({
   id: '/quotations',
   path: '/quotations',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrototypeRoute = PrototypeRouteImport.update({
+  id: '/prototype',
+  path: '/prototype',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PipelineRoute = PipelineRouteImport.update({
@@ -89,6 +95,7 @@ export interface FileRoutesByFullPath {
   '/clients': typeof ClientsRouteWithChildren
   '/orders': typeof OrdersRoute
   '/pipeline': typeof PipelineRoute
+  '/prototype': typeof PrototypeRoute
   '/quotations': typeof QuotationsRoute
   '/reports': typeof ReportsRoute
   '/revenue': typeof RevenueRoute
@@ -103,6 +110,7 @@ export interface FileRoutesByTo {
   '/clients': typeof ClientsRouteWithChildren
   '/orders': typeof OrdersRoute
   '/pipeline': typeof PipelineRoute
+  '/prototype': typeof PrototypeRoute
   '/quotations': typeof QuotationsRoute
   '/reports': typeof ReportsRoute
   '/revenue': typeof RevenueRoute
@@ -118,6 +126,7 @@ export interface FileRoutesById {
   '/clients': typeof ClientsRouteWithChildren
   '/orders': typeof OrdersRoute
   '/pipeline': typeof PipelineRoute
+  '/prototype': typeof PrototypeRoute
   '/quotations': typeof QuotationsRoute
   '/reports': typeof ReportsRoute
   '/revenue': typeof RevenueRoute
@@ -134,6 +143,7 @@ export interface FileRouteTypes {
     | '/clients'
     | '/orders'
     | '/pipeline'
+    | '/prototype'
     | '/quotations'
     | '/reports'
     | '/revenue'
@@ -148,6 +158,7 @@ export interface FileRouteTypes {
     | '/clients'
     | '/orders'
     | '/pipeline'
+    | '/prototype'
     | '/quotations'
     | '/reports'
     | '/revenue'
@@ -162,6 +173,7 @@ export interface FileRouteTypes {
     | '/clients'
     | '/orders'
     | '/pipeline'
+    | '/prototype'
     | '/quotations'
     | '/reports'
     | '/revenue'
@@ -177,6 +189,7 @@ export interface RootRouteChildren {
   ClientsRoute: typeof ClientsRouteWithChildren
   OrdersRoute: typeof OrdersRoute
   PipelineRoute: typeof PipelineRoute
+  PrototypeRoute: typeof PrototypeRoute
   QuotationsRoute: typeof QuotationsRoute
   ReportsRoute: typeof ReportsRoute
   RevenueRoute: typeof RevenueRoute
@@ -227,6 +240,13 @@ declare module '@tanstack/react-router' {
       path: '/quotations'
       fullPath: '/quotations'
       preLoaderRoute: typeof QuotationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/prototype': {
+      id: '/prototype'
+      path: '/prototype'
+      fullPath: '/prototype'
+      preLoaderRoute: typeof PrototypeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/pipeline': {
@@ -291,6 +311,7 @@ const rootRouteChildren: RootRouteChildren = {
   ClientsRoute: ClientsRouteWithChildren,
   OrdersRoute: OrdersRoute,
   PipelineRoute: PipelineRoute,
+  PrototypeRoute: PrototypeRoute,
   QuotationsRoute: QuotationsRoute,
   ReportsRoute: ReportsRoute,
   RevenueRoute: RevenueRoute,
