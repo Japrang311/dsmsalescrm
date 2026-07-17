@@ -334,7 +334,7 @@ function Dashboard() {
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <Select value={ytdYear} onValueChange={(v) => setYtdYear(v as typeof ytdYear)}>
-              <SelectTrigger size="sm" className="w-[110px] text-xs">
+              <SelectTrigger className="h-8 w-[110px] text-xs">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
