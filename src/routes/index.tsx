@@ -209,6 +209,67 @@ function Dashboard() {
         />
       </div>
 
+      {/* YTD cumulative chart */}
+      <Card>
+        <CardHeader className="flex-row items-start justify-between space-y-0">
+          <div>
+            <CardTitle className="text-base">Target YTD vs Achievement YTD</CardTitle>
+            <CardDescription>Kumulatif per bulan (Rp Juta).</CardDescription>
+          </div>
+          <div className="text-right text-xs text-muted-foreground">
+            <div>
+              <span className="font-semibold text-primary">{formatIDR(ytdAch)}</span>
+              <span> / {formatIDR(ytdTgt)}</span>
+            </div>
+            <div className="mt-0.5">Achievement {ytdPct}%</div>
+          </div>
+        </CardHeader>
+        <CardContent className="h-72">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={ytdData}>
+              <defs>
+                <linearGradient id="ytdTarget" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="var(--color-muted-foreground)" stopOpacity={0.25} />
+                  <stop offset="100%" stopColor="var(--color-muted-foreground)" stopOpacity={0.02} />
+                </linearGradient>
+                <linearGradient id="ytdAch" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="var(--color-primary)" stopOpacity={0.45} />
+                  <stop offset="100%" stopColor="var(--color-primary)" stopOpacity={0.05} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+              <XAxis dataKey="month" stroke="var(--color-muted-foreground)" fontSize={12} />
+              <YAxis stroke="var(--color-muted-foreground)" fontSize={12} />
+              <Tooltip
+                formatter={(v: number) => `Rp ${v.toLocaleString("id-ID")} Jt`}
+                contentStyle={{
+                  background: "var(--color-card)",
+                  border: "1px solid var(--color-border)",
+                  borderRadius: 8,
+                  fontSize: 12,
+                }}
+              />
+              <Legend wrapperStyle={{ fontSize: 12 }} />
+              <Area
+                type="monotone"
+                dataKey="Target YTD"
+                stroke="var(--color-muted-foreground)"
+                strokeDasharray="4 4"
+                fill="url(#ytdTarget)"
+                strokeWidth={2}
+              />
+              <Area
+                type="monotone"
+                dataKey="Achievement YTD"
+                stroke="var(--color-primary)"
+                fill="url(#ytdAch)"
+                strokeWidth={2}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
       {/* Charts row */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
