@@ -392,10 +392,10 @@ function Dashboard() {
             </div>
           </div>
         </CardHeader>
-        <CardContent className="h-72">
+        <CardContent className="h-80">
           <ResponsiveContainer width="100%" height="100%">
             {ytdMode === "total" ? (
-              <AreaChart data={ytdData}>
+              <AreaChart data={ytdData} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
                 <defs>
                   <linearGradient id="ytdTarget" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="var(--color-muted-foreground)" stopOpacity={0.25} />
@@ -408,17 +408,18 @@ function Dashboard() {
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
                 <XAxis dataKey="month" stroke="var(--color-muted-foreground)" fontSize={12} />
-                <YAxis stroke="var(--color-muted-foreground)" fontSize={12} />
-                <Tooltip
-                  formatter={(v: number) => `Rp ${v.toLocaleString("id-ID")} Jt`}
-                  contentStyle={{
-                    background: "var(--color-card)",
-                    border: "1px solid var(--color-border)",
-                    borderRadius: 8,
-                    fontSize: 12,
-                  }}
+                <YAxis
+                  stroke="var(--color-muted-foreground)"
+                  fontSize={12}
+                  tickFormatter={(v: number) => formatCompactJt(v)}
+                  width={56}
                 />
-                <Legend wrapperStyle={{ fontSize: 12 }} />
+                <Tooltip content={<YtdTooltip mode="total" />} cursor={{ stroke: "var(--color-border)" }} />
+                <Legend
+                  wrapperStyle={{ fontSize: 12, paddingTop: 8 }}
+                  iconType="circle"
+                  verticalAlign="bottom"
+                />
                 <Area
                   type="monotone"
                   dataKey="Target YTD"
@@ -426,6 +427,8 @@ function Dashboard() {
                   strokeDasharray="4 4"
                   fill="url(#ytdTarget)"
                   strokeWidth={2}
+                  dot={{ r: 2 }}
+                  activeDot={{ r: 4 }}
                 />
                 <Area
                   type="monotone"
@@ -433,23 +436,29 @@ function Dashboard() {
                   stroke="var(--color-primary)"
                   fill="url(#ytdAch)"
                   strokeWidth={2}
+                  dot={{ r: 2 }}
+                  activeDot={{ r: 5 }}
                 />
               </AreaChart>
             ) : (
-              <ComposedChart data={breakdownData}>
+              <ComposedChart data={breakdownData} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
                 <XAxis dataKey="month" stroke="var(--color-muted-foreground)" fontSize={12} />
-                <YAxis stroke="var(--color-muted-foreground)" fontSize={12} />
-                <Tooltip
-                  formatter={(v: number) => `Rp ${v.toLocaleString("id-ID")} Jt`}
-                  contentStyle={{
-                    background: "var(--color-card)",
-                    border: "1px solid var(--color-border)",
-                    borderRadius: 8,
-                    fontSize: 12,
-                  }}
+                <YAxis
+                  stroke="var(--color-muted-foreground)"
+                  fontSize={12}
+                  tickFormatter={(v: number) => formatCompactJt(v)}
+                  width={56}
                 />
-                <Legend wrapperStyle={{ fontSize: 12 }} />
+                <Tooltip
+                  content={<YtdTooltip mode={ytdMode} segmentKeys={segments.map((s) => s.key)} />}
+                  cursor={{ stroke: "var(--color-border)" }}
+                />
+                <Legend
+                  wrapperStyle={{ fontSize: 12, paddingTop: 8 }}
+                  iconType="circle"
+                  verticalAlign="bottom"
+                />
                 {segments.map((s) => (
                   <Area
                     key={s.key}
@@ -458,7 +467,7 @@ function Dashboard() {
                     stackId="ach"
                     stroke={s.color}
                     fill={s.color}
-                    fillOpacity={0.5}
+                    fillOpacity={0.55}
                     strokeWidth={1}
                   />
                 ))}
@@ -474,6 +483,7 @@ function Dashboard() {
             )}
           </ResponsiveContainer>
         </CardContent>
+
       </Card>
 
 
