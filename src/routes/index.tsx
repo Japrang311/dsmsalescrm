@@ -94,6 +94,21 @@ function Dashboard() {
     Target: Math.round((role === "sales" ? m.target * 0.25 : m.target) / 1_000_000),
   }));
 
+  let cumT = 0;
+  let cumA = 0;
+  const ytdData = monthlyTargets.map((m) => {
+    const t = role === "sales" ? m.target * 0.25 : m.target;
+    const a = role === "sales" ? m.achievement * 0.25 : m.achievement;
+    cumT += t;
+    cumA += a;
+    return {
+      month: m.month.slice(5),
+      "Target YTD": Math.round(cumT / 1_000_000),
+      "Achievement YTD": Math.round(cumA / 1_000_000),
+    };
+  });
+  const ytdPct = ytdTgt > 0 ? Math.round((ytdAch / ytdTgt) * 100) : 0;
+
   const ppnData = [
     { name: "PPN", value: ppn },
     { name: "Non-PPN", value: non },
