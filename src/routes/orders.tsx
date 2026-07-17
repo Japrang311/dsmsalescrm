@@ -1,7 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Fragment } from "react";
+import { Fragment, useState } from "react";
 import { PageHeader } from "@/components/app/page-header";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Check } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -32,7 +34,16 @@ function daysUntil(iso: string) {
   return Math.round((d.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 }
 
+function todayISO() {
+  return today.toISOString().slice(0, 10);
+}
+
 function OrdersPage() {
+  const [delivered, setDelivered] = useState<Record<string, string>>({});
+
+  const markDelivered = (id: string) =>
+    setDelivered((prev) => ({ ...prev, [id]: todayISO() }));
+
   return (
     <>
       <PageHeader
@@ -49,14 +60,17 @@ function OrdersPage() {
                 <TableHead>Client</TableHead>
                 <TableHead>Owner</TableHead>
                 <TableHead>PO Release</TableHead>
-                <TableHead>Target Kirim</TableHead>
+                <TableHead>Target Kirim / Delivered</TableHead>
                 <TableHead className="text-right">Qty</TableHead>
                 <TableHead className="text-right">Unit Price</TableHead>
                 <TableHead className="text-right">Amount</TableHead>
+                <TableHead className="text-right">Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {salesOrders.map((so) => {
+                const deliveredAt = delivered[so.id];
+                const isDone = Boolean(deliveredAt);
                 const remaining = daysUntil(so.expectedDeliveryDate);
                 const overdue = remaining < 0;
                 return (
@@ -76,20 +90,29 @@ function OrdersPage() {
                         {formatDate(so.poReleaseDate)}
                       </TableCell>
                       <TableCell className="text-xs">
-                        <div className="flex flex-col">
-                          <span>{formatDate(so.expectedDeliveryDate)}</span>
-                          <span
-                            className={
-                              overdue
-                                ? "text-destructive"
-                                : "text-muted-foreground"
-                            }
-                          >
-                            {overdue
-                              ? `${Math.abs(remaining)}d overdue`
-                              : `${remaining}d left`}
-                          </span>
-                        </div>
+                        {isDone ? (
+                          <div className="flex flex-col">
+                            <span className="font-medium text-emerald-600">
+                              Delivered to customer
+                            </span>
+                            <span className="text-muted-foreground">
+                              {formatDate(deliveredAt!)}
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col">
+                            <span>{formatDate(so.expectedDeliveryDate)}</span>
+                            <span
+                              className={
+                                overdue ? "text-destructive" : "text-muted-foreground"
+                              }
+                            >
+                              {overdue
+                                ? `${Math.abs(remaining)}d overdue`
+                                : `${remaining}d left`}
+                            </span>
+                          </div>
+                        )}
                       </TableCell>
                       <TableCell
                         colSpan={2}
@@ -99,6 +122,21 @@ function OrdersPage() {
                       </TableCell>
                       <TableCell className="text-right font-semibold">
                         {formatIDR(so.totalAmount)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {isDone ? (
+                          <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600">
+                            <Check className="h-3.5 w-3.5" /> Selesai
+                          </span>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => markDelivered(so.id)}
+                          >
+                            Selesai
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                     {so.lines.map((l) => (
@@ -118,6 +156,7 @@ function OrdersPage() {
                         <TableCell className="text-right text-sm">
                           {formatIDR(l.total)}
                         </TableCell>
+                        <TableCell />
                       </TableRow>
                     ))}
                   </Fragment>
