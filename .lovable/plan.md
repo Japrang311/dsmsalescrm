@@ -1,41 +1,50 @@
-## Sales Order — multi-product rows & column changes
+## Tambah grafik Target YTD vs Achievement YTD
 
-Scope: hanya halaman **Sales Order** (`/orders`). Halaman RFQ & Quotation tetap pakai `CommercialList` seperti sekarang.
+### Konteks
+Dashboard (`src/routes/index.tsx`) sudah punya chart bulanan (Monthly Achievement vs Target). Belum ada visual kumulatif YTD yang membandingkan pencapaian terhadap target secara akumulatif.
 
-### Perubahan data (mock)
-Tambahkan struktur baru di `src/lib/mock-data.ts`:
+### Perubahan
+Tambahkan satu chart baru **"Target YTD vs Achievement YTD"** di `src/routes/index.tsx`:
 
-- `SalesOrderLine`: `{ id, description, qty, unitPrice, total }`
-- `SalesOrder`: `{ id, soNo, poNo, clientId, ownerId, poReleaseDate, expectedDeliveryDate, lines: SalesOrderLine[] }`
-- Generator `salesOrders` (~10–14 SO). Tiap SO punya 1–4 line items dengan qty & unit price bervariasi. `expectedDeliveryDate = poReleaseDate + N hari` (mis. 21–45 hari, konsisten per SO).
+- Tipe: composed/area+line kumulatif per bulan (Jan → Jul 2026).
+- Data: akumulasi bulanan dari `monthlyTargets`:
+  - `Target YTD` = kumulatif `target`
+  - `Achievement YTD` = kumulatif `achievement`
+  - Scaling role-aware (sales × 0.25) mengikuti pola `trendData` yang sudah ada.
+- Nilai ditampilkan dalam Rp Juta, tooltip pakai `formatIDR`.
+- Sertakan label ringkas di header: `Achievement YTD {formatIDR(ytdAch)} / Target YTD {formatIDR(ytdTgt)}` + persentase pencapaian.
 
-### Perubahan UI `/orders`
-Ganti pemakaian `CommercialList` dengan komponen baru `SalesOrderList` (atau langsung inline di `src/routes/orders.tsx`). Layout: satu baris header per SO, lalu baris-baris produk di bawahnya (grouped rows, mirip invoice).
-
-Kolom baru:
-
-```text
-SO No | PO No | Client | Owner | PO Release | Target Kirim | Qty | Unit Price | Amount
-```
-
-- **Stage**: dihapus.
-- **Aging**: dihapus, diganti **Target Kirim** = `expectedDeliveryDate` (format tanggal + sisa hari, mis. "12 Aug 2026 · 26d").
-- **Qty** & **Unit Price**: ditampilkan per line item.
-- **Amount**: total per line; SO header menampilkan grand total.
-
-Contoh tampilan:
+### Layout
+Sisipkan sebagai baris chart baru **di atas** baris "Monthly Achievement vs Target" + "PPN Breakdown":
 
 ```text
-▸ SO-2026-001  PO-2001  PT Astra   Ratna  17 Jul → 12 Aug (26d)   Total: Rp 145 Jt
-    • Bracket SS304        120   Rp 850k    Rp 102 Jt
-    • Cover plate laser     60   Rp 720k    Rp  43 Jt
+[ KPI row ]
+[ Secondary KPI row ]
+[ Target YTD vs Achievement YTD  (full width, lg:col-span-3) ]   ← baru
+[ Monthly Bar (2/3)   |  PPN Pie (1/3) ]
+[ Tasks/Team | Top Customers | Pipeline ]
 ```
 
-Implementasi pakai `<TableBody>` dengan dua tingkat baris (header row + sub-rows) menggunakan styling muted untuk sub-rows.
+Card full-width supaya tren kumulatif jelas terbaca.
+
+### Detail teknis
+- Pakai `AreaChart` (recharts, sudah dipakai di file lain) atau `ComposedChart`. Rekomendasi: `AreaChart` dengan 2 Area — `Target YTD` warna muted, `Achievement YTD` warna primary, `stackId` tidak dipakai (overlay).
+- Tambah import `AreaChart`, `Area` dari `recharts`.
+- Data baru:
+  ```ts
+  let cumT = 0, cumA = 0;
+  const ytdData = monthlyTargets.map((m) => {
+    const t = role === "sales" ? m.target * 0.25 : m.target;
+    const a = role === "sales" ? m.achievement * 0.25 : m.achievement;
+    cumT += t; cumA += a;
+    return { month: m.month.slice(5),
+             "Target YTD": Math.round(cumT / 1_000_000),
+             "Achievement YTD": Math.round(cumA / 1_000_000) };
+  });
+  ```
+- Grid & styling ikuti pattern chart existing (CartesianGrid, XAxis/YAxis pakai `var(--color-muted-foreground)`, tooltip pakai `var(--color-card)`).
 
 ### File yang disentuh
-- `src/lib/mock-data.ts` — tambah tipe & data `salesOrders` (tidak mengubah `commercialItems` yang dipakai halaman lain).
-- `src/routes/orders.tsx` — ganti isi jadi tabel SO multi-line baru.
-- (opsional) `src/components/app/sales-order-list.tsx` — komponen tabel baru jika ingin dipisah.
+- `src/routes/index.tsx` — tambah imports recharts, hitung `ytdData`, render Card baru.
 
-Halaman RFQ, Quotation, Pipeline, Revenue **tidak berubah**.
+Tidak ada perubahan data mock atau file lain.
