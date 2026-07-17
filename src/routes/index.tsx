@@ -325,7 +325,17 @@ function Dashboard() {
               {ytdMode === "customer" ? " · breakdown per customer" : ytdMode === "product" ? " · breakdown per produk" : ""}.
             </CardDescription>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <Select value={ytdYear} onValueChange={(v) => setYtdYear(v as typeof ytdYear)}>
+              <SelectTrigger size="sm" className="w-[110px] text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="2024">FY 2024</SelectItem>
+                <SelectItem value="2025">FY 2025</SelectItem>
+                <SelectItem value="2026">FY 2026</SelectItem>
+              </SelectContent>
+            </Select>
             <ToggleGroup
               type="single"
               size="sm"
@@ -339,8 +349,8 @@ function Dashboard() {
             </ToggleGroup>
             <div className="text-right text-xs text-muted-foreground">
               <div>
-                <span className="font-semibold text-primary">{formatIDR(ytdAch)}</span>
-                <span> / {formatIDR(ytdTgt)}</span>
+                <span className="font-semibold text-primary">{formatIDR(yearYtdAch)}</span>
+                <span> / {formatIDR(yearYtdTgt)}</span>
               </div>
               <div className="mt-0.5">Achievement {ytdPct}%</div>
             </div>
