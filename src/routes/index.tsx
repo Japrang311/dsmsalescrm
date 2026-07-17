@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useMemo, useState } from "react";
 import {
   BarChart,
   Bar,
@@ -6,6 +7,7 @@ import {
   Line,
   AreaChart,
   Area,
+  ComposedChart,
   XAxis,
   YAxis,
   Tooltip,
@@ -16,6 +18,7 @@ import {
   Cell,
   Legend,
 } from "recharts";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   TrendingUp,
   Target,
@@ -44,6 +47,7 @@ import {
   formatIDR,
   monthlyTargets,
   ppnBreakdown,
+  revenue,
   salesPerformance,
   tasks,
   topCustomers,
@@ -108,6 +112,63 @@ function Dashboard() {
     };
   });
   const ytdPct = ytdTgt > 0 ? Math.round((ytdAch / ytdTgt) * 100) : 0;
+
+  const [ytdMode, setYtdMode] = useState<"total" | "customer" | "product">("total");
+
+  const SEGMENT_COLORS = [
+    "var(--color-primary)",
+    "var(--color-teal)",
+    "var(--color-info)",
+    "var(--color-success)",
+    "var(--color-warning)",
+  ];
+  const OTHERS_COLOR = "var(--color-muted-foreground)";
+
+  const { breakdownData, segments } = useMemo(() => {
+    if (ytdMode === "total") {
+      return { breakdownData: [] as Array<Record<string, number | string>>, segments: [] as Array<{ key: string; color: string }> };
+    }
+    const scopedRev = ownerFilter ? revenue.filter((r) => r.ownerId === ownerFilter) : revenue;
+    const keyOf = (r: (typeof revenue)[number]) =>
+      ytdMode === "customer" ? findClient(r.clientId)?.name ?? "Unknown" : r.description;
+
+    const totals = new Map<string, number>();
+    for (const r of scopedRev) {
+      totals.set(keyOf(r), (totals.get(keyOf(r)) ?? 0) + r.total);
+    }
+    const sorted = [...totals.entries()].sort((a, b) => b[1] - a[1]);
+    const topKeys = sorted.slice(0, 5).map(([k]) => k);
+    const othersKeys = new Set(sorted.slice(5).map(([k]) => k));
+    const hasOthers = sorted.slice(5).some(([, v]) => v > 0);
+
+    const segs: Array<{ key: string; color: string }> = topKeys.map((k, i) => ({
+      key: k,
+      color: SEGMENT_COLORS[i % SEGMENT_COLORS.length],
+    }));
+    if (hasOthers) segs.push({ key: "Others", color: OTHERS_COLOR });
+
+    const cum = new Map<string, number>(segs.map((s) => [s.key, 0]));
+    let cTgt = 0;
+    const data = monthlyTargets.map((m) => {
+      const t = role === "sales" ? m.target * 0.25 : m.target;
+      cTgt += t;
+      const monthRev = scopedRev.filter((r) => r.month === m.month);
+      for (const r of monthRev) {
+        const k = keyOf(r);
+        const bucket = othersKeys.has(k) ? "Others" : k;
+        if (!cum.has(bucket)) continue;
+        cum.set(bucket, (cum.get(bucket) ?? 0) + r.total);
+      }
+      const row: Record<string, number | string> = {
+        month: m.month.slice(5),
+        "Target YTD": Math.round(cTgt / 1_000_000),
+      };
+      for (const s of segs) row[s.key] = Math.round((cum.get(s.key) ?? 0) / 1_000_000);
+      return row;
+    });
+    return { breakdownData: data, segments: segs };
+  }, [ytdMode, ownerFilter, role]);
+
 
   const ppnData = [
     { name: "PPN", value: ppn },
@@ -211,64 +272,119 @@ function Dashboard() {
 
       {/* YTD cumulative chart */}
       <Card>
-        <CardHeader className="flex-row items-start justify-between space-y-0">
+        <CardHeader className="flex-row flex-wrap items-start justify-between gap-3 space-y-0">
           <div>
             <CardTitle className="text-base">Target YTD vs Achievement YTD</CardTitle>
-            <CardDescription>Kumulatif per bulan (Rp Juta).</CardDescription>
+            <CardDescription>
+              Kumulatif per bulan (Rp Juta)
+              {ytdMode === "customer" ? " · breakdown per customer" : ytdMode === "product" ? " · breakdown per produk" : ""}.
+            </CardDescription>
           </div>
-          <div className="text-right text-xs text-muted-foreground">
-            <div>
-              <span className="font-semibold text-primary">{formatIDR(ytdAch)}</span>
-              <span> / {formatIDR(ytdTgt)}</span>
+          <div className="flex items-center gap-3">
+            <ToggleGroup
+              type="single"
+              size="sm"
+              value={ytdMode}
+              onValueChange={(v) => v && setYtdMode(v as typeof ytdMode)}
+              className="border border-border rounded-md"
+            >
+              <ToggleGroupItem value="total" className="text-xs px-2">Total</ToggleGroupItem>
+              <ToggleGroupItem value="customer" className="text-xs px-2">Per Customer</ToggleGroupItem>
+              <ToggleGroupItem value="product" className="text-xs px-2">Per Produk</ToggleGroupItem>
+            </ToggleGroup>
+            <div className="text-right text-xs text-muted-foreground">
+              <div>
+                <span className="font-semibold text-primary">{formatIDR(ytdAch)}</span>
+                <span> / {formatIDR(ytdTgt)}</span>
+              </div>
+              <div className="mt-0.5">Achievement {ytdPct}%</div>
             </div>
-            <div className="mt-0.5">Achievement {ytdPct}%</div>
           </div>
         </CardHeader>
         <CardContent className="h-72">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={ytdData}>
-              <defs>
-                <linearGradient id="ytdTarget" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="var(--color-muted-foreground)" stopOpacity={0.25} />
-                  <stop offset="100%" stopColor="var(--color-muted-foreground)" stopOpacity={0.02} />
-                </linearGradient>
-                <linearGradient id="ytdAch" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="var(--color-primary)" stopOpacity={0.45} />
-                  <stop offset="100%" stopColor="var(--color-primary)" stopOpacity={0.05} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-              <XAxis dataKey="month" stroke="var(--color-muted-foreground)" fontSize={12} />
-              <YAxis stroke="var(--color-muted-foreground)" fontSize={12} />
-              <Tooltip
-                formatter={(v: number) => `Rp ${v.toLocaleString("id-ID")} Jt`}
-                contentStyle={{
-                  background: "var(--color-card)",
-                  border: "1px solid var(--color-border)",
-                  borderRadius: 8,
-                  fontSize: 12,
-                }}
-              />
-              <Legend wrapperStyle={{ fontSize: 12 }} />
-              <Area
-                type="monotone"
-                dataKey="Target YTD"
-                stroke="var(--color-muted-foreground)"
-                strokeDasharray="4 4"
-                fill="url(#ytdTarget)"
-                strokeWidth={2}
-              />
-              <Area
-                type="monotone"
-                dataKey="Achievement YTD"
-                stroke="var(--color-primary)"
-                fill="url(#ytdAch)"
-                strokeWidth={2}
-              />
-            </AreaChart>
+            {ytdMode === "total" ? (
+              <AreaChart data={ytdData}>
+                <defs>
+                  <linearGradient id="ytdTarget" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="var(--color-muted-foreground)" stopOpacity={0.25} />
+                    <stop offset="100%" stopColor="var(--color-muted-foreground)" stopOpacity={0.02} />
+                  </linearGradient>
+                  <linearGradient id="ytdAch" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="var(--color-primary)" stopOpacity={0.45} />
+                    <stop offset="100%" stopColor="var(--color-primary)" stopOpacity={0.05} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+                <XAxis dataKey="month" stroke="var(--color-muted-foreground)" fontSize={12} />
+                <YAxis stroke="var(--color-muted-foreground)" fontSize={12} />
+                <Tooltip
+                  formatter={(v: number) => `Rp ${v.toLocaleString("id-ID")} Jt`}
+                  contentStyle={{
+                    background: "var(--color-card)",
+                    border: "1px solid var(--color-border)",
+                    borderRadius: 8,
+                    fontSize: 12,
+                  }}
+                />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
+                <Area
+                  type="monotone"
+                  dataKey="Target YTD"
+                  stroke="var(--color-muted-foreground)"
+                  strokeDasharray="4 4"
+                  fill="url(#ytdTarget)"
+                  strokeWidth={2}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="Achievement YTD"
+                  stroke="var(--color-primary)"
+                  fill="url(#ytdAch)"
+                  strokeWidth={2}
+                />
+              </AreaChart>
+            ) : (
+              <ComposedChart data={breakdownData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+                <XAxis dataKey="month" stroke="var(--color-muted-foreground)" fontSize={12} />
+                <YAxis stroke="var(--color-muted-foreground)" fontSize={12} />
+                <Tooltip
+                  formatter={(v: number) => `Rp ${v.toLocaleString("id-ID")} Jt`}
+                  contentStyle={{
+                    background: "var(--color-card)",
+                    border: "1px solid var(--color-border)",
+                    borderRadius: 8,
+                    fontSize: 12,
+                  }}
+                />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
+                {segments.map((s) => (
+                  <Area
+                    key={s.key}
+                    type="monotone"
+                    dataKey={s.key}
+                    stackId="ach"
+                    stroke={s.color}
+                    fill={s.color}
+                    fillOpacity={0.5}
+                    strokeWidth={1}
+                  />
+                ))}
+                <Line
+                  type="monotone"
+                  dataKey="Target YTD"
+                  stroke="var(--color-muted-foreground)"
+                  strokeDasharray="4 4"
+                  strokeWidth={2}
+                  dot={false}
+                />
+              </ComposedChart>
+            )}
           </ResponsiveContainer>
         </CardContent>
       </Card>
+
 
       {/* Charts row */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
