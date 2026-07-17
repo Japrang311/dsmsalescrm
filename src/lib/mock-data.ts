@@ -276,6 +276,64 @@ export const commercialItems: CommercialItem[] = Array.from({ length: 42 }, (_, 
   };
 });
 
+// ---------------- Sales Orders (multi-line) ----------------
+export interface SalesOrderLine {
+  id: string;
+  description: string;
+  qty: number;
+  unitPrice: number;
+  total: number;
+}
+
+export interface SalesOrder {
+  id: string;
+  soNo: string;
+  poNo: string;
+  clientId: string;
+  ownerId: string;
+  poReleaseDate: string;
+  expectedDeliveryDate: string;
+  lines: SalesOrderLine[];
+  totalAmount: number;
+}
+
+function addDays(base: string, n: number) {
+  const d = new Date(base);
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+export const salesOrders: SalesOrder[] = Array.from({ length: 12 }, (_, i) => {
+  const client = clients[(i * 2) % clients.length];
+  const poRelease = daysAgo(((i * 6) % 40) + 3);
+  const leadDays = 21 + ((i * 7) % 25); // 21..45
+  const expected = addDays(poRelease, leadDays);
+  const lineCount = (i % 4) + 1; // 1..4 lines
+  const lines: SalesOrderLine[] = Array.from({ length: lineCount }, (_, j) => {
+    const qty = 20 + ((i * 11 + j * 17) % 180);
+    const unitPrice = 250_000 + (((i + j) * 13) % 24) * 75_000;
+    return {
+      id: `sol-${i + 1}-${j + 1}`,
+      description: descriptions[(i * 3 + j) % descriptions.length],
+      qty,
+      unitPrice,
+      total: qty * unitPrice,
+    };
+  });
+  const totalAmount = lines.reduce((s, l) => s + l.total, 0);
+  return {
+    id: `so${i + 1}`,
+    soNo: `SO-2026-${String(100 + i).padStart(3, "0")}`,
+    poNo: `PO-${String(2100 + i)}`,
+    clientId: client.id,
+    ownerId: client.ownerId,
+    poReleaseDate: poRelease,
+    expectedDeliveryDate: expected,
+    lines,
+    totalAmount,
+  };
+});
+
 // ---------------- Tasks ----------------
 const results: FollowUpResult[] = [
   "No Response",
