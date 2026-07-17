@@ -92,11 +92,6 @@ function Dashboard() {
 
   const scopedClients = ownerFilter ? clients.filter((c) => c.ownerId === ownerFilter) : clients;
 
-  const trendData = monthlyTargets.map((m) => ({
-    month: m.month.slice(5),
-    Achievement: Math.round((role === "sales" ? m.achievement * 0.25 : m.achievement) / 1_000_000),
-    Target: Math.round((role === "sales" ? m.target * 0.25 : m.target) / 1_000_000),
-  }));
 
   const [ytdYear, setYtdYear] = useState<"2024" | "2025" | "2026">("2026");
   const [ytdMode, setYtdMode] = useState<"total" | "customer" | "product">("total");
