@@ -354,6 +354,33 @@ function Dashboard() {
               <ToggleGroupItem value="customer" className="text-xs px-2">Per Customer</ToggleGroupItem>
               <ToggleGroupItem value="product" className="text-xs px-2">Per Produk</ToggleGroupItem>
             </ToggleGroup>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 text-xs"
+              onClick={() => {
+                const rows = ytdMode === "total" ? ytdData : breakdownData;
+                if (!rows.length) return;
+                const cols = Object.keys(rows[0]);
+                const esc = (v: unknown) => {
+                  const s = String(v ?? "");
+                  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+                };
+                const csv = [
+                  cols.join(","),
+                  ...rows.map((r) => cols.map((c) => esc((r as Record<string, unknown>)[c])).join(",")),
+                ].join("\n");
+                const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `ytd-${ytdMode}-FY${ytdYear}.csv`;
+                a.click();
+                URL.revokeObjectURL(url);
+              }}
+            >
+              <Download className="mr-1 h-3.5 w-3.5" /> CSV
+            </Button>
             <div className="text-right text-xs text-muted-foreground">
               <div>
                 <span className="font-semibold text-primary">{formatIDR(yearYtdAch)}</span>
