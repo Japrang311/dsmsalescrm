@@ -20,6 +20,13 @@ import {
 } from "recharts";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   TrendingUp,
   Target,
   AlertTriangle,
@@ -92,28 +99,71 @@ function Dashboard() {
 
   const scopedClients = ownerFilter ? clients.filter((c) => c.ownerId === ownerFilter) : clients;
 
-  const trendData = monthlyTargets.map((m) => ({
-    month: m.month.slice(5),
+
+  const [ytdYear, setYtdYear] = useState<"2024" | "2025" | "2026">("2026");
+  const [ytdMode, setYtdMode] = useState<"total" | "customer" | "product">("total");
+
+  // Scale factors to synthesize prior-year data from 2026 mock.
+  const yearScale: Record<typeof ytdYear, number> = {
+    "2024": 0.72,
+    "2025": 0.88,
+    "2026": 1,
+  };
+  const scale = yearScale[ytdYear];
+  // For prior years, treat the whole year as closed (all 12 months); for
+  // current year, keep the mock's realized months (Jan..Jul).
+  const yearMonths =
+    ytdYear === "2026"
+      ? monthlyTargets.map((m) => m.month.slice(5))
+      : [
+          "01",
+          "02",
+          "03",
+          "04",
+          "05",
+          "06",
+          "07",
+          "08",
+          "09",
+          "10",
+          "11",
+          "12",
+        ];
+
+  const yearMonthly = yearMonths.map((mm, i) => {
+    const base = monthlyTargets[i % monthlyTargets.length];
+    return {
+      month: mm,
+      target: base.target * scale,
+      achievement: base.achievement * scale,
+    };
+  });
+
+  const yearYtdTgtRaw = yearMonthly.reduce((s, m) => s + m.target, 0);
+  const yearYtdAchRaw = yearMonthly.reduce((s, m) => s + m.achievement, 0);
+  const yearYtdTgt = role === "sales" ? yearYtdTgtRaw * 0.25 : yearYtdTgtRaw;
+  const yearYtdAch = role === "sales" ? yearYtdAchRaw * 0.25 : yearYtdAchRaw;
+
+  const trendData = yearMonthly.map((m) => ({
+    month: m.month,
     Achievement: Math.round((role === "sales" ? m.achievement * 0.25 : m.achievement) / 1_000_000),
     Target: Math.round((role === "sales" ? m.target * 0.25 : m.target) / 1_000_000),
   }));
 
   let cumT = 0;
   let cumA = 0;
-  const ytdData = monthlyTargets.map((m) => {
+  const ytdData = yearMonthly.map((m) => {
     const t = role === "sales" ? m.target * 0.25 : m.target;
     const a = role === "sales" ? m.achievement * 0.25 : m.achievement;
     cumT += t;
     cumA += a;
     return {
-      month: m.month.slice(5),
+      month: m.month,
       "Target YTD": Math.round(cumT / 1_000_000),
       "Achievement YTD": Math.round(cumA / 1_000_000),
     };
   });
-  const ytdPct = ytdTgt > 0 ? Math.round((ytdAch / ytdTgt) * 100) : 0;
-
-  const [ytdMode, setYtdMode] = useState<"total" | "customer" | "product">("total");
+  const ytdPct = yearYtdTgt > 0 ? Math.round((yearYtdAch / yearYtdTgt) * 100) : 0;
 
   const SEGMENT_COLORS = [
     "var(--color-primary)",
@@ -134,7 +184,7 @@ function Dashboard() {
 
     const totals = new Map<string, number>();
     for (const r of scopedRev) {
-      totals.set(keyOf(r), (totals.get(keyOf(r)) ?? 0) + r.total);
+      totals.set(keyOf(r), (totals.get(keyOf(r)) ?? 0) + r.total * scale);
     }
     const sorted = [...totals.entries()].sort((a, b) => b[1] - a[1]);
     const topKeys = sorted.slice(0, 5).map(([k]) => k);
@@ -149,25 +199,27 @@ function Dashboard() {
 
     const cum = new Map<string, number>(segs.map((s) => [s.key, 0]));
     let cTgt = 0;
-    const data = monthlyTargets.map((m) => {
+    const data = yearMonthly.map((m, idx) => {
       const t = role === "sales" ? m.target * 0.25 : m.target;
       cTgt += t;
-      const monthRev = scopedRev.filter((r) => r.month === m.month);
+      const baseMonth = monthlyTargets[idx % monthlyTargets.length].month;
+      const monthRev = scopedRev.filter((r) => r.month === baseMonth);
       for (const r of monthRev) {
         const k = keyOf(r);
         const bucket = othersKeys.has(k) ? "Others" : k;
         if (!cum.has(bucket)) continue;
-        cum.set(bucket, (cum.get(bucket) ?? 0) + r.total);
+        cum.set(bucket, (cum.get(bucket) ?? 0) + r.total * scale);
       }
       const row: Record<string, number | string> = {
-        month: m.month.slice(5),
+        month: m.month,
         "Target YTD": Math.round(cTgt / 1_000_000),
       };
       for (const s of segs) row[s.key] = Math.round((cum.get(s.key) ?? 0) / 1_000_000);
       return row;
     });
     return { breakdownData: data, segments: segs };
-  }, [ytdMode, ownerFilter, role]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ytdMode, ownerFilter, role, ytdYear]);
 
 
   const ppnData = [
@@ -280,7 +332,17 @@ function Dashboard() {
               {ytdMode === "customer" ? " · breakdown per customer" : ytdMode === "product" ? " · breakdown per produk" : ""}.
             </CardDescription>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <Select value={ytdYear} onValueChange={(v) => setYtdYear(v as typeof ytdYear)}>
+              <SelectTrigger className="h-8 w-[110px] text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="2024">FY 2024</SelectItem>
+                <SelectItem value="2025">FY 2025</SelectItem>
+                <SelectItem value="2026">FY 2026</SelectItem>
+              </SelectContent>
+            </Select>
             <ToggleGroup
               type="single"
               size="sm"
@@ -294,8 +356,8 @@ function Dashboard() {
             </ToggleGroup>
             <div className="text-right text-xs text-muted-foreground">
               <div>
-                <span className="font-semibold text-primary">{formatIDR(ytdAch)}</span>
-                <span> / {formatIDR(ytdTgt)}</span>
+                <span className="font-semibold text-primary">{formatIDR(yearYtdAch)}</span>
+                <span> / {formatIDR(yearYtdTgt)}</span>
               </div>
               <div className="mt-0.5">Achievement {ytdPct}%</div>
             </div>
