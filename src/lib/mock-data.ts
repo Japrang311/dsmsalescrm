@@ -497,7 +497,7 @@ export function formatFullIDR(n: number): string {
 
 export function ytdAchievement(ownerId?: string) {
   const rows = ownerId ? revenue.filter((r) => r.ownerId === ownerId) : revenue;
-  return rows.reduce((s, r) => s + r.total, 0);
+  return rows.reduce((s, r) => s + r.total, 0) + prototypeRevenue(ownerId);
 }
 
 export function ytdTarget() {
@@ -506,8 +506,14 @@ export function ytdTarget() {
 
 export function ppnBreakdown(ownerId?: string) {
   const rows = ownerId ? revenue.filter((r) => r.ownerId === ownerId) : revenue;
-  const ppn = rows.filter((r) => r.ppn).reduce((s, r) => s + r.total, 0);
-  const non = rows.filter((r) => !r.ppn).reduce((s, r) => s + r.total, 0);
+  let ppn = rows.filter((r) => r.ppn).reduce((s, r) => s + r.total, 0);
+  let non = rows.filter((r) => !r.ppn).reduce((s, r) => s + r.total, 0);
+  const protos = ownerId ? prototypes.filter((p) => p.ownerId === ownerId) : prototypes;
+  for (const p of protos) {
+    if (!p.chargeable) continue;
+    if (p.ppn) ppn += p.totalAmount;
+    else non += p.totalAmount;
+  }
   return { ppn, non, total: ppn + non };
 }
 
@@ -515,6 +521,10 @@ export function topCustomers(limit = 5) {
   const map = new Map<string, number>();
   for (const r of revenue) {
     map.set(r.clientId, (map.get(r.clientId) ?? 0) + r.total);
+  }
+  for (const p of prototypes) {
+    if (!p.chargeable) continue;
+    map.set(p.clientId, (map.get(p.clientId) ?? 0) + p.totalAmount);
   }
   return [...map.entries()]
     .sort((a, b) => b[1] - a[1])
