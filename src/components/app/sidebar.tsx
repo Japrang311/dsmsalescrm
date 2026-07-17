@@ -12,6 +12,7 @@ import {
   BarChart3,
   Settings,
   Factory,
+  FlaskConical,
 } from "lucide-react";
 import { useRole } from "@/lib/role-store";
 import { cn } from "@/lib/utils";
@@ -30,6 +31,7 @@ const salesNav: NavItem[] = [
   { to: "/rfq", label: "RFQ", icon: FileText },
   { to: "/quotations", label: "Quotation", icon: FileSpreadsheet },
   { to: "/orders", label: "PO / Sales Order", icon: Receipt },
+  { to: "/prototype", label: "Prototype", icon: FlaskConical },
   { to: "/revenue", label: "Revenue", icon: TrendingUp },
   { to: "/activity", label: "Activity Log", icon: Activity },
   { to: "/reports", label: "Reports", icon: BarChart3 },
