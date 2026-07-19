@@ -1,3 +1,20 @@
+node_modules/
+dist/
+dist-ssr/
+.output/
+.vinxi/
+.tanstack/**
+.nitro/
+.wrangler/
+.dev.vars
+*.local
+.env
+.env.local
+.DS_Store
+supabase/.branches
+supabase/.temp
+import-review-log-*.jsonl
+
 # Logs
 logs
 *.log
@@ -7,26 +24,17 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-.output
-.vinxi
-.tanstack/**
-.nitro
-*.local
-
-# Wrangler / Cloudflare
-.wrangler/
-.dev.vars
-
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
 .idea
-.DS_Store
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
+
+# Generated/reproducible artifacts and sensitive working data — not source
+graphify-out/
+outputs/
+.claude/settings.local.json

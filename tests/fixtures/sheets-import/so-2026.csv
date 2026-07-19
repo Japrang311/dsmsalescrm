@@ -1,0 +1,9 @@
+No,Month,Week,No PO Customer,No SO,Customer,Sales,Deskripsi Project,Qty,UOM,Unit Price,Total Price
+1,January,1,PO-SO-143,DSM-26SO143,PT Astra Komponen Nusantara,Adhitya Wirambara,Housing panel,4,Pcs,7500000,30000000
+2,January,1,PO-SO-143,DSM-26SO143,PT Astra Komponen Nusantara,Adhitya Wirambara,Mounting kit,2,Set,6000000,12000000
+3,February,1,PO-UNKNOWN,DSM-26SO120,PT Fixture Tidak Dikenal,Adhitya Wirambara,Unknown customer,5,Pcs,2000000,10000000
+4,February,2,PO-OWNER,DSM-26SO121,PT Astra Komponen Nusantara,Sales Tidak Dikenal,Unknown owner,3,Pcs,3000000,9000000
+5,February,3,PO-BLANK,DSM-26SO122,PT Astra Komponen Nusantara,Adhitya Wirambara,Blank paid total,8,Pcs,1000000,
+6,March,1,PO-CONFLICT-A,DSM-26SO130,PT Astra Komponen Nusantara,Adhitya Wirambara,Conflicting header A,1,Unit,1000000,1000000
+7,March,1,PO-CONFLICT-B,DSM-26SO130,PT Astra Komponen Nusantara,Adhitya Wirambara,Conflicting header B,1,Unit,1000000,1000000
+8,March,2,PO-MISMATCH,DSM-26SO131,PT Astra Komponen Nusantara,Adhitya Wirambara,Price mismatch,2,Pcs,1000000,3000000

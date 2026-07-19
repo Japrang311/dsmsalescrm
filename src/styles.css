@@ -4,19 +4,30 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/*
+ * DSM Sales Execution — Salesforce-inspired enterprise theme.
+ * Tokens are defined in :root as oklch and mapped to Tailwind utilities via @theme inline.
+ * Never hardcode colors in components; always use semantic tokens.
+ */
+
 @theme inline {
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --radius-xl: calc(var(--radius) + 2px);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-primary-soft: var(--primary-soft);
+  --color-navy: var(--navy);
+  --color-navy-foreground: var(--navy-foreground);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
@@ -25,19 +36,14 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
-  --color-navy: var(--navy);
-  --color-navy-foreground: var(--navy-foreground);
-  --color-teal: var(--teal);
-  --color-teal-foreground: var(--teal-foreground);
   --color-success: var(--success);
   --color-success-foreground: var(--success-foreground);
   --color-warning: var(--warning);
   --color-warning-foreground: var(--warning-foreground);
-  --color-info: var(--info);
-  --color-info-foreground: var(--info-foreground);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
@@ -51,91 +57,141 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
-  --font-display: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-sans:
+    "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
 :root {
-  --radius: 0.5rem;
-  --background: oklch(0.985 0.003 250);
-  --foreground: oklch(0.18 0.03 250);
+  --radius: 0.375rem;
+
+  /* Surfaces — bright, clean, enterprise */
+  --background: oklch(0.99 0.003 240); /* #FCFCFD-ish white */
+  --foreground: oklch(0.24 0.06 258); /* #032D60 navy text */
+  --surface: oklch(1 0 0); /* pure white cards */
+  --surface-muted: oklch(0.975 0.008 250); /* cloud gray */
+
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.18 0.03 250);
+  --card-foreground: oklch(0.24 0.06 258);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.18 0.03 250);
-  --primary: oklch(0.42 0.12 255);
-  --primary-foreground: oklch(0.99 0.005 250);
-  --secondary: oklch(0.955 0.012 250);
-  --secondary-foreground: oklch(0.22 0.04 255);
-  --muted: oklch(0.955 0.012 250);
-  --muted-foreground: oklch(0.5 0.025 255);
-  --accent: oklch(0.93 0.03 220);
-  --accent-foreground: oklch(0.22 0.05 240);
-  --destructive: oklch(0.58 0.22 27);
-  --destructive-foreground: oklch(0.99 0.005 250);
-  --border: oklch(0.9 0.015 250);
-  --input: oklch(0.92 0.012 250);
-  --ring: oklch(0.55 0.13 240);
+  --popover-foreground: oklch(0.24 0.06 258);
 
-  --navy: oklch(0.24 0.06 255);
-  --navy-foreground: oklch(0.98 0.005 250);
-  --teal: oklch(0.62 0.11 195);
-  --teal-foreground: oklch(0.99 0.005 250);
-  --success: oklch(0.62 0.14 155);
-  --success-foreground: oklch(0.99 0.005 250);
-  --warning: oklch(0.75 0.15 75);
-  --warning-foreground: oklch(0.2 0.04 60);
-  --info: oklch(0.6 0.13 240);
-  --info-foreground: oklch(0.99 0.005 250);
+  /* Primary — Salesforce-like confident blue #0176D3 */
+  --primary: oklch(0.58 0.16 250);
+  --primary-foreground: oklch(1 0 0);
+  --primary-soft: oklch(0.95 0.03 250); /* pale blue #EEF4FF */
 
-  --chart-1: oklch(0.42 0.12 255);
-  --chart-2: oklch(0.62 0.11 195);
-  --chart-3: oklch(0.62 0.14 155);
-  --chart-4: oklch(0.75 0.15 75);
-  --chart-5: oklch(0.55 0.2 15);
+  /* Navy accents #032D60 */
+  --navy: oklch(0.24 0.06 258);
+  --navy-foreground: oklch(1 0 0);
 
-  --sidebar: oklch(0.22 0.055 255);
-  --sidebar-foreground: oklch(0.92 0.01 250);
-  --sidebar-primary: oklch(0.62 0.11 195);
-  --sidebar-primary-foreground: oklch(0.99 0.005 250);
-  --sidebar-accent: oklch(0.3 0.06 255);
-  --sidebar-accent-foreground: oklch(0.98 0.005 250);
-  --sidebar-border: oklch(0.3 0.05 255);
-  --sidebar-ring: oklch(0.62 0.11 195);
+  --secondary: oklch(0.965 0.006 250);
+  --secondary-foreground: oklch(0.24 0.06 258);
+  --muted: oklch(0.965 0.006 250);
+  --muted-foreground: oklch(0.5 0.03 258);
+  --accent: oklch(0.95 0.03 250);
+  --accent-foreground: oklch(0.24 0.06 258);
+
+  /* Status colors */
+  --destructive: oklch(0.52 0.22 25); /* #BA0517 */
+  --destructive-foreground: oklch(1 0 0);
+  --success: oklch(0.53 0.13 150); /* #2E844A */
+  --success-foreground: oklch(1 0 0);
+  --warning: oklch(0.66 0.16 55); /* #DD7A01 */
+  --warning-foreground: oklch(1 0 0);
+
+  /* Borders — subtle gray #C9C9C9 → prefer lighter for cards */
+  --border: oklch(0.9 0.004 250);
+  --border-strong: oklch(0.82 0.005 250);
+  --input: oklch(0.9 0.004 250);
+  --ring: oklch(0.58 0.16 250);
+
+  /* Charts */
+  --chart-1: oklch(0.58 0.16 250);
+  --chart-2: oklch(0.53 0.13 150);
+  --chart-3: oklch(0.66 0.16 55);
+  --chart-4: oklch(0.52 0.22 25);
+  --chart-5: oklch(0.45 0.1 280);
+
+  /* Sidebar — navy on light rail with white text */
+  --sidebar: oklch(0.24 0.06 258);
+  --sidebar-foreground: oklch(0.95 0.01 250);
+  --sidebar-primary: oklch(0.58 0.16 250);
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-accent: oklch(0.3 0.06 258);
+  --sidebar-accent-foreground: oklch(1 0 0);
+  --sidebar-border: oklch(0.3 0.05 258);
+  --sidebar-ring: oklch(0.58 0.16 250);
 }
 
 .dark {
-  --background: oklch(0.16 0.03 255);
-  --foreground: oklch(0.96 0.005 250);
-  --card: oklch(0.22 0.04 255);
-  --card-foreground: oklch(0.96 0.005 250);
-  --popover: oklch(0.22 0.04 255);
-  --popover-foreground: oklch(0.96 0.005 250);
-  --primary: oklch(0.7 0.12 220);
-  --primary-foreground: oklch(0.15 0.04 255);
-  --secondary: oklch(0.28 0.04 255);
-  --secondary-foreground: oklch(0.96 0.005 250);
-  --muted: oklch(0.28 0.04 255);
-  --muted-foreground: oklch(0.7 0.02 255);
-  --accent: oklch(0.28 0.04 255);
-  --accent-foreground: oklch(0.96 0.005 250);
+  --background: oklch(0.18 0.03 258);
+  --foreground: oklch(0.97 0.005 250);
+  --surface: oklch(0.22 0.04 258);
+  --surface-muted: oklch(0.24 0.04 258);
+  --card: oklch(0.22 0.04 258);
+  --card-foreground: oklch(0.97 0.005 250);
+  --popover: oklch(0.22 0.04 258);
+  --popover-foreground: oklch(0.97 0.005 250);
+  --primary: oklch(0.68 0.15 250);
+  --primary-foreground: oklch(0.18 0.03 258);
+  --primary-soft: oklch(0.3 0.06 258);
+  --navy: oklch(0.97 0.005 250);
+  --navy-foreground: oklch(0.18 0.03 258);
+  --secondary: oklch(0.26 0.04 258);
+  --secondary-foreground: oklch(0.97 0.005 250);
+  --muted: oklch(0.26 0.04 258);
+  --muted-foreground: oklch(0.72 0.02 250);
+  --accent: oklch(0.3 0.06 258);
+  --accent-foreground: oklch(0.97 0.005 250);
+  --destructive: oklch(0.62 0.2 25);
+  --destructive-foreground: oklch(1 0 0);
+  --success: oklch(0.62 0.13 150);
+  --success-foreground: oklch(1 0 0);
+  --warning: oklch(0.72 0.15 55);
+  --warning-foreground: oklch(0.18 0.03 258);
   --border: oklch(1 0 0 / 10%);
+  --border-strong: oklch(1 0 0 / 20%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.55 0.13 240);
-  --sidebar: oklch(0.14 0.03 255);
-  --sidebar-foreground: oklch(0.92 0.01 250);
-  --sidebar-accent: oklch(0.22 0.04 255);
-  --sidebar-accent-foreground: oklch(0.96 0.005 250);
+  --ring: oklch(0.68 0.15 250);
+  --chart-1: oklch(0.68 0.15 250);
+  --chart-2: oklch(0.65 0.13 150);
+  --chart-3: oklch(0.72 0.15 55);
+  --chart-4: oklch(0.65 0.2 25);
+  --chart-5: oklch(0.6 0.1 280);
+  --sidebar: oklch(0.15 0.03 258);
+  --sidebar-foreground: oklch(0.95 0.01 250);
+  --sidebar-primary: oklch(0.68 0.15 250);
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-accent: oklch(0.24 0.04 258);
+  --sidebar-accent-foreground: oklch(0.97 0.005 250);
   --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.68 0.15 250);
 }
 
 @layer base {
   * {
     border-color: var(--color-border);
   }
+
+  html,
+  body {
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
-    font-family: var(--font-display);
-    -webkit-font-smoothing: antialiased;
   }
+
+  /* Tabular numerals for financial displays */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+}
+
+@utility num {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
 }

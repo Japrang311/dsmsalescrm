@@ -1,0 +1,544 @@
+import { useMemo, useState } from "react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { ArrowLeft, Lock, Pencil, Receipt } from "lucide-react";
+import { toast } from "sonner";
+
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { updateSalesOrderTax } from "@/lib/data/sales-orders";
+import {
+  getCurrentActorId,
+  listSalesOrderTaxHistory,
+  logActivity,
+} from "@/lib/data/activity-log";
+import {
+  formatDateShort,
+  formatRupiahFull,
+  formatRupiahShort,
+} from "@/lib/format";
+import { StatusBadge } from "@/components/clients/StatusBadges";
+import { useRole, ROLE_LABEL } from "@/context/role-context";
+import { useDashboardData } from "@/hooks/use-dashboard-data";
+
+export const Route = createFileRoute("/_app/sales-orders/$soId")({
+  head: () => ({ meta: [{ title: "Sales Order Detail · DSM" }] }),
+  component: SalesOrderDetail,
+});
+
+function SalesOrderDetail() {
+  const { soId } = Route.useParams();
+  const navigate = useNavigate();
+  const { role, authReady } = useRole();
+  const queryClient = useQueryClient();
+  const {
+    orders,
+    clients: clientList,
+    items,
+    ownersById,
+    isLoading,
+  } = useDashboardData();
+  const { data: audit = [] } = useQuery({
+    queryKey: ["activity-log", "sales-order-tax", soId],
+    queryFn: () => listSalesOrderTaxHistory(soId),
+    enabled: authReady,
+  });
+
+  const so = useMemo(() => orders.find((s) => s.id === soId), [orders, soId]);
+  const client = so ? clientList.find((c) => c.id === so.clientId) : undefined;
+  const owner = so ? ownersById[so.ownerId] : undefined;
+  const linkedItems = so
+    ? items.filter(
+        (ci) =>
+          ci.soNumber === so.soNumber ||
+          (ci.customerPoNumber && ci.clientId === so.clientId),
+      )
+    : [];
+
+  if (!authReady || isLoading) {
+    return (
+      <div className="mx-auto max-w-md p-8 text-center text-sm text-muted-foreground">
+        Loading…
+      </div>
+    );
+  }
+
+  if (!so) {
+    return (
+      <div className="mx-auto max-w-md p-8 text-center">
+        <h1 className="text-lg font-semibold">Sales Order tidak ditemukan</h1>
+        <Button asChild variant="outline" className="mt-4">
+          <Link to="/sales-orders">Kembali</Link>
+        </Button>
+      </div>
+    );
+  }
+
+  const foc = so.type === "Prototype" && so.prototypeStatus === "FOC";
+  const effectiveTax = so.taxType;
+  const canEditTax = role === "manager" || role === "super_admin";
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center gap-3">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => navigate({ to: "/sales-orders" })}
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
+        <div>
+          <div className="flex items-center gap-2">
+            <Receipt className="h-5 w-5 text-primary" />
+            <h1 className="font-mono text-xl font-semibold">{so.soNumber}</h1>
+            <Badge variant="outline">{so.type}</Badge>
+            <Badge variant="secondary">{so.numberMode}</Badge>
+            {foc && (
+              <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">
+                FOC
+              </Badge>
+            )}
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Referensi Sales Order · dicatat {formatDateShort(so.date)}
+          </p>
+        </div>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card className="md:col-span-2">
+          <CardContent className="grid gap-4 p-4">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Cell label="Klien">
+                {client ? (
+                  <Link
+                    to="/clients/$clientId"
+                    params={{ clientId: client.id }}
+                    className="text-sm font-medium hover:text-primary"
+                  >
+                    {client.name}
+                  </Link>
+                ) : (
+                  "—"
+                )}
+                {client && (
+                  <div className="mt-1">
+                    <StatusBadge status={client.status} />
+                  </div>
+                )}
+              </Cell>
+              <Cell label="Sales Owner">{owner?.name ?? "—"}</Cell>
+              <Cell label="Source revenue">
+                <Badge variant="secondary" className="text-[11px]">
+                  {so.source}
+                </Badge>
+              </Cell>
+              <TaxCell
+                foc={foc}
+                soId={so.id}
+                ownerId={so.ownerId}
+                clientId={so.clientId}
+                current={effectiveTax}
+                canEdit={canEditTax}
+              />
+              <Cell label="Tanggal SO">{formatDateShort(so.date)}</Cell>
+              <Cell label="Customer PO">
+                <span className="font-mono text-xs">
+                  {so.customerPoNumber ?? "—"}
+                </span>
+              </Cell>
+              <Cell label="Tipe SO">
+                {so.type}
+                {so.prototypeStatus ? ` · ${so.prototypeStatus}` : ""}
+              </Cell>
+              <Cell label="Jumlah item">{so.items.length}</Cell>
+              {so.backdateReason && (
+                <Cell label="Alasan Backdate">{so.backdateReason}</Cell>
+              )}
+            </div>
+
+            <Separator />
+
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Nilai
+              </p>
+              <p className="mt-1 text-2xl font-semibold tabular-nums">
+                {foc ? "Rp0" : formatRupiahFull(so.value ?? 0)}
+                {!foc && (so.value ?? 0) >= 1_000_000 && (
+                  <span className="ml-2 text-sm font-normal text-muted-foreground">
+                    ({formatRupiahShort(so.value ?? 0)})
+                  </span>
+                )}
+              </p>
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                {foc
+                  ? "SO Prototype FOC tidak berkontribusi ke revenue & achievement."
+                  : "Kontribusi 100% ke revenue pada periode SO."}
+              </p>
+            </div>
+
+            <Separator />
+
+            <SalesOrderItemsTable items={so.items} showMoney={!foc} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Linked Commercial Items
+            </p>
+            {linkedItems.length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                Tidak ada item pipeline yang direferensikan ke SO ini.
+              </p>
+            ) : (
+              <ul className="flex flex-col gap-1.5">
+                {linkedItems.map((it) => (
+                  <li
+                    key={it.id}
+                    className="rounded-md border bg-muted/30 p-2 text-xs"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium">
+                        {it.projectName ?? it.description}
+                      </span>
+                      <Badge variant="outline" className="text-[10px]">
+                        {it.type}
+                      </Badge>
+                    </div>
+                    <div className="mt-1 text-[11px] text-muted-foreground">
+                      {it.stage}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {audit.length > 0 && (
+        <Card>
+          <CardContent className="p-4">
+            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Riwayat perubahan pajak
+            </p>
+            <ul className="flex flex-col gap-2">
+              {audit.map((a) => (
+                <li
+                  key={a.id}
+                  className="flex flex-col gap-0.5 rounded-md border bg-muted/30 p-2 text-xs"
+                >
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <Badge variant="outline" className="text-[10px]">
+                      {a.from}
+                    </Badge>
+                    <span className="text-muted-foreground">→</span>
+                    <Badge className="bg-primary/10 text-primary hover:bg-primary/10 text-[10px]">
+                      {a.to}
+                    </Badge>
+                    <span className="ml-auto text-[11px] text-muted-foreground">
+                      {new Date(a.at).toLocaleString("id-ID")}
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-muted-foreground">
+                    oleh {a.byUserName} · {ROLE_LABEL[a.byRole]}
+                    {a.note ? ` — "${a.note}"` : ""}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Tax cell — read-only badge for non-managers, inline editor for managers.
+// ---------------------------------------------------------------------------
+
+function TaxCell({
+  foc,
+  soId,
+  ownerId,
+  clientId,
+  current,
+  canEdit,
+}: {
+  foc: boolean;
+  soId: string;
+  ownerId: string;
+  clientId: string;
+  current: "PPN" | "Non-PPN" | undefined;
+  canEdit: boolean;
+}) {
+  const queryClient = useQueryClient();
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<"PPN" | "Non-PPN">(current ?? "PPN");
+  const [note, setNote] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  if (foc) {
+    return (
+      <Cell label="Pajak">
+        <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">
+          FOC
+        </Badge>
+        <p className="mt-1 text-[11px] text-muted-foreground">
+          Prototype FOC tidak memiliki komponen pajak.
+        </p>
+      </Cell>
+    );
+  }
+
+  const label = "Pajak (PPN / Non-PPN)";
+
+  if (!canEdit) {
+    return (
+      <Cell label={label}>
+        <div className="flex items-center gap-2">
+          <Badge
+            variant={current === "PPN" ? "default" : "secondary"}
+            className="text-[11px]"
+          >
+            {current ?? "Belum diset"}
+          </Badge>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="inline-flex items-center text-muted-foreground">
+                <Lock className="h-3 w-3" />
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>
+              Hanya Sales Manager yang dapat mengubah pajak SO.
+            </TooltipContent>
+          </Tooltip>
+        </div>
+      </Cell>
+    );
+  }
+
+  if (!editing) {
+    return (
+      <Cell label={label}>
+        <div className="flex items-center gap-2">
+          <Badge
+            variant={current === "PPN" ? "default" : "secondary"}
+            className="text-[11px]"
+          >
+            {current ?? "Belum diset"}
+          </Badge>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 gap-1 px-2 text-xs"
+            onClick={() => {
+              setDraft(current ?? "PPN");
+              setNote("");
+              setEditing(true);
+            }}
+          >
+            <Pencil className="h-3 w-3" /> Ubah
+          </Button>
+        </div>
+      </Cell>
+    );
+  }
+
+  const changed = draft !== current;
+
+  return (
+    <Cell label={label}>
+      <div className="flex flex-col gap-2">
+        <Select
+          value={draft}
+          onValueChange={(v) => setDraft(v as "PPN" | "Non-PPN")}
+        >
+          <SelectTrigger className="h-8 w-[160px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="PPN">PPN</SelectItem>
+            <SelectItem value="Non-PPN">Non-PPN</SelectItem>
+          </SelectContent>
+        </Select>
+        <div className="space-y-1">
+          <Label className="text-[11px] text-muted-foreground">
+            Catatan (opsional)
+          </Label>
+          <Input
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="cth. Koreksi klasifikasi pajak dari admin"
+            className="h-8 text-xs"
+          />
+        </div>
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            className="h-7 text-xs"
+            disabled={!changed || saving}
+            onClick={() => {
+              void (async () => {
+                setSaving(true);
+                try {
+                  await updateSalesOrderTax(soId, draft);
+                  const actorId = await getCurrentActorId();
+                  if (actorId) {
+                    const detail = note.trim()
+                      ? `${current ?? "—"} → ${draft}\n${note.trim()}`
+                      : `${current ?? "—"} → ${draft}`;
+                    await logActivity({
+                      kind: "sales_order_tax_change",
+                      ownerId,
+                      actorId,
+                      clientId,
+                      salesOrderId: soId,
+                      title: `Pajak SO diubah ke ${draft}`,
+                      detail,
+                    });
+                  }
+                  await queryClient.invalidateQueries({
+                    queryKey: ["sales-orders"],
+                  });
+                  await queryClient.invalidateQueries({
+                    queryKey: ["activity-log"],
+                  });
+                  toast.success(`Pajak SO diubah ke ${draft}`);
+                  setEditing(false);
+                } catch (error) {
+                  toast.error("Gagal mengubah pajak SO", {
+                    description:
+                      error instanceof Error ? error.message : "Unknown error",
+                  });
+                } finally {
+                  setSaving(false);
+                }
+              })();
+            }}
+          >
+            {saving ? "Menyimpan…" : "Simpan"}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 text-xs"
+            onClick={() => setEditing(false)}
+            disabled={saving}
+          >
+            Batal
+          </Button>
+        </div>
+      </div>
+    </Cell>
+  );
+}
+
+function Cell({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+        {label}
+      </p>
+      <div className="mt-1">{children}</div>
+    </div>
+  );
+}
+
+function SalesOrderItemsTable({
+  items,
+  showMoney,
+}: {
+  items: ReturnType<typeof useDashboardData>["orders"][number]["items"];
+  showMoney: boolean;
+}) {
+  return (
+    <div>
+      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        Line Items
+      </p>
+      <div className="overflow-x-auto rounded-md border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Nama Product</TableHead>
+              <TableHead>Description</TableHead>
+              <TableHead className="text-right">Qty</TableHead>
+              <TableHead>UOM</TableHead>
+              {showMoney && (
+                <>
+                  <TableHead className="text-right">Unit Price</TableHead>
+                  <TableHead className="text-right">Total</TableHead>
+                </>
+              )}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {items.map((item) => (
+              <TableRow key={item.id}>
+                <TableCell className="font-medium">
+                  {item.productName ?? "Nama Product belum diisi"}
+                </TableCell>
+                <TableCell>{item.description ?? "—"}</TableCell>
+                <TableCell className="text-right tabular-nums">
+                  {item.qty ?? "—"}
+                </TableCell>
+                <TableCell>{item.uom ?? "—"}</TableCell>
+                {showMoney && (
+                  <>
+                    <TableCell className="text-right tabular-nums">
+                      {item.unitPrice === null
+                        ? "—"
+                        : formatRupiahFull(item.unitPrice)}
+                    </TableCell>
+                    <TableCell className="text-right font-medium tabular-nums">
+                      {item.lineTotal === null
+                        ? "—"
+                        : formatRupiahFull(item.lineTotal)}
+                    </TableCell>
+                  </>
+                )}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  );
+}

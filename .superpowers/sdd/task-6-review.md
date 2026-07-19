@@ -1,0 +1,43 @@
+# Task 6 Independent Review
+
+Date: 2026-07-19
+Verdict: **APPROVED**
+
+## Confirmed compliant
+
+- [Pasti] `Role` union widened to the four-role type and `ROLE_LABEL.super_admin = "Super Admin"` exactly as required by the brief's Interfaces section (`src/lib/mock/selectors.ts:19`, `src/context/role-context.tsx:189-194`).
+
+- [Pasti] `src/lib/mock/selectors.ts` scoping functions genuinely route `super_admin` into the company-wide branch without per-function edits — every scope/target helper branches only on `role === "sales"` vs. else, so `super_admin` (like `manager`/`executive`) falls into the else branch automatically. Spot-checked: `scopeClients:254-258`, `scopeTasks:242-246`, `scopeCommercialItems:248-252`, `scopeSalesOrders:236-240`, `targetInRange:40-44`, `monthlyTarget:264-268`. No function in the file special-cases `manager`/`executive` in a way that would exclude `super_admin` from company-wide reads.
+
+- [Pasti] Real-session inactive-account handling is fail-closed and traced end-to-end: `role-context.tsx:93-135`. `fetchAccountStatus` (`src/lib/auth/account-status.ts:62-82`) returns a discriminated result where only `{kind:"active"}` carries a `role` field (verified by test `account-status.test.ts:83-101`, which asserts `"role" in result === false` for the inactive case — not a vacuous check). On `kind === "inactive"`, `role-context.tsx:97-108` calls `signOutInactiveAccount()`, sets only `hydrated` (never `authReady`), and defers the `/login` redirect 3s for the toast to be readable. `authReady` never becomes `true` on this path, and grep across the whole `src/` tree confirms every single business-data `useQuery` (`enabled: authReady`) and every route's loading gate (`if (!authReady || isLoading)`) is conditioned on it — dashboard, clients, sales-orders, tasks, pipeline, commercial, settings all comply. No path allows a stale/wrong role or a business query to fire during the 3-second window before redirect.
+
+- [Pasti] `DevRole = Exclude<Role, "super_admin">` (`role-context.tsx:46`) removes `super_admin` from `ROLE_LOGIN` (`:48-52`) and from the `stored`-value allowlist read from `localStorage` (`:124-127`, only accepts `"sales" | "manager" | "executive"`). `setRole()` explicitly guards `r === "super_admin"` with a `console.warn` no-op (`:140-148`) rather than falling through to `signInForRole`. No unrecognized/unhandled role value is mapped to `"manager"` or `"sales"` anywhere in this file — confirmed by reading every branch of `loadRealSession`'s three outcomes and `setRole`'s guard.
+
+- [Pasti] `src/lib/auth/account-status.ts` message string is byte-for-byte `"Akun Anda telah dinonaktifkan. Hubungi Super Admin."` (`:23-24`), matches the brief's Step 3 text verbatim, and is asserted verbatim in `account-status.test.ts:158-162`. `signOutInactiveAccount` calls `client.auth.signOut()` (`:92`), exercised by a real assertion (`toHaveBeenCalledTimes(1)`, `account-status.test.ts:146-156`) — not a vacuous test. All four discriminated outcomes (active, inactive, missing_profile via null data, missing_profile via query error) have dedicated tests with real `expect(...).toEqual(...)` assertions against fake-client fixtures, plus one test asserting the exact query column list and `.eq` scoping (`:122-142`).
+
+- [Pasti] Cross-file test isolation fix verified as actually applied, not just claimed: `account-status.ts` takes an optional injectable `client` parameter on both `fetchAccountStatus` (`:62-64`) and `signOutInactiveAccount` (`:88-90`), defaulting to a cast real client (`:59-60`). `account-status.test.ts` never calls `mock.module("@/lib/supabase", ...)` — only `sonner` is mocked (`:16-18`), and the report's stated reason (no other test file imports `sonner`) is architecturally sound. Every test passes a plain fake object through the injected parameter (`fakeProfileClient(...)`, `:32-55`, and inline `{ auth: { signOut } }` at `:149`). This is a real fix, not a cosmetic one.
+
+- [Pasti] `src/lib/data/clients.ts`: `listSalesTeamProfiles()` still filters `.eq("role", "sales")` (`:118-125`), and the new regression test (`clients.test.ts:109-123`) uses a real `fixtures.super_admin` profile, signs in as manager, calls the real function against local Supabase, and asserts both `fixtures.super_admin.id` is absent and `fixtures.sales.id` is present in the result — a genuine two-sided assertion, not trivially true.
+
+- [Pasti] `src/lib/data/targets.ts` needing no change is verified against the actual caller, not just trusted from the report: `src/routes/_app.settings.tsx:133-136` sources the `realSalesTeam` query from `queryFn: listSalesTeamProfiles` (sales-only), and the `upsertYearlyTarget(member.id, numeric)` call site (`:1189`) iterates over that same sales-only collection (`member` is destructured from a row built off `realSalesTeam`). A Super Admin id structurally cannot reach `upsertYearlyTarget`.
+
+- [Pasti] `TopBar.tsx:65-89`: the dev-switcher ternary has an explicit, non-fallthrough terminal branch for the `super_admin` case (falls into the final `else` after `sales`, showing a neutral placeholder, never the Sales seed identity).
+
+- [Pasti] `AppSidebar.tsx:62,114`: `items = role === "executive" ? NAV_EXECUTIVE : NAV_FULL` and the Commercial Items section's `role !== "executive"` condition both already route Super Admin onto the same full nav as Manager/Sales — confirmed no Manager-only or Sales-only list exists that would need a separate Super Admin branch.
+
+- [Pasti] Consistent `role === "manager" || role === "super_admin"`-style widening applied correctly across all four claimed call sites: `ChangeStatusDialog.tsx:42-43` (`isManagerOverride`), `CommercialDetailPage.tsx:148-149,471-473` (`canEditTax` plus the copy update to "Manager dan Super Admin dapat mengoreksi pilihan Sales"), `_app.clients.$clientId.tsx:95-96,421` (`canEditStatus`, confirmed both occurrences — the declaration and the inline dialog-render condition — updated consistently), `_app.sales-orders.$soId.tsx:96` (`canEditTax`).
+
+- [Pasti] `_app.settings.tsx`: the Task-5-era `role as AppRole` bridge cast and `contextRole` variable are gone; `grep` for `contextRole` returns nothing, and line 169-170 uses `ROLE_LABEL[role]` directly. Remaining `AppRole` references (`:94,376,761,769,829,913,990`) are the unrelated Team-management member-role type, not the session role — no dead reference.
+
+- [Pasti] `bunx tsc --noEmit` reproduced independently: exactly the two pre-existing errors the report lists (`CommercialViews.tsx:383,433` TS2322; `commercial-count-rpc.test.ts:87` TS2769), no new errors.
+
+- [Pasti] `dashboard-selectors.ts`/`use-dashboard-data.ts` claim verified: `use-dashboard-data.ts:46-49` sources `salesTeam` from `listSalesTeamProfiles` (sales-only), confirming the report's "no change needed" claim for `dashboard-selectors.ts`.
+
+## Noted, not graded
+
+- The Dashboard route's Manager-vs-Executive report-card selection showing Super Admin neither set is a genuine open product question, correctly flagged by the implementer as out of scope for this task (no security/data-leak implication — RLS already grants Super Admin the same company-wide reads). Not treated as a defect.
+- `team.test.ts`'s unrestored `mock.module("@/lib/supabase", ...)` is a pre-existing fragility outside this task's file list, correctly flagged as a follow-up rather than fixed inline.
+
+## Review method
+
+Read the task-6 brief and report in full, then independently re-derived every claim against the actual source rather than trusting the report's prose: read `selectors.ts` end-to-end and spot-checked six scoping/target functions named in the assignment; traced the full inactive-session control flow in `role-context.tsx` including a repo-wide grep confirming `authReady` gates every data-fetching call site; read `account-status.ts` and its test file in full, checking the injectable-client fix is structurally applied (not just described) and that tests use real fake-client assertions; read `clients.ts`/`clients.test.ts` and confirmed the regression test exercises a real Super Admin fixture; traced the actual `_app.settings.tsx` call site feeding `upsertYearlyTarget` back to `listSalesTeamProfiles` rather than trusting the report's assertion; read `TopBar.tsx` and `AppSidebar.tsx` conditionals directly; grepped and read all four `role === "manager"` widening sites plus both `canEditStatus` occurrences; grepped `_app.settings.tsx` for dead `contextRole`/cast references; reran `bunx tsc --noEmit` myself to independently confirm exactly two pre-existing errors. Did not rerun the full test suite (per instructions, the controller's prior 193/0/30 run is trusted) and did not weigh in on the Dashboard product question (per instructions).

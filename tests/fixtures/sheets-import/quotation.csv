@@ -1,0 +1,6 @@
+Quotation Number,Date,Account,Clients,Address,Status,SO Number,Note,Description,QTY,UOM,Harga satuan,Harga total
+DSM-26QUO-0404,2026-07-01,Adhitya Wirambara,PT Astra Komponen Nusantara,Plant A,Quotes Sent,,Base quotation,Housing,2,Unit,10000000,20000000
+DSM-26QUO-0404,2026-07-01,Adhitya Wirambara,PT Astra Komponen Nusantara,Plant A,Quotes Sent,,Base quotation,Bracket,5,Pcs,2000000,10000000
+DSM-26QUO-0404_REV.01,2026-07-10,Adhitya Wirambara,PT Astra Komponen Nusantara,Plant A,Negotiation,,Revision one,Revised package,1,Set,35000000,35000000
+DSM-26QUO-0403,2026-06-20,Adhitya Wirambara,PT Astra Komponen Nusantara,Plant A,Quotes Sent,,Conflict A,Old quote A,1,Lot,5000000,5000000
+DSM-26QUO-0403,2026-06-21,Adhitya Wirambara,PT Astra Komponen Nusantara,Plant B,Quotes Sent,,Conflict B,Old quote B,1,Lot,5000000,5000000
