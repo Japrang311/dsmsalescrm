@@ -77,35 +77,19 @@ export type SalesTeamMember = { id: string; name: string; initials: string };
 
 // Executive dashboard "Sales Performance" composition. Adhitya Wirambara
 // and Leli Al personally run a sales book despite their profiles.role
-// being 'manager', so they're included here; Andri Sutomo (profiles.role
-// 'sales') has no personal book of business and is excluded. Display-only
-// for this dashboard/export — does not change anyone's actual RLS
-// role/permissions. Per owner decision 2026-07-20.
-const DASHBOARD_SALES_INCLUDE_MANAGERS = new Set([
-  "Adhitya Wirambara",
-  "Leli Al",
-]);
+// being 'manager', so listSalesTeamProfiles() (clients.ts) already includes
+// them; Andri Sutomo (profiles.role 'sales') has no personal book of
+// business and is excluded here instead. Display-only for this
+// dashboard/export — does not change anyone's actual RLS role/permissions.
+// Per owner decision 2026-07-20.
 const DASHBOARD_SALES_EXCLUDE = new Set(["Andri Sutomo"]);
 
 export function dashboardSalesTeam(
   salesTeam: SalesTeamMember[],
-  ownersById: Record<string, { name: string; initials: string; role: string }>,
 ): SalesTeamMember[] {
-  const managers = Object.entries(ownersById)
-    .filter(
-      ([, owner]) =>
-        owner.role === "manager" &&
-        DASHBOARD_SALES_INCLUDE_MANAGERS.has(owner.name),
-    )
-    .map(([id, owner]) => ({
-      id,
-      name: owner.name,
-      initials: owner.initials,
-    }));
-  const sales = salesTeam.filter(
+  return salesTeam.filter(
     (member) => !DASHBOARD_SALES_EXCLUDE.has(member.name),
   );
-  return [...sales, ...managers];
 }
 
 function inRange(dateStr: string, range: DateRange): boolean {

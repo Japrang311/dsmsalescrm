@@ -72,7 +72,6 @@ type Props = {
   currentNext?: string;
   allItems: CommercialItem[];
   profilesById: Record<string, { name: string }>;
-  salesTeam: { id: string; name: string }[];
 };
 
 const FIELD_LABEL: Record<string, string> = {
@@ -87,7 +86,6 @@ export function PipelineCardDrawer({
   item,
   allItems,
   profilesById,
-  salesTeam,
   client,
   currentNext,
 }: Props) {
@@ -129,7 +127,6 @@ export function PipelineCardDrawer({
   const currentStatus = client?.status ?? ("Prospect" as ClientStatus);
 
   const [stage, setStage] = useState(currentStage);
-  const [ownerId, setOwnerId] = useState(currentOwnerId);
   const [nextDate, setNextDate] = useState(currentNext ?? "");
   const [status, setStatus] = useState<ClientStatus>(currentStatus);
 
@@ -137,7 +134,6 @@ export function PipelineCardDrawer({
   useEffect(() => {
     if (!open || !item || !client) return;
     setStage(currentStage);
-    setOwnerId(currentOwnerId);
     setNextDate(currentNext ?? "");
     setStatus(currentStatus);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -216,9 +212,7 @@ export function PipelineCardDrawer({
   }
 
   const dirty =
-    stage !== currentStage ||
-    ownerId !== currentOwnerId ||
-    (nextDate || "") !== (currentNext ?? "");
+    stage !== currentStage || (nextDate || "") !== (currentNext ?? "");
   const statusDirty = status !== currentStatus;
 
   async function saveChanges() {
@@ -226,8 +220,6 @@ export function PipelineCardDrawer({
     const changes: { field: string; from?: string; to?: string }[] = [];
     if (stage !== currentStage)
       changes.push({ field: "stage", from: currentStage, to: stage });
-    if (ownerId !== currentOwnerId)
-      changes.push({ field: "ownerId", from: currentOwnerId, to: ownerId });
     const nd = nextDate || undefined;
     const cn = currentNext || undefined;
     if (nd !== cn) changes.push({ field: "nextActionDate", from: cn, to: nd });
@@ -237,16 +229,21 @@ export function PipelineCardDrawer({
       // commercial_documents has no next_action_date column post-Phase-11
       // normalization — updateCommercialItem() rejects that field outright
       // (see commercial-items.ts). "Next action" now lives on tasks; a
-      // changed date creates a follow-up task instead, below.
+      // changed date creates a follow-up task instead, below. owner_id is
+      // also deliberately not sent — the DB revokes UPDATE on that column
+      // for commercial_documents (see harden_normalized_document_permissions
+      // migration), so owner reassignment isn't supported for RFQ/Quotation
+      // documents; sending it unconditionally previously made every save
+      // through this drawer fail with "permission denied for table
+      // commercial_documents", even when only the stage changed.
       await updateCommercialItem(item.id, {
         stage,
-        ownerId,
       });
       const actorId = await getCurrentActorId();
       if (actorId) {
         await logActivity({
           kind: "commercial_item_stage_change",
-          ownerId,
+          ownerId: currentOwnerId,
           actorId,
           clientId: item.clientId,
           commercialItemId: item.id,
@@ -257,7 +254,7 @@ export function PipelineCardDrawer({
       if (nd && nd !== cn) {
         await createTask({
           clientId: item.clientId,
-          ownerId,
+          ownerId: currentOwnerId,
           commercialItemId: item.id,
           title: `Follow-up · ${item.type} — ${client.name}`,
           dueDate: nd,
@@ -370,22 +367,12 @@ export function PipelineCardDrawer({
 
             <div className="flex flex-col gap-1">
               <Label className="text-[11px]">Owner</Label>
-              <Select
-                value={ownerId}
-                onValueChange={setOwnerId}
-                disabled={!canEdit || role === "sales"}
-              >
-                <SelectTrigger className="h-8 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {salesTeam.map((m) => (
-                    <SelectItem key={m.id} value={m.id} className="text-xs">
-                      {m.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {/* Read-only: the DB revokes UPDATE on owner_id for
+                  commercial_documents, so RFQ/Quotation ownership can't be
+                  reassigned from this drawer. */}
+              <div className="flex h-8 items-center rounded-md border bg-muted px-2.5 text-xs text-muted-foreground">
+                {profilesById[currentOwnerId]?.name ?? "-"}
+              </div>
             </div>
 
             <div className="flex flex-col gap-1 sm:col-span-2">
@@ -409,7 +396,6 @@ export function PipelineCardDrawer({
                 className="h-7 text-xs"
                 onClick={() => {
                   setStage(currentStage);
-                  setOwnerId(currentOwnerId);
                   setNextDate(currentNext ?? "");
                 }}
               >

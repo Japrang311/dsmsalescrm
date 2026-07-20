@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils";
 export function SalesPerformanceTable() {
   const { orders, tasks, clients, salesTeam, ownersById, targetsByMember } =
     useDashboardData();
-  const displayTeam = dashboardSalesTeam(salesTeam, ownersById);
+  const displayTeam = dashboardSalesTeam(salesTeam);
   const rows = salesPerformance(
     orders,
     tasks,

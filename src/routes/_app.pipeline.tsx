@@ -653,7 +653,6 @@ function PipelineBoard({ role }: { role: Role }) {
         currentNext={drawerItemId ? nextByItem.get(drawerItemId) : undefined}
         allItems={items}
         profilesById={ownerById}
-        salesTeam={salesTeam}
       />
     </div>
   );

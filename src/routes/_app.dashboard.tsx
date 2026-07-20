@@ -132,7 +132,7 @@ function DashboardPage() {
     items,
     clients,
     ownersById,
-    salesTeam: dashboardSalesTeam(salesTeam, ownersById),
+    salesTeam: dashboardSalesTeam(salesTeam),
     targetsByMember,
     companyTarget,
   };

@@ -91,7 +91,7 @@ function ReportsPage() {
     companyTarget,
     isLoading,
   } = useDashboardData();
-  const displayTeam = dashboardSalesTeam(salesTeam, ownersById);
+  const displayTeam = dashboardSalesTeam(salesTeam);
 
   const [filters, setFilters] = useState<ReportFilters>(() =>
     defaultReportFilters({ from: new Date(CURRENT_YEAR, 0, 1), to: NOW }),

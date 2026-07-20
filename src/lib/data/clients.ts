@@ -108,22 +108,36 @@ export async function listOwners(): Promise<OwnerLookup> {
   return lookup;
 }
 
-// Used by the "Sales" owner filter on the Client List, which only managers
-// and executives see — RLS lets them read every profile. The .eq("role",
-// "sales") filter is also the app's one enforcement point keeping Super
-// Admin out of every owner/target/performance selector that's built from
-// this function's output (Settings' target assignment dropdown, dashboard
-// and report "sales team" collections) — Super Admin is not a Sales owner
-// and must never appear there (Phase 12 plan, Global Constraints).
+// Managers who personally own clients despite profiles.role = 'manager', not
+// 'sales' — Adhitya Wirambara and Leli Al both have a real book of business
+// (e.g. PT. Putra Arga Binangun, PT. Symphos Electric under Adhitya). They're
+// included here so owner filter/selector dropdowns can find their clients
+// too, same as any Sales rep. This is a display-layer inclusion only — it
+// does not touch RLS or their actual manager role/permissions. Per owner
+// decision 2026-07-20.
+const SALES_TEAM_INCLUDE_MANAGERS = new Set(["Adhitya Wirambara", "Leli Al"]);
+
+// Used by the "Sales"/"Owner" filter on the Client List, Pipeline, Tasks,
+// Sales Orders, and Reports pages, plus owner-assignment dropdowns — RLS
+// lets managers/executives read every profile. The .in("role", [...])
+// filter is also the app's one enforcement point keeping Super Admin out of
+// every owner/target/performance selector built from this function's output
+// (Settings' target assignment dropdown, dashboard and report "sales team"
+// collections) — Super Admin is not a Sales owner and must never appear
+// there (Phase 12 plan, Global Constraints).
 export async function listSalesTeamProfiles(): Promise<
   { id: string; name: string; initials: string; email: string }[]
 > {
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, name, initials, email")
-    .eq("role", "sales");
+    .select("id, name, initials, email, role")
+    .in("role", ["sales", "manager"]);
   if (error) throw error;
-  return data ?? [];
+  return (data ?? [])
+    .filter(
+      (p) => p.role === "sales" || SALES_TEAM_INCLUDE_MANAGERS.has(p.name),
+    )
+    .map(({ id, name, initials, email }) => ({ id, name, initials, email }));
 }
 
 // Reads public.client_search_index (id + name only), not the clients table
