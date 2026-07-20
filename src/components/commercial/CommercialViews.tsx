@@ -41,12 +41,12 @@ import {
   listSalesTeamProfiles,
 } from "@/lib/data/clients";
 
+// RFQ and Quotations are the only remaining CommercialViews consumers
+// (Customer PO/Prototypes/Repeat Orders were removed 2026-07-20 — they
+// always read commercial_documents, which never carries those types for
+// real data), so `types` is the only filter still needed.
 export type CommercialViewFilter = {
   types?: CommercialItem["type"][];
-  sourceFlows?: CommercialItem["sourceFlow"][];
-  requireQuotationNumber?: boolean;
-  requireCustomerPo?: boolean;
-  requireSoNumber?: boolean;
 };
 
 export type CommercialViewsProps = {
@@ -105,16 +105,6 @@ export function CommercialViews(props: CommercialViewsProps) {
       const set = new Set(props.filter.types);
       items = items.filter((i) => set.has(i.type));
     }
-    if (props.filter.sourceFlows) {
-      const set = new Set(props.filter.sourceFlows);
-      items = items.filter((i) => set.has(i.sourceFlow));
-    }
-    if (props.filter.requireQuotationNumber)
-      items = items.filter((i) => Boolean(i.quotationNumber));
-    if (props.filter.requireCustomerPo)
-      items = items.filter((i) => Boolean(i.customerPoNumber));
-    if (props.filter.requireSoNumber)
-      items = items.filter((i) => Boolean(i.soNumber));
     return items;
   }, [allItems, props.filter]);
 

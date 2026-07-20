@@ -10,9 +10,6 @@ import {
   Settings,
   FileText,
   ReceiptText,
-  Repeat,
-  FlaskConical,
-  FileCheck2,
 } from "lucide-react";
 
 import {
@@ -51,9 +48,6 @@ const NAV_EXECUTIVE = [
 const COMMERCIAL_ITEMS_NAV = [
   { title: "RFQ", url: "/rfq", icon: FileText },
   { title: "Quotations", url: "/quotations", icon: ReceiptText },
-  { title: "Repeat Orders", url: "/repeat-orders", icon: Repeat },
-  { title: "Prototypes", url: "/prototypes", icon: FlaskConical },
-  { title: "Customer PO", url: "/customer-po", icon: FileCheck2 },
 ] as const;
 
 export function AppSidebar() {

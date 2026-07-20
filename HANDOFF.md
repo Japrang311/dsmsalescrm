@@ -261,6 +261,7 @@ working tree clean; **not pushed**.
 
 **Flagged, not yet acted on** (see the report for detail — don't silently
 build these without asking first):
+
 - New Sales Order header/item edits aren't logged to Activity Log yet (the
   tax editor on the same page is).
 - The ~94 remaining owner-mismatched documents (95 minus the one fixed)

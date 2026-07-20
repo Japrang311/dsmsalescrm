@@ -21,17 +21,11 @@ import { Route as AppClientsRouteImport } from './routes/_app.clients'
 import { Route as AppActivityRouteImport } from './routes/_app.activity'
 import { Route as AppSalesOrdersIndexRouteImport } from './routes/_app.sales-orders.index'
 import { Route as AppRfqIndexRouteImport } from './routes/_app.rfq.index'
-import { Route as AppRepeatOrdersIndexRouteImport } from './routes/_app.repeat-orders.index'
 import { Route as AppQuotationsIndexRouteImport } from './routes/_app.quotations.index'
-import { Route as AppPrototypesIndexRouteImport } from './routes/_app.prototypes.index'
-import { Route as AppCustomerPoIndexRouteImport } from './routes/_app.customer-po.index'
 import { Route as AppClientsIndexRouteImport } from './routes/_app.clients.index'
 import { Route as AppSalesOrdersSoIdRouteImport } from './routes/_app.sales-orders.$soId'
 import { Route as AppRfqIdRouteImport } from './routes/_app.rfq.$id'
-import { Route as AppRepeatOrdersIdRouteImport } from './routes/_app.repeat-orders.$id'
 import { Route as AppQuotationsIdRouteImport } from './routes/_app.quotations.$id'
-import { Route as AppPrototypesIdRouteImport } from './routes/_app.prototypes.$id'
-import { Route as AppCustomerPoIdRouteImport } from './routes/_app.customer-po.$id'
 import { Route as AppClientsClientIdRouteImport } from './routes/_app.clients.$clientId'
 
 const LoginRoute = LoginRouteImport.update({
@@ -93,24 +87,9 @@ const AppRfqIndexRoute = AppRfqIndexRouteImport.update({
   path: '/rfq/',
   getParentRoute: () => AppRoute,
 } as any)
-const AppRepeatOrdersIndexRoute = AppRepeatOrdersIndexRouteImport.update({
-  id: '/repeat-orders/',
-  path: '/repeat-orders/',
-  getParentRoute: () => AppRoute,
-} as any)
 const AppQuotationsIndexRoute = AppQuotationsIndexRouteImport.update({
   id: '/quotations/',
   path: '/quotations/',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppPrototypesIndexRoute = AppPrototypesIndexRouteImport.update({
-  id: '/prototypes/',
-  path: '/prototypes/',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppCustomerPoIndexRoute = AppCustomerPoIndexRouteImport.update({
-  id: '/customer-po/',
-  path: '/customer-po/',
   getParentRoute: () => AppRoute,
 } as any)
 const AppClientsIndexRoute = AppClientsIndexRouteImport.update({
@@ -128,24 +107,9 @@ const AppRfqIdRoute = AppRfqIdRouteImport.update({
   path: '/rfq/$id',
   getParentRoute: () => AppRoute,
 } as any)
-const AppRepeatOrdersIdRoute = AppRepeatOrdersIdRouteImport.update({
-  id: '/repeat-orders/$id',
-  path: '/repeat-orders/$id',
-  getParentRoute: () => AppRoute,
-} as any)
 const AppQuotationsIdRoute = AppQuotationsIdRouteImport.update({
   id: '/quotations/$id',
   path: '/quotations/$id',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppPrototypesIdRoute = AppPrototypesIdRouteImport.update({
-  id: '/prototypes/$id',
-  path: '/prototypes/$id',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppCustomerPoIdRoute = AppCustomerPoIdRouteImport.update({
-  id: '/customer-po/$id',
-  path: '/customer-po/$id',
   getParentRoute: () => AppRoute,
 } as any)
 const AppClientsClientIdRoute = AppClientsClientIdRouteImport.update({
@@ -165,17 +129,11 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AppSettingsRoute
   '/tasks': typeof AppTasksRoute
   '/clients/$clientId': typeof AppClientsClientIdRoute
-  '/customer-po/$id': typeof AppCustomerPoIdRoute
-  '/prototypes/$id': typeof AppPrototypesIdRoute
   '/quotations/$id': typeof AppQuotationsIdRoute
-  '/repeat-orders/$id': typeof AppRepeatOrdersIdRoute
   '/rfq/$id': typeof AppRfqIdRoute
   '/sales-orders/$soId': typeof AppSalesOrdersSoIdRoute
   '/clients/': typeof AppClientsIndexRoute
-  '/customer-po/': typeof AppCustomerPoIndexRoute
-  '/prototypes/': typeof AppPrototypesIndexRoute
   '/quotations/': typeof AppQuotationsIndexRoute
-  '/repeat-orders/': typeof AppRepeatOrdersIndexRoute
   '/rfq/': typeof AppRfqIndexRoute
   '/sales-orders/': typeof AppSalesOrdersIndexRoute
 }
@@ -189,17 +147,11 @@ export interface FileRoutesByTo {
   '/settings': typeof AppSettingsRoute
   '/tasks': typeof AppTasksRoute
   '/clients/$clientId': typeof AppClientsClientIdRoute
-  '/customer-po/$id': typeof AppCustomerPoIdRoute
-  '/prototypes/$id': typeof AppPrototypesIdRoute
   '/quotations/$id': typeof AppQuotationsIdRoute
-  '/repeat-orders/$id': typeof AppRepeatOrdersIdRoute
   '/rfq/$id': typeof AppRfqIdRoute
   '/sales-orders/$soId': typeof AppSalesOrdersSoIdRoute
   '/clients': typeof AppClientsIndexRoute
-  '/customer-po': typeof AppCustomerPoIndexRoute
-  '/prototypes': typeof AppPrototypesIndexRoute
   '/quotations': typeof AppQuotationsIndexRoute
-  '/repeat-orders': typeof AppRepeatOrdersIndexRoute
   '/rfq': typeof AppRfqIndexRoute
   '/sales-orders': typeof AppSalesOrdersIndexRoute
 }
@@ -216,17 +168,11 @@ export interface FileRoutesById {
   '/_app/settings': typeof AppSettingsRoute
   '/_app/tasks': typeof AppTasksRoute
   '/_app/clients/$clientId': typeof AppClientsClientIdRoute
-  '/_app/customer-po/$id': typeof AppCustomerPoIdRoute
-  '/_app/prototypes/$id': typeof AppPrototypesIdRoute
   '/_app/quotations/$id': typeof AppQuotationsIdRoute
-  '/_app/repeat-orders/$id': typeof AppRepeatOrdersIdRoute
   '/_app/rfq/$id': typeof AppRfqIdRoute
   '/_app/sales-orders/$soId': typeof AppSalesOrdersSoIdRoute
   '/_app/clients/': typeof AppClientsIndexRoute
-  '/_app/customer-po/': typeof AppCustomerPoIndexRoute
-  '/_app/prototypes/': typeof AppPrototypesIndexRoute
   '/_app/quotations/': typeof AppQuotationsIndexRoute
-  '/_app/repeat-orders/': typeof AppRepeatOrdersIndexRoute
   '/_app/rfq/': typeof AppRfqIndexRoute
   '/_app/sales-orders/': typeof AppSalesOrdersIndexRoute
 }
@@ -243,17 +189,11 @@ export interface FileRouteTypes {
     | '/settings'
     | '/tasks'
     | '/clients/$clientId'
-    | '/customer-po/$id'
-    | '/prototypes/$id'
     | '/quotations/$id'
-    | '/repeat-orders/$id'
     | '/rfq/$id'
     | '/sales-orders/$soId'
     | '/clients/'
-    | '/customer-po/'
-    | '/prototypes/'
     | '/quotations/'
-    | '/repeat-orders/'
     | '/rfq/'
     | '/sales-orders/'
   fileRoutesByTo: FileRoutesByTo
@@ -267,17 +207,11 @@ export interface FileRouteTypes {
     | '/settings'
     | '/tasks'
     | '/clients/$clientId'
-    | '/customer-po/$id'
-    | '/prototypes/$id'
     | '/quotations/$id'
-    | '/repeat-orders/$id'
     | '/rfq/$id'
     | '/sales-orders/$soId'
     | '/clients'
-    | '/customer-po'
-    | '/prototypes'
     | '/quotations'
-    | '/repeat-orders'
     | '/rfq'
     | '/sales-orders'
   id:
@@ -293,17 +227,11 @@ export interface FileRouteTypes {
     | '/_app/settings'
     | '/_app/tasks'
     | '/_app/clients/$clientId'
-    | '/_app/customer-po/$id'
-    | '/_app/prototypes/$id'
     | '/_app/quotations/$id'
-    | '/_app/repeat-orders/$id'
     | '/_app/rfq/$id'
     | '/_app/sales-orders/$soId'
     | '/_app/clients/'
-    | '/_app/customer-po/'
-    | '/_app/prototypes/'
     | '/_app/quotations/'
-    | '/_app/repeat-orders/'
     | '/_app/rfq/'
     | '/_app/sales-orders/'
   fileRoutesById: FileRoutesById
@@ -400,32 +328,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppRfqIndexRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/repeat-orders/': {
-      id: '/_app/repeat-orders/'
-      path: '/repeat-orders'
-      fullPath: '/repeat-orders/'
-      preLoaderRoute: typeof AppRepeatOrdersIndexRouteImport
-      parentRoute: typeof AppRoute
-    }
     '/_app/quotations/': {
       id: '/_app/quotations/'
       path: '/quotations'
       fullPath: '/quotations/'
       preLoaderRoute: typeof AppQuotationsIndexRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/prototypes/': {
-      id: '/_app/prototypes/'
-      path: '/prototypes'
-      fullPath: '/prototypes/'
-      preLoaderRoute: typeof AppPrototypesIndexRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/customer-po/': {
-      id: '/_app/customer-po/'
-      path: '/customer-po'
-      fullPath: '/customer-po/'
-      preLoaderRoute: typeof AppCustomerPoIndexRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/clients/': {
@@ -449,32 +356,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppRfqIdRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/repeat-orders/$id': {
-      id: '/_app/repeat-orders/$id'
-      path: '/repeat-orders/$id'
-      fullPath: '/repeat-orders/$id'
-      preLoaderRoute: typeof AppRepeatOrdersIdRouteImport
-      parentRoute: typeof AppRoute
-    }
     '/_app/quotations/$id': {
       id: '/_app/quotations/$id'
       path: '/quotations/$id'
       fullPath: '/quotations/$id'
       preLoaderRoute: typeof AppQuotationsIdRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/prototypes/$id': {
-      id: '/_app/prototypes/$id'
-      path: '/prototypes/$id'
-      fullPath: '/prototypes/$id'
-      preLoaderRoute: typeof AppPrototypesIdRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/customer-po/$id': {
-      id: '/_app/customer-po/$id'
-      path: '/customer-po/$id'
-      fullPath: '/customer-po/$id'
-      preLoaderRoute: typeof AppCustomerPoIdRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/clients/$clientId': {
@@ -509,16 +395,10 @@ interface AppRouteChildren {
   AppReportsRoute: typeof AppReportsRoute
   AppSettingsRoute: typeof AppSettingsRoute
   AppTasksRoute: typeof AppTasksRoute
-  AppCustomerPoIdRoute: typeof AppCustomerPoIdRoute
-  AppPrototypesIdRoute: typeof AppPrototypesIdRoute
   AppQuotationsIdRoute: typeof AppQuotationsIdRoute
-  AppRepeatOrdersIdRoute: typeof AppRepeatOrdersIdRoute
   AppRfqIdRoute: typeof AppRfqIdRoute
   AppSalesOrdersSoIdRoute: typeof AppSalesOrdersSoIdRoute
-  AppCustomerPoIndexRoute: typeof AppCustomerPoIndexRoute
-  AppPrototypesIndexRoute: typeof AppPrototypesIndexRoute
   AppQuotationsIndexRoute: typeof AppQuotationsIndexRoute
-  AppRepeatOrdersIndexRoute: typeof AppRepeatOrdersIndexRoute
   AppRfqIndexRoute: typeof AppRfqIndexRoute
   AppSalesOrdersIndexRoute: typeof AppSalesOrdersIndexRoute
 }
@@ -531,16 +411,10 @@ const AppRouteChildren: AppRouteChildren = {
   AppReportsRoute: AppReportsRoute,
   AppSettingsRoute: AppSettingsRoute,
   AppTasksRoute: AppTasksRoute,
-  AppCustomerPoIdRoute: AppCustomerPoIdRoute,
-  AppPrototypesIdRoute: AppPrototypesIdRoute,
   AppQuotationsIdRoute: AppQuotationsIdRoute,
-  AppRepeatOrdersIdRoute: AppRepeatOrdersIdRoute,
   AppRfqIdRoute: AppRfqIdRoute,
   AppSalesOrdersSoIdRoute: AppSalesOrdersSoIdRoute,
-  AppCustomerPoIndexRoute: AppCustomerPoIndexRoute,
-  AppPrototypesIndexRoute: AppPrototypesIndexRoute,
   AppQuotationsIndexRoute: AppQuotationsIndexRoute,
-  AppRepeatOrdersIndexRoute: AppRepeatOrdersIndexRoute,
   AppRfqIndexRoute: AppRfqIndexRoute,
   AppSalesOrdersIndexRoute: AppSalesOrdersIndexRoute,
 }

@@ -86,11 +86,11 @@ deliberately closed):
 - **UI** (`_app.sales-orders.$soId.tsx`): new `EditSalesOrderHeaderDialog`
   (Klien/Customer PO/Tanggal/Sales Owner) and per-row inline line-item
   editing, gated by `canEditOwnSo = manager | super_admin | (sales &&
-  so.ownerId === CURRENT_SALES_ID)`; owner reassignment specifically is
+so.ownerId === CURRENT_SALES_ID)`; owner reassignment specifically is
   manager/super_admin-only within the dialog.
-- **Tests**: 4 pre-existing tests encoded the *old* stricter contract (no
+- **Tests**: 4 pre-existing tests encoded the _old_ stricter contract (no
   one may ever touch `owner_id`/`client_id` on `sales_orders`) and needed
-  updating to the *new*, deliberately narrower one — not deleted, rewritten
+  updating to the _new_, deliberately narrower one — not deleted, rewritten
   to assert the accurate per-role behavior (including that RLS-blocked
   UPDATEs return 0 rows with no error, not a thrown error — a real subtlety
   found while fixing these). Added one new dedicated test using a fresh

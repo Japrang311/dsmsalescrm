@@ -33,14 +33,16 @@ export type FeedEvent = {
   link?: FeedLink;
 };
 
+// Direct Order/Prototype/Customer PO no longer have a dedicated list/detail
+// page — those pages always read from commercial_documents, which never
+// carries those types for real (sheet-imported) data (they're recorded as
+// sales_orders instead); the pages were removed 2026-07-20. RFQ/Quotation
+// are the only real commercial_documents types.
 const COMMERCIAL_ROUTE: Partial<
   Record<CommercialItem["type"], { to: string; label: string }>
 > = {
   RFQ: { to: "/rfq/$id", label: "Buka RFQ" },
   Quotation: { to: "/quotations/$id", label: "Buka Quotation" },
-  "Direct Order": { to: "/repeat-orders/$id", label: "Buka Repeat Order" },
-  Prototype: { to: "/prototypes/$id", label: "Buka Prototype" },
-  "Customer PO": { to: "/customer-po/$id", label: "Buka Customer PO" },
 };
 
 function commercialLink(
