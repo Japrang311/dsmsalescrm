@@ -1,6 +1,6 @@
 # Handoff — DSM Sales Web App V2
 
-Context dump for continuing this work in another tool (Codex). Written 2026-07-18; Phase 11/12 status refreshed 2026-07-19; Phase 11 import-review reconciliation session added 2026-07-19; post-import UX/bugfix session added 2026-07-20 (see bottom).
+Context dump for continuing this work in another tool (Codex). Written 2026-07-18; Phase 11/12 status refreshed 2026-07-19; Phase 11 import-review reconciliation session added 2026-07-19; post-import UX/bugfix session added 2026-07-20; second 2026-07-20 session (pipeline permissions/FK bugfixes) added at the bottom.
 
 ## Project basics
 
@@ -9,11 +9,11 @@ Context dump for continuing this work in another tool (Codex). Written 2026-07-1
 - Local Supabase: `bunx supabase start` / `bunx supabase db reset` (rebuilds from `supabase/migrations/*.sql` + `supabase/seed.sql`) / `bunx supabase stop`.
 - Git is present on branch `main`, connected to `github.com/Japrang311/dsmsalescrm`
   (the Lovable-connected remote). Working tree is clean as of commit
-  `7aecd2e` (2026-07-20) — the earlier note about extensive uncommitted
-  files is stale; two real commits (`7a84907`, `7aecd2e`) now capture that
-  work. Neither has been pushed to `origin` — push needs separate explicit
-  approval. Still never rewrite history, rebase, amend, squash, or
-  force-push on this repo.
+  `48c1cd4` (2026-07-20) — see the bottom section for what that and the two
+  commits before it (`77d637a`, `aad642f`) contain. **None of these commits
+  have been pushed to `origin`** — push needs separate explicit approval.
+  Still never rewrite history, rebase, amend, squash, or force-push on this
+  repo.
 - The user (Aditya) is not a programmer — explain things in plain terms, avoid silently making irreversible calls (schema changes, deleting data).
 
 ## Latest accepted direction — supersedes older deferred notes below
@@ -266,18 +266,141 @@ build these without asking first):
   tax editor on the same page is).
 - The ~94 remaining owner-mismatched documents (95 minus the one fixed)
   are not bulk-corrected — the new edit form is one-at-a-time.
-- `public.profiles` is missing `Hendra Wijaya` (7 profiles where `seed.sql`
-  defines 8) — not caused by this session's own changes; origin
-  unconfirmed, not investigated further as it was out of scope.
 - Search/notifications/SO-edit/product-name UI changes were verified via
   `tsc`/`lint`/`test`/`build` only, not a live browser click-through —
   Chrome DevTools MCP was disconnected for most of this session. Do a
   manual pass before treating this as fully proven.
 
+**Resolved in the 2026-07-20 follow-up session (see bottom section):**
+`public.profiles` no longer has a `Hendra Wijaya` row — confirmed mock data,
+deliberately deleted (not restored) — see below for detail. Do not treat that
+old line above as still open.
+
+## What happened this session (2026-07-20, pipeline permissions/FK bugfix session)
+
+Starting point: the owner (Adhitya) kept using the app after the post-import
+UX session above and reported more concrete problems, one at a time, mostly
+via screenshots. Three commits landed: `77d637a`, `aad642f`, `48c1cd4`.
+
+1. **Removed Hendra Wijaya entirely** (owner decision — he is confirmed
+   mock/placeholder data, not a real team member). Deleted his
+   `public.profiles`/`auth.users` rows from the live local DB and from
+   `supabase/seed.sql`. This broke the dev role switcher's "Manager" login,
+   which was hardcoded to sign in as `hendra@local.dsm.test` — fixed by
+   repointing `ROLE_LOGIN.manager` in `src/context/role-context.tsx` to
+   `leli@local.dsm.test` (an existing real manager), and the matching
+   fallback display name in `_app.settings.tsx`.
+2. **Fixed a systemic pipeline stage-vocabulary bug.** The owner supplied a
+   screenshot of the correct 7 weighted stages (Client Request for Quotes
+   15%, Quotes Sent 30%, Negotiation 55%, Hot Prospect 75%, Commit 90%,
+   Closed Won 100%, Closed Lost 0%). `commercial-stages.ts` already had the
+   right weights, but `business-rules.ts`, `domain.ts`,
+   `_app.pipeline.tsx`, `PipelineCardDrawer.tsx`, and
+   `PipelineAnalytics.tsx` each had independently hardcoded **old** stage
+   names that never matched real data — this dumped almost every Pipeline
+   card into a fallback column, and made the Dashboard's "Waiting PO Value"
+   KPI, "Quotation Funnel", and "Forecast vs Achievement" always show
+   wrong/zero figures (`dashboard-selectors.ts`, `_app.reports.tsx` had
+   duplicate hand-rolled forecast math using the old names too). Fixed by
+   making `COMMERCIAL_STAGES` (`commercial-stages.ts`) the single source of
+   truth everywhere, and routing all forecast math through the existing
+   `forecastValue()` function instead of ad hoc duplicates.
+3. **Restricted pipeline stage moves to the document owner.** Previously any
+   Sales or Manager could drag/edit any card, which just meant Sales users
+   silently hit an RLS-driven failure when they didn't own the card. Added
+   an ownership check (`canMoveItem`/`canEdit` in `_app.pipeline.tsx` and
+   `PipelineCardDrawer.tsx`) — Sales can only move/edit cards they own;
+   Manager/Super Admin remain unrestricted, matching the existing
+   `sales_orders_update` RLS pattern.
+4. **Fixed the Owner search/filter dropdowns silently excluding two
+   managers with a real book of business.** Adhitya Wirambara ("G.M.
+   Manager" role = `manager` in the DB) and Leli Al both personally own
+   clients (Adhitya: 4 including PT. Putra Arga Binangun and PT. Symphos
+   Electric; Leli: 26 — more than any Sales rep), but
+   `listSalesTeamProfiles()` only queried `role = 'sales'`, so neither
+   ever appeared in the Owner filter on Pipeline/Clients/Tasks/Sales
+   Orders/Reports/Commercial views. Fixed by widening the query to
+   `role IN ('sales', 'manager')`, keeping only Sales + those two named
+   managers (Super Admin stays excluded per Phase 12). Simplified
+   `dashboardSalesTeam()` in `dashboard-selectors.ts`, which had
+   separately hardcoded the same two managers just for Dashboard/target
+   views — now redundant, removed to avoid double-counting.
+5. **Fixed the Pipeline card drawer failing on every single save** —
+   `"Gagal menyimpan perubahan" / permission denied for table
+   commercial_documents`. Root cause: `PipelineCardDrawer.tsx`'s
+   `saveChanges()` always sent `ownerId` in the update patch, even when
+   unchanged — but a Phase 11 hardening migration
+   (`20260719041351_harden_normalized_document_permissions.sql`)
+   deliberately revokes `UPDATE` on `owner_id` for `commercial_documents`
+   (RFQ/Quotation ownership isn't reassignable from the client, unlike
+   Sales Orders). Any UPDATE that touches that column in its SET clause
+   fails regardless of whether the value actually changes. Fixed by never
+   sending `ownerId`, and turning the Owner field read-only in
+   `PipelineCardDrawer.tsx` and `CommercialDetailPage.tsx` (owner
+   reassignment for these documents genuinely isn't supported by the DB —
+   this isn't a UI bug, it's DB-enforced by design).
+6. **Fixed a systemic `commercial_item_id`/`commercial_document_id` FK
+   mismatch** — `"Gagal memindahkan pipeline card" / insert or update on
+   table "activity_log" violates foreign key constraint
+   "activity_log_commercial_item_id_fkey"`. The legacy `commercial_item_id`
+   column on `activity_log`, `tasks`, and `follow_up_logs` now only
+   references a **frozen historical snapshot table**
+   (`private.legacy_commercial_items_20260718`) created during Phase 11
+   normalization — confirmed via `pg_constraint` that no live table named
+   `public.commercial_items` exists anymore, and confirmed via direct query
+   that **zero** rows in `tasks`/`activity_log` actually rely on the legacy
+   column (everything live already resolves through
+   `commercial_document_id`). Every call site that passed a normalized
+   document's `.id` into the `commercialItemId:` field of `logActivity()`
+   or `createTask()` was therefore writing an id that can never exist in
+   the frozen snapshot, and always failed with this FK violation. Fixed in
+   6 files: `_app.pipeline.tsx`, `PipelineCardDrawer.tsx`,
+   `CommercialDetailPage.tsx`, `LogCommercialFollowUpDialog.tsx`,
+   `LogFollowUpDialog.tsx` (`src/components/tasks/`), and `_app.tasks.tsx`
+   — all now pass `commercialDocumentId:` instead. Also fixed
+   `LogCommercialFollowUpDialog.tsx`'s "Perbarui Next follow-up" checkbox,
+   which called the same broken `updateCommercialItem(..., {
+   nextActionDate })` pattern already fixed in Pipeline earlier this
+   session — it now creates a follow-up task instead (same as the adjacent
+   "Buat task follow-up berikutnya" checkbox), without double-creating a
+   task if both boxes are checked.
+7. **Fixed one remaining stale stage name.** `_app.tasks.tsx`'s "Move to
+   Waiting PO" task action (found while reviewing item 6, not separately
+   reported by the owner) wrote the stage literal `"Waiting PO"`, which
+   isn't one of the 7 real stages from item 2's refactor — the correct
+   current name is `"Commit"` (same mapping already used for the
+   Dashboard's "Waiting PO Value" KPI). Fixed the write and the menu label
+   ("Move to Commit").
+
+Checkpoint after every change in this session: `bunx tsc --noEmit` clean,
+`bun run lint` 0 errors (12 pre-existing warnings only, same baseline as
+before), **`bun run test` 314/314**, `bun run build` succeeds. Three commits
+on `main`: `77d637a`, `aad642f`, `48c1cd4`. Working tree clean except an
+untracked `.planning/` directory (unrelated tooling output, not part of this
+work, left alone). **Not pushed to `origin`.**
+
+**Flagged from this session, not yet acted on:**
+
+- No live browser click-through of any of the fixes above — Chrome DevTools
+  MCP was unavailable this session too. The owner confirmed each fix by
+  reproducing the original error screenshot-by-screenshot after each patch,
+  but a systematic pass (drag every stage, edit every field, log a
+  follow-up from every entry point) hasn't been done.
+- Given how many call sites shared the exact same
+  `commercial_item_id`/`commercial_document_id` bug (item 6), it's worth
+  grepping for `commercialItemId:` as a literal object-key pattern
+  periodically — any *new* code that copies an older call site risks
+  reintroducing it. There is no lint rule or type-level guard against it;
+  the two fields are both optional strings on the same input type, so
+  TypeScript can't catch the mix-up.
+- The legacy `commercial_item_id` / `private.legacy_commercial_items_20260718`
+  archive table itself was not touched or cleaned up — it's just historical
+  evidence, left as-is.
+
 ## Suggested next steps for Codex
 
-1. Read `.superpowers/sdd/p11-post-import-ux-fixes-report.md` first — it's the freshest state. Then `.superpowers/sdd/p11-review-decisions-report.md`, `.superpowers/sdd/p11-task-8-report.md`, and `.superpowers/sdd/task-7-report.md` for the fuller history. Phases 11/12 are locally verified complete; the Phase 11 import review is fully decided (0 pending entries).
+1. Read this file's two most recent sessions first (2026-07-20 post-import UX/bugfix, then 2026-07-20 pipeline permissions/FK bugfix, both above) — they're the freshest state. Then `.superpowers/sdd/p11-post-import-ux-fixes-report.md`, `.superpowers/sdd/p11-review-decisions-report.md`, `.superpowers/sdd/p11-task-8-report.md`, and `.superpowers/sdd/task-7-report.md` for the fuller history. Phases 11/12 are locally verified complete; the Phase 11 import review is fully decided (0 pending entries).
 2. Keep all remote work blocked until the user identifies the exact Supabase target and explicitly approves the reviewed migration/import commands. This now also covers `20260720000000_add_sales_order_edit_support.sql`, which has never been applied anywhere but local.
-3. Do a live browser pass on global search, notifications, the Sales Order edit dialog/inline item editor, and the Sales Orders list's new "Nama Product" column before assuming they're fully correct — see "Flagged, not yet acted on" above.
+3. Do a live browser pass on global search, notifications, the Sales Order edit dialog/inline item editor, the Sales Orders list's "Nama Product" column, and everything in the pipeline-permissions/FK session above before assuming any of it is fully correct — see both "Flagged, not yet acted on" sections.
 4. Preserve Activity Log immutability, ownership attribution, task/follow-up/activity foreign keys, and archived legacy evidence. If asked to log the new SO edits to Activity Log, that needs a new `activity_kind` enum value (small migration) before wiring `logActivity()` calls.
-5. Git now has real commits (`7a84907`, `7aecd2e`) and a clean working tree — treat it normally (stage intentionally, don't `add -A` blindly, never force-push/rewrite history on this Lovable-connected repo). Nothing has been pushed to `origin` yet.
+5. Git now has real commits through `48c1cd4` and a clean working tree (an untracked `.planning/` directory aside) — treat it normally (stage intentionally, don't `add -A` blindly, never force-push/rewrite history on this Lovable-connected repo). Nothing has been pushed to `origin` yet.
