@@ -17,15 +17,14 @@ import { useDashboardData } from "@/hooks/use-dashboard-data";
 import { formatRupiahShort } from "@/lib/format";
 import { useIsMobile } from "@/hooks/use-mobile";
 
-const CURRENT_SALES_ID = "22222222-2222-2222-2222-222222222222";
-
 export function RevenueTrendChart({ role }: { role: Role }) {
   const isMobile = useIsMobile();
-  const { orders, targetsByMember, companyTarget } = useDashboardData();
+  const { orders, targetsByMember, companyTarget, currentUserId } =
+    useDashboardData();
   const data = monthlyRevenueTrend(
     orders,
     role,
-    CURRENT_SALES_ID,
+    currentUserId ?? "",
     targetsByMember,
     companyTarget,
   );

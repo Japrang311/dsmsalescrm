@@ -34,6 +34,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { ROLE_LABEL, useRole } from "@/context/role-context";
 import type { Role } from "@/lib/domain";
 import { listOwners } from "@/lib/data/clients";
+import { getCurrentActorId } from "@/lib/data/activity-log";
 import { useDashboardData } from "@/hooks/use-dashboard-data";
 import { AddClientDialog } from "@/components/clients/AddClientDialog";
 import { AddFollowUpDialog } from "@/components/clients/AddFollowUpDialog";
@@ -63,13 +64,6 @@ export const QUICK_CREATE_ITEMS = [
   kind: QuickCreateKind;
   label: string;
 }[];
-
-// Matches the hardcoded seed account the dev role switcher signs into for
-// "sales" (see role-context.tsx) — same simplification used in
-// TargetCharts.tsx, _app.dashboard.tsx and _app.reports.tsx. Only used
-// when authSource === "dev" (local dev role-switching), never for a real
-// signed-in session.
-const CURRENT_SALES_ID = "22222222-2222-2222-2222-222222222222";
 
 const MAX_RESULTS_PER_GROUP = 5;
 
@@ -307,30 +301,31 @@ function NotificationsMenu() {
 }
 
 export function TopBar() {
-  const { role, setRole, authSource, realProfile, signOut } = useRole();
+  const { role, setRole, authSource, authReady, realProfile, signOut } =
+    useRole();
   const [quickCreate, setQuickCreate] = useState<QuickCreateKind | null>(null);
   const { data: owners = {} } = useQuery({
     queryKey: ["profiles", "owners"],
     queryFn: listOwners,
     enabled: authSource === "dev",
   });
-  const manager = Object.values(owners).find((o) => o.role === "manager");
+  // Looked up by the real signed-in user's id, not guessed by role — the
+  // dev switcher signs into a specific seed account per role (see
+  // role-context.tsx's ROLE_LOGIN), and a hardcoded id or an "any manager"
+  // heuristic previously showed the wrong person's name/avatar whenever
+  // that specific seed account wasn't the one actually running.
+  const { data: currentUserId } = useQuery({
+    queryKey: ["current-user-id"],
+    queryFn: getCurrentActorId,
+    enabled: authReady && authSource === "dev",
+  });
+  const devUser = currentUserId ? owners[currentUserId] : undefined;
   const currentUser =
     authSource === "real" && realProfile
       ? realProfile
       : role === "executive"
         ? { name: "Direktur Utama", initials: "DU", email: "exec@dsm.co.id" }
-        : role === "manager"
-          ? (manager ?? { name: "—", initials: "—", email: "—" })
-          : role === "sales"
-            ? (owners[CURRENT_SALES_ID] ?? {
-                name: "—",
-                initials: "—",
-                email: "—",
-              })
-            : // super_admin has no dev seed login (see role-context.tsx) — never
-              // fall back to the Sales seed account's identity here.
-              { name: "—", initials: "—", email: "—" };
+        : (devUser ?? { name: "—", initials: "—", email: "—" });
 
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-border bg-background/95 px-3 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:px-4">

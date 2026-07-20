@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -35,11 +35,6 @@ import { ClientPickerField } from "@/components/clients/ClientPicker";
 import { createTask } from "@/lib/data/tasks";
 import { getCurrentActorId, logActivity } from "@/lib/data/activity-log";
 import { useRole } from "@/context/role-context";
-
-// Matches the local role switcher's fixed sign-in for "sales" (see
-// role-context.tsx's ROLE_LOGIN) — same "act as one specific person"
-// simplification used throughout the tasks pages.
-const CURRENT_SALES_ID = "22222222-2222-2222-2222-222222222222";
 
 const METHODS = ["Phone", "Email", "WhatsApp", "Visit", "Meeting"] as const;
 const PRIORITIES = ["High", "Normal", "Low"] as const;
@@ -93,19 +88,24 @@ export function CreateTaskDialog({
     queryFn: listClients,
     enabled: authReady,
   });
+  const { data: currentUserId } = useQuery({
+    queryKey: ["current-user-id"],
+    queryFn: getCurrentActorId,
+    enabled: authReady,
+  });
 
   const defaultOwner =
     role === "sales"
-      ? CURRENT_SALES_ID
-      : (salesTeam[0]?.id ?? CURRENT_SALES_ID);
+      ? (currentUserId ?? "")
+      : (salesTeam[0]?.id ?? currentUserId ?? "");
 
+  // listClients() is already RLS-scoped to the caller's own clients for
+  // Sales — no client-side re-filter needed (or safe to do correctly,
+  // since there's no reliable "current user id" available synchronously
+  // here anyway).
   const clients = useMemo(() => {
-    const scoped =
-      role === "sales"
-        ? allClients.filter((c) => c.ownerId === CURRENT_SALES_ID)
-        : allClients;
-    return [...scoped].sort((a, b) => a.name.localeCompare(b.name));
-  }, [role, allClients]);
+    return [...allClients].sort((a, b) => a.name.localeCompare(b.name));
+  }, [allClients]);
 
   const {
     register,
@@ -125,6 +125,16 @@ export function CreateTaskDialog({
       ownerId: defaultOwner,
     },
   });
+
+  // For Sales, the Owner field below is disabled (never user-editable), so
+  // it depends entirely on defaultOwner being correct. currentUserId loads
+  // asynchronously and may not be ready when useForm's defaultValues are
+  // taken, so sync it in once it resolves.
+  useEffect(() => {
+    if (role === "sales" && currentUserId) {
+      setValue("ownerId", currentUserId);
+    }
+  }, [role, currentUserId, setValue]);
 
   const onSubmit = handleSubmit(async (v) => {
     try {

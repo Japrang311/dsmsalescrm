@@ -10,6 +10,7 @@ import {
 } from "@/lib/data/clients";
 import { listTargets } from "@/lib/data/targets";
 import { companyMonthlyTarget } from "@/lib/data/dashboard-selectors";
+import { getCurrentActorId } from "@/lib/data/activity-log";
 
 // Shared real-data fetch for every dashboard/reports/activity component.
 // Each query reuses the same queryKey used elsewhere in the app (Clients
@@ -53,6 +54,15 @@ export function useDashboardData() {
     queryFn: () => listTargets(),
     enabled: authReady,
   });
+  // The real signed-in user's profile id — replaces the old hardcoded
+  // "current sales id" constant that used to be duplicated across every
+  // dashboard/reports/tasks component and only matched one specific seed
+  // account, showing wrong data/identity for every other sales user.
+  const currentUserId = useQuery({
+    queryKey: ["current-user-id"],
+    queryFn: getCurrentActorId,
+    enabled: authReady,
+  });
 
   const targetsByMember = targets.data ?? {};
 
@@ -65,6 +75,7 @@ export function useDashboardData() {
     salesTeam: salesTeam.data ?? [],
     targetsByMember,
     companyTarget: companyMonthlyTarget(targetsByMember),
+    currentUserId: currentUserId.data,
     isLoading:
       !authReady ||
       orders.isLoading ||

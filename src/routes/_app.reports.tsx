@@ -75,7 +75,6 @@ export const Route = createFileRoute("/_app/reports")({
 });
 
 const CHART_COLORS = ["#0176D3", "#10B981", "#8B5CF6", "#F59E0B", "#EF4444"];
-const CURRENT_SALES_ID = "22222222-2222-2222-2222-222222222222";
 
 function ReportsPage() {
   const { role, authReady } = useRole();
@@ -89,6 +88,7 @@ function ReportsPage() {
     salesTeam,
     targetsByMember,
     companyTarget,
+    currentUserId,
     isLoading,
   } = useDashboardData();
   const displayTeam = dashboardSalesTeam(salesTeam);
@@ -157,14 +157,14 @@ function ReportsPage() {
       return arr.slice(0, CURRENT_MONTH).reduce((s, m) => s + m.target, 0);
     }
     if (role === "sales") {
-      return targetsFor(targetsByMember, CURRENT_SALES_ID)
+      return targetsFor(targetsByMember, currentUserId ?? "")
         .slice(0, CURRENT_MONTH)
         .reduce((s, m) => s + m.target, 0);
     }
     return companyTarget
       .slice(0, CURRENT_MONTH)
       .reduce((s, m) => s + m.target, 0);
-  }, [filters.ownerId, role, targetsByMember, companyTarget]);
+  }, [filters.ownerId, role, targetsByMember, companyTarget, currentUserId]);
 
   const ytdAchievementPct =
     yearTargetTotal > 0 ? totals.revenue / yearTargetTotal : 0;

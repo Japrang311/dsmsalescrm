@@ -94,12 +94,6 @@ export const Route = createFileRoute("/_app/dashboard")({
   component: DashboardPage,
 });
 
-// Matches the hardcoded seed account the dev role switcher signs into for
-// "sales" (see role-context.tsx) — same simplification used in
-// TargetCharts.tsx and _app.reports.tsx. Not a Task 18 concern: this app
-// doesn't yet support multiple distinct sales identities.
-const CURRENT_SALES_ID = "22222222-2222-2222-2222-222222222222";
-
 function DashboardPage() {
   const { role } = useRole();
   const {
@@ -111,6 +105,7 @@ function DashboardPage() {
     salesTeam,
     targetsByMember,
     companyTarget,
+    currentUserId,
     isLoading,
   } = useDashboardData();
   const monthName = new Date(2026, CURRENT_MONTH - 1, 1).toLocaleDateString(
@@ -126,7 +121,7 @@ function DashboardPage() {
   const exportContext = {
     role,
     range: period,
-    salesUserId: CURRENT_SALES_ID,
+    salesUserId: currentUserId ?? "",
     orders,
     tasks: allTasks,
     items,
@@ -194,7 +189,7 @@ function DashboardPage() {
   const ytd = ytdRevenue(orders);
   const ytdTgt = ytdTargetValue(
     role,
-    CURRENT_SALES_ID,
+    currentUserId ?? "",
     targetsByMember,
     companyTarget,
   );
@@ -203,7 +198,7 @@ function DashboardPage() {
   const monthRev = monthlyRevenue(orders);
   const monthTgt = monthlyTargetValue(
     role,
-    CURRENT_SALES_ID,
+    currentUserId ?? "",
     targetsByMember,
     companyTarget,
   );

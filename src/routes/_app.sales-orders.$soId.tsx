@@ -62,11 +62,6 @@ import { StatusBadge } from "@/components/clients/StatusBadges";
 import { useRole, ROLE_LABEL } from "@/context/role-context";
 import { useDashboardData } from "@/hooks/use-dashboard-data";
 
-// Matches the hardcoded seed account the dev role switcher signs into for
-// "sales" (see role-context.tsx) — same simplification used in
-// TopBar.tsx, TargetCharts.tsx, _app.dashboard.tsx and _app.reports.tsx.
-const CURRENT_SALES_ID = "22222222-2222-2222-2222-222222222222";
-
 export const Route = createFileRoute("/_app/sales-orders/$soId")({
   head: () => ({ meta: [{ title: "Sales Order Detail · DSM" }] }),
   component: SalesOrderDetail,
@@ -82,6 +77,7 @@ function SalesOrderDetail() {
     clients: clientList,
     items,
     ownersById,
+    currentUserId,
     isLoading,
   } = useDashboardData();
   const { data: audit = [] } = useQuery({
@@ -126,7 +122,7 @@ function SalesOrderDetail() {
   const canEditOwnSo =
     role === "manager" ||
     role === "super_admin" ||
-    (role === "sales" && so.ownerId === CURRENT_SALES_ID);
+    (role === "sales" && so.ownerId === currentUserId);
 
   return (
     <div className="flex flex-col gap-4">

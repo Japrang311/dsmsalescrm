@@ -25,8 +25,6 @@ import { useDashboardData } from "@/hooks/use-dashboard-data";
 import { formatPercent, formatRupiahShort } from "@/lib/format";
 import { useIsMobile } from "@/hooks/use-mobile";
 
-const CURRENT_SALES_ID = "22222222-2222-2222-2222-222222222222";
-
 const tooltipStyle = {
   background: "var(--color-surface)",
   border: "1px solid var(--color-border)",
@@ -153,18 +151,19 @@ const chartCardContent = "px-1 pb-4 pt-2 sm:px-4 sm:pb-6";
 // ---------------------------------------------------------------------------
 export function YtdAchievementVsTargetChart({ role }: { role: Role }) {
   const cfg = useChartConfig();
-  const { orders, targetsByMember, companyTarget } = useDashboardData();
+  const { orders, targetsByMember, companyTarget, currentUserId } =
+    useDashboardData();
   const data = ytdCumulativeTrend(
     orders,
     role,
-    CURRENT_SALES_ID,
+    currentUserId ?? "",
     targetsByMember,
     companyTarget,
   );
   const ach = ytdRevenue(orders);
   const tgt = ytdTargetValue(
     role,
-    CURRENT_SALES_ID,
+    currentUserId ?? "",
     targetsByMember,
     companyTarget,
   );
@@ -266,11 +265,12 @@ export function YtdAchievementVsTargetChart({ role }: { role: Role }) {
 // ---------------------------------------------------------------------------
 export function MonthlyAchievementVsTargetChart({ role }: { role: Role }) {
   const cfg = useChartConfig();
-  const { orders, targetsByMember, companyTarget } = useDashboardData();
+  const { orders, targetsByMember, companyTarget, currentUserId } =
+    useDashboardData();
   const data = monthlyRevenueTrend(
     orders,
     role,
-    CURRENT_SALES_ID,
+    currentUserId ?? "",
     targetsByMember,
     companyTarget,
   );
@@ -357,20 +357,22 @@ export function MonthlyAchievementVsTargetChart({ role }: { role: Role }) {
 // ---------------------------------------------------------------------------
 export function SingleSalesTargetChart() {
   const cfg = useChartConfig();
-  const { orders, ownersById, targetsByMember, companyTarget } =
+  const { orders, ownersById, targetsByMember, companyTarget, currentUserId } =
     useDashboardData();
-  const memberName = ownersById[CURRENT_SALES_ID]?.name ?? "Sales";
+  const memberName = currentUserId
+    ? (ownersById[currentUserId]?.name ?? "Sales")
+    : "Sales";
   const data = monthlyRevenueTrend(
     orders,
     "sales",
-    CURRENT_SALES_ID,
+    currentUserId ?? "",
     targetsByMember,
     companyTarget,
   );
   const ach = ytdRevenue(orders);
   const tgt = ytdTargetValue(
     "sales",
-    CURRENT_SALES_ID,
+    currentUserId ?? "",
     targetsByMember,
     companyTarget,
   );
