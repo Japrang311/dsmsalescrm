@@ -1,16 +1,19 @@
 # Handoff — DSM Sales Web App V2
 
-Context dump for continuing this work in another tool (Codex). Written 2026-07-18; Phase 11/12 status refreshed 2026-07-19; Phase 11 import-review reconciliation session added 2026-07-19 (see bottom).
+Context dump for continuing this work in another tool (Codex). Written 2026-07-18; Phase 11/12 status refreshed 2026-07-19; Phase 11 import-review reconciliation session added 2026-07-19; post-import UX/bugfix session added 2026-07-20 (see bottom).
 
 ## Project basics
 
 - TanStack Start (React 19) front-end with a real local Supabase Postgres backend (`src/lib/data/`). The production mock layer was fully removed on 2026-07-19.
 - Package manager: **bun**. Key commands: `bun run dev`, `bun run test` (needs local Supabase running), `bun run lint`, `bun run build`, `bunx tsc --noEmit`.
 - Local Supabase: `bunx supabase start` / `bunx supabase db reset` (rebuilds from `supabase/migrations/*.sql` + `supabase/seed.sql`) / `bunx supabase stop`.
-- Git is currently present on branch `main`, but the worktree contains extensive
-  pre-existing modified, deleted, and untracked files. Do not create a broad
-  commit, rewrite history, rebase, amend, squash, or force-push. Review and
-  isolate the intended files before any future commit.
+- Git is present on branch `main`, connected to `github.com/Japrang311/dsmsalescrm`
+  (the Lovable-connected remote). Working tree is clean as of commit
+  `7aecd2e` (2026-07-20) — the earlier note about extensive uncommitted
+  files is stale; two real commits (`7a84907`, `7aecd2e`) now capture that
+  work. Neither has been pushed to `origin` — push needs separate explicit
+  approval. Still never rewrite history, rebase, amend, squash, or
+  force-push on this repo.
 - The user (Aditya) is not a programmer — explain things in plain terms, avoid silently making irreversible calls (schema changes, deleting data).
 
 ## Latest accepted direction — supersedes older deferred notes below
@@ -206,10 +209,74 @@ CSVs and the decided review workbook
 (`Phase-11-Import-Review-DECIDED.xlsx`) live outside the repo in the Downloads
 folder mentioned above, not committed anywhere.
 
+## What happened this session (2026-07-20, post-import UX/bugfix session)
+
+Starting point: the owner started actually using the app after the Phase 11
+import-review reconciliation, and reported concrete problems one at a time.
+Full detail in `.superpowers/sdd/p11-post-import-ux-fixes-report.md`; short
+version:
+
+1. **Dashboard crash fixed** — `/dashboard` threw and fell to the error
+   boundary because `dashboard-selectors.ts` indexed a per-member target
+   array without a bounds guard; a member with no seeded `targets` row
+   (empty array) triggered it. Fixed 4 unguarded sites.
+2. **Global search and notifications built** — both were fully decorative
+   (no `value`/`onChange`, no click handler) despite looking functional.
+   Search now does client-side lookup across client/RFQ/quotation/SO into a
+   grouped dropdown; notifications now derive from today/overdue tasks.
+   `ClientPickerField` (shared by every "create X" dialog) rebuilt as a
+   searchable combobox instead of a scroll-only dropdown.
+3. **Sales Orders made editable** (client, owner, PO, date, line items) —
+   triggered by the owner finding a real SO whose client showed "—".
+   Root cause: correct `client_id`, but the client's `owner_id` (set by the
+   Phase 11 bulk import's client-matching heuristic) differed from the SO's
+   own owner, and RLS correctly hid it. Scale check: **21 of 189 imported
+   Sales Orders and 74 of 400 commercial documents** have this same
+   mismatch. New migration `20260720000000_add_sales_order_edit_support.sql`
+   adds a `client_search_index` view (any active user can look up any
+   client's id+name, not gated by `clients_select`'s ownership rule),
+   reopens `client_id`/`owner_id` as edit-form-and-RLS-checked columns on
+   `sales_orders` (owner decision — reverses part of
+   `20260719041351_harden_normalized_document_permissions.sql`), and adds a
+   trigger so `sales_orders.total_value` stays in sync with its items
+   (didn't exist before; a real gap once item editing was allowed). Applied
+   via `supabase migration up --local`, not `db reset` (would have wiped
+   the real 586-document import, which isn't seed-sourced). 4 pre-existing
+   RLS tests updated (not deleted) to match the new, narrower contract.
+4. **Twelve leftover mock/demo clients deleted** (with their mock
+   tasks/orders) — both live and from `seed.sql` — verified first that none
+   had real `Imported` data attached. `PT. HARIFF DAYA TUNGGAL ENGINEERING`
+   looked like mock data too but has 27 real imported sales orders — kept.
+5. **Sales Performance dashboard composition changed** (owner decision,
+   display-only) — Andri Sutomo dropped, Adhitya Wirambara and Leli Al
+   added despite their `profiles.role` being `manager`. No RLS/role change.
+6. **Product Name backfilled from Description** (owner decision, reverses
+   part of the original Phase 11 import design) — 1,102 of 1,106 historical
+   line items had `product_name` null with the real text sitting in
+   `description`; moved into `product_name`, `description` cleared.
+
+Checkpoint: `bunx tsc --noEmit` clean, `bun run lint` 0 errors, **`bun run
+test` 314/314**, `bun run build` succeeds. Committed as `7aecd2e` on `main`;
+working tree clean; **not pushed**.
+
+**Flagged, not yet acted on** (see the report for detail — don't silently
+build these without asking first):
+- New Sales Order header/item edits aren't logged to Activity Log yet (the
+  tax editor on the same page is).
+- The ~94 remaining owner-mismatched documents (95 minus the one fixed)
+  are not bulk-corrected — the new edit form is one-at-a-time.
+- `public.profiles` is missing `Hendra Wijaya` (7 profiles where `seed.sql`
+  defines 8) — not caused by this session's own changes; origin
+  unconfirmed, not investigated further as it was out of scope.
+- Search/notifications/SO-edit/product-name UI changes were verified via
+  `tsc`/`lint`/`test`/`build` only, not a live browser click-through —
+  Chrome DevTools MCP was disconnected for most of this session. Do a
+  manual pass before treating this as fully proven.
+
 ## Suggested next steps for Codex
 
-1. Read `.superpowers/sdd/p11-task-8-report.md`, `.superpowers/sdd/task-7-report.md`, and `.superpowers/sdd/p11-review-decisions-report.md`; Phase 11 and Phase 12 are locally verified complete as of 2026-07-19, and the Phase 11 import review is now fully decided (0 pending entries).
-2. Keep all remote work blocked until the user identifies the exact Supabase target and explicitly approves the reviewed migration/import commands.
-3. The 55-entry review backlog is closed; 33 review rows remain and all correspond to 16 deliberately-rejected documents (incomplete source data) — no further decisions are outstanding. Rerun dry-run reconciliation immediately before any remote import regardless; never reuse the current maxima as hardcoded seeds.
-4. Preserve Activity Log immutability, ownership attribution, task/follow-up/activity foreign keys, and archived legacy evidence.
-5. This folder still has no `.git`; do not initialize or rewrite Lovable-connected history without explicit approval.
+1. Read `.superpowers/sdd/p11-post-import-ux-fixes-report.md` first — it's the freshest state. Then `.superpowers/sdd/p11-review-decisions-report.md`, `.superpowers/sdd/p11-task-8-report.md`, and `.superpowers/sdd/task-7-report.md` for the fuller history. Phases 11/12 are locally verified complete; the Phase 11 import review is fully decided (0 pending entries).
+2. Keep all remote work blocked until the user identifies the exact Supabase target and explicitly approves the reviewed migration/import commands. This now also covers `20260720000000_add_sales_order_edit_support.sql`, which has never been applied anywhere but local.
+3. Do a live browser pass on global search, notifications, the Sales Order edit dialog/inline item editor, and the Sales Orders list's new "Nama Product" column before assuming they're fully correct — see "Flagged, not yet acted on" above.
+4. Preserve Activity Log immutability, ownership attribution, task/follow-up/activity foreign keys, and archived legacy evidence. If asked to log the new SO edits to Activity Log, that needs a new `activity_kind` enum value (small migration) before wiring `logActivity()` calls.
+5. Git now has real commits (`7a84907`, `7aecd2e`) and a clean working tree — treat it normally (stage intentionally, don't `add -A` blindly, never force-push/rewrite history on this Lovable-connected repo). Nothing has been pushed to `origin` yet.
