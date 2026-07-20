@@ -150,7 +150,7 @@ function SettingsPage() {
     realProfile ??
     {
       sales: { name: "Nur Iman", email: "nur@local.dsm.test" },
-      manager: { name: "Hendra Wijaya", email: "hendra@local.dsm.test" },
+      manager: { name: "Leli Al", email: "leli@local.dsm.test" },
       executive: {
         name: "Direktur Utama",
         email: "executive@local.dsm.test",

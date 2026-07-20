@@ -6,14 +6,16 @@ import type {
   SourceFlow,
 } from "@/lib/domain";
 
+// The seven exact weighted stages (PRD §7) — see
+// src/lib/data/commercial-stages.ts's COMMERCIAL_STAGE_WEIGHTS for the
+// forecast weights these same names carry.
 export const RFQ_STAGES: RfqStage[] = [
-  "RFQ Received",
-  "Quotation in Progress",
-  "Quotation Sent",
-  "Waiting Client PO",
-  "PO Received",
-  "Sales Order Released",
-  "Revenue Recorded",
+  "Client Request for Quotes",
+  "Quotes Sent",
+  "Negotiation",
+  "Hot Prospect",
+  "Commit",
+  "Closed Won",
   "Closed Lost",
 ];
 

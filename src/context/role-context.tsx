@@ -47,7 +47,7 @@ type DevRole = Exclude<Role, "super_admin">;
 
 const ROLE_LOGIN: Record<DevRole, { email: string; password: string }> = {
   sales: { email: "nur@local.dsm.test", password: "seed-local-only" },
-  manager: { email: "hendra@local.dsm.test", password: "seed-local-only" },
+  manager: { email: "leli@local.dsm.test", password: "seed-local-only" },
   executive: { email: "executive@local.dsm.test", password: "seed-local-only" },
 };
 const SEED_EMAILS = new Set(Object.values(ROLE_LOGIN).map((v) => v.email));

@@ -11,6 +11,10 @@ import {
   type DateRange,
 } from "@/lib/domain";
 import type { MonthlyTarget, TargetsByMember } from "@/lib/data/targets";
+import {
+  forecastValue,
+  type CommercialStage,
+} from "@/lib/data/commercial-stages";
 
 function paidRevenue(so: SalesOrder): number {
   return so.value ?? 0;
@@ -455,9 +459,12 @@ export function activeCommercialCount(items: CommercialItem[]) {
   return items.length;
 }
 
+// "Commit" (90%) is the closest-to-closing open stage — items essentially
+// agreed, waiting on the customer's formal PO. Same equivalence used by
+// Reports' "Waiting PO — Nilai & Aging" card.
 export function waitingPoValue(items: CommercialItem[]) {
   return items
-    .filter((c) => c.stage === "Waiting Client PO")
+    .filter((c) => c.stage === "Commit")
     .reduce((s, c) => s + c.estimatedValue, 0);
 }
 
@@ -560,13 +567,20 @@ export function topCustomersYtd(
     .slice(0, limit);
 }
 
+// Funnel progression through the seven weighted stages (PRD §7), ending at
+// Closed Won — Closed Lost is the "we lost" branch, not a funnel step.
+const FUNNEL_STAGES: CommercialStage[] = [
+  "Client Request for Quotes",
+  "Quotes Sent",
+  "Negotiation",
+  "Hot Prospect",
+  "Commit",
+  "Closed Won",
+];
+
 export function quotationFunnel(items: CommercialItem[]) {
-  const stages: Array<{ stage: string; count: number; value: number }> = [
-    { stage: "Quotation Sent", count: 0, value: 0 },
-    { stage: "Waiting Client PO", count: 0, value: 0 },
-    { stage: "PO Received", count: 0, value: 0 },
-    { stage: "Sales Order Released", count: 0, value: 0 },
-  ];
+  const stages: Array<{ stage: string; count: number; value: number }> =
+    FUNNEL_STAGES.map((stage) => ({ stage, count: 0, value: 0 }));
   for (const ci of items) {
     const s = stages.find((x) => x.stage === ci.stage);
     if (s) {
@@ -583,11 +597,12 @@ export function forecastVsAchievement(
   ytdTargetExecutive: number,
 ) {
   const achievement = ytdRevenue(orders);
+  // Closed Won is already realized revenue (counted in `achievement` via
+  // orders) and Closed Lost contributes nothing — only still-open stages
+  // count toward the pipeline forecast, weighted per PRD §7.
   const pipeline = items.reduce((s, ci) => {
-    if (ci.stage === "Waiting Client PO" || ci.stage === "PO Received")
-      return s + ci.estimatedValue;
-    if (ci.stage === "Quotation Sent") return s + ci.estimatedValue * 0.5;
-    return s;
+    if (ci.stage === "Closed Won" || ci.stage === "Closed Lost") return s;
+    return s + (forecastValue(ci.estimatedValue, ci.stage) ?? 0);
   }, 0);
   const forecast = achievement + pipeline;
   return { achievement, forecast, target: ytdTargetExecutive };
@@ -614,7 +629,7 @@ export function riskAlerts(
     });
   }
   const bigPending = items.filter(
-    (c) => c.stage === "Waiting Client PO" && c.estimatedValue > 400_000_000,
+    (c) => c.stage === "Commit" && c.estimatedValue > 400_000_000,
   );
   if (bigPending.length > 0) {
     alerts.push({

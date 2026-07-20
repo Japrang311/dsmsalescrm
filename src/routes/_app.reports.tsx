@@ -56,6 +56,7 @@ import {
   riskAlerts,
   targetsFor,
 } from "@/lib/data/dashboard-selectors";
+import { forecastValue } from "@/lib/data/commercial-stages";
 import { useDashboardData } from "@/hooks/use-dashboard-data";
 import {
   ReportFilterBar,
@@ -227,13 +228,13 @@ function ReportsPage() {
     [totals],
   );
 
-  // Forecast: achievement + waiting PO + 50% of Quotation Sent
+  // Forecast: achievement + weighted pipeline value per the seven weighted
+  // stages (PRD §7) — Closed Won is already realized revenue counted in
+  // `totals.revenue`, Closed Lost contributes nothing.
   const forecast = useMemo(() => {
     const pipeline = commercial.reduce((s, ci) => {
-      if (ci.stage === "Waiting Client PO" || ci.stage === "PO Received")
-        return s + ci.estimatedValue;
-      if (ci.stage === "Quotation Sent") return s + ci.estimatedValue * 0.5;
-      return s;
+      if (ci.stage === "Closed Won" || ci.stage === "Closed Lost") return s;
+      return s + (forecastValue(ci.estimatedValue, ci.stage) ?? 0);
     }, 0);
     return {
       achievement: totals.revenue,
@@ -247,14 +248,16 @@ function ReportsPage() {
   const openQuotationValue = useMemo(
     () =>
       commercial
-        .filter((c) => c.stage === "Quotation Sent")
+        .filter((c) => c.stage === "Quotes Sent")
         .reduce((s, c) => s + c.estimatedValue, 0),
     [commercial],
   );
 
+  // "Commit" (90%) is the closest-to-closing open stage — items essentially
+  // agreed, waiting on the customer's formal PO.
   const waitingPoRows = useMemo(() => {
     return commercial
-      .filter((c) => c.stage === "Waiting Client PO")
+      .filter((c) => c.stage === "Commit")
       .map((c) => ({ item: c, aging: agingBucket(c.updatedAt) }))
       .sort((a, b) => b.item.estimatedValue - a.item.estimatedValue);
   }, [commercial]);
@@ -554,8 +557,8 @@ function ReportsPage() {
               Forecast vs Achievement vs Target YTD
             </CardTitle>
             <p className="text-[11px] text-muted-foreground">
-              Forecast = Achievement + Waiting Client PO + PO Received + 50%
-              Quotation Sent.
+              Forecast = Achievement + nilai pipeline terbobot per stage (Client
+              Request for Quotes 15% s/d Commit 90%).
             </p>
           </CardHeader>
           <CardContent className="grid gap-3 sm:grid-cols-3">

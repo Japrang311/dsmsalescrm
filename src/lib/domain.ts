@@ -39,14 +39,17 @@ export type SourceFlow =
   | "Existing / Repeat Order"
   | "Prototype";
 
+// The seven exact weighted stages (PRD §7) — see
+// src/lib/data/commercial-stages.ts's COMMERCIAL_STAGE_WEIGHTS, the actual
+// source of truth. Kept as a separate type alias here (not re-exported from
+// commercial-stages.ts) only because domain.ts has no data-layer imports.
 export type RfqStage =
-  | "RFQ Received"
-  | "Quotation in Progress"
-  | "Quotation Sent"
-  | "Waiting Client PO"
-  | "PO Received"
-  | "Sales Order Released"
-  | "Revenue Recorded"
+  | "Client Request for Quotes"
+  | "Quotes Sent"
+  | "Negotiation"
+  | "Hot Prospect"
+  | "Commit"
+  | "Closed Won"
   | "Closed Lost";
 
 export type RepeatStage =

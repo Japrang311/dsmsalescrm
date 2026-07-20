@@ -24,7 +24,8 @@ import {
   listOwners,
   listSalesTeamProfiles,
 } from "@/lib/data/clients";
-import { listTasks } from "@/lib/data/tasks";
+import { createTask, listTasks } from "@/lib/data/tasks";
+import { COMMERCIAL_STAGES } from "@/lib/data/commercial-stages";
 import { formatRupiahShort, formatDateShort, daysBetween } from "@/lib/format";
 import { StatusBadge } from "@/components/clients/StatusBadges";
 import { Button } from "@/components/ui/button";
@@ -46,7 +47,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
+import { cn, getErrorMessage } from "@/lib/utils";
 import { getCurrentActorId, logActivity } from "@/lib/data/activity-log";
 
 export const Route = createFileRoute("/_app/pipeline")({
@@ -56,15 +57,7 @@ export const Route = createFileRoute("/_app/pipeline")({
   component: PipelinePage,
 });
 
-const STAGES = [
-  "RFQ Received",
-  "Quotation in Progress",
-  "Quotation Sent",
-  "Waiting Client PO",
-  "PO Received",
-  "Prototype in Progress",
-  "Closed Lost",
-] as const;
+const STAGES = COMMERCIAL_STAGES;
 
 type Stage = (typeof STAGES)[number];
 type NextWindow = "all" | "overdue" | "today" | "week" | "none";
@@ -195,7 +188,7 @@ function PipelineBoard({ role }: { role: Role }) {
     for (const it of filtered) {
       const key = (STAGES as readonly string[]).includes(it.stage)
         ? (it.stage as Stage)
-        : "RFQ Received";
+        : "Client Request for Quotes";
       g.get(key)!.push(it);
     }
     return g;
@@ -206,6 +199,22 @@ function PipelineBoard({ role }: { role: Role }) {
     (owner !== "all" ? 1 : 0) +
     (status !== "all" ? 1 : 0) +
     (nextWindow !== "all" ? 1 : 0);
+
+  const { data: currentUserId } = useQuery({
+    queryKey: ["current-user-id"],
+    queryFn: getCurrentActorId,
+    enabled: authReady,
+  });
+
+  // Manager/super_admin can move any card; sales can only move cards they
+  // own — mirrors the ownership boundary RLS already enforces server-side
+  // (see sales_orders_update policy), so this just avoids a confusing
+  // silent-failure toast for a move the DB would reject anyway.
+  function canMoveItem(item: { ownerId: string }) {
+    if (role === "manager" || role === "super_admin") return true;
+    if (role === "sales") return item.ownerId === currentUserId;
+    return false;
+  }
 
   const canDrag = role !== "executive";
 
@@ -234,9 +243,13 @@ function PipelineBoard({ role }: { role: Role }) {
     const item = items.find((i) => i.id === pendingMove.itemId);
     if (!item) return;
     try {
+      // commercial_documents has no next_action_date column post-Phase-11
+      // normalization — updateCommercialItem() rejects that field outright
+      // (see commercial-items.ts). "Next action" now lives on tasks, same
+      // as nextByItem already reads it. Stage is the only thing patched
+      // here; a changed date creates/logs a follow-up task instead.
       await updateCommercialItem(pendingMove.itemId, {
         stage: pendingMove.toStage,
-        nextActionDate: nextDateInput || undefined,
       });
       const actorId = await getCurrentActorId();
       if (actorId) {
@@ -250,6 +263,19 @@ function PipelineBoard({ role }: { role: Role }) {
           detail: `stage: ${pendingMove.fromStage} → ${pendingMove.toStage}`,
         });
       }
+      if (nextDateInput && nextDateInput !== pendingMove.currentNext) {
+        await createTask({
+          clientId: item.clientId,
+          ownerId: item.ownerId,
+          commercialItemId: item.id,
+          title: `Follow-up · ${item.type} — ${pendingMove.clientName}`,
+          dueDate: nextDateInput,
+          method: "Phone",
+          priority: "Normal",
+          status: "Upcoming",
+        });
+        await queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      }
       await queryClient.invalidateQueries({ queryKey: ["commercial-items"] });
       await queryClient.invalidateQueries({ queryKey: ["activity-log"] });
       toast.success(`${pendingMove.clientName} → ${pendingMove.toStage}`, {
@@ -259,7 +285,7 @@ function PipelineBoard({ role }: { role: Role }) {
       });
     } catch (error) {
       toast.error("Gagal memindahkan pipeline card", {
-        description: error instanceof Error ? error.message : "Unknown error",
+        description: getErrorMessage(error),
       });
     }
     setPendingMove(null);
@@ -439,12 +465,13 @@ function PipelineBoard({ role }: { role: Role }) {
                     const overdue = nextDays !== null && nextDays < 0;
                     const today = nextDays === 0;
                     const isDragging = draggingId === it.id;
+                    const canMoveThis = canMoveItem(it);
                     return (
                       <div
                         key={it.id}
-                        draggable={canDrag}
+                        draggable={canMoveThis}
                         onDragStart={(e) => {
-                          if (!canDrag) return;
+                          if (!canMoveThis) return;
                           setDraggingId(it.id);
                           e.dataTransfer.effectAllowed = "move";
                           e.dataTransfer.setData("text/plain", it.id);
@@ -464,12 +491,12 @@ function PipelineBoard({ role }: { role: Role }) {
                         }}
                         className={cn(
                           "group relative flex flex-col gap-1.5 rounded-md border bg-card p-2.5 pl-6 shadow-sm transition-all hover:border-primary/50 hover:shadow-md",
-                          canDrag && "cursor-grab active:cursor-grabbing",
-                          !canDrag && "cursor-pointer",
+                          canMoveThis && "cursor-grab active:cursor-grabbing",
+                          !canMoveThis && "cursor-pointer",
                           isDragging && "opacity-40",
                         )}
                       >
-                        {canDrag && (
+                        {canMoveThis && (
                           <GripVertical className="pointer-events-none absolute left-1 top-2.5 h-3.5 w-3.5 text-muted-foreground/50 group-hover:text-muted-foreground" />
                         )}
                         <div className="flex items-start justify-between gap-2">

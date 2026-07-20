@@ -31,7 +31,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { StatusBadge } from "@/components/clients/StatusBadges";
-import { cn } from "@/lib/utils";
+import { cn, getErrorMessage } from "@/lib/utils";
 import { formatRupiahShort, formatDateShort } from "@/lib/format";
 import { useRole } from "@/context/role-context";
 import {
@@ -45,6 +45,8 @@ import {
   describeCommercialItemChanges,
 } from "@/lib/data/commercial-items";
 import { listSalesOrders } from "@/lib/data/sales-orders";
+import { createTask } from "@/lib/data/tasks";
+import { COMMERCIAL_STAGES } from "@/lib/data/commercial-stages";
 import {
   getCurrentActorId,
   listClientStatusHistory,
@@ -60,15 +62,7 @@ const CLIENT_STATUSES: ClientStatus[] = [
   "Lost",
 ];
 
-const STAGES = [
-  "RFQ Received",
-  "Quotation in Progress",
-  "Quotation Sent",
-  "Waiting Client PO",
-  "PO Received",
-  "Prototype in Progress",
-  "Closed Lost",
-];
+const STAGES = COMMERCIAL_STAGES;
 
 type Props = {
   open: boolean;
@@ -116,7 +110,18 @@ export function PipelineCardDrawer({
     enabled: authReady,
   });
 
-  const canEdit = role !== "executive";
+  const { data: currentUserId } = useQuery({
+    queryKey: ["current-user-id"],
+    queryFn: getCurrentActorId,
+    enabled: authReady,
+  });
+
+  // Manager/super_admin can edit any card; sales can only edit cards they
+  // own — mirrors the ownership boundary RLS already enforces server-side.
+  const canEdit =
+    role === "manager" || role === "super_admin"
+      ? true
+      : role === "sales" && item?.ownerId === currentUserId;
 
   // Current values are already real (no override layer to merge anymore).
   const currentStage = item?.stage ?? "";
@@ -217,7 +222,7 @@ export function PipelineCardDrawer({
   const statusDirty = status !== currentStatus;
 
   async function saveChanges() {
-    if (!item) return;
+    if (!item || !client) return;
     const changes: { field: string; from?: string; to?: string }[] = [];
     if (stage !== currentStage)
       changes.push({ field: "stage", from: currentStage, to: stage });
@@ -229,10 +234,13 @@ export function PipelineCardDrawer({
 
     if (changes.length === 0) return;
     try {
+      // commercial_documents has no next_action_date column post-Phase-11
+      // normalization — updateCommercialItem() rejects that field outright
+      // (see commercial-items.ts). "Next action" now lives on tasks; a
+      // changed date creates a follow-up task instead, below.
       await updateCommercialItem(item.id, {
         stage,
         ownerId,
-        nextActionDate: nextDate || undefined,
       });
       const actorId = await getCurrentActorId();
       if (actorId) {
@@ -246,6 +254,19 @@ export function PipelineCardDrawer({
           detail: describeCommercialItemChanges(changes),
         });
       }
+      if (nd && nd !== cn) {
+        await createTask({
+          clientId: item.clientId,
+          ownerId,
+          commercialItemId: item.id,
+          title: `Follow-up · ${item.type} — ${client.name}`,
+          dueDate: nd,
+          method: "Phone",
+          priority: "Normal",
+          status: "Upcoming",
+        });
+        await queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      }
       await queryClient.invalidateQueries({ queryKey: ["commercial-items"] });
       await queryClient.invalidateQueries({ queryKey: ["activity-log"] });
       toast.success("Pipeline card diperbarui", {
@@ -255,7 +276,7 @@ export function PipelineCardDrawer({
       });
     } catch (error) {
       toast.error("Gagal menyimpan perubahan", {
-        description: error instanceof Error ? error.message : "Unknown error",
+        description: getErrorMessage(error),
       });
     }
   }
@@ -281,7 +302,7 @@ export function PipelineCardDrawer({
       toast.success(`Status ${client.name} → ${status}`);
     } catch (error) {
       toast.error("Gagal mengubah status", {
-        description: error instanceof Error ? error.message : "Unknown error",
+        description: getErrorMessage(error),
       });
     }
   }

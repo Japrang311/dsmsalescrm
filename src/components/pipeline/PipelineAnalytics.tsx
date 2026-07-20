@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { TrendingUp, Target, Percent, Wallet } from "lucide-react";
 import { formatRupiahShort } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { COMMERCIAL_STAGES } from "@/lib/data/commercial-stages";
 
 type Item = {
   id: string;
@@ -10,17 +11,9 @@ type Item = {
   estimatedValue: number;
 };
 
-const ALL_STAGES = [
-  "RFQ Received",
-  "Quotation in Progress",
-  "Quotation Sent",
-  "Waiting Client PO",
-  "PO Received",
-  "Prototype in Progress",
-  "Closed Lost",
-] as const;
+const ALL_STAGES = COMMERCIAL_STAGES;
 
-const WON_STAGES = new Set(["PO Received", "Prototype in Progress"]);
+const WON_STAGES = new Set(["Closed Won"]);
 const LOST_STAGES = new Set(["Closed Lost"]);
 
 function pct(part: number, whole: number): number {

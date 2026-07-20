@@ -22,7 +22,6 @@ insert into auth.users (
   created_at, updated_at, confirmation_token, recovery_token,
   email_change, email_change_token_new
 ) values
-  ('00000000-0000-0000-0000-000000000000', '11111111-1111-1111-1111-111111111111', 'authenticated', 'authenticated', 'hendra@local.dsm.test', extensions.crypt('seed-local-only', extensions.gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}', '{}', now(), now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000', '22222222-2222-2222-2222-222222222222', 'authenticated', 'authenticated', 'adhitya@local.dsm.test', extensions.crypt('seed-local-only', extensions.gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}', '{}', now(), now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000', '33333333-3333-3333-3333-333333333333', 'authenticated', 'authenticated', 'nur@local.dsm.test', extensions.crypt('seed-local-only', extensions.gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}', '{}', now(), now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000', '44444444-4444-4444-4444-444444444444', 'authenticated', 'authenticated', 'feni@local.dsm.test', extensions.crypt('seed-local-only', extensions.gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}', '{}', now(), now(), '', '', '', ''),
@@ -35,7 +34,6 @@ insert into auth.users (
   ('00000000-0000-0000-0000-000000000000', '66666666-6666-6666-6666-666666666666', 'authenticated', 'authenticated', 'executive@local.dsm.test', extensions.crypt('seed-local-only', extensions.gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}', '{}', now(), now(), '', '', '', '');
 
 insert into public.profiles (id, role, account_status, name, initials, email) values
-  ('11111111-1111-1111-1111-111111111111', 'manager',     'active', 'Hendra Wijaya',      'HW', 'hendra@local.dsm.test'),
   ('22222222-2222-2222-2222-222222222222', 'manager',     'active', 'Adhitya Wirambara',  'AW', 'adhitya@local.dsm.test'),
   ('33333333-3333-3333-3333-333333333333', 'sales',       'active', 'Nur Iman',           'NI', 'nur@local.dsm.test'),
   ('44444444-4444-4444-4444-444444444444', 'sales',       'active', 'Feni Cahyaningtias', 'FC', 'feni@local.dsm.test'),
