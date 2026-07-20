@@ -126,6 +126,19 @@ export async function listSalesTeamProfiles(): Promise<
   return data ?? [];
 }
 
+// Reads public.client_search_index (id + name only), not the clients table
+// directly — clients_select's RLS restricts a client row to its own
+// owner plus manager/executive/super_admin, but correcting which client a
+// Sales Order belongs to needs to find a client regardless of who owns it.
+// See supabase/migrations/20260720000000_add_sales_order_edit_support.sql.
+export async function searchClients(): Promise<{ id: string; name: string }[]> {
+  const { data, error } = await supabase
+    .from("client_search_index")
+    .select("id, name");
+  if (error) throw error;
+  return data ?? [];
+}
+
 export type ClientListRow = {
   client: Client;
   ownerName: string;

@@ -40,6 +40,7 @@ import { useRole, ROLE_LABEL } from "@/context/role-context";
 import { CURRENT_MONTH } from "@/lib/domain";
 import {
   activeCommercialCount,
+  dashboardSalesTeam,
   monthlyRevenue,
   monthlyTargetValue,
   prototypeSummary,
@@ -131,7 +132,7 @@ function DashboardPage() {
     items,
     clients,
     ownersById,
-    salesTeam,
+    salesTeam: dashboardSalesTeam(salesTeam, ownersById),
     targetsByMember,
     companyTarget,
   };

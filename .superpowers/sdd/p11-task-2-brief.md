@@ -87,8 +87,9 @@ Hand off the pre/post evidence packet and stop if any count/value/FK differs.
 ## Context from Task 1 (already complete, independently reviewed, and locally verified)
 
 Task 1 created the target schema this task migrates data into:
+
 - `public.commercial_documents` / `public.commercial_document_items` — new, currently empty.
-- `public.sales_orders_new` / `public.sales_order_items` — new, currently empty, **temporarily named**. This task's Step 6 is what finally renames `sales_orders_new` → `sales_orders` (after first renaming/relocating the *legacy* `sales_orders` table to `private.legacy_sales_orders_20260718`) — the brief's Step 6 language ("finalize target table names") means exactly this rename, since Task 1 deliberately deferred it to avoid a name collision during Task 1's own migration.
+- `public.sales_orders_new` / `public.sales_order_items` — new, currently empty, **temporarily named**. This task's Step 6 is what finally renames `sales_orders_new` → `sales_orders` (after first renaming/relocating the _legacy_ `sales_orders` table to `private.legacy_sales_orders_20260718`) — the brief's Step 6 language ("finalize target table names") means exactly this rename, since Task 1 deliberately deferred it to avoid a name collision during Task 1's own migration.
 - `private.document_number_counters` — new, empty, unwired (Task 3's job, not this task's).
 - Legacy `public.commercial_items` and legacy `public.sales_orders` — both currently still the live, authoritative, row-per-item tables this task must read from and then relocate to `private` (per Step 6) once migration is verified.
 

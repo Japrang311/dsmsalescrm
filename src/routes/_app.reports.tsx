@@ -51,6 +51,7 @@ import { useRole, ROLE_LABEL } from "@/context/role-context";
 import { CURRENT_MONTH, CURRENT_YEAR, NOW } from "@/lib/domain";
 import {
   activityCompliance,
+  dashboardSalesTeam,
   quotationFunnel,
   riskAlerts,
   targetsFor,
@@ -89,6 +90,7 @@ function ReportsPage() {
     companyTarget,
     isLoading,
   } = useDashboardData();
+  const displayTeam = dashboardSalesTeam(salesTeam, ownersById);
 
   const [filters, setFilters] = useState<ReportFilters>(() =>
     defaultReportFilters({ from: new Date(CURRENT_YEAR, 0, 1), to: NOW }),
@@ -276,7 +278,7 @@ function ReportsPage() {
   }, [rows, clients]);
 
   const salesPerf = useMemo(() => {
-    return salesTeam
+    return displayTeam
       .map((member) => {
         const orders = rows.filter((s) => s.ownerId === member.id);
         const revenue = orders.reduce((s, o) => s + (o.value ?? 0), 0);
@@ -303,7 +305,7 @@ function ReportsPage() {
         };
       })
       .sort((a, b) => b.revenue - a.revenue);
-  }, [rows, salesTeam, allTasks, clientList, targetsByMember]);
+  }, [rows, displayTeam, allTasks, clientList, targetsByMember]);
 
   const compliance = useMemo(
     () => activityCompliance(clientList),
@@ -369,7 +371,7 @@ function ReportsPage() {
         value={filters}
         onChange={patch}
         clients={clientList}
-        salesTeam={salesTeam}
+        salesTeam={displayTeam}
       />
 
       <div className="flex flex-wrap gap-1.5 text-[11px] text-muted-foreground">

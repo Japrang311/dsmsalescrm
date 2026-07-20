@@ -24,8 +24,8 @@ Status: **DONE**
   each `_REV.n` revision), Direct Order, Prototype, or Customer PO header.
   Carries client/owner, type/source flow, the admin-assigned RFQ/Quotation/SO
   numbers, revision linkage (`quotation_base_number` + `quotation_revision`
-  + `is_current_revision` + `supersedes_document_id`), pipeline `stage`, and
-  free-text `note`.
+  - `is_current_revision` + `supersedes_document_id`), pipeline `stage`, and
+    free-text `note`.
 - **`public.commercial_document_items`** — the line items belonging to a
   `commercial_documents` row (product, qty, UOM, unit price, line total,
   position). Cascade-deletes with its parent header.
@@ -57,7 +57,7 @@ columns in the schema test" — so I had to choose types/nullability/
 constraints for `sales_orders_new`/`sales_order_items` myself. Choices made,
 all deliberately mirroring existing patterns already reviewed in this repo:
 
-- `type`, `tax_type`, `prototype_status`, `source` reuse the *existing*
+- `type`, `tax_type`, `prototype_status`, `source` reuse the _existing_
   enums (`so_type`, `tax_type`, `prototype_status`, `revenue_source`) from
   the legacy `sales_orders` migration rather than inventing new ones.
 - `total_value` carries the same FOC money-shape check constraint as the
@@ -113,6 +113,7 @@ confirmed against `bunx supabase status`'s `DB_URL`.
 75 assertions cover, per table (`commercial_documents`,
 `commercial_document_items`, `sales_orders` logical/`sales_orders_new`
 actual, `sales_order_items`):
+
 - exact column set (no missing, no extra columns)
 - per-column `data_type`/`udt_name`/`is_nullable` against the brief's exact
   column list
@@ -134,18 +135,21 @@ item tables.
 
 **RED** (`bun run test supabase/tests/commercial-documents-schema.test.ts`,
 before the migration existed):
+
 ```
 2 pass
 73 fail
 75 expect() calls
 Ran 75 tests across 1 file.
 ```
-(The 2 passes were assertions that correctly expect *absence* — e.g. "legacy
+
+(The 2 passes were assertions that correctly expect _absence_ — e.g. "legacy
 tables exist" partially, "document_number_counters absent from public" — and
 happened to pass trivially before the migration too; everything asserting
 new-table presence failed as expected.)
 
 **GREEN** (after `bunx supabase db reset` applied the new migration):
+
 ```
 75 pass
 0 fail
@@ -168,6 +172,7 @@ $ bun run test
  991 expect() calls
 Ran 268 tests across 31 files.
 ```
+
 268 = the pre-existing 193 + this task's 75 new tests. 0 fail — full suite
 stayed green.
 
@@ -177,6 +182,7 @@ src/components/commercial/CommercialViews.tsx(383,35): error TS2322 ...
 src/components/commercial/CommercialViews.tsx(433,27): error TS2322 ...
 supabase/tests/commercial-count-rpc.test.ts(87,42): error TS2769 ...
 ```
+
 Exactly the 2 pre-existing errors named in the task brief (same file/line
 numbers). No new errors introduced.
 
@@ -184,6 +190,7 @@ numbers). No new errors introduced.
 $ bun run lint
 ✖ 19 problems (6 errors, 13 warnings)
 ```
+
 Exactly the pre-existing baseline (6 errors + 13 warnings, all in the same
 Phase-11 route files / `commercial-count-rpc.test.ts` named in the brief).
 My new test file initially tripped prettier formatting + `no-explicit-any`
@@ -194,6 +201,7 @@ before this final lint run — zero lint issues remain in either new file.
 $ bun run build
 ✓ built in 619ms
 ```
+
 Production build succeeds.
 
 ## Confirmation

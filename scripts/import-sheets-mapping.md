@@ -114,17 +114,17 @@ matched the existing master client. Source of truth is
 `APPROVED_CLIENT_ALIASES` in `scripts/import-sheets/classify.ts`; keep this
 table in sync with it.
 
-| Historical source spelling            | Existing master client               |
-| -------------------------------------- | ------------------------------------- |
-| `CV. LEUWIANYAR TEKNIK`                | `CV. LEUWI ANYAR TEKNIK`             |
-| `PT. ENGINEERING VISI ANTAR NUSA`      | `PT. ENGINEERING VISIT ANTAR NUSA`   |
-| `PT. IDEA EDVOLUTION TECHNOLOGY`       | `PT. IDEAS EDVOLUTION TECHNOLOGGY`   |
-| `PT. RIZQALLAH BOEM MAKMUR`            | `PT. Rizqallah Boer Makmur`          |
-| `PT. ZAITECH ENGINEERING INDONESIA`    | `PT ZAITECH ENJINIRING INDONESIA`    |
-| `PT. CIKARANG LISTRINDO`               | `PT. Cikarang listrindo Indonesia`   |
-| `PT. MEKANIKA ELEKRIKA INDOCIPTA`      | `PT. MEKANIKA ELEKTRIKA INDOCIPTA`   |
-| `PT. CONTROL SYSTEM ARENA PARA NUSA`   | `PT. CONTROL SYSTEMS ARENA PARA NUSA`|
-| `PT SURYA ANUGRAH ENJINEERING`         | `PT. SURYA ANUGRAH ENJINEERING`      |
+| Historical source spelling           | Existing master client                |
+| ------------------------------------ | ------------------------------------- |
+| `CV. LEUWIANYAR TEKNIK`              | `CV. LEUWI ANYAR TEKNIK`              |
+| `PT. ENGINEERING VISI ANTAR NUSA`    | `PT. ENGINEERING VISIT ANTAR NUSA`    |
+| `PT. IDEA EDVOLUTION TECHNOLOGY`     | `PT. IDEAS EDVOLUTION TECHNOLOGGY`    |
+| `PT. RIZQALLAH BOEM MAKMUR`          | `PT. Rizqallah Boer Makmur`           |
+| `PT. ZAITECH ENGINEERING INDONESIA`  | `PT ZAITECH ENJINIRING INDONESIA`     |
+| `PT. CIKARANG LISTRINDO`             | `PT. Cikarang listrindo Indonesia`    |
+| `PT. MEKANIKA ELEKRIKA INDOCIPTA`    | `PT. MEKANIKA ELEKTRIKA INDOCIPTA`    |
+| `PT. CONTROL SYSTEM ARENA PARA NUSA` | `PT. CONTROL SYSTEMS ARENA PARA NUSA` |
+| `PT SURYA ANUGRAH ENJINEERING`       | `PT. SURYA ANUGRAH ENJINEERING`       |
 
 Every other non-exact client name remains quarantined until explicitly approved.
 
@@ -134,14 +134,14 @@ These are new customers (not aliases of an existing client) — created once
 in `supabase/seed.sql` because their sheet-name candidates all scored too
 low (30–65) to be treated as a spelling variant of an existing master:
 
-| Sheet name                                    | Notes                                    |
-| ---------------------------------------------- | ----------------------------------------- |
-| `PT. PUTRA ARGA BINANGUN`                      | 8 documents across QUOTATION/SO 2026      |
-| `CV. RDD TECHNOLOGIES`                         | 3 documents, SO 2026                      |
-| `PT. ABHIMATA CITRA ABADI`                     | 4 documents, SO 2026                      |
-| `KOPERASI KARYAWAN BERSATU SEJAHTERA`          | 2 documents, NP 2026 (no `PT.` prefix — it's a koperasi, not a PT) |
-| `PT. Quantum Tera Network`                     | 2 documents, QUOTATION/SO 2026            |
-| `PT. TOHAAN RENEWABLE ENERGY ENGINEERING`      | 1 document, SO 2026                       |
+| Sheet name                                | Notes                                                              |
+| ----------------------------------------- | ------------------------------------------------------------------ |
+| `PT. PUTRA ARGA BINANGUN`                 | 8 documents across QUOTATION/SO 2026                               |
+| `CV. RDD TECHNOLOGIES`                    | 3 documents, SO 2026                                               |
+| `PT. ABHIMATA CITRA ABADI`                | 4 documents, SO 2026                                               |
+| `KOPERASI KARYAWAN BERSATU SEJAHTERA`     | 2 documents, NP 2026 (no `PT.` prefix — it's a koperasi, not a PT) |
+| `PT. Quantum Tera Network`                | 2 documents, QUOTATION/SO 2026                                     |
+| `PT. TOHAAN RENEWABLE ENERGY ENGINEERING` | 1 document, SO 2026                                                |
 
 See `.superpowers/sdd/p11-review-decisions-report.md` for the full
 decision record.

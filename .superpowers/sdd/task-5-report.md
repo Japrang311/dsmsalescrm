@@ -43,7 +43,7 @@ The focused tests prove:
 ### `src/lib/data/team.ts`
 
 - Added narrow local `AppRole` bridge with `sales | manager | executive |
-  super_admin`; Task 6 remains responsible for the canonical session union.
+super_admin`; Task 6 remains responsible for the canonical session union.
 - Added account-status metadata, active ownership counts, and latest
   administrative change to `TeamMember`.
 - The privileged roster includes inactive profiles and all four roles.
@@ -350,6 +350,7 @@ supabase/tests/commercial-count-rpc.test.ts:
 ```
 
 Live curl testing:
+
 - Manager: HTTP 200 with numeric count (0)
 - Sales: HTTP 400 with error code P0001 "INSUFFICIENT_PRIVILEGE"
 

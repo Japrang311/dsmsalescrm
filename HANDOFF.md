@@ -186,7 +186,7 @@ knowledge-graph pass had just been run over the repo (see
    the original closeout, missed by the earlier cleanup pass. Restored from
    `quotation-real.csv`.
 5. Fixed a client master naming error (`PT. KOPERASI KARYAWAN BERSATU
-   SEJAHTERA` → `KOPERASI KARYAWAN BERSATU SEJAHTERA`; a koperasi isn't a
+SEJAHTERA` → `KOPERASI KARYAWAN BERSATU SEJAHTERA`; a koperasi isn't a
    PT).
 6. Applied all 55 decisions to working copies of the five source CSVs
    (outside the repo, under
@@ -199,7 +199,7 @@ knowledge-graph pass had just been run over the repo (see
    normalized-schema rebuild and were never actually actionable against it).
 8. End-of-session checkpoint: `bun run test` 313/313, `bunx tsc --noEmit`
    clean, `bun run lint` 12 pre-existing warnings only (no errors), `bun run
-   build` succeeds.
+build` succeeds.
 
 Nothing in this session touched a remote Supabase project. The corrected
 CSVs and the decided review workbook

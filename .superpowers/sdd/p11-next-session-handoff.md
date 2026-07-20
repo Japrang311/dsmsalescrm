@@ -41,13 +41,13 @@ Reason counts:
 
 Source-tab snapshot:
 
-| Tab | Source rows | Review rows | Accepted docs | Accepted items |
-| --- | ---: | ---: | ---: | ---: |
-| QUOTATION | 747 | 98 | 377 | 649 |
-| SO 2026 | 312 | 25 | 127 | 287 |
-| NP 2026 | 18 | 4 | 12 | 14 |
-| PROTY | 12 | 0 | 8 | 12 |
-| HARIFF | 43 | 0 | 25 | 43 |
+| Tab       | Source rows | Review rows | Accepted docs | Accepted items |
+| --------- | ----------: | ----------: | ------------: | -------------: |
+| QUOTATION |         747 |          98 |           377 |            649 |
+| SO 2026   |         312 |          25 |           127 |            287 |
+| NP 2026   |          18 |           4 |            12 |             14 |
+| PROTY     |          12 |           0 |             8 |             12 |
+| HARIFF    |          43 |           0 |            25 |             43 |
 
 ## Next Task
 

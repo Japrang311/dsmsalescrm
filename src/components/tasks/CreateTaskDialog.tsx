@@ -31,6 +31,7 @@ import type { TaskStatus } from "@/lib/domain";
 import { NOW } from "@/lib/domain";
 import type { Role } from "@/lib/domain";
 import { listClients, listSalesTeamProfiles } from "@/lib/data/clients";
+import { ClientPickerField } from "@/components/clients/ClientPicker";
 import { createTask } from "@/lib/data/tasks";
 import { getCurrentActorId, logActivity } from "@/lib/data/activity-log";
 import { useRole } from "@/context/role-context";
@@ -197,27 +198,16 @@ export function CreateTaskDialog({
         </DialogHeader>
         <form onSubmit={onSubmit} className="grid gap-3">
           <div>
-            <Label>Klien</Label>
-            <Select
+            <ClientPickerField
+              clients={clients}
               value={watch("clientId")}
-              onValueChange={(v) =>
+              onChange={(v) =>
                 setValue("clientId", v, {
                   shouldDirty: true,
                   shouldValidate: true,
                 })
               }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Pilih klien…" />
-              </SelectTrigger>
-              <SelectContent className="max-h-72">
-                {clients.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            />
             {errors.clientId && (
               <p className="mt-1 text-xs text-destructive">
                 {errors.clientId.message}

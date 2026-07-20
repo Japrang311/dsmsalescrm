@@ -45,22 +45,17 @@ insert into public.profiles (id, role, account_status, name, initials, email) va
   ('66666666-6666-6666-6666-666666666666', 'executive',   'active', 'Executive Viewer',  'EV', 'executive@dsm.co.id');
 
 -- -----------------------------------------------------------------------
--- Clients (mirrors src/lib/mock/data.ts's CLIENTS array)
+-- Clients. Only real master data lives here now — the twelve mockup demo
+-- clients (mirrors of src/lib/mock/data.ts's old CLIENTS array, ids
+-- ...0001-...000c) and their mock tasks/commercial_items/sales_orders were
+-- removed on 2026-07-19 at the owner's request, since Phase 10 already
+-- deleted src/lib/mock/ and these rows were fake placeholder data with zero
+-- real Sheet-imported documents attached. PT. HARIFF DAYA TUNGGAL
+-- ENGINEERING (...000d) is kept — it is the real customer the HARIFF Sheet
+-- import (25 headers / 43 items / Rp3.259.394.500) actually resolves to.
 -- -----------------------------------------------------------------------
 
 insert into public.clients (id, name, status, source, owner_id, spending_ytd, last_fu, next_fu) values
-  ('a0000000-0000-4000-8000-000000000001', 'PT Astra Komponen Nusantara',         'Active Customer', 'Business Relationship', '22222222-2222-2222-2222-222222222222', 1450000000, '2026-07-10', '2026-07-18'),
-  ('a0000000-0000-4000-8000-000000000002', 'PT Sinar Baja Elektrik',              'Repeat Order',     'Repeat',                 '22222222-2222-2222-2222-222222222222',  890000000, '2026-07-12', '2026-07-17'),
-  ('a0000000-0000-4000-8000-000000000003', 'CV Mitra Presisi',                    'Active Customer', 'Referral',               '33333333-3333-3333-3333-333333333333',  620000000, '2026-07-08', '2026-07-16'),
-  ('a0000000-0000-4000-8000-000000000004', 'PT Chandra Sakti Utama',              'Prospect',        'Website Inquiry',        '44444444-4444-4444-4444-444444444444',          0, '2026-07-05', '2026-07-17'),
-  ('a0000000-0000-4000-8000-000000000005', 'PT Panasonic Manufacturing Indonesia','Active Customer', 'Business Relationship', '55555555-5555-5555-5555-555555555555', 1120000000, '2026-07-11', '2026-07-19'),
-  ('a0000000-0000-4000-8000-000000000006', 'PT Yamaha Indonesia Motor',           'Repeat Order',     'Repeat',                 '33333333-3333-3333-3333-333333333333', 2050000000, '2026-07-14', '2026-07-21'),
-  ('a0000000-0000-4000-8000-000000000007', 'PT Denso Indonesia',                  'Active Customer', 'Business Relationship', '22222222-2222-2222-2222-222222222222',  780000000, '2026-07-09', '2026-07-15'),
-  ('a0000000-0000-4000-8000-000000000008', 'PT Krakatau Engineering',             'Dormant',         'Referral',               '44444444-4444-4444-4444-444444444444',  120000000, null,         null),
-  ('a0000000-0000-4000-8000-000000000009', 'PT Indofood Sukses Makmur',           'Prospect',        'Referral',               '55555555-5555-5555-5555-555555555555',          0, null,         '2026-07-17'),
-  ('a0000000-0000-4000-8000-00000000000a', 'PT Mayora Indah Tbk',                 'Active Customer', 'Website Inquiry',        '33333333-3333-3333-3333-333333333333',  540000000, '2026-07-13', '2026-07-20'),
-  ('a0000000-0000-4000-8000-00000000000b', 'PT Toyota Motor Manufacturing',       'Repeat Order',     'Repeat',                 '22222222-2222-2222-2222-222222222222', 1780000000, '2026-07-14', '2026-07-18'),
-  ('a0000000-0000-4000-8000-00000000000c', 'CV Karya Logam Sejahtera',            'Lost',            'Referral',               '44444444-4444-4444-4444-444444444444',          0, null,         null),
   ('a0000000-0000-4000-8000-00000000000d', 'PT. HARIFF DAYA TUNGGAL ENGINEERING', 'Active Customer', 'Business Relationship',  '55555555-5555-5555-5555-555555555555',          0, null,         null);
 
 -- -----------------------------------------------------------------------
@@ -143,104 +138,15 @@ VALUES
   ('a0000000-0000-4000-8000-000000000081', 'PT.NAWASENA JAYA KREASI', 'Active Customer', 'Referral', '33333333-3333-3333-3333-333333333333', 0, now());
 
 -- -----------------------------------------------------------------------
--- Tasks (mirrors src/lib/mock/data.ts's TASKS array). commercial_item_id
--- is left null throughout — commercial_items doesn't exist yet (Phase 4),
--- so there's nothing real to point it at.
+-- Tasks, legacy commercial items, and legacy sales orders that used to
+-- mirror src/lib/mock/data.ts's TASKS/COMMERCIAL_ITEMS/SALES_ORDERS arrays
+-- were removed on 2026-07-19 at the owner's request, together with the
+-- twelve mockup clients above. They were fake placeholder data (mirrors of
+-- an already-deleted mock module, Phase 10) with zero real Sheet-imported
+-- documents attached — see the clients block above for the full removal
+-- note. `private.migrate_commercial_document_data()` below now has nothing
+-- to convert and is a safe no-op.
 -- -----------------------------------------------------------------------
-
-insert into public.tasks (client_id, owner_id, title, due_date, method, status, priority) values
-  ('a0000000-0000-4000-8000-000000000001', '22222222-2222-2222-2222-222222222222', 'Kirim revisi drawing bracket',      '2026-07-17', 'Email',    'Today',    'High'),
-  ('a0000000-0000-4000-8000-000000000002', '22222222-2222-2222-2222-222222222222', 'Follow up konfirmasi PO',           '2026-07-17', 'Phone',    'Today',    'High'),
-  ('a0000000-0000-4000-8000-000000000007', '22222222-2222-2222-2222-222222222222', 'Update progress prototype',         '2026-07-15', 'Phone',    'Overdue',  'Normal'),
-  ('a0000000-0000-4000-8000-00000000000b', '22222222-2222-2222-2222-222222222222', 'Konfirmasi jadwal delivery',        '2026-07-17', 'WhatsApp', 'Today',    'Normal'),
-  ('a0000000-0000-4000-8000-000000000003', '33333333-3333-3333-3333-333333333333', 'Kirim quotation revisi',            '2026-07-17', 'Email',    'Today',    'High'),
-  ('a0000000-0000-4000-8000-000000000006', '33333333-3333-3333-3333-333333333333', 'Meeting review harga',              '2026-07-16', 'Meeting',  'Overdue',  'High'),
-  ('a0000000-0000-4000-8000-00000000000a', '33333333-3333-3333-3333-333333333333', 'Follow up hasil quotation',         '2026-07-18', 'Phone',    'Upcoming', 'Normal'),
-  ('a0000000-0000-4000-8000-000000000004', '44444444-4444-4444-4444-444444444444', 'Perkenalan produk & katalog',       '2026-07-17', 'Visit',    'Today',    'Normal'),
-  ('a0000000-0000-4000-8000-000000000008', '44444444-4444-4444-4444-444444444444', 'Re-engagement dormant account',     '2026-07-14', 'Phone',    'Overdue',  'Normal'),
-  ('a0000000-0000-4000-8000-000000000005', '55555555-5555-5555-5555-555555555555', 'Konfirmasi PO batch Juli',          '2026-07-17', 'Email',    'Today',    'High'),
-  ('a0000000-0000-4000-8000-000000000009', '55555555-5555-5555-5555-555555555555', 'Diskusi requirement tray',          '2026-07-19', 'Meeting',  'Upcoming', 'Normal');
-
--- -----------------------------------------------------------------------
--- Commercial items (mirrors src/lib/mock/data.ts's COMMERCIAL_ITEMS array)
--- -----------------------------------------------------------------------
-
--- Phase 11 Task 2 relocated this table to private.legacy_commercial_items_20260718
--- (see migration 20260719024024_migrate_commercial_document_data.sql) -- seed
--- data still targets the legacy row-per-item shape, and
--- private.migrate_commercial_document_data() (called at the bottom of this
--- file) converts it into the normalized commercial_documents/sales_orders
--- tables, exactly mirroring what happens to real legacy data at migration
--- time on a database that already has some.
--- rfq_number (last column) is backfilled here only for the three RFQ-type
--- rows below: this column was added later by migration
--- 20260718060000_line_items.sql and seed.sql was never updated to set it,
--- leaving these three RFQ rows with no document number at all. Phase 11
--- Task 2's normalized commercial_documents.rfq_number is NOT NULL whenever
--- type = 'RFQ', so a still-null rfq_number here would make these three rows
--- fail that check and land in private.commercial_document_migration_review
--- (MISSING_REQUIRED_DOCUMENT_NUMBER) instead of converting -- which in turn
--- leaves the tasks/follow_up_logs that already point at these rows via
--- commercial_item_id with no commercial_document_id counterpart (an
--- orphaned link). Backfilling a dev-only synthetic number here (this seed
--- file is disposable, not real business data) keeps local reconciliation
--- fully clean; it does not touch real/remote data.
-insert into private.legacy_commercial_items_20260718 (id, client_id, owner_id, type, source_flow, stage, description, project_name, estimated_value, updated_at, quotation_number, customer_po_number, so_number, tax_type, prototype_status, next_action_date, rfq_number) values
-  ('b0000000-0000-4000-8000-000000000001', 'a0000000-0000-4000-8000-000000000001', '22222222-2222-2222-2222-222222222222', 'RFQ',          'RFQ / New Product',        'Quotation in Progress',           'Bracket assembly 2mm SPCC',        'Astra Bracket A17',           320000000, '2026-07-14', null,               null,                  null,           null,   null,    '2026-07-18', 'RFQ/26/VII/0017'),
-  ('b0000000-0000-4000-8000-000000000002', 'a0000000-0000-4000-8000-000000000002', '22222222-2222-2222-2222-222222222222', 'Quotation',    'RFQ / New Product',        'Waiting Client PO',                'Housing cover rev.B',              'Sinar Housing rev.B',         185000000, '2026-07-13', 'QT/26/VII/0042',   null,                  null,           null,   null,    '2026-07-19', null),
-  ('b0000000-0000-4000-8000-000000000003', 'a0000000-0000-4000-8000-000000000003', '33333333-3333-3333-3333-333333333333', 'RFQ',          'RFQ / New Product',        'Quotation Sent',                   'Panel enclosure IP54',             'Mitra Panel IP54',            240000000, '2026-07-12', 'QT/26/VII/0038',   null,                  null,           null,   null,    '2026-07-17', 'RFQ/26/VII/0013'),
-  ('b0000000-0000-4000-8000-000000000004', 'a0000000-0000-4000-8000-000000000005', '55555555-5555-5555-5555-555555555555', 'Direct Order', 'Existing / Repeat Order',  'Waiting Client PO',                'Repeat batch fan guard',           'Panasonic Fan Guard',          95000000, '2026-07-14', null,               null,                  null,           null,   null,    '2026-07-18', null),
-  ('b0000000-0000-4000-8000-000000000005', 'a0000000-0000-4000-8000-000000000006', '33333333-3333-3333-3333-333333333333', 'Quotation',    'RFQ / New Product',        'Waiting Client PO',                'Frame chassis QTY 800',            'Yamaha Frame Chassis',        610000000, '2026-07-14', 'QT/26/VII/0045',   null,                  null,           null,   null,    '2026-07-20', null),
-  ('b0000000-0000-4000-8000-000000000006', 'a0000000-0000-4000-8000-000000000007', '22222222-2222-2222-2222-222222222222', 'Prototype',    'Prototype',                'Prototype in Progress',            'Sensor mount prototype',           'Denso Sensor Mount',           18000000, '2026-07-11', null,               null,                  null,           null,   'Paid',  '2026-07-19', null),
-  ('b0000000-0000-4000-8000-000000000007', 'a0000000-0000-4000-8000-000000000009', '55555555-5555-5555-5555-555555555555', 'RFQ',          'RFQ / New Product',        'RFQ Received',                     'Stainless food-grade tray',        'Indofood Tray SS304',         145000000, '2026-07-15', null,               null,                  null,           null,   null,    '2026-07-22', 'RFQ/26/VII/0022'),
-  ('b0000000-0000-4000-8000-000000000008', 'a0000000-0000-4000-8000-00000000000b', '22222222-2222-2222-2222-222222222222', 'Direct Order', 'Existing / Repeat Order',  'PO Received',                      'Repeat order bracket A17',         'Toyota Bracket Batch VII',    420000000, '2026-07-15', null,               'PO-TMMIN-26-0712',   null,           'PPN',  null,    '2026-07-19', null),
-  ('b0000000-0000-4000-8000-000000000009', 'a0000000-0000-4000-8000-00000000000a', '33333333-3333-3333-3333-333333333333', 'Quotation',    'RFQ / New Product',        'Quotation Sent',                   'Conveyor side plate',              'Mayora Conveyor Plate',       210000000, '2026-07-13', 'QT/26/VII/0041',   null,                  null,           null,   null,    '2026-07-18', null),
-  ('b0000000-0000-4000-8000-00000000000a', 'a0000000-0000-4000-8000-000000000005', '55555555-5555-5555-5555-555555555555', 'Prototype',    'Prototype',                'SO Prototype Released',            'Panel enclosure sample',           'Panasonic Enclosure Sample',          0, '2026-07-10', null,               null,                  'SO-26-0403',   null,   'FOC',   '2026-07-24', null),
-  ('b0000000-0000-4000-8000-00000000000b', 'a0000000-0000-4000-8000-000000000006', '33333333-3333-3333-3333-333333333333', 'Direct Order', 'Existing / Repeat Order',  'Timeplan/Price Update Requested',  'Chassis batch Q3',                 'Yamaha Q3 Repeat',            720000000, '2026-07-16', null,               null,                  null,           null,   null,    '2026-07-21', null),
-  ('b0000000-0000-4000-8000-00000000000c', 'a0000000-0000-4000-8000-000000000001', '22222222-2222-2222-2222-222222222222', 'Customer PO',  'RFQ / New Product',        'Sales Order Released',             'Bracket assembly production run',  'Astra Bracket A17',           295000000, '2026-06-10', 'QT/26/VI/0033',    'PO-ASTRA-26-0605',   'SO-26-0602',   'PPN',  null,    null, null);
-
--- Link tasks to their commercial item, mirroring TASKS' commercialItemId in
--- src/lib/mock/data.ts (matched here by title, since these are the only
--- two tables where both sides are already seeded with known rows).
-update public.tasks set commercial_item_id = 'b0000000-0000-4000-8000-000000000001' where title = 'Kirim revisi drawing bracket';
-update public.tasks set commercial_item_id = 'b0000000-0000-4000-8000-000000000002' where title = 'Follow up konfirmasi PO';
-update public.tasks set commercial_item_id = 'b0000000-0000-4000-8000-000000000006' where title = 'Update progress prototype';
-update public.tasks set commercial_item_id = 'b0000000-0000-4000-8000-000000000008' where title = 'Konfirmasi jadwal delivery';
-update public.tasks set commercial_item_id = 'b0000000-0000-4000-8000-000000000003' where title = 'Kirim quotation revisi';
-update public.tasks set commercial_item_id = 'b0000000-0000-4000-8000-000000000005' where title = 'Meeting review harga';
-update public.tasks set commercial_item_id = 'b0000000-0000-4000-8000-000000000009' where title = 'Follow up hasil quotation';
-update public.tasks set commercial_item_id = 'b0000000-0000-4000-8000-000000000004' where title = 'Konfirmasi PO batch Juli';
-update public.tasks set commercial_item_id = 'b0000000-0000-4000-8000-000000000007' where title = 'Diskusi requirement tray';
-
--- -----------------------------------------------------------------------
--- Sales orders (mirrors src/lib/mock/data.ts's SALES_ORDERS array). The two
--- Prototype "FOC" rows (so10, so17) intentionally have a null value and
--- source 'Prototype FOC' — the revenue_recognized view excludes them.
--- -----------------------------------------------------------------------
-
--- Relocated to private.legacy_sales_orders_20260718 by Phase 11 Task 2, same
--- reasoning as commercial_items above.
-insert into private.legacy_sales_orders_20260718 (so_number, client_id, owner_id, type, tax_type, prototype_status, source, value, date) values
-  ('SO-26-0101', 'a0000000-0000-4000-8000-000000000001', '22222222-2222-2222-2222-222222222222', 'Regular',   'PPN',     null,    'RFQ / New Product',       380000000, '2026-01-14'),
-  ('SO-26-0102', 'a0000000-0000-4000-8000-000000000002', '22222222-2222-2222-2222-222222222222', 'Regular',   'PPN',     null,    'Existing / Repeat Order', 220000000, '2026-01-22'),
-  ('SO-26-0201', 'a0000000-0000-4000-8000-000000000005', '55555555-5555-5555-5555-555555555555', 'Regular',   'PPN',     null,    'Existing / Repeat Order', 310000000, '2026-02-10'),
-  ('SO-26-0202', 'a0000000-0000-4000-8000-000000000003', '33333333-3333-3333-3333-333333333333', 'Regular',   'Non-PPN', null,    'RFQ / New Product',       160000000, '2026-02-19'),
-  ('SO-26-0301', 'a0000000-0000-4000-8000-000000000006', '33333333-3333-3333-3333-333333333333', 'Regular',   'PPN',     null,    'Existing / Repeat Order', 450000000, '2026-03-11'),
-  ('SO-26-0302', 'a0000000-0000-4000-8000-00000000000b', '22222222-2222-2222-2222-222222222222', 'Regular',   'PPN',     null,    'Existing / Repeat Order', 520000000, '2026-03-18'),
-  ('SO-26-0303', 'a0000000-0000-4000-8000-000000000001', '22222222-2222-2222-2222-222222222222', 'Prototype', 'PPN',     'Paid',  'Prototype Paid',          24000000,  '2026-03-25'),
-  ('SO-26-0401', 'a0000000-0000-4000-8000-00000000000a', '33333333-3333-3333-3333-333333333333', 'Regular',   'Non-PPN', null,    'RFQ / New Product',       195000000, '2026-04-08'),
-  ('SO-26-0402', 'a0000000-0000-4000-8000-000000000007', '22222222-2222-2222-2222-222222222222', 'Regular',   'PPN',     null,    'Existing / Repeat Order', 280000000, '2026-04-16'),
-  ('SO-26-0403', 'a0000000-0000-4000-8000-000000000005', '55555555-5555-5555-5555-555555555555', 'Prototype', null,      'FOC',   'Prototype FOC',           null,      '2026-04-20'),
-  ('SO-26-0501', 'a0000000-0000-4000-8000-000000000002', '22222222-2222-2222-2222-222222222222', 'Regular',   'PPN',     null,    'Existing / Repeat Order', 340000000, '2026-05-06'),
-  ('SO-26-0502', 'a0000000-0000-4000-8000-000000000006', '33333333-3333-3333-3333-333333333333', 'Regular',   'PPN',     null,    'Existing / Repeat Order', 610000000, '2026-05-15'),
-  ('SO-26-0503', 'a0000000-0000-4000-8000-000000000003', '33333333-3333-3333-3333-333333333333', 'Regular',   'Non-PPN', null,    'RFQ / New Product',       140000000, '2026-05-22'),
-  ('SO-26-0601', 'a0000000-0000-4000-8000-00000000000b', '22222222-2222-2222-2222-222222222222', 'Regular',   'PPN',     null,    'Existing / Repeat Order', 480000000, '2026-06-04'),
-  ('SO-26-0602', 'a0000000-0000-4000-8000-000000000001', '22222222-2222-2222-2222-222222222222', 'Regular',   'PPN',     null,    'RFQ / New Product',       295000000, '2026-06-12'),
-  ('SO-26-0603', 'a0000000-0000-4000-8000-000000000005', '55555555-5555-5555-5555-555555555555', 'Prototype', 'PPN',     'Paid',  'Prototype Paid',          31000000,  '2026-06-20'),
-  ('SO-26-0604', 'a0000000-0000-4000-8000-000000000007', '22222222-2222-2222-2222-222222222222', 'Prototype', null,      'FOC',   'Prototype FOC',           null,      '2026-06-25'),
-  ('SO-26-0701', 'a0000000-0000-4000-8000-000000000002', '22222222-2222-2222-2222-222222222222', 'Regular',   'PPN',     null,    'Existing / Repeat Order', 260000000, '2026-07-03'),
-  ('SO-26-0702', 'a0000000-0000-4000-8000-000000000006', '33333333-3333-3333-3333-333333333333', 'Regular',   'PPN',     null,    'Existing / Repeat Order', 390000000, '2026-07-09'),
-  ('SO-26-0703', 'a0000000-0000-4000-8000-00000000000a', '33333333-3333-3333-3333-333333333333', 'Regular',   'Non-PPN', null,    'RFQ / New Product',       180000000, '2026-07-11');
 
 -- -----------------------------------------------------------------------
 -- Targets (mirrors src/lib/mock/data.ts's MONTHLY_TARGETS_PER_SALES — same

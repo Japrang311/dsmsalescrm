@@ -15,11 +15,11 @@ Supabase.
 
 ## Decisions (55 of 55, all resolved)
 
-| Decision | Count | Detail |
-| --- | ---: | --- |
-| Approve correction | 38 | 20 new-customer creations, 7 status conflicts (last row in sheet order wins), 4 note conflicts (last row wins), 2 customer-name typo fixes (cross-checked via the Address column), 1 dual-linked-SO header (both SOs recorded), 1 computed missing line total, 2 price-mismatch resolutions (Line Total treated as authoritative post-discount value), 1 owner correction (confirmed by owner: Feni Cahyaningtias) |
-| Keep rejected | 16 | 1 blank customer name, 11 rows with qty/price both blank, 3 rows with qty present but price entirely blank, 1 document kept fully quarantined per the Task 33 whole-document rule (one line item had no price; partial-row import was considered and explicitly rejected to avoid recreating the regression Task 33 fixed) |
-| Needs source update (reverted to no-op) | 1 | `DSM-26SO082`: three customer POs on one internal SO. Splitting into 3 new documents was proposed and rejected — no historical document numbers existed for a 3-way split, so the owner chose to keep it as one consolidated SO with all three PO numbers recorded in the header (same pattern already used for HARIFF's multi-PO merge) |
+| Decision                                | Count | Detail                                                                                                                                                                                                                                                                                                                                                                                                             |
+| --------------------------------------- | ----: | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Approve correction                      |    38 | 20 new-customer creations, 7 status conflicts (last row in sheet order wins), 4 note conflicts (last row wins), 2 customer-name typo fixes (cross-checked via the Address column), 1 dual-linked-SO header (both SOs recorded), 1 computed missing line total, 2 price-mismatch resolutions (Line Total treated as authoritative post-discount value), 1 owner correction (confirmed by owner: Feni Cahyaningtias) |
+| Keep rejected                           |    16 | 1 blank customer name, 11 rows with qty/price both blank, 3 rows with qty present but price entirely blank, 1 document kept fully quarantined per the Task 33 whole-document rule (one line item had no price; partial-row import was considered and explicitly rejected to avoid recreating the regression Task 33 fixed)                                                                                         |
+| Needs source update (reverted to no-op) |     1 | `DSM-26SO082`: three customer POs on one internal SO. Splitting into 3 new documents was proposed and rejected — no historical document numbers existed for a 3-way split, so the owner chose to keep it as one consolidated SO with all three PO numbers recorded in the header (same pattern already used for HARIFF's multi-PO merge)                                                                           |
 
 Two additional per-document header conflicts were discovered only during
 dry-run verification (the review tool records one conflict field per
@@ -67,14 +67,14 @@ already-approved rules:
 
 ## Result
 
-| Tab | Headers before → after | Review rows before → after |
-| --- | --- | --- |
-| QUOTATION | 377 → 397 | 98 → 31 |
-| SO 2026 | 127 → 142 | 25 → 1 |
-| NP 2026 | 12 → 14 | 4 → 1 |
-| PROTY | 8 → 8 | 0 → 0 |
-| HARIFF | 25 → 25 | 0 → 0 |
-| **Total** | **549 → 586** | **127 → 33** |
+| Tab       | Headers before → after | Review rows before → after |
+| --------- | ---------------------- | -------------------------- |
+| QUOTATION | 377 → 397              | 98 → 31                    |
+| SO 2026   | 127 → 142              | 25 → 1                     |
+| NP 2026   | 12 → 14                | 4 → 1                      |
+| PROTY     | 8 → 8                  | 0 → 0                      |
+| HARIFF    | 25 → 25                | 0 → 0                      |
+| **Total** | **549 → 586**          | **127 → 33**               |
 
 Paid total rose from Rp103.459.907.623 to approximately Rp131.024.482.393.
 The 33 remaining review rows correspond exactly to the 16 documents the

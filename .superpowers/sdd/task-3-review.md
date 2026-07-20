@@ -89,7 +89,7 @@ future broad table-level grant.
   `20260718173153_add_team_admin_audit_fields.sql:38-47`; invalid-role rejection
   is tested at `supabase/tests/activity-log.test.ts:261-285`.
 - **Target deletion persistence — compliant.** [Pasti] The FK is `ON DELETE SET
-  NULL` at `20260718173153_add_team_admin_audit_fields.sql:1-5`, with a partial
+NULL` at `20260718173153_add_team_admin_audit_fields.sql:1-5`, with a partial
   FK lookup index at `:7-11`. The integration test deletes the target and
   verifies a null target ID plus the exact persisted three-key snapshot and
   reason at `supabase/tests/activity-log.test.ts:287-365`.

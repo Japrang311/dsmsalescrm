@@ -51,7 +51,7 @@ Verdict: **CHANGES_REQUIRED**
 #### 1. Commercial ownership count still does not match the Task 4 transfer predicate
 
 - Evidence: `src/lib/data/team.ts:125-128` excludes terminal stages through a case-sensitive, whitespace-sensitive PostgREST `not in` list. Task 4 deliberately defines the server transfer scope as `lower(btrim(stage)) not in (...)` in `supabase/migrations/20260718180929_add_account_lifecycle_functions.sql:194-202`, while `stage` remains unconstrained free-form text (`supabase/migrations/20260717235315_commercial_items.sql:7-13,29`).
-- Impact: a terminal value such as ` closed won ` or `CLOSED WON` is counted as active by the roster but is not transferred by the server. The Super Admin therefore still sees a misleading ownership total before lifecycle actions.
+- Impact: a terminal value such as `closed won` or `CLOSED WON` is counted as active by the roster but is not transferred by the server. The Super Admin therefore still sees a misleading ownership total before lifecycle actions.
 - Concrete fix: make the roster count use the exact normalized server predicate. Prefer one protected server-side summary/count function sharing the Task 4 predicate, rather than attempting to emulate `lower(btrim(...))` through a client filter. Add a focused regression case for case/whitespace variants.
 
 ### Critical

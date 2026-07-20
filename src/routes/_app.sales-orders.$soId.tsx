@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, Lock, Pencil, Receipt } from "lucide-react";
+import { ArrowLeft, Check, Lock, Pencil, Receipt, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Card, CardContent } from "@/components/ui/card";
@@ -29,9 +29,24 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { updateSalesOrderTax } from "@/lib/data/sales-orders";
+import {
+  updateSalesOrderHeader,
+  updateSalesOrderItem,
+  updateSalesOrderTax,
+  type SalesOrderLineItem,
+} from "@/lib/data/sales-orders";
+import { searchClients } from "@/lib/data/clients";
+import type { Uom } from "@/lib/data/document-numbering";
 import {
   getCurrentActorId,
   listSalesOrderTaxHistory,
@@ -42,9 +57,15 @@ import {
   formatRupiahFull,
   formatRupiahShort,
 } from "@/lib/format";
+import { ClientPickerField } from "@/components/clients/ClientPicker";
 import { StatusBadge } from "@/components/clients/StatusBadges";
 import { useRole, ROLE_LABEL } from "@/context/role-context";
 import { useDashboardData } from "@/hooks/use-dashboard-data";
+
+// Matches the hardcoded seed account the dev role switcher signs into for
+// "sales" (see role-context.tsx) — same simplification used in
+// TopBar.tsx, TargetCharts.tsx, _app.dashboard.tsx and _app.reports.tsx.
+const CURRENT_SALES_ID = "22222222-2222-2222-2222-222222222222";
 
 export const Route = createFileRoute("/_app/sales-orders/$soId")({
   head: () => ({ meta: [{ title: "Sales Order Detail · DSM" }] }),
@@ -102,6 +123,10 @@ function SalesOrderDetail() {
   const foc = so.type === "Prototype" && so.prototypeStatus === "FOC";
   const effectiveTax = so.taxType;
   const canEditTax = role === "manager" || role === "super_admin";
+  const canEditOwnSo =
+    role === "manager" ||
+    role === "super_admin" ||
+    (role === "sales" && so.ownerId === CURRENT_SALES_ID);
 
   return (
     <div className="flex flex-col gap-4">
@@ -113,7 +138,7 @@ function SalesOrderDetail() {
         >
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <div>
+        <div className="flex-1">
           <div className="flex items-center gap-2">
             <Receipt className="h-5 w-5 text-primary" />
             <h1 className="font-mono text-xl font-semibold">{so.soNumber}</h1>
@@ -129,6 +154,16 @@ function SalesOrderDetail() {
             Referensi Sales Order · dicatat {formatDateShort(so.date)}
           </p>
         </div>
+        {canEditOwnSo && (
+          <EditSalesOrderHeaderDialog
+            soId={so.id}
+            clientId={so.clientId}
+            ownerId={so.ownerId}
+            customerPoNumber={so.customerPoNumber}
+            date={so.date}
+            canEditOwner={role === "manager" || role === "super_admin"}
+          />
+        )}
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
@@ -206,7 +241,11 @@ function SalesOrderDetail() {
 
             <Separator />
 
-            <SalesOrderItemsTable items={so.items} showMoney={!foc} />
+            <SalesOrderItemsTable
+              items={so.items}
+              showMoney={!foc}
+              canEdit={canEditOwnSo}
+            />
           </CardContent>
         </Card>
 
@@ -280,6 +319,163 @@ function SalesOrderDetail() {
         </Card>
       )}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Header edit dialog — Klien, Customer PO, Tanggal, Sales Owner. Klien uses
+// searchClients() (public.client_search_index), not the RLS-scoped clients
+// list, so a sales user correcting their own SO can find a client even when
+// it's registered to a different owner — see
+// supabase/migrations/20260720000000_add_sales_order_edit_support.sql.
+// ---------------------------------------------------------------------------
+
+function EditSalesOrderHeaderDialog({
+  soId,
+  clientId,
+  ownerId,
+  customerPoNumber,
+  date,
+  canEditOwner,
+}: {
+  soId: string;
+  clientId: string;
+  ownerId: string;
+  customerPoNumber: string | null;
+  date: string;
+  canEditOwner: boolean;
+}) {
+  const queryClient = useQueryClient();
+  const { ownersById } = useDashboardData();
+  const [open, setOpen] = useState(false);
+  const [draftClientId, setDraftClientId] = useState(clientId);
+  const [draftOwnerId, setDraftOwnerId] = useState(ownerId);
+  const [draftPo, setDraftPo] = useState(customerPoNumber ?? "");
+  const [draftDate, setDraftDate] = useState(date);
+  const [saving, setSaving] = useState(false);
+
+  const { data: searchableClients = [] } = useQuery({
+    queryKey: ["clients", "search-index"],
+    queryFn: searchClients,
+    enabled: open,
+  });
+
+  const ownerOptions = Object.entries(ownersById).filter(
+    ([, o]) => o.role === "sales" || o.role === "manager",
+  );
+
+  function openDialog() {
+    setDraftClientId(clientId);
+    setDraftOwnerId(ownerId);
+    setDraftPo(customerPoNumber ?? "");
+    setDraftDate(date);
+    setOpen(true);
+  }
+
+  async function save() {
+    setSaving(true);
+    try {
+      await updateSalesOrderHeader(soId, {
+        clientId: draftClientId,
+        ownerId: canEditOwner ? draftOwnerId : ownerId,
+        customerPoNumber: draftPo,
+        date: draftDate,
+      });
+      await queryClient.invalidateQueries({ queryKey: ["sales-orders"] });
+      await queryClient.invalidateQueries({ queryKey: ["clients"] });
+      toast.success("Detail Sales Order diperbarui");
+      setOpen(false);
+    } catch (error) {
+      toast.error("Gagal menyimpan perubahan", {
+        description: error instanceof Error ? error.message : "Unknown error",
+      });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <>
+      <Button
+        variant="outline"
+        size="sm"
+        className="gap-1.5"
+        onClick={openDialog}
+      >
+        <Pencil className="h-3.5 w-3.5" /> Edit
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Sales Order</DialogTitle>
+            <DialogDescription>
+              Perbaiki data Klien, Customer PO, Tanggal, atau Sales Owner untuk
+              SO ini.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3">
+            <ClientPickerField
+              clients={searchableClients}
+              value={draftClientId}
+              onChange={setDraftClientId}
+            />
+            <div>
+              <Label>Sales Owner</Label>
+              {canEditOwner ? (
+                <Select value={draftOwnerId} onValueChange={setDraftOwnerId}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ownerOptions.map(([id, o]) => (
+                      <SelectItem key={id} value={id}>
+                        {o.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
+                  {ownersById[ownerId]?.name ?? "—"}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Lock className="h-3 w-3" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      Hanya Sales Manager yang dapat memindahkan kepemilikan SO.
+                    </TooltipContent>
+                  </Tooltip>
+                </p>
+              )}
+            </div>
+            <div>
+              <Label>Customer PO</Label>
+              <Input
+                value={draftPo}
+                onChange={(e) => setDraftPo(e.target.value)}
+                placeholder="Nomor Customer PO"
+              />
+            </div>
+            <div>
+              <Label>Tanggal SO</Label>
+              <Input
+                type="date"
+                value={draftDate}
+                onChange={(e) => setDraftDate(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setOpen(false)}>
+              Batal
+            </Button>
+            <Button onClick={() => void save()} disabled={saving}>
+              {saving ? "Menyimpan…" : "Simpan"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -484,9 +680,11 @@ function Cell({
 function SalesOrderItemsTable({
   items,
   showMoney,
+  canEdit,
 }: {
-  items: ReturnType<typeof useDashboardData>["orders"][number]["items"];
+  items: SalesOrderLineItem[];
   showMoney: boolean;
+  canEdit: boolean;
 }) {
   return (
     <div>
@@ -507,38 +705,205 @@ function SalesOrderItemsTable({
                   <TableHead className="text-right">Total</TableHead>
                 </>
               )}
+              {canEdit && <TableHead className="w-16" />}
             </TableRow>
           </TableHeader>
           <TableBody>
             {items.map((item) => (
-              <TableRow key={item.id}>
-                <TableCell className="font-medium">
-                  {item.productName ?? "Nama Product belum diisi"}
-                </TableCell>
-                <TableCell>{item.description ?? "—"}</TableCell>
-                <TableCell className="text-right tabular-nums">
-                  {item.qty ?? "—"}
-                </TableCell>
-                <TableCell>{item.uom ?? "—"}</TableCell>
-                {showMoney && (
-                  <>
-                    <TableCell className="text-right tabular-nums">
-                      {item.unitPrice === null
-                        ? "—"
-                        : formatRupiahFull(item.unitPrice)}
-                    </TableCell>
-                    <TableCell className="text-right font-medium tabular-nums">
-                      {item.lineTotal === null
-                        ? "—"
-                        : formatRupiahFull(item.lineTotal)}
-                    </TableCell>
-                  </>
-                )}
-              </TableRow>
+              <SalesOrderItemRow
+                key={item.id}
+                item={item}
+                showMoney={showMoney}
+                canEdit={canEdit}
+              />
             ))}
           </TableBody>
         </Table>
       </div>
     </div>
+  );
+}
+
+const UOM_OPTIONS: Uom[] = ["Unit", "Pcs", "Set", "Lot"];
+
+function SalesOrderItemRow({
+  item,
+  showMoney,
+  canEdit,
+}: {
+  item: SalesOrderLineItem;
+  showMoney: boolean;
+  canEdit: boolean;
+}) {
+  const queryClient = useQueryClient();
+  const [editing, setEditing] = useState(false);
+  const [productName, setProductName] = useState(item.productName ?? "");
+  const [description, setDescription] = useState(item.description ?? "");
+  const [qty, setQty] = useState(String(item.qty ?? ""));
+  const [uom, setUom] = useState<Uom>(item.uom ?? "Unit");
+  const [unitPrice, setUnitPrice] = useState(String(item.unitPrice ?? ""));
+  const [saving, setSaving] = useState(false);
+
+  function startEdit() {
+    setProductName(item.productName ?? "");
+    setDescription(item.description ?? "");
+    setQty(String(item.qty ?? ""));
+    setUom(item.uom ?? "Unit");
+    setUnitPrice(String(item.unitPrice ?? ""));
+    setEditing(true);
+  }
+
+  async function save() {
+    const qtyNum = Number(qty);
+    if (!Number.isFinite(qtyNum) || qtyNum <= 0) {
+      toast.error("Qty harus lebih dari 0");
+      return;
+    }
+    const priceNum = showMoney ? Number(unitPrice) : null;
+    if (showMoney && (!Number.isFinite(priceNum) || (priceNum ?? 0) <= 0)) {
+      toast.error("Unit Price harus lebih dari 0");
+      return;
+    }
+    setSaving(true);
+    try {
+      await updateSalesOrderItem(item.id, {
+        productName: productName.trim() || null,
+        description: description.trim() || null,
+        qty: qtyNum,
+        uom,
+        unitPrice: priceNum,
+      });
+      await queryClient.invalidateQueries({ queryKey: ["sales-orders"] });
+      toast.success("Item diperbarui");
+      setEditing(false);
+    } catch (error) {
+      toast.error("Gagal menyimpan item", {
+        description: error instanceof Error ? error.message : "Unknown error",
+      });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (!editing) {
+    return (
+      <TableRow>
+        <TableCell className="font-medium">
+          {item.productName ?? "Nama Product belum diisi"}
+        </TableCell>
+        <TableCell>{item.description ?? "—"}</TableCell>
+        <TableCell className="text-right tabular-nums">
+          {item.qty ?? "—"}
+        </TableCell>
+        <TableCell>{item.uom ?? "—"}</TableCell>
+        {showMoney && (
+          <>
+            <TableCell className="text-right tabular-nums">
+              {item.unitPrice === null ? "—" : formatRupiahFull(item.unitPrice)}
+            </TableCell>
+            <TableCell className="text-right font-medium tabular-nums">
+              {item.lineTotal === null ? "—" : formatRupiahFull(item.lineTotal)}
+            </TableCell>
+          </>
+        )}
+        {canEdit && (
+          <TableCell>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={startEdit}
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
+          </TableCell>
+        )}
+      </TableRow>
+    );
+  }
+
+  return (
+    <TableRow>
+      <TableCell>
+        <Input
+          aria-label="Nama Product"
+          value={productName}
+          onChange={(e) => setProductName(e.target.value)}
+          className="h-8 min-w-[140px] text-xs"
+          placeholder="Nama Product"
+        />
+      </TableCell>
+      <TableCell>
+        <Input
+          aria-label="Description"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          className="h-8 min-w-[160px] text-xs"
+          placeholder="Description"
+        />
+      </TableCell>
+      <TableCell>
+        <Input
+          aria-label="Qty"
+          type="number"
+          min="0"
+          value={qty}
+          onChange={(e) => setQty(e.target.value)}
+          className="h-8 w-20 text-right text-xs"
+        />
+      </TableCell>
+      <TableCell>
+        <Select value={uom} onValueChange={(v) => setUom(v as Uom)}>
+          <SelectTrigger className="h-8 w-24 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {UOM_OPTIONS.map((u) => (
+              <SelectItem key={u} value={u}>
+                {u}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </TableCell>
+      {showMoney && (
+        <>
+          <TableCell>
+            <Input
+              aria-label="Unit Price"
+              type="number"
+              min="0"
+              value={unitPrice}
+              onChange={(e) => setUnitPrice(e.target.value)}
+              className="h-8 w-28 text-right text-xs"
+            />
+          </TableCell>
+          <TableCell className="text-right text-xs text-muted-foreground">
+            {formatRupiahFull((Number(qty) || 0) * (Number(unitPrice) || 0))}
+          </TableCell>
+        </>
+      )}
+      <TableCell>
+        <div className="flex gap-1">
+          <Button
+            size="icon"
+            className="h-7 w-7"
+            disabled={saving}
+            onClick={() => void save()}
+          >
+            <Check className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            disabled={saving}
+            onClick={() => setEditing(false)}
+          >
+            <X className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </TableCell>
+    </TableRow>
   );
 }

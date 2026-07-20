@@ -175,3 +175,70 @@ export async function updateSalesOrderTax(
   if (error) throw error;
   return toSalesOrder(data as SalesOrderRow);
 }
+
+export type UpdateSalesOrderHeaderInput = Partial<{
+  clientId: string;
+  ownerId: string;
+  customerPoNumber: string;
+  date: string;
+}>;
+
+// client_id/owner_id are correction-only fields for fixing imported/mistyped
+// records — RLS (sales_orders_update) is the real boundary on who may set
+// them to what: a sales-role caller may only keep owner_id equal to their
+// own auth.uid(), manager/super_admin are unrestricted. See
+// supabase/migrations/20260720000000_add_sales_order_edit_support.sql.
+export async function updateSalesOrderHeader(
+  id: string,
+  patch: UpdateSalesOrderHeaderInput,
+): Promise<SalesOrderDocument> {
+  const row: Record<string, string> = {};
+  if (patch.clientId !== undefined) row.client_id = patch.clientId;
+  if (patch.ownerId !== undefined) row.owner_id = patch.ownerId;
+  if (patch.customerPoNumber !== undefined)
+    row.customer_po_number = patch.customerPoNumber;
+  if (patch.date !== undefined) row.date = patch.date;
+
+  const { data, error } = await supabase
+    .from("sales_orders")
+    .update(row)
+    .eq("id", id)
+    .select("*, sales_order_items(*)")
+    .single();
+  if (error) throw error;
+  return toSalesOrder(data as SalesOrderRow);
+}
+
+export type UpdateSalesOrderItemInput = {
+  productName: string | null;
+  description: string | null;
+  qty: number;
+  uom: Uom;
+  // null for Prototype FOC items, which never carry money — matches the
+  // sales_order_items check constraint (unit_price/line_total must be null
+  // or a positive/non-negative number, never a bare 0 standing in for FOC).
+  unitPrice: number | null;
+};
+
+// line_total is always derived as qty * unitPrice here, never taken as a
+// separate input — same "value is always Qty × Unit Price, never manually
+// overridable" rule the Create dialogs already use. The parent
+// sales_orders.total_value recomputes automatically via the
+// sales_order_items_recompute_total trigger.
+export async function updateSalesOrderItem(
+  itemId: string,
+  input: UpdateSalesOrderItemInput,
+): Promise<void> {
+  const { error } = await supabase
+    .from("sales_order_items")
+    .update({
+      product_name: input.productName,
+      description: input.description,
+      qty: input.qty,
+      uom: input.uom,
+      unit_price: input.unitPrice,
+      line_total: input.unitPrice === null ? null : input.qty * input.unitPrice,
+    })
+    .eq("id", itemId);
+  if (error) throw error;
+}

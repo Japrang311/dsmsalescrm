@@ -18,7 +18,7 @@ Super Admin is already structurally excluded from the Sales owner/target/perform
   per-function changes.
 - `src/context/role-context.tsx` — real-session path now delegates to the new
   `account-status.ts` module instead of reading only `role` from `profiles`. Added `DevRole =
-  Exclude<Role, "super_admin">` for the local dev switcher (`ROLE_LOGIN`, `signInForRole`, the
+Exclude<Role, "super_admin">` for the local dev switcher (`ROLE_LOGIN`, `signInForRole`, the
   `stored` fallback) since there is no seed Super Admin login. `setRole()` now explicitly guards
   against `"super_admin"` (console.warn + no-op) rather than silently mapping it into
   `signInForRole`. `ROLE_LABEL` gained `super_admin: "Super Admin"`.
@@ -55,7 +55,7 @@ Super Admin is already structurally excluded from the Sales owner/target/perform
   practice (no dev seed login for Super Admin), but the guard satisfies "never map an unknown role
   to Manager or Sales."
 - `src/components/shell/AppSidebar.tsx` — **no change.** Verified: `items = role === "executive" ?
-  NAV_EXECUTIVE : NAV_FULL` already puts Super Admin on `NAV_FULL` (same as Manager/Sales — includes
+NAV_EXECUTIVE : NAV_FULL` already puts Super Admin on `NAV_FULL` (same as Manager/Sales — includes
   Settings), and the Commercial Items nav section's `role !== "executive"` condition already shows
   it to Super Admin too. No entry in either list is Manager-only or Sales-only, so Super Admin
   neither loses nor gains anything incorrect.
@@ -77,7 +77,7 @@ Super Admin is already structurally excluded from the Sales owner/target/perform
 ## What was deliberately left unchanged (and why)
 
 - **Dashboard route's `role === "manager" ? <SalesPerformanceTable/> : role === "executive" ? <...>
-  : null` card-selection blocks** (`src/routes/_app.dashboard.tsx`) — Super Admin currently sees
+: null` card-selection blocks** (`src/routes/_app.dashboard.tsx`) — Super Admin currently sees
   neither the Manager nor Executive card set. This is a product/UX call (which specific reporting
   cards a Super Admin should see) rather than a security-boundary gap — RLS already allows Super
   Admin the same company-wide reads as Manager/Executive, and no data leak exists. Changing it
@@ -85,7 +85,7 @@ Super Admin is already structurally excluded from the Sales owner/target/perform
   which of the two card sets (or a new third set) is correct. Flagging for a follow-up decision
   rather than guessing.
 - **`src/lib/data/dashboard-selectors.ts`** — no change needed. It already receives `salesTeam:
-  SalesTeamMember[]` as a parameter from callers, and the only real caller
+SalesTeamMember[]` as a parameter from callers, and the only real caller
   (`src/hooks/use-dashboard-data.ts`) sources it from `listSalesTeamProfiles()` — already
   sales-only. Confirmed via reading; no test gap to close beyond the `clients.test.ts` regression
   test added above (which covers the actual enforcement point).
@@ -144,7 +144,7 @@ bun run build                                    → succeeds
   literal-type mismatch on a template-string `to={...}` prop. Unrelated to Role/auth; file not
   touched by this task.
 - `supabase/tests/commercial-count-rpc.test.ts:87` — `TS2769`, an `expect(...).toBe(possibly
-  undefined)` overload mismatch. Unrelated to Role/auth; file not touched by this task.
+undefined)` overload mismatch. Unrelated to Role/auth; file not touched by this task.
 
 Both confirmed present before any of this task's edits (same two errors, same line numbers,
 reproduced from a clean state before touching `role-context.tsx`/`selectors.ts`).

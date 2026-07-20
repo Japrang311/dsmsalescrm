@@ -1,6 +1,7 @@
 # Subagent-Driven Development Progress
 
 ## Plan 1: `docs/superpowers/plans/2026-07-18-super-admin-team-role-management-implementation.md` (Phase 12) — COMPLETE 2026-07-19
+
 Started: 2026-07-18
 Environment: no Git repository; local Supabase only; review evidence uses current files and task reports.
 
@@ -23,6 +24,7 @@ Minor findings ledger:
 - Task 7 may harden the concurrency harness by replacing the current 150 ms timing boundary with deterministic lock synchronization; this is non-blocking because both real races are already covered and passing locally.
 
 ## Plan 2: `docs/superpowers/plans/2026-07-18-commercial-documents-numbering-implementation.md` (Phase 11) — COMPLETE 2026-07-19
+
 Environment: no Git repository; local Supabase only; review evidence uses current files and task reports.
 
 - Task 1: complete (no Git commits; independent review APPROVED with one Minor finding — controller fixed directly: wrapped 24 unwrapped `public.current_user_role()` calls in `supabase/migrations/20260719014036_normalize_commercial_documents.sql` as `(select public.current_user_role())` to match the Phase 12 RLS performance-pattern convention; re-verified `db reset` + schema test 75/75 + full suite 268/268 after the fix.)

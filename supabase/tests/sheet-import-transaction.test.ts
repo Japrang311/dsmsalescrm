@@ -8,7 +8,10 @@ import {
 } from "./helpers";
 
 const db = new SQL("postgresql://postgres:postgres@127.0.0.1:54322/postgres");
-const CLIENT_ID = "a0000000-0000-4000-8000-000000000001";
+// Mock-client fixture ...0001 was removed 2026-07-19 along with the rest of
+// the mockup demo data (see supabase/seed.sql); ...000d (HARIFF) is the only
+// client guaranteed to exist locally now, so tests use it as a fixture.
+const CLIENT_ID = "a0000000-0000-4000-8000-00000000000d";
 const OWNER_ID = "22222222-2222-2222-2222-222222222222";
 
 function quotation(number: string, uom = "Pcs") {

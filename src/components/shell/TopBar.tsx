@@ -13,19 +13,28 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Popover,
+  PopoverAnchor,
+  PopoverContent,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
 
 import { ROLE_LABEL, useRole } from "@/context/role-context";
 import type { Role } from "@/lib/domain";
 import { listOwners } from "@/lib/data/clients";
+import { useDashboardData } from "@/hooks/use-dashboard-data";
 import { AddClientDialog } from "@/components/clients/AddClientDialog";
 import { AddFollowUpDialog } from "@/components/clients/AddFollowUpDialog";
 import {
@@ -62,6 +71,241 @@ export const QUICK_CREATE_ITEMS = [
 // signed-in session.
 const CURRENT_SALES_ID = "22222222-2222-2222-2222-222222222222";
 
+const MAX_RESULTS_PER_GROUP = 5;
+
+// Global search covers exactly what its placeholder promises — client, RFQ,
+// quotation, SO — matched client-side against data already fetched by
+// useDashboardData() (shared React Query cache, no extra network round
+// trip). Uses a plain <Input> + PopoverAnchor (not PopoverTrigger) so the
+// dropdown opens as the user types rather than on click.
+function GlobalSearch() {
+  const navigate = useNavigate();
+  const { clients, items, orders } = useDashboardData();
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+
+  const q = query.trim().toLowerCase();
+  const matchedClients = q
+    ? clients
+        .filter((c) => c.name.toLowerCase().includes(q))
+        .slice(0, MAX_RESULTS_PER_GROUP)
+    : [];
+  const matchedRfq = q
+    ? items
+        .filter(
+          (i) => i.type === "RFQ" && i.rfqNumber?.toLowerCase().includes(q),
+        )
+        .slice(0, MAX_RESULTS_PER_GROUP)
+    : [];
+  const matchedQuotation = q
+    ? items
+        .filter(
+          (i) =>
+            i.type === "Quotation" &&
+            i.quotationNumber?.toLowerCase().includes(q),
+        )
+        .slice(0, MAX_RESULTS_PER_GROUP)
+    : [];
+  const matchedOrders = q
+    ? orders
+        .filter((o) => o.soNumber.toLowerCase().includes(q))
+        .slice(0, MAX_RESULTS_PER_GROUP)
+    : [];
+  const hasResults =
+    matchedClients.length > 0 ||
+    matchedRfq.length > 0 ||
+    matchedQuotation.length > 0 ||
+    matchedOrders.length > 0;
+
+  function closeSearch() {
+    setOpen(false);
+    setQuery("");
+  }
+
+  return (
+    <Popover open={open && q.length > 0} onOpenChange={setOpen}>
+      <PopoverAnchor asChild>
+        <div className="relative hidden flex-1 max-w-xl md:block">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setOpen(true);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") setOpen(false);
+            }}
+            placeholder="Cari client, RFQ, quotation, SO..."
+            className="h-9 pl-8 bg-surface-muted border-border"
+          />
+        </div>
+      </PopoverAnchor>
+      <PopoverContent
+        align="start"
+        className="w-(--radix-popover-anchor-width) p-0"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
+        <Command shouldFilter={false}>
+          <CommandList className="max-h-80">
+            {!hasResults && (
+              <CommandEmpty>
+                Tidak ada hasil untuk &ldquo;{query}&rdquo;.
+              </CommandEmpty>
+            )}
+            {matchedClients.length > 0 && (
+              <CommandGroup heading="Client">
+                {matchedClients.map((c) => (
+                  <CommandItem
+                    key={c.id}
+                    value={`client-${c.id}`}
+                    onSelect={() => {
+                      closeSearch();
+                      void navigate({
+                        to: "/clients/$clientId",
+                        params: { clientId: c.id },
+                      });
+                    }}
+                  >
+                    {c.name}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            )}
+            {matchedRfq.length > 0 && (
+              <CommandGroup heading="RFQ">
+                {matchedRfq.map((i) => (
+                  <CommandItem
+                    key={i.id}
+                    value={`rfq-${i.id}`}
+                    onSelect={() => {
+                      closeSearch();
+                      void navigate({ to: "/rfq/$id", params: { id: i.id } });
+                    }}
+                  >
+                    {i.rfqNumber}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            )}
+            {matchedQuotation.length > 0 && (
+              <CommandGroup heading="Quotation">
+                {matchedQuotation.map((i) => (
+                  <CommandItem
+                    key={i.id}
+                    value={`quotation-${i.id}`}
+                    onSelect={() => {
+                      closeSearch();
+                      void navigate({
+                        to: "/quotations/$id",
+                        params: { id: i.id },
+                      });
+                    }}
+                  >
+                    {i.quotationNumber}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            )}
+            {matchedOrders.length > 0 && (
+              <CommandGroup heading="Sales Order">
+                {matchedOrders.map((o) => (
+                  <CommandItem
+                    key={o.id}
+                    value={`so-${o.id}`}
+                    onSelect={() => {
+                      closeSearch();
+                      void navigate({
+                        to: "/sales-orders/$soId",
+                        params: { soId: o.id },
+                      });
+                    }}
+                  >
+                    {o.soNumber}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            )}
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+// Notifications derived from data already on hand — tasks due today or
+// overdue — rather than a separate notifications table/read-state, per
+// owner decision 2026-07-20.
+function NotificationsMenu() {
+  const navigate = useNavigate();
+  const { tasks, clients } = useDashboardData();
+  const alerts = tasks
+    .filter((t) => t.status === "Overdue" || t.status === "Today")
+    .sort((a, b) =>
+      a.status === b.status ? 0 : a.status === "Overdue" ? -1 : 1,
+    );
+  const clientName = (id: string) =>
+    clients.find((c) => c.id === id)?.name ?? "—";
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="relative h-9 w-9"
+          aria-label="Notifikasi"
+        >
+          <Bell className="h-4 w-4" />
+          {alerts.length > 0 && (
+            <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-destructive ring-2 ring-background" />
+          )}
+          <span className="sr-only">Notifications</span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-80">
+        <DropdownMenuLabel>Notifikasi</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        {alerts.length === 0 ? (
+          <p className="px-2 py-6 text-center text-sm text-muted-foreground">
+            Tidak ada task jatuh tempo atau overdue.
+          </p>
+        ) : (
+          alerts.slice(0, 10).map((t) => (
+            <DropdownMenuItem
+              key={t.id}
+              className="flex flex-col items-start gap-0.5 whitespace-normal py-2"
+              onSelect={() =>
+                void navigate({
+                  to: "/clients/$clientId",
+                  params: { clientId: t.clientId },
+                })
+              }
+            >
+              <span className="flex w-full items-center justify-between gap-2">
+                <span className="text-sm font-medium">{t.title}</span>
+                <Badge
+                  variant="outline"
+                  className={
+                    t.status === "Overdue"
+                      ? "border-destructive/40 bg-destructive/10 text-destructive"
+                      : "border-warning/40 bg-warning/10 text-warning"
+                  }
+                >
+                  {t.status === "Overdue" ? "Overdue" : "Hari ini"}
+                </Badge>
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {clientName(t.clientId)}
+              </span>
+            </DropdownMenuItem>
+          ))
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 export function TopBar() {
   const { role, setRole, authSource, realProfile, signOut } = useRole();
   const [quickCreate, setQuickCreate] = useState<QuickCreateKind | null>(null);
@@ -92,13 +336,7 @@ export function TopBar() {
     <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-border bg-background/95 px-3 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:px-4">
       <SidebarTrigger className="text-foreground" />
 
-      <div className="relative hidden flex-1 max-w-xl md:block">
-        <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          placeholder="Cari client, RFQ, quotation, SO..."
-          className="h-9 pl-8 bg-surface-muted border-border"
-        />
-      </div>
+      <GlobalSearch />
 
       <div className="ml-auto flex items-center gap-1.5 md:gap-2">
         <DropdownMenu>
@@ -147,16 +385,7 @@ export function TopBar() {
           onOpenChange={(o) => !o && setQuickCreate(null)}
         />
 
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon" className="relative h-9 w-9">
-              <Bell className="h-4 w-4" />
-              <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-destructive ring-2 ring-background" />
-              <span className="sr-only">Notifications</span>
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Notifikasi</TooltipContent>
-        </Tooltip>
+        <NotificationsMenu />
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

@@ -201,6 +201,7 @@ function SalesOrdersRevenuePage() {
                     <TableHead>Tanggal</TableHead>
                     <TableHead>Customer PO</TableHead>
                     <TableHead>Klien</TableHead>
+                    <TableHead>Nama Product</TableHead>
                     <TableHead>Owner</TableHead>
                     <TableHead>Tipe</TableHead>
                     <TableHead>Source</TableHead>
@@ -227,6 +228,13 @@ function SalesOrdersRevenuePage() {
                         </TableCell>
                         <TableCell className="max-w-[220px] truncate">
                           {clients[so.clientId]?.name ?? "-"}
+                        </TableCell>
+                        <TableCell className="max-w-[220px] truncate">
+                          {so.items.length === 0
+                            ? "—"
+                            : so.items.length === 1
+                              ? (so.items[0].productName ?? "—")
+                              : `${so.items[0].productName ?? "—"} +${so.items.length - 1} lainnya`}
                         </TableCell>
                         <TableCell className="whitespace-nowrap text-xs">
                           {owners[so.ownerId]?.name ?? "-"}

@@ -108,6 +108,13 @@ const EXPECTED_TABLES: Record<string, ExpectedTable> = {
   sales_orders: {
     actualName: "sales_orders",
     authenticatedUpdateColumns: [
+      // client_id/owner_id reopened 2026-07-20 for Sales Order correction
+      // (e.g. imported records with a mismatched owner) — RLS's WITH CHECK
+      // is the real boundary: sales may only keep owner_id as their own
+      // auth.uid(), manager/super_admin are unrestricted. See
+      // supabase/migrations/20260720000000_add_sales_order_edit_support.sql.
+      "client_id",
+      "owner_id",
       "customer_po_number",
       "date",
       "tax_type",

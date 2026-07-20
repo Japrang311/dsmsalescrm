@@ -71,6 +71,39 @@ export function ytdTargetValue(
 
 export type SalesTeamMember = { id: string; name: string; initials: string };
 
+// Executive dashboard "Sales Performance" composition. Adhitya Wirambara
+// and Leli Al personally run a sales book despite their profiles.role
+// being 'manager', so they're included here; Andri Sutomo (profiles.role
+// 'sales') has no personal book of business and is excluded. Display-only
+// for this dashboard/export — does not change anyone's actual RLS
+// role/permissions. Per owner decision 2026-07-20.
+const DASHBOARD_SALES_INCLUDE_MANAGERS = new Set([
+  "Adhitya Wirambara",
+  "Leli Al",
+]);
+const DASHBOARD_SALES_EXCLUDE = new Set(["Andri Sutomo"]);
+
+export function dashboardSalesTeam(
+  salesTeam: SalesTeamMember[],
+  ownersById: Record<string, { name: string; initials: string; role: string }>,
+): SalesTeamMember[] {
+  const managers = Object.entries(ownersById)
+    .filter(
+      ([, owner]) =>
+        owner.role === "manager" &&
+        DASHBOARD_SALES_INCLUDE_MANAGERS.has(owner.name),
+    )
+    .map(([id, owner]) => ({
+      id,
+      name: owner.name,
+      initials: owner.initials,
+    }));
+  const sales = salesTeam.filter(
+    (member) => !DASHBOARD_SALES_EXCLUDE.has(member.name),
+  );
+  return [...sales, ...managers];
+}
+
 function inRange(dateStr: string, range: DateRange): boolean {
   const d = new Date(dateStr).getTime();
   return d >= range.from.getTime() && d <= range.to.getTime();
@@ -169,7 +202,7 @@ export function monthlyRevenueTrend(
         month: "short",
       }),
       revenue: monthlyRevenue(orders, m),
-      target: targetArr[i].target,
+      target: targetArr[i]?.target ?? 0,
     };
   });
 }
@@ -187,7 +220,7 @@ export function ytdCumulativeTrend(
   return Array.from({ length: CURRENT_MONTH }, (_, i) => {
     const m = i + 1;
     cumRev += monthlyRevenue(orders, m);
-    cumTgt += targetArr[i].target;
+    cumTgt += targetArr[i]?.target ?? 0;
     return {
       month: new Date(CURRENT_YEAR, i, 1).toLocaleDateString("id-ID", {
         month: "short",
@@ -288,7 +321,7 @@ export function monthlyRevenueTrendInRange(
       rows.push({
         month: monthLabel,
         revenue: rev,
-        target: (targetArr[m].target * covDays) / daysInMonth,
+        target: ((targetArr[m]?.target ?? 0) * covDays) / daysInMonth,
       });
     }
     cursor.setMonth(cursor.getMonth() + 1);
@@ -398,7 +431,7 @@ export function sumMonthlyProrated(
         0,
         Math.round((covEnd.getTime() - covStart.getTime()) / 86_400_000) + 1,
       );
-      total += (arr[m].target * covDays) / monthEnd.getDate();
+      total += ((arr[m]?.target ?? 0) * covDays) / monthEnd.getDate();
     }
     cursor.setMonth(cursor.getMonth() + 1);
   }

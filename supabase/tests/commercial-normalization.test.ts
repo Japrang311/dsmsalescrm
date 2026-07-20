@@ -12,7 +12,10 @@ afterAll(async () => {
   await db.end();
 });
 
-const CLIENT_ID = "a0000000-0000-4000-8000-000000000001";
+// Mock-client fixture ...0001 was removed 2026-07-19 along with the rest of
+// the mockup demo data (see supabase/seed.sql); ...000d (HARIFF) is the only
+// client guaranteed to exist locally now, so tests use it as a fixture.
+const CLIENT_ID = "a0000000-0000-4000-8000-00000000000d";
 const OWNER_ID = "22222222-2222-2222-2222-222222222222";
 
 async function cleanupCommercialFixture(
@@ -308,7 +311,7 @@ describe("Phase 11 legacy commercial normalization", () => {
   test("rejects incompatible same-number groups into the review table", async () => {
     const rfqNumber = `RFQ-COLLISION-${crypto.randomUUID().slice(0, 8)}`;
     const legacyIds = [crypto.randomUUID(), crypto.randomUUID()];
-    const otherClientId = "a0000000-0000-4000-8000-000000000002";
+    const otherClientId = "a0000000-0000-4000-8000-000000000014";
 
     try {
       await db`

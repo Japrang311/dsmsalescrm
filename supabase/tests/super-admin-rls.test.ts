@@ -597,15 +597,19 @@ describe("complete four-role operation matrix", () => {
     }
   });
 
-  test("Sales, Manager, Executive, and Super Admin cannot reassign owner_id directly", async () => {
+  test("Sales, Manager, Executive, and Super Admin cannot reassign owner_id on clients/tasks/commercial_documents", async () => {
     const roleUsers = getFixtures();
     const fixtureRows = getRows();
     const rowIds = {
       clients: fixtureRows.client,
       tasks: fixtureRows.task,
       commercial_documents: fixtureRows.commercialItem,
-      sales_orders: fixtureRows.salesOrder,
     };
+    const stillLockedTables = [
+      "clients",
+      "tasks",
+      "commercial_documents",
+    ] as const;
 
     for (const role of [
       "sales",
@@ -614,7 +618,7 @@ describe("complete four-role operation matrix", () => {
       "super_admin",
     ] as const) {
       const client = await signInAs(roleUsers[role]);
-      for (const table of mutableOwnerTables) {
+      for (const table of stillLockedTables) {
         const { error } = await client
           .from(table)
           .update({ owner_id: roleUsers.manager.id })
@@ -630,6 +634,61 @@ describe("complete four-role operation matrix", () => {
         expect(stored.owner_id).toBe(roleUsers.sales.id);
       }
     }
+  });
+
+  // sales_orders is the one exception: owner_id/client_id were reopened for
+  // browser correction on 2026-07-20 (Sales Order edit form) — RLS's WITH
+  // CHECK is the real boundary, not the column grant. Sales may only keep
+  // owner_id as their own auth.uid(); manager/super_admin are unrestricted;
+  // executive still can't update sales_orders at all. Uses a fresh
+  // throwaway row (not fixtureRows.salesOrder) so later tests in this file
+  // that assume the shared fixture's owner never changes aren't affected.
+  test("sales_orders owner_id: sales cannot reassign to someone else; manager/super_admin can; executive cannot update at all", async () => {
+    const roleUsers = getFixtures();
+    const adminInsert = await adminClient
+      .from("sales_orders")
+      .insert(
+        valuesForOwnerInsert(
+          "sales_orders",
+          roleUsers.sales.id,
+          roleUsers.sales.id,
+        ),
+      )
+      .select("id")
+      .single();
+    if (adminInsert.error) throw adminInsert.error;
+    const soId = adminInsert.data.id as string;
+    trackInsertedRow("sales_orders", soId);
+
+    const salesClient = await signInAs(roleUsers.sales);
+    const salesAttempt = await salesClient
+      .from("sales_orders")
+      .update({ owner_id: roleUsers.manager.id })
+      .eq("id", soId);
+    expect(salesAttempt.error).not.toBeNull();
+
+    // Executive isn't in sales_orders_update's USING clause at all, so the
+    // row simply doesn't match for update — 0 rows affected, no thrown
+    // error (RLS USING excludes rows rather than erroring; WITH CHECK is
+    // what errors, and that only fires for rows USING already matched).
+    // Same pattern as "Executive is denied every write verb..." above.
+    const executiveClient = await signInAs(roleUsers.executive);
+    const executiveAttempt = await executiveClient
+      .from("sales_orders")
+      .update({ owner_id: roleUsers.manager.id })
+      .eq("id", soId)
+      .select("id");
+    if (executiveAttempt.error) throw executiveAttempt.error;
+    expect(executiveAttempt.data).toEqual([]);
+
+    const managerClient = await signInAs(roleUsers.manager);
+    const managerAttempt = await managerClient
+      .from("sales_orders")
+      .update({ owner_id: roleUsers.manager.id })
+      .eq("id", soId)
+      .select("owner_id");
+    expect(managerAttempt.error).toBeNull();
+    expect(managerAttempt.data).toEqual([{ owner_id: roleUsers.manager.id }]);
   });
 });
 
