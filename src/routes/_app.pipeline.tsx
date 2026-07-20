@@ -258,7 +258,7 @@ function PipelineBoard({ role }: { role: Role }) {
           ownerId: item.ownerId,
           actorId,
           clientId: item.clientId,
-          commercialItemId: item.id,
+          commercialDocumentId: item.id,
           title: `${item.description} diperbarui`,
           detail: `stage: ${pendingMove.fromStage} → ${pendingMove.toStage}`,
         });
@@ -267,7 +267,7 @@ function PipelineBoard({ role }: { role: Role }) {
         await createTask({
           clientId: item.clientId,
           ownerId: item.ownerId,
-          commercialItemId: item.id,
+          commercialDocumentId: item.id,
           title: `Follow-up · ${item.type} — ${pendingMove.clientName}`,
           dueDate: nextDateInput,
           method: "Phone",

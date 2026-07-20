@@ -29,10 +29,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import type { CommercialItem } from "@/lib/domain";
 import { useQueryClient } from "@tanstack/react-query";
-import {
-  updateCommercialItem,
-  describeCommercialItemChanges,
-} from "@/lib/data/commercial-items";
 import { createTask } from "@/lib/data/tasks";
 import { getCurrentActorId, logActivity } from "@/lib/data/activity-log";
 import { logFollowUp, type FollowUpResult } from "@/lib/data/follow-ups";
@@ -145,7 +141,7 @@ export function LogCommercialFollowUpDialog({
     try {
       await logFollowUp({
         clientId: item.clientId,
-        commercialItemId: item.id,
+        commercialDocumentId: item.id,
         ownerId: item.ownerId,
         fuDate: v.fuDate,
         method: v.method,
@@ -162,50 +158,17 @@ export function LogCommercialFollowUpDialog({
       return;
     }
 
-    if (
-      v.updateItemNextDate &&
-      v.nextFuDate &&
-      v.nextFuDate !== item.nextActionDate
-    ) {
-      try {
-        await updateCommercialItem(item.id, { nextActionDate: v.nextFuDate });
-        const changes = [
-          {
-            field: "nextActionDate",
-            from: item.nextActionDate,
-            to: v.nextFuDate,
-          },
-        ];
-        const actorId = await getCurrentActorId();
-        if (actorId) {
-          await logActivity({
-            kind: "commercial_item_stage_change",
-            ownerId: item.ownerId,
-            actorId,
-            clientId: item.clientId,
-            commercialItemId: item.id,
-            title: `${item.description} diperbarui`,
-            detail: describeCommercialItemChanges(changes),
-          });
-        }
-        await queryClient.invalidateQueries({
-          queryKey: ["commercial-items"],
-        });
-        await queryClient.invalidateQueries({ queryKey: ["activity-log"] });
-      } catch (error) {
-        toast.error("Gagal memperbarui next action date", {
-          description: error instanceof Error ? error.message : "Unknown error",
-        });
-        return;
-      }
-    }
-
-    if (v.createNextTask && v.nextFuDate) {
+    // commercial_documents has no next_action_date column post-Phase-11
+    // normalization, so "Perbarui Next follow-up" and "Buat task follow-up
+    // berikutnya" both resolve to the same action now: scheduling a task.
+    // Only one task is created even if both boxes are checked.
+    const scheduleNextFollowUp = v.updateItemNextDate || v.createNextTask;
+    if (scheduleNextFollowUp && v.nextFuDate) {
       try {
         const nextTask = await createTask({
           clientId: item.clientId,
           ownerId: item.ownerId,
-          commercialItemId: item.id,
+          commercialDocumentId: item.id,
           title:
             v.nextAction?.trim() || `Follow-up · ${item.type} — ${clientName}`,
           dueDate: v.nextFuDate,
@@ -220,7 +183,7 @@ export function LogCommercialFollowUpDialog({
             ownerId: item.ownerId,
             actorId,
             clientId: item.clientId,
-            commercialItemId: item.id,
+            commercialDocumentId: item.id,
             taskId: nextTask.id,
             title: "Task follow-up lanjutan dibuat",
             detail: nextTask.title,
@@ -229,7 +192,7 @@ export function LogCommercialFollowUpDialog({
         await queryClient.invalidateQueries({ queryKey: ["tasks"] });
         await queryClient.invalidateQueries({ queryKey: ["activity-log"] });
       } catch (error) {
-        toast.error("Gagal membuat task lanjutan", {
+        toast.error("Gagal membuat task follow-up", {
           description: error instanceof Error ? error.message : "Unknown error",
         });
         return;
@@ -238,7 +201,7 @@ export function LogCommercialFollowUpDialog({
 
     toast.success("Follow-up tercatat", {
       description: `${clientName} · ${item.type} · ${v.result}${
-        v.createNextTask ? " · task lanjutan dibuat" : ""
+        scheduleNextFollowUp ? " · next follow-up dijadwalkan" : ""
       }`,
     });
     setOpen(false);

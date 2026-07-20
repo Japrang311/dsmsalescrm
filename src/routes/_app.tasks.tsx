@@ -491,7 +491,7 @@ function TasksInboxPage() {
     try {
       const childTask = await createTask({
         clientId: t.clientId,
-        commercialItemId: t.commercialItemId,
+        commercialDocumentId: t.commercialItemId,
         ownerId: t.ownerId,
         title:
           kind === "Quotation" ? "Siapkan quotation" : "Koordinasi prototype",
@@ -534,8 +534,13 @@ function TasksInboxPage() {
       return;
     }
     try {
-      await updateCommercialItem(t.commercialItemId, { stage: "Waiting PO" });
-      const changes = [{ field: "stage", from: ci.stage, to: "Waiting PO" }];
+      // "Waiting PO" isn't one of the 7 weighted stages (see
+      // commercial-stages.ts) — it's the old pre-refactor name for what's
+      // now "Commit", same mapping already applied to dashboard/report
+      // "waiting PO" figures elsewhere. Writing the old name here silently
+      // misrouted the card to the pipeline board's fallback column.
+      await updateCommercialItem(t.commercialItemId, { stage: "Commit" });
+      const changes = [{ field: "stage", from: ci.stage, to: "Commit" }];
       const actorId = await getCurrentActorId();
       if (actorId) {
         await logActivity({
@@ -543,14 +548,14 @@ function TasksInboxPage() {
           ownerId: ci.ownerId,
           actorId,
           clientId: ci.clientId,
-          commercialItemId: ci.id,
+          commercialDocumentId: ci.id,
           title: `${ci.description} diperbarui`,
           detail: `${describeCommercialItemChanges(changes)} — dipindah dari task: ${t.title}`,
         });
       }
       await queryClient.invalidateQueries({ queryKey: ["commercial-items"] });
       await queryClient.invalidateQueries({ queryKey: ["activity-log"] });
-      toast.success("Commercial item → Waiting PO", { description: t.title });
+      toast.success("Commercial item → Commit", { description: t.title });
     } catch (error) {
       toast.error("Gagal memindahkan commercial item", {
         description: error instanceof Error ? error.message : "Unknown error",
@@ -1334,8 +1339,7 @@ function TaskRow({
                       onSelect={() => onMoveWaitingPO(task)}
                       disabled={!task.commercialItemId}
                     >
-                      <PackageCheck className="mr-2 h-4 w-4" /> Move to Waiting
-                      PO
+                      <PackageCheck className="mr-2 h-4 w-4" /> Move to Commit
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                   </>

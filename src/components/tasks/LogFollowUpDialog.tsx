@@ -174,7 +174,7 @@ export function LogFollowUpDialog({
       await logFollowUp({
         taskId: task.id,
         clientId: task.clientId,
-        commercialItemId: task.commercialItemId,
+        commercialDocumentId: task.commercialItemId,
         ownerId: task.ownerId,
         fuDate: v.fuDate,
         method: v.method,
@@ -206,7 +206,7 @@ export function LogFollowUpDialog({
         const nextTask = await createTask({
           clientId: task.clientId,
           ownerId: task.ownerId,
-          commercialItemId: task.commercialItemId,
+          commercialDocumentId: task.commercialItemId,
           title:
             v.nextAction?.trim() ||
             `Follow-up lanjutan · ${client?.name ?? ""}`,

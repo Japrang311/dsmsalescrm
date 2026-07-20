@@ -246,7 +246,7 @@ export function PipelineCardDrawer({
           ownerId: currentOwnerId,
           actorId,
           clientId: item.clientId,
-          commercialItemId: item.id,
+          commercialDocumentId: item.id,
           title: `${item.description} diperbarui`,
           detail: describeCommercialItemChanges(changes),
         });
@@ -255,7 +255,7 @@ export function PipelineCardDrawer({
         await createTask({
           clientId: item.clientId,
           ownerId: currentOwnerId,
-          commercialItemId: item.id,
+          commercialDocumentId: item.id,
           title: `Follow-up · ${item.type} — ${client.name}`,
           dueDate: nd,
           method: "Phone",

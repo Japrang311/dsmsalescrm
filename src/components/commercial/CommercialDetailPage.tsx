@@ -49,11 +49,7 @@ import {
   updateCommercialItem,
   describeCommercialItemChanges,
 } from "@/lib/data/commercial-items";
-import {
-  listClients,
-  listOwners,
-  listSalesTeamProfiles,
-} from "@/lib/data/clients";
+import { listClients, listOwners } from "@/lib/data/clients";
 import { listTasks } from "@/lib/data/tasks";
 import {
   getCurrentActorId,
@@ -91,11 +87,6 @@ export function CommercialDetailPage({
     queryFn: listOwners,
     enabled: authReady,
   });
-  const { data: salesTeam = [] } = useQuery({
-    queryKey: ["profiles", "sales-team"],
-    queryFn: listSalesTeamProfiles,
-    enabled: authReady && role !== "sales",
-  });
   const { data: allTasks = [] } = useQuery({
     queryKey: ["tasks", "all"],
     queryFn: listTasks,
@@ -113,13 +104,11 @@ export function CommercialDetailPage({
   });
 
   const [stage, setStage] = useState(item?.stage ?? "");
-  const [ownerId, setOwnerId] = useState(item?.ownerId ?? "");
   const [soNumber, setSoNumber] = useState(item?.soNumber ?? "");
 
   useEffect(() => {
     if (!item) return;
     setStage(item.stage);
-    setOwnerId(item.ownerId);
     setSoNumber(item.soNumber ?? "");
   }, [item]);
 
@@ -171,8 +160,6 @@ export function CommercialDetailPage({
     const changes: { field: string; from?: string; to?: string }[] = [];
     if (stage !== item.stage)
       changes.push({ field: "stage", from: item.stage, to: stage });
-    if (ownerId !== item.ownerId)
-      changes.push({ field: "ownerId", from: item.ownerId, to: ownerId });
     if (soNumber !== (item.soNumber ?? ""))
       changes.push({
         field: "soNumber",
@@ -188,7 +175,6 @@ export function CommercialDetailPage({
     try {
       await updateCommercialItem(item.id, {
         stage: stage !== item.stage ? stage : undefined,
-        ownerId: ownerId !== item.ownerId ? ownerId : undefined,
         soNumber: soNumber !== (item.soNumber ?? "") ? soNumber : undefined,
       });
       const actorId = await getCurrentActorId();
@@ -198,7 +184,7 @@ export function CommercialDetailPage({
           ownerId: item.ownerId,
           actorId,
           clientId: item.clientId,
-          commercialItemId: item.id,
+          commercialDocumentId: item.id,
           title: `${item.description} diperbarui`,
           detail: describeCommercialItemChanges(changes),
         });
@@ -303,22 +289,10 @@ export function CommercialDetailPage({
                 icon={<User2 className="h-3.5 w-3.5" />}
                 label="Sales owner"
               >
-                {canEdit && role !== "sales" ? (
-                  <Select value={ownerId} onValueChange={setOwnerId}>
-                    <SelectTrigger className="h-8 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {salesTeam.map((m) => (
-                        <SelectItem key={m.id} value={m.id}>
-                          {m.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <span className="text-sm">{owner?.name ?? "-"}</span>
-                )}
+                {/* Read-only: the DB revokes UPDATE on owner_id for
+                    commercial_documents, so RFQ/Quotation ownership can't be
+                    reassigned here. */}
+                <span className="text-sm">{owner?.name ?? "-"}</span>
               </InfoCell>
               <InfoCell
                 icon={<Layers className="h-3.5 w-3.5" />}
