@@ -1,6 +1,6 @@
 # Handoff — DSM Sales Web App V2
 
-Context dump for continuing this work in another tool (Codex). Written 2026-07-18; Phase 11/12 status refreshed 2026-07-19; Phase 11 import-review reconciliation session added 2026-07-19; post-import UX/bugfix session added 2026-07-20; second 2026-07-20 session (pipeline permissions/FK bugfixes) added 2026-07-20; Client Detail/Client List real-data wiring session added 2026-07-21; remote-migration-push + data-restoration session added 2026-07-21.
+Context dump for continuing this work in another tool (Codex). Written 2026-07-18; Phase 11/12 status refreshed 2026-07-19; Phase 11 import-review reconciliation session added 2026-07-19; post-import UX/bugfix session added 2026-07-20; second 2026-07-20 session (pipeline permissions/FK bugfixes) added 2026-07-20; Client Detail/Client List real-data wiring session added 2026-07-21; remote-migration-push + data-restoration session added 2026-07-21; browser-verification + spending_ytd fix + SO edit audit trail session added 2026-07-21.
 
 ## Project basics
 
@@ -9,11 +9,16 @@ Context dump for continuing this work in another tool (Codex). Written 2026-07-1
 - Local Supabase: `bunx supabase start` / `bunx supabase db reset` (rebuilds from `supabase/migrations/*.sql` + `supabase/seed.sql`) / `bunx supabase stop`.
 - Git is present on branch `main`, connected to `github.com/Japrang311/dsmsalescrm`
   (the Lovable-connected remote). Working tree is clean as of commit
-  `2c1c196` (2026-07-21) — see the bottom section for what that and the two
-  commits before it (`77d637a`, `aad642f`) contain. **None of these commits
-  have been pushed to `origin`** — push needs separate explicit approval.
-  Still never rewrite history, rebase, amend, squash, or force-push on this
-  repo.
+  `9a12281` (2026-07-21) — see the bottom section for what that and the
+  commit before it (`843af1f`) contain. **Both are pushed to `origin/main`**,
+  and both migrations they depend on are applied to the linked remote
+  Supabase project (`qhtfixgbcpcitokeryxb`, DSM Sales Web App V2). Still
+  never rewrite history, rebase, amend, squash, or force-push on this repo.
+- `bunx supabase db push --linked` cannot be run by the agent — the
+  Claude Code auto-mode classifier categorically blocks it regardless of
+  prior chat approval (confirms/retries in conversation don't help). The
+  owner has to run it themselves from their own terminal; the agent can
+  still confirm the result afterward with `bunx supabase migration list --linked`.
 - The user (Aditya) is not a programmer — explain things in plain terms, avoid silently making irreversible calls (schema changes, deleting data).
 
 ## Latest accepted direction — supersedes older deferred notes below
@@ -467,10 +472,45 @@ Starting point: commit `2c1c196` had the Client Detail/List wiring and client-pi
 - Chrome DevTools MCP was added to `.mcp.json` (`chrome-devtools` server, `--isolated`) — needs a session restart to activate.
 - The dev server runs on whatever port is free (8083 this session; 8080-8082 were occupied).
 
+## What happened this session (2026-07-21, browser verification + spending_ytd fix + SO edit audit trail)
+
+Starting point: commit `1ecb133` (client owner reassign/handover feature, 4 iterative RLS bugfix commits) was the tip of `main`, pushed. The owner asked for a live browser verification pass over previously-flagged and previously-closed items, using Chrome DevTools MCP against production (`dsmsalescrm.vercel.app`) since local Supabase had no business data at session start (0 sales_orders/commercial_documents/tasks rows — a `db reset` had happened without a follow-up manual CSV re-import, likely during the reassign-feature debugging session).
+
+### Browser verification findings
+
+- **Actor-name misattribution bug (real, reproduced live on production):** `ChangeStatusDialog`/`ReassignOwnerDialog` on the Client Detail page passed `ownerName` (the client's Sales owner) as `actorName` instead of the actually logged-in user. Reproduced on production: logged in as Super Admin, reassign dialog showed "Dicatat sebagai Leli Al" (the client's owner) instead of "Super Admin". Fixed in `_app.clients.$clientId.tsx` by deriving `currentActorName` from `authSource === "real" ? realProfile.name : ...` and passing that instead.
+- **`spending_ytd` stale-data bug (real, both Client Detail and Client List):** `clients.spending_ytd` is a raw stored column the Sheet import never populated — always 0 or stale. Client Detail's "Spending YTD" MiniStat and Client List's Spending YTD/sort/filter column both read straight from it. Fixed by recomputing from real `sales_orders` via the same `clientRevenueMetrics()` / `revenueByTax()` selectors the PPN/Non-PPN columns already use (see below).
+- **Verified working, no fix needed:** global search, Client Detail tabs/metrics with real data, Client List PPN/Non-PPN columns, Sales Orders "Nama Product" column, SO Edit dialog structure, notifications empty state, client picker (owner-mismatch fix from the previous session) in Create dialogs.
+- **Confirmed still-open, deliberately not acted on:** ~95 owner-mismatched SOs/commercial documents (21/189 SOs, 74/400 commercial docs per the 2026-07-20 SO-edit-support migration's own count) need case-by-case correctness judgment, not a mechanical bulk fix — left as backlog.
+
+### Changes committed as `843af1f` (pushed to `origin/main`, migration applied to remote)
+
+- **`_app.clients.$clientId.tsx`**: actor-name fix (above) + `spending_ytd` fix — header MiniStat now reads `revenue.totalRevenue` (already computed via `clientRevenueMetrics()`).
+- **`_app.clients.index.tsx`**: `enrichedRows` now overrides `spendingYtd` with `revenueByTax().total`, same pattern as the existing `ppn`/`nonPpn` override. `ClientsTable.tsx` reads `r.spendingYtd` for sort/column/filter, so all three benefit from one change.
+- **SO edit Activity Log gap closed**: editing a Sales Order's header (Klien/Owner/PO/Tanggal) or a line item was previously unaudited — only tax-type changes were logged. Added two new `activity_kind` enum values (`sales_order_header_change`, `sales_order_item_change`) via migration `20260721100000_add_sales_order_edit_activity_kinds.sql`, added labels to `activity-log.ts`, and wired `logActivity()` calls into `EditSalesOrderHeaderDialog.save()` and `SalesOrderItemRow.save()` in `_app.sales-orders.$soId.tsx` (threading `soId`/`soNumber`/`clientId`/`ownerId` props down as needed).
+- Verification: `bunx tsc --noEmit` clean, `bun run lint` clean (one prettier auto-fix needed), `bun run build` succeeds. `bun run test`: 294/314 pass — the 20 failures (`permission denied for table activity_log`/`follow_up_logs`) were confirmed via `git stash` to be **pre-existing on the unmodified baseline**, not caused by this session's changes.
+
+### Real production bug found and fixed as `9a12281` (pushed to `origin/main`, migration applied to remote)
+
+While locally verifying the SO edit Activity Log wiring end-to-end (couldn't test on production — auto-mode correctly blocks form submissions/clicks against live business data), found that **Sales Order item editing was completely broken on production**, unrelated to this session's other work:
+
+- Root cause: `sales_order_items.description` had column-level `UPDATE` grant to `authenticated` since `20260719041351`. Earlier the same day, `20260721000001_merge_description_into_product_name.sql` dropped the column, and `20260721000002_add_description_to_sales_order_items.sql` re-added it — but Postgres column privileges don't survive `DROP COLUMN`/`ADD COLUMN`, and the re-add never restored the grant.
+- Impact: `updateSalesOrderItem()` always includes `description` in its `UPDATE` SET list, and Postgres denies the *entire* statement if privilege is missing on *any* column in the SET list — so every SO item edit failed with "permission denied for table sales_order_items" for every role.
+- Fix: one-line migration `20260721110000_fix_sales_order_items_description_grant.sql` (`grant update (description) on table public.sales_order_items to authenticated;`).
+- Verified by seeding a throwaway test SO directly in local Postgres (local dev server's `.env.local` currently points `VITE_SUPABASE_URL` at the **production** REST API, not local — see note below — so browser-driven local testing wasn't possible; a standalone script signing in as the `leli@local.dsm.test` seed account exercised the exact same mutation + `logActivity()` calls the UI makes). Confirmed both the item update and the new `sales_order_item_change` log row succeed only after the grant fix; failed with the same "permission denied" error before it. Test fixture data deleted afterward.
+- Post-push production spot-check (after the owner ran `bunx supabase db push --linked` themselves, since the agent is blocked from running it): Client List and Client Detail both show correct non-zero Spending YTD matching PPN totals; latest Vercel deployment confirmed `Ready`.
+
+### Important environment note for future sessions
+
+- **`.env.local`'s `VITE_SUPABASE_URL` currently points at the production Supabase REST API** (`https://qhtfixgbcpcitokeryxb.supabase.co`), not `http://127.0.0.1:54321`. Confirmed by watching `bun run dev`'s network requests — every REST call went to the production host, and the local dev-role-switcher's sign-in attempts (`nur@local.dsm.test` etc., seed accounts that only exist in the local Auth) correctly got rejected by production Auth. `bun run test` is unaffected because `supabase/tests/helpers.ts` reads a separate `SUPABASE_URL` env var (unset, defaults to local) — the earlier 294/314 test result was genuinely local. But **`bun run dev` right now is not a safe local sandbox** — treat any UI testing done via `bun run dev` as hitting real production data until `.env.local` is repointed. The agent's file tools are permission-denied on `.env.local` (both `Read` and `cat`), so only the owner can fix this from their own editor/terminal.
+
 ## Suggested next steps for Codex
 
-1. Read this file's most recent session first (2026-07-21 remote migration push + data restoration, above) — it's the freshest state. Then the 2026-07-21 Client Detail/Client List wiring session, then the 2026-07-20 sessions. Then `.superpowers/sdd/p11-review-decisions-report.md` for the 55 import decisions that the corrected CSVs encode.
-2. Remote is now fully provisioned: schema (28/28 migrations), 8 profiles (Adhitya+Leli managers; Nur, Feni, Siti, Andri sales; Triyanto executive; Super Admin), 69 clients with remote-mapped owner_ids, 189 SOs (Rp24.15B), 397 commercial docs / 720 items, 48 target rows — imported from the corrected CSVs via `import-sheets.ts --allow-remote`. Any FUTURE data re-import to remote still needs the owner's explicit go-ahead.
-3. Do a live browser pass on global search, notifications, the Sales Order edit dialog/inline item editor, the Sales Orders list's "Nama Product" column, the Client Detail page (7 metric cards + 6 tabs), the Client List page (PPN/Non-PPN columns, Saved Views), and the client picker in all Create dialogs before assuming any of it is fully correct — see "Flagged, not yet acted on" sections in earlier sessions.
-4. Preserve Activity Log immutability, ownership attribution, task/follow-up/activity foreign keys, and archived legacy evidence. If asked to log the new SO edits to Activity Log, that needs a new `activity_kind` enum value (small migration) before wiring `logActivity()` calls.
-5. Git now has real commits through `2c1c196` plus this session's doc updates — treat it normally (stage intentionally, don't `add -A` blindly, never force-push/rewrite history on this Lovable-connected repo). Nothing has been pushed to `origin` yet.
+1. Read this file's most recent session first (2026-07-21 browser verification + spending_ytd fix + SO edit audit trail, above) — it's the freshest state. Then the 2026-07-21 remote migration push + data restoration session, then Client Detail/Client List wiring, then the 2026-07-20 sessions. Then `.superpowers/sdd/p11-review-decisions-report.md` for the 55 import decisions that the corrected CSVs encode.
+2. Remote is fully provisioned and now includes this session's two migrations (`20260721100000`, `20260721110000`) on top of the prior 28: schema, 8 profiles, 69 clients, 189 SOs (Rp24.15B), 397 commercial docs / 720 items, 48 target rows. Any FUTURE data re-import to remote still needs the owner's explicit go-ahead.
+3. **Fix `.env.local`'s `VITE_SUPABASE_URL` before relying on `bun run dev` for local testing** — see the environment note above. Until then, prefer either (a) direct-Postgres/service-role scripts against local Supabase for verification, or (b) the owner driving the browser against production themselves while the agent observes via Chrome DevTools MCP (console/network/DB checks), since auto-mode blocks the agent from submitting forms on production.
+4. `bunx supabase db push --linked` cannot be run by the agent (auto-mode classifier blocks it unconditionally, retries don't help) — hand the exact command to the owner and verify afterward with `bunx supabase migration list --linked`.
+5. Do a live browser pass on global search, notifications, the Sales Order edit dialog/inline item editor (now that the `description` grant is fixed — worth confirming end-to-end on production), the Client Detail page (7 metric cards + 6 tabs), the Client List page (PPN/Non-PPN/Spending YTD columns, Saved Views), and the client picker in all Create dialogs before assuming any of it is fully correct.
+6. Preserve Activity Log immutability, ownership attribution, task/follow-up/activity foreign keys, and archived legacy evidence.
+7. The ~95 owner-mismatched SOs/commercial documents (21/189 SOs, 74/400 commercial docs) remain an open data-quality backlog item — needs case-by-case correctness judgment, not a mechanical bulk fix. Don't attempt it without the owner's explicit sign-off on the correction approach.
+8. Git has real commits through `9a12281`, all pushed to `origin/main`. Treat it normally (stage intentionally, don't `add -A` blindly, never force-push/rewrite history on this Lovable-connected repo).
