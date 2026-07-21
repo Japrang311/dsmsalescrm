@@ -1580,3 +1580,103 @@ Implementation order: complete Phase 12's schema/RLS foundation before Phase 11 
 - [x] Bootstrap is rehearsed locally; no real credential or remote project is touched
 - [x] PRD/spec/ADR/plan/todo/CLAUDE/HANDOFF are updated from target to verified as-built state
 - [x] Remote migration/deployment remains a separate explicit approval naming the exact target
+
+---
+
+## Post-Phase 12: Real-Data Wiring & Bug Fixes
+
+### Task 42: Wire Client Detail page to real Supabase data
+
+**Status:** Complete (2026-07-21)
+
+**Description:** Replace all hardcoded `"—"` placeholders on the Client Detail page (`_app.clients.$clientId.tsx`) with real data from sales_orders and commercial_items.
+
+**Acceptance criteria:**
+
+- [x] 7 MetricCards (Total Revenue, PPN, Non-PPN, RFQ Pipeline, Commit, Prototype Paid, Prototype FOC) query real data via `clientRevenueMetrics()` / `clientCommercialMetrics()`
+- [x] "Waiting PO" card renamed to "Commit" — shows all commercial items at Commit stage
+- [x] 6 tabs (Overview/Upcoming Actions, Tasks, Commercial Items, Quotations, Sales Orders, Revenue History) replaced `NotYetAvailable` placeholders with real data tables
+- [x] Dead `NotYetAvailable` component removed
+
+**Verification:** `bunx tsc --noEmit` clean, `bun run lint` 0 errors, `bun run build` succeeds.
+
+**Files touched:**
+
+- `src/routes/_app.clients.$clientId.tsx`
+- `src/lib/data/dashboard-selectors.ts` (added `clientRevenueMetrics()`, `clientCommercialMetrics()`)
+
+**Estimated scope:** Medium (2 files)
+
+---
+
+### Task 43: Wire Client List page PPN/Non-PPN to real data + Saved Views
+
+**Status:** Complete (2026-07-21)
+
+**Description:** Replace hardcoded `ppn`/`nonPpn` zeros on the Client List page with real computed values from sales_orders. Wire Saved Views dropdown to actual filters.
+
+**Acceptance criteria:**
+
+- [x] PPN/Non-PPN columns computed from real `sales_orders` data via `enrichedRows` + `revenueByTax()`
+- [x] Saved Views dropdown wired: "Butuh Perhatian" → `overdueOnly`, "Prospect Aktif" → `statuses=["Prospect"]`, "Semua Semua" → `resetFilters()`
+- [x] Dead spending-range code block removed
+
+**Verification:** `bunx tsc --noEmit` clean, `bun run lint` 0 errors, `bun run build` succeeds.
+
+**Files touched:**
+
+- `src/routes/_app.clients.index.tsx`
+
+**Estimated scope:** Small (1 file)
+
+---
+
+### Task 44: Fix owner-mismatch client picker (PT. PUTRA ARGA BINANGIN)
+
+**Status:** Complete (2026-07-21)
+
+**Description:** When a SO's `owner_id` differs from the client's `owner_id` (owner mismatch from Sheet import), the client doesn't appear in the Create dialog picker because `listClients()` is scoped by `clients_select` RLS. Fix by using `searchClients()` (client_search_index) which bypasses ownership.
+
+**Acceptance criteria:**
+
+- [x] Migration `20260721000000_expand_client_search_index.sql` adds `owner_id` to `client_search_index` view
+- [x] `searchClients()` returns `{id, name, ownerId}`
+- [x] `useClientResolution()` in `ClientPicker.tsx` switched from `listClients()` to `searchClients()`
+- [x] CreateRecordDialogs: added `["clients"]` query invalidation after SO creation
+
+**Verification:** `bunx tsc --noEmit` clean, `bun run lint` 0 errors, `bun run build` succeeds.
+
+**Files touched:**
+
+- `supabase/migrations/20260721000000_expand_client_search_index.sql` (new)
+- `src/lib/data/clients.ts`
+- `src/components/clients/ClientPicker.tsx`
+- `src/components/clients/CreateRecordDialogs.tsx`
+
+**Estimated scope:** Small (4 files, 1 migration)
+
+---
+
+### Task 45: Push all migrations to remote + restore Sheet data from corrected CSVs
+
+**Status:** Complete (2026-07-21)
+
+**Description:** Owner approved pushing all 22 pending migrations to the remote Supabase project. During browser verification, achievement showed 22.84M instead of the expected 24.1M — root cause was re-importing from the repo's pre-decision fixture CSVs instead of the corrected CSVs that carry the 55 Phase 11 review decisions.
+
+**Acceptance criteria:**
+
+- [x] All 28 migrations applied to remote `qhtfixgbcpcitokeryxb` (DSM Sales Web App V2, Northeast Asia/Tokyo) via `bunx supabase db push` — local and remote in sync
+- [x] Local DB reset, all 5 tabs re-imported from `~/Downloads/Work/Projects/dsm-sheet-export/corrected/*-corrected.csv`
+- [x] SO total verified: 189 sales orders, Rp24.153.354.852 (24.15M) — matches expected 24.1M
+- [x] 397 commercial documents / 720 items restored
+- [x] Remaining rejections match the previous session's "Keep rejected" decisions (blank rows, missing prices)
+
+**Root cause of the 1.31B gap:** the repo fixture CSVs (`tests/fixtures/sheets-import/`) are pre-decision versions. Two SOs were quarantined on re-import: `DSM-26SO082` (Rp1.13B, three distinct customer POs on one internal SO — owner decided: merge all POs in header, HARIFF pattern) and `DSM-26SO111` (Rp177.5jt, missing line total on a shipping row — owner decided: compute from qty × unit price). The corrected CSVs apply these decisions.
+
+**Key learning:** always import from the corrected CSVs in `~/Downloads/Work/Projects/dsm-sheet-export/corrected/`, never from the repo fixtures.
+
+**Verification:** DB query confirms `count=189, sum(total_value)=24153354852`.
+
+**Files touched:** none in repo (data-only operation; stray review-log JSONLs deleted)
+
+**Estimated scope:** Data operation

@@ -1,6 +1,6 @@
 # Handoff — DSM Sales Web App V2
 
-Context dump for continuing this work in another tool (Codex). Written 2026-07-18; Phase 11/12 status refreshed 2026-07-19; Phase 11 import-review reconciliation session added 2026-07-19; post-import UX/bugfix session added 2026-07-20; second 2026-07-20 session (pipeline permissions/FK bugfixes) added 2026-07-20; Client Detail/Client List real-data wiring session added 2026-07-21.
+Context dump for continuing this work in another tool (Codex). Written 2026-07-18; Phase 11/12 status refreshed 2026-07-19; Phase 11 import-review reconciliation session added 2026-07-19; post-import UX/bugfix session added 2026-07-20; second 2026-07-20 session (pipeline permissions/FK bugfixes) added 2026-07-20; Client Detail/Client List real-data wiring session added 2026-07-21; remote-migration-push + data-restoration session added 2026-07-21.
 
 ## Project basics
 
@@ -439,10 +439,38 @@ Starting point: all 41 tasks in `tasks/todo.md` were complete (Phases 0–12), b
 
 **Migration to apply:** `20260721000000_expand_client_search_index.sql` — needs `bunx supabase db reset` (local) or `supabase migration up` to apply. This is required for the client picker fix to take effect.
 
+## What happened this session (2026-07-21, remote migration push + data restoration)
+
+Starting point: commit `2c1c196` had the Client Detail/List wiring and client-picker fix. The owner approved pushing all pending migrations to the remote Supabase project, then browser verification revealed wrong achievement numbers.
+
+### What was done
+
+1. **Pushed 22 pending migrations to remote.** `bunx supabase db push` applied everything from `20260718020000` through `20260721000000` to the remote project `qhtfixgbcpcitokeryxb` (DSM Sales Web App V2, Northeast Asia/Tokyo). All 28 migrations are now in sync between local and remote (`bunx supabase migration list` shows identical columns). Owner approval was given explicitly before pushing.
+
+2. **Found remote DB has zero business data.** The remote has the schema and 2 real profiles (`adhitya@dutasolusimetalindo.com` = manager, `superadmin@dutasolusimetalindo.com` = super_admin) but 0 clients / 0 SOs / 0 tasks. The real business data only exists in the local Supabase. `.env.local` was briefly pointed at the remote, then reverted to `http://127.0.0.1:54321`.
+
+3. **Root-caused the achievement mismatch (22.84M vs expected 24.1M).** After a local `db reset` wiped the data, the first re-import used the repo's fixture CSVs (`tests/fixtures/sheets-import/`) — these are **pre-decision** versions. Two SOs got quarantined:
+   - `DSM-26SO082` (Rp1.13B): three distinct customer POs (PO/2026/VI/RM/041, /042, /043) on one internal SO → `header_conflict`. Owner's prior decision: keep one consolidated SO with all three POs merged in the header (same pattern as HARIFF multi-PO merge).
+   - `DSM-26SO111` (Rp177.5jt): a shipping row had unit price but empty Total Price → `invalid_paid_money`, quarantining the whole document. Owner's prior decision: compute the missing total from qty × unit price.
+   - The 115 "unmatched_customer" SO rows were just monthly summary rows in the CSV (e.g. `Rp1.766.299.000,JANUARI`) — correctly ignored.
+
+4. **Re-imported from the corrected CSVs.** The decision-applied files live outside the repo at `~/Downloads/Work/Projects/dsm-sheet-export/corrected/` (`so-2026-corrected.csv`, `quotation-corrected.csv`, `np-2026-corrected.csv`, `proty-corrected.csv`, `hariff-corrected.csv`). Full `db reset` + re-import of all 5 tabs produced:
+   - **189 sales orders, Rp24.153.354.852 (24.15M)** — matches the owner's expected 24.1M
+   - 397 commercial documents / 720 items
+   - Remaining rejections (1 SO, 31 quotation, 1 NP) match the previous session's documented "Keep rejected" decisions (blank rows, missing prices).
+
+### Key learnings for future sessions
+
+- **Always import from `~/Downloads/Work/Projects/dsm-sheet-export/corrected/*-corrected.csv`, never from `tests/fixtures/sheets-import/`.** The repo fixtures are pre-decision and will silently lose Rp1.31B of SO value plus 12 quotation documents to `header_conflict` quarantines.
+- The import script needs `SUPABASE_URL=http://127.0.0.1:54321` and a `SUPABASE_SERVICE_ROLE_KEY` JWT signed with the local JWT secret (`super-secret-jwt-token-with-at-least-32-characters-long`, from `docker exec supabase_db_DSM_SALES_WEB_APP_V2 env`).
+- `bunx supabase db push` only affects the remote; local needs `bunx supabase db reset` to pick up new migrations.
+- Chrome DevTools MCP was added to `.mcp.json` (`chrome-devtools` server, `--isolated`) — needs a session restart to activate.
+- The dev server runs on whatever port is free (8083 this session; 8080-8082 were occupied).
+
 ## Suggested next steps for Codex
 
-1. Read this file's most recent session first (2026-07-21 Client Detail/Client List real-data wiring, above) — it's the freshest state. Then the 2026-07-20 sessions (post-import UX/bugfix, pipeline permissions/FK bugfix). Then `.superpowers/sdd/p11-post-import-ux-fixes-report.md`, `.superpowers/sdd/p11-review-decisions-report.md`, `.superpowers/sdd/p11-task-8-report.md`, and `.superpowers/sdd/task-7-report.md` for the fuller history. Phases 11/12 are locally verified complete; the Phase 11 import review is fully decided (0 pending entries).
-2. Keep all remote work blocked until the user identifies the exact Supabase target and explicitly approves the reviewed migration/import commands. All 28 local migrations have been pushed to the remote project `qhtfixgbcpcitokeryxb` (DSM Sales Web App V2, Northeast Asia/Tokyo) — remote and local are now in sync.
+1. Read this file's most recent session first (2026-07-21 remote migration push + data restoration, above) — it's the freshest state. Then the 2026-07-21 Client Detail/Client List wiring session, then the 2026-07-20 sessions. Then `.superpowers/sdd/p11-review-decisions-report.md` for the 55 import decisions that the corrected CSVs encode.
+2. Remote schema is fully in sync (28/28 migrations on `qhtfixgbcpcitokeryxb`), but **remote has no business data** — importing the corrected CSVs to remote is a separate explicit approval, and the import script currently hard-guards against non-local URLs (`requireLocalSupabaseUrl`). Do not attempt remote data import without the owner's explicit go-ahead.
 3. Do a live browser pass on global search, notifications, the Sales Order edit dialog/inline item editor, the Sales Orders list's "Nama Product" column, the Client Detail page (7 metric cards + 6 tabs), the Client List page (PPN/Non-PPN columns, Saved Views), and the client picker in all Create dialogs before assuming any of it is fully correct — see "Flagged, not yet acted on" sections in earlier sessions.
 4. Preserve Activity Log immutability, ownership attribution, task/follow-up/activity foreign keys, and archived legacy evidence. If asked to log the new SO edits to Activity Log, that needs a new `activity_kind` enum value (small migration) before wiring `logActivity()` calls.
-5. Git now has real commits through `2c1c196` and a clean working tree (an untracked `.planning/` directory aside) — treat it normally (stage intentionally, don't `add -A` blindly, never force-push/rewrite history on this Lovable-connected repo). Nothing has been pushed to `origin` yet.
+5. Git now has real commits through `2c1c196` plus this session's doc updates — treat it normally (stage intentionally, don't `add -A` blindly, never force-push/rewrite history on this Lovable-connected repo). Nothing has been pushed to `origin` yet.
