@@ -24,7 +24,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { useRole } from "@/context/role-context";
-import dsmMarkUrl from "/dsm-mark.svg";
+import dsmMarkUrl from "/dsm-mark.png";
 
 const NAV_FULL = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
