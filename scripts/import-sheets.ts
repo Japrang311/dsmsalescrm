@@ -53,8 +53,10 @@ Usage: bun scripts/import-sheets.ts --file <path> --tab <tab> [--year <YYYY>] [-
   --year      Year for month-only SO tabs (default: current year)
   --dry-run   Reconcile and report without writing documents or counters
   --review-log <path>  Optional JSONL destination for rejected rows
+  --allow-remote  Skip the local-origin guard (owner-approved remote imports only)
 
-Only the exact local Supabase origin on port 54321 is accepted.
+Only the exact local Supabase origin on port 54321 is accepted unless
+--allow-remote is passed.
 `);
   process.exit(1);
 }
@@ -82,8 +84,12 @@ async function main() {
   if (!configuredUrl || !serviceRoleKey) {
     throw new Error("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required");
   }
-  const localUrl = requireLocalSupabaseUrl(configuredUrl);
-  const supabase = createClient(localUrl, serviceRoleKey, {
+  // Default: only the approved local origin is accepted. --allow-remote is an
+  // explicit escape hatch for the owner-approved production import (2026-07-21).
+  const targetUrl = args["allow-remote"]
+    ? configuredUrl
+    : requireLocalSupabaseUrl(configuredUrl);
+  const supabase = createClient(targetUrl, serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
