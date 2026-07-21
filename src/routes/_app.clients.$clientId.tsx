@@ -844,10 +844,13 @@ function ClientProfilePage() {
           onConfirm={async (newOwnerId, note) => {
             try {
               const oldOwnerName = ownerName;
-              const { error: updateErr } = await supabase
-                .from("clients")
-                .update({ owner_id: newOwnerId })
-                .eq("id", client.id);
+              const { error: updateErr } = await supabase.rpc(
+                "reassign_client_owner",
+                {
+                  p_client_id: client.id,
+                  p_new_owner_id: newOwnerId,
+                },
+              );
               if (updateErr) throw updateErr;
 
               const newOwnerName =
