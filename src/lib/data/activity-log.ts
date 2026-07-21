@@ -11,6 +11,8 @@ export type ActivityKind =
   | "commercial_item_stage_change"
   | "sales_order_created"
   | "sales_order_tax_change"
+  | "sales_order_header_change"
+  | "sales_order_item_change"
   | "team_member_created"
   | "team_member_profile_updated"
   | "team_member_role_changed"
@@ -28,6 +30,8 @@ export const ACTIVITY_KIND_LABELS: Record<ActivityKind, string> = {
   commercial_item_stage_change: "Perubahan Tahap Commercial",
   sales_order_created: "Sales Order Baru",
   sales_order_tax_change: "Koreksi Pajak Sales Order",
+  sales_order_header_change: "Perubahan Detail Sales Order",
+  sales_order_item_change: "Perubahan Item Sales Order",
   team_member_created: "Anggota Tim Dibuat",
   team_member_profile_updated: "Profil Anggota Tim Diperbarui",
   team_member_role_changed: "Role Anggota Tim Diubah",

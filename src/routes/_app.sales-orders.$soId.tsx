@@ -153,6 +153,7 @@ function SalesOrderDetail() {
         {canEditOwnSo && (
           <EditSalesOrderHeaderDialog
             soId={so.id}
+            soNumber={so.soNumber}
             clientId={so.clientId}
             ownerId={so.ownerId}
             customerPoNumber={so.customerPoNumber}
@@ -238,6 +239,10 @@ function SalesOrderDetail() {
             <Separator />
 
             <SalesOrderItemsTable
+              soId={so.id}
+              soNumber={so.soNumber}
+              clientId={so.clientId}
+              ownerId={so.ownerId}
               items={so.items}
               showMoney={!foc}
               canEdit={canEditOwnSo}
@@ -328,6 +333,7 @@ function SalesOrderDetail() {
 
 function EditSalesOrderHeaderDialog({
   soId,
+  soNumber,
   clientId,
   ownerId,
   customerPoNumber,
@@ -335,6 +341,7 @@ function EditSalesOrderHeaderDialog({
   canEditOwner,
 }: {
   soId: string;
+  soNumber: string;
   clientId: string;
   ownerId: string;
   customerPoNumber: string | null;
@@ -371,14 +378,36 @@ function EditSalesOrderHeaderDialog({
   async function save() {
     setSaving(true);
     try {
+      const newOwnerId = canEditOwner ? draftOwnerId : ownerId;
       await updateSalesOrderHeader(soId, {
         clientId: draftClientId,
-        ownerId: canEditOwner ? draftOwnerId : ownerId,
+        ownerId: newOwnerId,
         customerPoNumber: draftPo,
         date: draftDate,
       });
+
+      const actorId = await getCurrentActorId();
+      if (actorId) {
+        const changes: string[] = [];
+        if (draftClientId !== clientId) changes.push("Klien diubah");
+        if (newOwnerId !== ownerId) changes.push("Sales Owner diubah");
+        if (draftPo !== (customerPoNumber ?? ""))
+          changes.push("Customer PO diubah");
+        if (draftDate !== date) changes.push(`Tanggal ${date} → ${draftDate}`);
+        await logActivity({
+          kind: "sales_order_header_change",
+          ownerId: newOwnerId,
+          actorId,
+          clientId: draftClientId,
+          salesOrderId: soId,
+          title: `Detail SO ${soNumber} diperbarui`,
+          detail: changes.length ? changes.join("; ") : undefined,
+        });
+      }
+
       await queryClient.invalidateQueries({ queryKey: ["sales-orders"] });
       await queryClient.invalidateQueries({ queryKey: ["clients"] });
+      await queryClient.invalidateQueries({ queryKey: ["activity-log"] });
       toast.success("Detail Sales Order diperbarui");
       setOpen(false);
     } catch (error) {
@@ -674,10 +703,18 @@ function Cell({
 }
 
 function SalesOrderItemsTable({
+  soId,
+  soNumber,
+  clientId,
+  ownerId,
   items,
   showMoney,
   canEdit,
 }: {
+  soId: string;
+  soNumber: string;
+  clientId: string;
+  ownerId: string;
   items: SalesOrderLineItem[];
   showMoney: boolean;
   canEdit: boolean;
@@ -708,6 +745,10 @@ function SalesOrderItemsTable({
             {items.map((item) => (
               <SalesOrderItemRow
                 key={item.id}
+                soId={soId}
+                soNumber={soNumber}
+                clientId={clientId}
+                ownerId={ownerId}
                 item={item}
                 showMoney={showMoney}
                 canEdit={canEdit}
@@ -723,10 +764,18 @@ function SalesOrderItemsTable({
 const UOM_OPTIONS: Uom[] = ["Unit", "Pcs", "Set", "Lot"];
 
 function SalesOrderItemRow({
+  soId,
+  soNumber,
+  clientId,
+  ownerId,
   item,
   showMoney,
   canEdit,
 }: {
+  soId: string;
+  soNumber: string;
+  clientId: string;
+  ownerId: string;
   item: SalesOrderLineItem;
   showMoney: boolean;
   canEdit: boolean;
@@ -769,7 +818,22 @@ function SalesOrderItemRow({
         uom,
         unitPrice: priceNum,
       });
+
+      const actorId = await getCurrentActorId();
+      if (actorId) {
+        await logActivity({
+          kind: "sales_order_item_change",
+          ownerId,
+          actorId,
+          clientId,
+          salesOrderId: soId,
+          title: `Item pada SO ${soNumber} diperbarui`,
+          detail: `${item.productName ?? "Item"} → ${productName.trim() || "—"}`,
+        });
+      }
+
       await queryClient.invalidateQueries({ queryKey: ["sales-orders"] });
+      await queryClient.invalidateQueries({ queryKey: ["activity-log"] });
       toast.success("Item diperbarui");
       setEditing(false);
     } catch (error) {

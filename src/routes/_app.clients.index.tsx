@@ -109,14 +109,21 @@ function ClientListPage() {
   const [savedView, setSavedView] = useState<SavedView>(SAVED_VIEWS[0]);
   const pageSize = 10;
 
-  // Compute per-client PPN/Non-PPN from real Sales Orders data
+  // Compute per-client PPN/Non-PPN/Spending YTD from real Sales Orders data
+  // (client.spendingYtd is a raw stored column the Sheet import never
+  // populated — it's always 0/stale, so this recomputes it like ppn/nonPpn)
   const enrichedRows = useMemo(() => {
     if (salesOrders.length === 0) return rows;
     return rows.map((row) => {
       const tax = revenueByTax(
         salesOrders.filter((so) => so.clientId === row.client.id),
       );
-      return { ...row, ppn: tax.ppn, nonPpn: tax.nonPpn };
+      return {
+        ...row,
+        ppn: tax.ppn,
+        nonPpn: tax.nonPpn,
+        spendingYtd: tax.total,
+      };
     });
   }, [rows, salesOrders]);
 
