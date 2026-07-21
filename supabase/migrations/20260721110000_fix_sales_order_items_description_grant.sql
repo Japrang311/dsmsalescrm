@@ -1,0 +1,12 @@
+-- Fix: sales_order_items.description lost its column-level UPDATE grant.
+--
+-- 20260719041351_harden_normalized_document_permissions.sql originally
+-- granted authenticated UPDATE on (product_name, description, qty, uom,
+-- unit_price, line_total, line_position). 20260721000001 then dropped the
+-- description column, and 20260721000002 re-added it without re-granting
+-- UPDATE — column privileges do not survive DROP COLUMN/ADD COLUMN in
+-- Postgres. Since updateSalesOrderItem() always writes description in its
+-- SET list, every Sales Order item edit currently fails outright ("permission
+-- denied for table sales_order_items"), because Postgres requires privilege
+-- on every column in an UPDATE's SET list, not just the ones that changed.
+grant update (description) on table public.sales_order_items to authenticated;
