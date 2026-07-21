@@ -12,7 +12,6 @@ export type SalesOrderLineItem = {
   id: string;
   salesOrderId: string;
   productName: string | null;
-  description: string | null;
   qty: number | null;
   uom: Uom | null;
   unitPrice: number | null;
@@ -46,7 +45,6 @@ type SalesOrderItemRow = {
   id: string;
   sales_order_id: string;
   product_name: string | null;
-  description: string | null;
   qty: number | null;
   uom: Uom | null;
   unit_price: number | null;
@@ -79,7 +77,6 @@ function toLineItem(row: SalesOrderItemRow): SalesOrderLineItem {
     id: row.id,
     salesOrderId: row.sales_order_id,
     productName: row.product_name,
-    description: row.description,
     qty: row.qty,
     uom: row.uom,
     unitPrice: row.unit_price,
@@ -211,7 +208,6 @@ export async function updateSalesOrderHeader(
 
 export type UpdateSalesOrderItemInput = {
   productName: string | null;
-  description: string | null;
   qty: number;
   uom: Uom;
   // null for Prototype FOC items, which never carry money — matches the
@@ -233,7 +229,6 @@ export async function updateSalesOrderItem(
     .from("sales_order_items")
     .update({
       product_name: input.productName,
-      description: input.description,
       qty: input.qty,
       uom: input.uom,
       unit_price: input.unitPrice,

@@ -692,7 +692,6 @@ function SalesOrderItemsTable({
           <TableHeader>
             <TableRow>
               <TableHead>Nama Product</TableHead>
-              <TableHead>Description</TableHead>
               <TableHead className="text-right">Qty</TableHead>
               <TableHead>UOM</TableHead>
               {showMoney && (
@@ -734,7 +733,6 @@ function SalesOrderItemRow({
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
   const [productName, setProductName] = useState(item.productName ?? "");
-  const [description, setDescription] = useState(item.description ?? "");
   const [qty, setQty] = useState(String(item.qty ?? ""));
   const [uom, setUom] = useState<Uom>(item.uom ?? "Unit");
   const [unitPrice, setUnitPrice] = useState(String(item.unitPrice ?? ""));
@@ -742,7 +740,6 @@ function SalesOrderItemRow({
 
   function startEdit() {
     setProductName(item.productName ?? "");
-    setDescription(item.description ?? "");
     setQty(String(item.qty ?? ""));
     setUom(item.uom ?? "Unit");
     setUnitPrice(String(item.unitPrice ?? ""));
@@ -764,7 +761,6 @@ function SalesOrderItemRow({
     try {
       await updateSalesOrderItem(item.id, {
         productName: productName.trim() || null,
-        description: description.trim() || null,
         qty: qtyNum,
         uom,
         unitPrice: priceNum,
@@ -787,7 +783,6 @@ function SalesOrderItemRow({
         <TableCell className="font-medium">
           {item.productName ?? "Nama Product belum diisi"}
         </TableCell>
-        <TableCell>{item.description ?? "—"}</TableCell>
         <TableCell className="text-right tabular-nums">
           {item.qty ?? "—"}
         </TableCell>
@@ -827,15 +822,6 @@ function SalesOrderItemRow({
           onChange={(e) => setProductName(e.target.value)}
           className="h-8 min-w-[140px] text-xs"
           placeholder="Nama Product"
-        />
-      </TableCell>
-      <TableCell>
-        <Input
-          aria-label="Description"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          className="h-8 min-w-[160px] text-xs"
-          placeholder="Description"
         />
       </TableCell>
       <TableCell>
