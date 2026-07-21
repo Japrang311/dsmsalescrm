@@ -8,9 +8,13 @@ import {
   Clock,
   FileText,
   Layers,
+  Mail,
   Package,
+  Pencil,
+  Phone,
   PhoneCall,
   ReceiptText,
+  Smartphone,
   Sparkles,
   AlertTriangle,
 } from "lucide-react";
@@ -70,7 +74,8 @@ import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { ChangeStatusDialog } from "@/components/clients/ChangeStatusDialog";
 import { ReassignOwnerDialog } from "@/components/clients/ReassignOwnerDialog";
-import type { ClientStatus } from "@/lib/domain";
+import { EditClientInfoDialog } from "@/components/clients/EditClientInfoDialog";
+import type { Client, ClientStatus } from "@/lib/domain";
 
 export const Route = createFileRoute("/_app/clients/$clientId")({
   head: () => ({ meta: [{ title: "Client · DSM Sales Execution" }] }),
@@ -143,6 +148,7 @@ function ClientProfilePage() {
   const [activeTab, setActiveTab] = useState("overview");
   const [pendingStatus, setPendingStatus] = useState<ClientStatus | null>(null);
   const [showReassign, setShowReassign] = useState(false);
+  const [showEditInfo, setShowEditInfo] = useState(false);
   const canEditStatus =
     role === "sales" || role === "manager" || role === "super_admin";
   const canReassign = role === "manager" || role === "super_admin";
@@ -417,6 +423,12 @@ function ClientProfilePage() {
               }
             />
           </div>
+
+          <ClientInfoCard
+            client={client}
+            canEdit={canEditStatus}
+            onEdit={() => setShowEditInfo(true)}
+          />
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
             <Card className="lg:col-span-2">
@@ -908,6 +920,13 @@ function ClientProfilePage() {
           }}
         />
       )}
+
+      <EditClientInfoDialog
+        client={client}
+        actorName={currentActorName}
+        open={showEditInfo}
+        onOpenChange={setShowEditInfo}
+      />
     </div>
   );
 }
@@ -977,6 +996,99 @@ function SectionTitle({
   return (
     <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
       <Icon className="h-4 w-4 text-primary" /> {title}
+    </div>
+  );
+}
+
+function ClientInfoCard({
+  client,
+  canEdit,
+  onEdit,
+}: {
+  client: Client;
+  canEdit: boolean;
+  onEdit: () => void;
+}) {
+  const hasCompanyInfo =
+    client.address || client.industry || client.website || client.notes;
+  const filledContacts = client.contacts.filter(
+    (c) => c.name || c.email || c.phone || c.mobile,
+  );
+
+  return (
+    <Card>
+      <CardContent className="p-4">
+        <div className="flex items-center justify-between">
+          <SectionTitle icon={Building2} title="Info Perusahaan & Kontak" />
+          {canEdit && (
+            <Button variant="outline" size="sm" onClick={onEdit}>
+              <Pencil className="h-3.5 w-3.5" /> Edit Info
+            </Button>
+          )}
+        </div>
+
+        <div className="mt-3 grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <div className="grid gap-2 text-xs">
+            <InfoRow label="Alamat" value={client.address} />
+            <InfoRow label="Bidang Usaha" value={client.industry} />
+            <InfoRow label="Website" value={client.website} />
+            <InfoRow label="Catatan" value={client.notes} />
+            {!hasCompanyInfo && (
+              <p className="text-muted-foreground">
+                Belum ada info perusahaan.
+              </p>
+            )}
+          </div>
+
+          <div className="grid gap-2">
+            {filledContacts.length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                Belum ada kontak person.
+              </p>
+            ) : (
+              client.contacts.map((c, i) =>
+                c.name || c.email || c.phone || c.mobile ? (
+                  <div
+                    key={i}
+                    className="rounded-md border bg-muted/30 p-2.5 text-xs"
+                  >
+                    <p className="font-medium">
+                      {c.name || `Kontak Person ${i + 1}`}
+                    </p>
+                    <div className="mt-1 flex flex-col gap-0.5 text-muted-foreground">
+                      {c.email && (
+                        <span className="flex items-center gap-1.5">
+                          <Mail className="h-3 w-3" /> {c.email}
+                        </span>
+                      )}
+                      {c.phone && (
+                        <span className="flex items-center gap-1.5">
+                          <Phone className="h-3 w-3" /> {c.phone}
+                        </span>
+                      )}
+                      {c.mobile && (
+                        <span className="flex items-center gap-1.5">
+                          <Smartphone className="h-3 w-3" /> {c.mobile}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ) : null,
+              )
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function InfoRow({ label, value }: { label: string; value?: string }) {
+  if (!value) return null;
+  return (
+    <div>
+      <span className="text-muted-foreground">{label}: </span>
+      <span className="text-foreground">{value}</span>
     </div>
   );
 }

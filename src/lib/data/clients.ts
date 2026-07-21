@@ -1,5 +1,10 @@
 import { supabase } from "@/lib/supabase";
-import type { Client, ClientSource, ClientStatus } from "@/lib/domain";
+import type {
+  Client,
+  ClientContact,
+  ClientSource,
+  ClientStatus,
+} from "@/lib/domain";
 
 type ClientRow = {
   id: string;
@@ -10,7 +15,31 @@ type ClientRow = {
   spending_ytd: number;
   last_fu: string | null;
   next_fu: string | null;
+  address: string | null;
+  industry: string | null;
+  website: string | null;
+  notes: string | null;
+  cp1_name: string | null;
+  cp1_email: string | null;
+  cp1_phone: string | null;
+  cp1_mobile: string | null;
+  cp2_name: string | null;
+  cp2_email: string | null;
+  cp2_phone: string | null;
+  cp2_mobile: string | null;
+  cp3_name: string | null;
+  cp3_email: string | null;
+  cp3_phone: string | null;
+  cp3_mobile: string | null;
 };
+
+function toContact(row: ClientRow, position: 1 | 2 | 3): ClientContact {
+  const name = row[`cp${position}_name`] ?? undefined;
+  const email = row[`cp${position}_email`] ?? undefined;
+  const phone = row[`cp${position}_phone`] ?? undefined;
+  const mobile = row[`cp${position}_mobile`] ?? undefined;
+  return { name, email, phone, mobile };
+}
 
 function toClient(row: ClientRow): Client {
   return {
@@ -22,6 +51,11 @@ function toClient(row: ClientRow): Client {
     spendingYtd: row.spending_ytd,
     lastFu: row.last_fu ?? undefined,
     nextFu: row.next_fu ?? undefined,
+    address: row.address ?? undefined,
+    industry: row.industry ?? undefined,
+    website: row.website ?? undefined,
+    notes: row.notes ?? undefined,
+    contacts: [toContact(row, 1), toContact(row, 2), toContact(row, 3)],
   };
 }
 
@@ -79,13 +113,43 @@ export async function updateClientStatus(
   return toClient(data);
 }
 
-export async function updateClientOwner(
+export type UpdateClientDetailsInput = {
+  address?: string;
+  industry?: string;
+  website?: string;
+  notes?: string;
+  contacts: [ClientContact, ClientContact, ClientContact];
+};
+
+// All fields are nullable columns — an empty string from the form is written
+// as null so cleared fields actually clear, matching the "—" empty-state
+// rendering on the Client Detail page.
+export async function updateClientDetails(
   id: string,
-  newOwnerId: string,
+  patch: UpdateClientDetailsInput,
 ): Promise<Client> {
+  const blank = (v?: string) => (v && v.trim() ? v.trim() : null);
+  const [cp1, cp2, cp3] = patch.contacts;
   const { data, error } = await supabase
     .from("clients")
-    .update({ owner_id: newOwnerId })
+    .update({
+      address: blank(patch.address),
+      industry: blank(patch.industry),
+      website: blank(patch.website),
+      notes: blank(patch.notes),
+      cp1_name: blank(cp1.name),
+      cp1_email: blank(cp1.email),
+      cp1_phone: blank(cp1.phone),
+      cp1_mobile: blank(cp1.mobile),
+      cp2_name: blank(cp2.name),
+      cp2_email: blank(cp2.email),
+      cp2_phone: blank(cp2.phone),
+      cp2_mobile: blank(cp2.mobile),
+      cp3_name: blank(cp3.name),
+      cp3_email: blank(cp3.email),
+      cp3_phone: blank(cp3.phone),
+      cp3_mobile: blank(cp3.mobile),
+    })
     .eq("id", id)
     .select("*")
     .single();

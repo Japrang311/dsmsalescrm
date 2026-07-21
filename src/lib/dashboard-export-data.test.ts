@@ -35,6 +35,7 @@ const context: DashboardExportContext = {
       source: "Referral",
       ownerId: "sales-1",
       spendingYtd: 125_000_000,
+      contacts: [{}, {}, {}],
     },
   ],
   ownersById: {

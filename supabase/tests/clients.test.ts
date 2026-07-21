@@ -105,6 +105,87 @@ describe("clients RLS", () => {
     expect(data).toHaveLength(0);
   });
 
+  test("new client rows have null company/contact columns by default", async () => {
+    const { data, error } = await adminClient
+      .from("clients")
+      .select(
+        "address, industry, website, notes, cp1_name, cp1_email, cp1_phone, cp1_mobile",
+      )
+      .eq("id", clientIds.own)
+      .single();
+    if (error) throw error;
+    expect(data.address).toBeNull();
+    expect(data.industry).toBeNull();
+    expect(data.website).toBeNull();
+    expect(data.notes).toBeNull();
+    expect(data.cp1_name).toBeNull();
+    expect(data.cp1_email).toBeNull();
+    expect(data.cp1_phone).toBeNull();
+    expect(data.cp1_mobile).toBeNull();
+  });
+
+  test("sales role can update their own client's company/contact info", async () => {
+    const client = await signInAs(fixtures.sales);
+    const { data, error } = await client
+      .from("clients")
+      .update({
+        address: "Jl. Industri No. 1, Surabaya",
+        industry: "Panel Maker",
+        website: "https://example.com",
+        notes: "Klien lama, respons cepat",
+        cp1_name: "Budi Santoso",
+        cp1_email: "budi@example.com",
+        cp1_phone: "031-1234567",
+        cp1_mobile: "0812-3456-7890",
+      })
+      .eq("id", clientIds.own)
+      .select(
+        "address, industry, website, notes, cp1_name, cp1_email, cp1_phone, cp1_mobile",
+      )
+      .single();
+    if (error) throw error;
+    expect(data.address).toBe("Jl. Industri No. 1, Surabaya");
+    expect(data.industry).toBe("Panel Maker");
+    expect(data.website).toBe("https://example.com");
+    expect(data.notes).toBe("Klien lama, respons cepat");
+    expect(data.cp1_name).toBe("Budi Santoso");
+    expect(data.cp1_email).toBe("budi@example.com");
+    expect(data.cp1_phone).toBe("031-1234567");
+    expect(data.cp1_mobile).toBe("0812-3456-7890");
+  });
+
+  test("sales role cannot update company/contact info on a client they don't own", async () => {
+    const client = await signInAs(fixtures.sales);
+    const { data, error } = await client
+      .from("clients")
+      .update({ address: "Should Not Apply" })
+      .eq("id", clientIds.other)
+      .select("id");
+    if (error) throw error;
+    expect(data).toHaveLength(0);
+  });
+
+  test("executive role cannot update company/contact info", async () => {
+    const client = await signInAs(fixtures.executive);
+    const { error } = await client
+      .from("clients")
+      .update({ address: "Should Fail" })
+      .eq("id", clientIds.own);
+    expect(error).not.toBeNull();
+  });
+
+  test("manager role can update company/contact info on any client", async () => {
+    const client = await signInAs(fixtures.manager);
+    const { data, error } = await client
+      .from("clients")
+      .update({ industry: "Telco Infrastructure" })
+      .eq("id", clientIds.other)
+      .select("industry")
+      .single();
+    if (error) throw error;
+    expect(data.industry).toBe("Telco Infrastructure");
+  });
+
   test("no role can delete a client (archive-only policy, per PRD §9)", async () => {
     const client = await signInAs(fixtures.manager);
     const { error, count } = await client

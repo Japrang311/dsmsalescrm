@@ -15,6 +15,13 @@ export type ClientSource =
   | "Business Relationship"
   | "Repeat";
 
+export type ClientContact = {
+  name?: string;
+  email?: string;
+  phone?: string;
+  mobile?: string;
+};
+
 export type Client = {
   id: string;
   name: string;
@@ -24,6 +31,11 @@ export type Client = {
   spendingYtd: number;
   lastFu?: string;
   nextFu?: string;
+  address?: string;
+  industry?: string;
+  website?: string;
+  notes?: string;
+  contacts: [ClientContact, ClientContact, ClientContact];
 };
 
 export type CommercialType =

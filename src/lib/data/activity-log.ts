@@ -5,6 +5,7 @@ import type { Role } from "@/lib/domain";
 export type ActivityKind =
   | "client_created"
   | "client_status_change"
+  | "client_details_change"
   | "task_created"
   | "task_status_change"
   | "commercial_item_created"
@@ -24,6 +25,7 @@ export type ActivityKind =
 export const ACTIVITY_KIND_LABELS: Record<ActivityKind, string> = {
   client_created: "Client Baru",
   client_status_change: "Perubahan Status Client",
+  client_details_change: "Perubahan Info Klien",
   task_created: "Task Baru",
   task_status_change: "Perubahan Status Task",
   commercial_item_created: "Commercial Baru",

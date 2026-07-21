@@ -389,3 +389,27 @@ describe("activity_log RLS", () => {
     }
   });
 });
+
+describe("client_details_change activity kind", () => {
+  test("inserts cleanly (proves the enum value exists post-reset)", async () => {
+    const fixtures = await createRoleFixtureUsers();
+    try {
+      const { data, error } = await adminClient
+        .from("activity_log")
+        .insert({
+          kind: "client_details_change",
+          owner_id: fixtures.sales.id,
+          actor_id: fixtures.sales.id,
+          title: "Info klien diperbarui",
+          detail: "Alamat, Kontak 1",
+        })
+        .select("id, kind")
+        .single();
+      if (error) throw error;
+      expect(data.kind).toBe("client_details_change");
+      await adminClient.from("activity_log").delete().eq("id", data.id);
+    } finally {
+      await deleteRoleFixtureUsers(fixtures);
+    }
+  });
+});
