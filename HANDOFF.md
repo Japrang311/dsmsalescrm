@@ -1,6 +1,6 @@
 # Handoff — DSM Sales Web App V2
 
-Context dump for continuing this work in another tool (Codex). Written 2026-07-18; Phase 11/12 status refreshed 2026-07-19; Phase 11 import-review reconciliation session added 2026-07-19; post-import UX/bugfix session added 2026-07-20; second 2026-07-20 session (pipeline permissions/FK bugfixes) added 2026-07-20; Client Detail/Client List real-data wiring session added 2026-07-21; remote-migration-push + data-restoration session added 2026-07-21; browser-verification + spending_ytd fix + SO edit audit trail session added 2026-07-21.
+Context dump for continuing this work in another tool (Codex). Written 2026-07-18; Phase 11/12 status refreshed 2026-07-19; Phase 11 import-review reconciliation session added 2026-07-19; post-import UX/bugfix session added 2026-07-20; second 2026-07-20 session (pipeline permissions/FK bugfixes) added 2026-07-20; Client Detail/Client List real-data wiring session added 2026-07-21; remote-migration-push + data-restoration session added 2026-07-21; browser-verification + spending_ytd fix + SO edit audit trail session added 2026-07-21; unused-code cleanup + client database (company info/contacts) feature session added 2026-07-22.
 
 ## Project basics
 
@@ -9,11 +9,14 @@ Context dump for continuing this work in another tool (Codex). Written 2026-07-1
 - Local Supabase: `bunx supabase start` / `bunx supabase db reset` (rebuilds from `supabase/migrations/*.sql` + `supabase/seed.sql`) / `bunx supabase stop`.
 - Git is present on branch `main`, connected to `github.com/Japrang311/dsmsalescrm`
   (the Lovable-connected remote). Working tree is clean as of commit
-  `9a12281` (2026-07-21) — see the bottom section for what that and the
-  commit before it (`843af1f`) contain. **Both are pushed to `origin/main`**,
-  and both migrations they depend on are applied to the linked remote
-  Supabase project (`qhtfixgbcpcitokeryxb`, DSM Sales Web App V2). Still
-  never rewrite history, rebase, amend, squash, or force-push on this repo.
+  `371ac81` (2026-07-22) — see the bottom section for what it and `e98b003`
+  contain. **Neither is pushed to `origin/main` yet** (2 commits ahead of
+  origin as of this writing) and **neither migration is applied to the
+  remote Supabase project** — both are local-only, awaiting explicit
+  push approval. The previous two commits (`9a12281`, `843af1f`) ARE
+  pushed and their migrations ARE applied to remote
+  (`qhtfixgbcpcitokeryxb`, DSM Sales Web App V2). Still never rewrite
+  history, rebase, amend, squash, or force-push on this repo.
 - `bunx supabase db push --linked` cannot be run by the agent — the
   Claude Code auto-mode classifier categorically blocks it regardless of
   prior chat approval (confirms/retries in conversation don't help). The
@@ -504,13 +507,52 @@ While locally verifying the SO edit Activity Log wiring end-to-end (couldn't tes
 
 - **`.env.local`'s `VITE_SUPABASE_URL` currently points at the production Supabase REST API** (`https://qhtfixgbcpcitokeryxb.supabase.co`), not `http://127.0.0.1:54321`. Confirmed by watching `bun run dev`'s network requests — every REST call went to the production host, and the local dev-role-switcher's sign-in attempts (`nur@local.dsm.test` etc., seed accounts that only exist in the local Auth) correctly got rejected by production Auth. `bun run test` is unaffected because `supabase/tests/helpers.ts` reads a separate `SUPABASE_URL` env var (unset, defaults to local) — the earlier 294/314 test result was genuinely local. But **`bun run dev` right now is not a safe local sandbox** — treat any UI testing done via `bun run dev` as hitting real production data until `.env.local` is repointed. The agent's file tools are permission-denied on `.env.local` (both `Read` and `cat`), so only the owner can fix this from their own editor/terminal.
 
+## What happened this session (2026-07-22, unused-code cleanup + client database feature)
+
+Starting point: commit `9a12281` was the tip of `main`, pushed, both its migrations applied to remote. The owner asked to find unused code/files and any open tasks/flags, then to build a new "client database" feature.
+
+### Unused-code audit (committed as `e98b003`, pushed... no, local only — see push status above)
+
+Ran `knip` and verified every hit against actual usage before acting (many knip hits are false positives: vendored shadcn/ui primitives nobody's used yet, and `manage-team-member` which IS used but via a runtime `supabase.functions.invoke()` string knip can't trace). Real, verified-dead findings:
+
+- **Deleted**: `updateClientOwner()` (`src/lib/data/clients.ts`) — the old raw `.update({owner_id})` client-reassign implementation, superseded by the `reassign_client_owner` RPC called directly in `_app.clients.$clientId.tsx` (the SECURITY DEFINER fix from `1ecb133`). Nothing called it anymore.
+- **Deleted**: `src/components/shell/PhaseStub.tsx` — unused placeholder, no references anywhere, no task ever mentioned it.
+- **Confirmed intentional, left alone**: `src/components/clients/StatusAuditTrail.tsx` (documented orphan since Task 23, see that section above), `createCommercialItem()`/`createCommercialItemsBatch()` in `commercial-items.ts` (deliberate poison-pill stubs that `throw new Error("NORMALIZED_DOCUMENT_INPUT_REQUIRED")`, guarding against stale pre-normalization callers — not dead code).
+- All 45 tasks in `tasks/todo.md` and all `tasks/plan.md` checkpoints were already complete; no open TODO/FIXME comments anywhere in `src/`.
+
+### Client database feature: company info + up to 3 contact persons (committed as `371ac81`, local only)
+
+Owner request (Indonesian): turn the existing 69 clients into a real client database — Contact Person 1/2/3 (nama/email/telepon/HP each) plus alamat perusahaan, connected to existing revenue/status data. Went through full plan-mode: 1 Explore agent (schema/UI/RLS-pattern discovery) → 1 Plan agent (design) → 2 AskUserQuestion clarifications (extra fields: owner picked bidang usaha + website + catatan, declined NPWP; UI placement: card in Overview tab, not a 7th tab) → written plan approved via ExitPlanMode → executed.
+
+**Design**: flat nullable columns on `clients` (not a child table — exactly 3 fixed UI slots, so flat columns let `select("*")`/RLS/grants absorb them with zero policy changes). New columns: `address`, `industry`, `website`, `notes`, `cp1_name/email/phone/mobile`, `cp2_*`, `cp3_*` (16 total). New `activity_kind` value `client_details_change`, logged once per save with a coarse "what changed" summary (field-group names only, never phone/email values in the log).
+
+**Migrations** (both local-only, NOT on remote):
+- `supabase/migrations/20260722060000_add_client_company_details.sql` — the 16 columns AND a column-level `grant update (...) on table public.clients to authenticated`
+- `supabase/migrations/20260722060001_add_client_details_activity_kind.sql` — the enum value, own transaction boundary (Postgres rule)
+
+**Real bug caught before shipping**: initial exploration wrongly assumed `clients` had a table-level UPDATE grant. It's actually column-level (`20260718164503_apply_super_admin_rls_matrix.sql:277-284`), originally listing only `name, status, source, spending_ytd, last_fu, next_fu`. Without the grant statement above, every edit from the new dialog would have failed with "permission denied for table clients" — the same class of bug as the `sales_order_items.description` issue fixed in `9a12281` last session. This time the new RLS tests in `supabase/tests/clients.test.ts` caught it locally (via a full `bunx supabase db reset` cycle) before it ever reached production. **Lesson for future schema work on this table: always check `20260718164503_apply_super_admin_rls_matrix.sql` for the current column-level UPDATE grant list before assuming `select("*")`-style table grants cover new columns — clients, tasks, commercial_items, and sales_orders are ALL column-level-grant tables per that migration, not just clients.**
+
+**Data layer** (`src/lib/data/clients.ts`, `src/lib/domain.ts`): `Client.contacts` is a fixed-length-3 tuple `[ClientContact, ClientContact, ClientContact]`; `updateClientDetails(id, patch)` writes empty-string form fields as explicit `null` so clearing a field actually clears it.
+
+**UI**: new `src/components/clients/EditClientInfoDialog.tsx` (react-hook-form + zod, same pattern as `AddClientDialog.tsx`); new local `ClientInfoCard`/`InfoRow` components in `_app.clients.$clientId.tsx`, rendered at the top of the Overview tab, "Edit Info" button gated by the same `canEditStatus` boolean used for status editing (sales-own/manager/super_admin; executive read-only).
+
+**Tests**: extended `supabase/tests/clients.test.ts` (own-client update succeeds, other-sales-rep's-client denied, executive denied, manager succeeds on any client, fresh row has null defaults) and `supabase/tests/activity-log.test.ts` (new enum value inserts cleanly). `bun run test`: 300 pass / 20 fail — the 20 are the same documented pre-existing `permission denied for anon` baseline from prior sessions, unaffected by this work.
+
+**Verification**: `bunx tsc --noEmit` clean, `bunx eslint` clean (one auto-fix pass), `bun run build` succeeds, plus a standalone script (mirrors `EditClientInfoDialog.save()` exactly) signed in as the `nur@local.dsm.test` seed account, proved a real update + `client_details_change` log entry + null-clearing all round-trip correctly against local Supabase, then cleaned up its own test data.
+
+**NOT done / explicitly deferred**: no live browser walkthrough of the new UI (same `.env.local`-points-at-production blocker as last session — see the environment note above; used the direct-Supabase script approach instead, per the owner's approved plan). Not pushed to GitHub or remote Supabase — owner said "buat dulu di lokal baru push ke github/live/remote" (build locally first, then push), so the push step is still pending a separate go-ahead.
+
+### Important environment note (still true, carried forward)
+
+- **`.env.local`'s `VITE_SUPABASE_URL` still points at the production Supabase REST API**, not `http://127.0.0.1:54321`. Still unresolved — the agent's file tools are still permission-denied on `.env.local`. `bun run dev` is still not a safe local sandbox; keep using direct-Postgres/service-role scripts (see `verify-client-info.ts`-style throwaway scripts from the last two sessions) for local functional verification instead.
+
 ## Suggested next steps for Codex
 
-1. Read this file's most recent session first (2026-07-21 browser verification + spending_ytd fix + SO edit audit trail, above) — it's the freshest state. Then the 2026-07-21 remote migration push + data restoration session, then Client Detail/Client List wiring, then the 2026-07-20 sessions. Then `.superpowers/sdd/p11-review-decisions-report.md` for the 55 import decisions that the corrected CSVs encode.
-2. Remote is fully provisioned and now includes this session's two migrations (`20260721100000`, `20260721110000`) on top of the prior 28: schema, 8 profiles, 69 clients, 189 SOs (Rp24.15B), 397 commercial docs / 720 items, 48 target rows. Any FUTURE data re-import to remote still needs the owner's explicit go-ahead.
-3. **Fix `.env.local`'s `VITE_SUPABASE_URL` before relying on `bun run dev` for local testing** — see the environment note above. Until then, prefer either (a) direct-Postgres/service-role scripts against local Supabase for verification, or (b) the owner driving the browser against production themselves while the agent observes via Chrome DevTools MCP (console/network/DB checks), since auto-mode blocks the agent from submitting forms on production.
-4. `bunx supabase db push --linked` cannot be run by the agent (auto-mode classifier blocks it unconditionally, retries don't help) — hand the exact command to the owner and verify afterward with `bunx supabase migration list --linked`.
-5. Do a live browser pass on global search, notifications, the Sales Order edit dialog/inline item editor (now that the `description` grant is fixed — worth confirming end-to-end on production), the Client Detail page (7 metric cards + 6 tabs), the Client List page (PPN/Non-PPN/Spending YTD columns, Saved Views), and the client picker in all Create dialogs before assuming any of it is fully correct.
+1. Read this file's most recent session first (2026-07-22 unused-code cleanup + client database feature, above) — it's the freshest state. Then 2026-07-21 browser verification + spending_ytd fix + SO edit audit trail, then remote migration push + data restoration, then Client Detail/Client List wiring, then the 2026-07-20 sessions.
+2. **Two local-only commits are pending push**: `e98b003` (PhaseStub/HANDOFF cleanup) and `371ac81` (client database feature, needs its two migrations pushed to remote too). Get the owner's explicit go-ahead before `git push` and before `bunx supabase db push --linked` — remember the push command itself must be run BY THE OWNER in their own terminal (see below), not by the agent.
+3. `bunx supabase db push --linked` cannot be run by the agent (auto-mode classifier blocks it unconditionally, retries don't help, even after prior chat approval) — hand the exact command to the owner and verify afterward with `bunx supabase migration list --linked`.
+4. **Before adding any new column to `clients`, `tasks`, `commercial_items`, or `sales_orders`, check the column-level UPDATE grant list in `20260718164503_apply_super_admin_rls_matrix.sql`** and add the new column to a `grant update (...)` statement in the same migration — these four tables do NOT have table-level UPDATE grants, only specific columns are grantable. This bit twice now (`sales_order_items.description` in the prior session, caught after the fact; `clients`' new columns this session, caught before shipping via local RLS tests).
+5. Do a live browser pass on the new "Info Perusahaan & Kontak" card/dialog on Client Detail (once deployed), plus the still-outstanding items from prior sessions: global search, notifications, the Sales Order edit dialog/inline item editor, the Client List page (PPN/Non-PPN/Spending YTD columns, Saved Views), and the client picker in all Create dialogs.
 6. Preserve Activity Log immutability, ownership attribution, task/follow-up/activity foreign keys, and archived legacy evidence.
 7. The ~95 owner-mismatched SOs/commercial documents (21/189 SOs, 74/400 commercial docs) remain an open data-quality backlog item — needs case-by-case correctness judgment, not a mechanical bulk fix. Don't attempt it without the owner's explicit sign-off on the correction approach.
-8. Git has real commits through `9a12281`, all pushed to `origin/main`. Treat it normally (stage intentionally, don't `add -A` blindly, never force-push/rewrite history on this Lovable-connected repo).
+8. Git has real commits through `371ac81`; only through `9a12281` is pushed to `origin/main`. Treat it normally (stage intentionally, don't `add -A` blindly, never force-push/rewrite history on this Lovable-connected repo).
