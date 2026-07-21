@@ -79,6 +79,20 @@ export async function updateClientStatus(
   return toClient(data);
 }
 
+export async function updateClientOwner(
+  id: string,
+  newOwnerId: string,
+): Promise<Client> {
+  const { data, error } = await supabase
+    .from("clients")
+    .update({ owner_id: newOwnerId })
+    .eq("id", id)
+    .select("*")
+    .single();
+  if (error) throw error;
+  return toClient(data);
+}
+
 export type OwnerLookup = Record<
   string,
   {

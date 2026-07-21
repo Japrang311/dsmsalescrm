@@ -42,6 +42,8 @@ import {
   getClientById,
   listOwners,
   updateClientStatus,
+  updateClientOwner,
+  listSalesTeamProfiles,
 } from "@/lib/data/clients";
 import { getCurrentActorId, logActivity } from "@/lib/data/activity-log";
 import { listFollowUpsForClient } from "@/lib/data/follow-ups";
@@ -67,6 +69,7 @@ import { NOW, CURRENT_YEAR } from "@/lib/domain";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { ChangeStatusDialog } from "@/components/clients/ChangeStatusDialog";
+import { ReassignOwnerDialog } from "@/components/clients/ReassignOwnerDialog";
 import type { ClientStatus } from "@/lib/domain";
 
 export const Route = createFileRoute("/_app/clients/$clientId")({
@@ -109,6 +112,11 @@ function ClientProfilePage() {
     queryFn: listTasks,
     enabled: authReady,
   });
+  const { data: teamMembers = [] } = useQuery({
+    queryKey: ["profiles", "sales-team"],
+    queryFn: listSalesTeamProfiles,
+    enabled: authReady && (role === "manager" || role === "super_admin"),
+  });
 
   const revenue = clientRevenueMetrics(salesOrders, clientId);
   const commercial = clientCommercialMetrics(commercialItems, clientId);
@@ -129,8 +137,10 @@ function ClientProfilePage() {
 
   const [activeTab, setActiveTab] = useState("overview");
   const [pendingStatus, setPendingStatus] = useState<ClientStatus | null>(null);
+  const [showReassign, setShowReassign] = useState(false);
   const canEditStatus =
     role === "sales" || role === "manager" || role === "super_admin";
+  const canReassign = role === "manager" || role === "super_admin";
 
   if (!authReady || isLoading) {
     return (
@@ -242,6 +252,16 @@ function ClientProfilePage() {
                   ))}
                 </SelectContent>
               </Select>
+              {canReassign && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs"
+                  onClick={() => setShowReassign(true)}
+                >
+                  Reassign
+                </Button>
+              )}
             </div>
           </div>
         </CardContent>
@@ -811,6 +831,55 @@ function ClientProfilePage() {
             }}
           />
         )}
+
+      {showReassign && canReassign && (
+        <ReassignOwnerDialog
+          open={showReassign}
+          onOpenChange={setShowReassign}
+          clientName={client.name}
+          currentOwnerName={ownerName}
+          teamMembers={teamMembers}
+          role={role}
+          actorName={ownerName}
+          onConfirm={async (newOwnerId, note) => {
+            try {
+              const oldOwnerName = ownerName;
+              await updateClientOwner(client.id, newOwnerId);
+              const actorId = await getCurrentActorId();
+              const newOwnerName =
+                teamMembers.find((m) => m.id === newOwnerId)?.name ?? "—";
+              if (actorId) {
+                await logActivity({
+                  kind: "client_status_change",
+                  ownerId: newOwnerId,
+                  actorId,
+                  clientId: client.id,
+                  title: `${client.name} direassign ke ${newOwnerName}`,
+                  detail: note
+                    ? `${oldOwnerName} → ${newOwnerName}\n${note}`
+                    : `${oldOwnerName} → ${newOwnerName}`,
+                });
+              }
+              await queryClient.invalidateQueries({ queryKey: ["clients"] });
+              await queryClient.invalidateQueries({
+                queryKey: ["profiles", "owners"],
+              });
+              await queryClient.invalidateQueries({
+                queryKey: ["activity-log"],
+              });
+              toast.success(`Klien direassign ke ${newOwnerName}`, {
+                description: "Perubahan disimpan ke database.",
+              });
+            } catch (error) {
+              toast.error("Gagal reassign klien", {
+                description:
+                  error instanceof Error ? error.message : "Unknown error",
+              });
+            }
+            setShowReassign(false);
+          }}
+        />
+      )}
     </div>
   );
 }
