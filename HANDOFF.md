@@ -1,6 +1,6 @@
 # Handoff — DSM Sales Web App V2
 
-Context dump for continuing this work in another tool (Codex). Written 2026-07-18; Phase 11/12 status refreshed 2026-07-19; Phase 11 import-review reconciliation session added 2026-07-19; post-import UX/bugfix session added 2026-07-20; second 2026-07-20 session (pipeline permissions/FK bugfixes) added at the bottom.
+Context dump for continuing this work in another tool (Codex). Written 2026-07-18; Phase 11/12 status refreshed 2026-07-19; Phase 11 import-review reconciliation session added 2026-07-19; post-import UX/bugfix session added 2026-07-20; second 2026-07-20 session (pipeline permissions/FK bugfixes) added 2026-07-20; Client Detail/Client List real-data wiring session added 2026-07-21.
 
 ## Project basics
 
@@ -9,7 +9,7 @@ Context dump for continuing this work in another tool (Codex). Written 2026-07-1
 - Local Supabase: `bunx supabase start` / `bunx supabase db reset` (rebuilds from `supabase/migrations/*.sql` + `supabase/seed.sql`) / `bunx supabase stop`.
 - Git is present on branch `main`, connected to `github.com/Japrang311/dsmsalescrm`
   (the Lovable-connected remote). Working tree is clean as of commit
-  `48c1cd4` (2026-07-20) — see the bottom section for what that and the two
+  `2c1c196` (2026-07-21) — see the bottom section for what that and the two
   commits before it (`77d637a`, `aad642f`) contain. **None of these commits
   have been pushed to `origin`** — push needs separate explicit approval.
   Still never rewrite history, rebase, amend, squash, or force-push on this
@@ -397,10 +397,52 @@ work, left alone). **Not pushed to `origin`.**
   archive table itself was not touched or cleaned up — it's just historical
   evidence, left as-is.
 
+## What happened this session (2026-07-21, Client Detail/Client List real-data wiring)
+
+Starting point: all 41 tasks in `tasks/todo.md` were complete (Phases 0–12), but the Client Detail page and Client List page still had hardcoded `"—"` placeholders for revenue/commercial metrics. The owner (Aditya) reported that "PT. PUTRA ARGA BINANGIN" didn't appear in the client picker form but existed in SO records.
+
+### Changes committed as `2c1c196`:
+
+**Client Detail page (`_app.clients.$clientId.tsx`):**
+- All 7 MetricCards (Total Revenue, PPN, Non-PPN, RFQ Pipeline, Commit, Prototype Paid, Prototype FOC) wired to real data via `clientRevenueMetrics()` / `clientCommercialMetrics()` selectors in `dashboard-selectors.ts`
+- "Waiting PO" card renamed to "Commit" — shows all commercial items at Commit stage (not just Quotation type)
+- 6 tabs replaced hardcoded `NotYetAvailable` placeholders:
+  - Overview → Upcoming Actions: top 5 tasks with status badges
+  - Tasks tab: full task table (title, method, due date, status, priority)
+  - Commercial Items tab: all items (type, description, stage, est. value)
+  - Quotations tab: RFQ + Quotation items (number, description, stage, est. value)
+  - Sales Orders tab: all SOs sorted newest first (SO number, type, tax, date, value)
+  - Revenue History tab: revenue breakdown (SO number, source, tax, prototype status, revenue)
+- Dead `NotYetAvailable` component removed
+
+**Client List page (`_app.clients.index.tsx`):**
+- PPN/Non-PPN columns computed from real `sales_orders` data via `enrichedRows` + `revenueByTax()`
+- Saved Views dropdown wired to actual filters: "Butuh Perhatian" sets `overdueOnly`, "Prospect Aktif" sets `statuses=["Prospect"]`, "Semua Semua" calls `resetFilters()`
+- Dead spending-range code block removed (incomplete refactor from earlier)
+
+**Owner-mismatch fix (PT. PUTRA ARGA BINANGIN not in client picker):**
+- Root cause: the `client_search_index` view only exposed `id` + `name`. `useClientResolution()` used `listClients()` (RLS-scoped by `clients_select`), so clients owned by another sales rep didn't appear in Create dialog pickers
+- Scale check: the SO edit support migration already documented "21 of 189 imported Sales Orders and 74 of 400 commercial documents have this same owner mismatch"
+- New migration `20260721000000_expand_client_search_index.sql` adds `owner_id` to the view
+- `searchClients()` now returns `{id, name, ownerId}`
+- `useClientResolution()` in `ClientPicker.tsx` switched from `listClients()` to `searchClients()` — the picker now shows ALL clients regardless of owner
+
+**CreateRecordDialogs:**
+- Added `["clients"]` query invalidation after SO creation so `spendingYtd` stays fresh
+
+**Code review findings fixed (same commit):**
+- WR-01: Removed dead spending-range code block in `_app.clients.index.tsx:135-141`
+- WR-02: Saved Views dropdown wired to actual filters
+- WR-03: Added `["clients"]` query invalidation in `CreateRecordDialogs.tsx`
+
+**Verification:** `bunx tsc --noEmit` clean, `bun run lint` 0 errors (12 pre-existing warnings only), `bun run build` succeeds.
+
+**Migration to apply:** `20260721000000_expand_client_search_index.sql` — needs `bunx supabase db reset` (local) or `supabase migration up` to apply. This is required for the client picker fix to take effect.
+
 ## Suggested next steps for Codex
 
-1. Read this file's two most recent sessions first (2026-07-20 post-import UX/bugfix, then 2026-07-20 pipeline permissions/FK bugfix, both above) — they're the freshest state. Then `.superpowers/sdd/p11-post-import-ux-fixes-report.md`, `.superpowers/sdd/p11-review-decisions-report.md`, `.superpowers/sdd/p11-task-8-report.md`, and `.superpowers/sdd/task-7-report.md` for the fuller history. Phases 11/12 are locally verified complete; the Phase 11 import review is fully decided (0 pending entries).
-2. Keep all remote work blocked until the user identifies the exact Supabase target and explicitly approves the reviewed migration/import commands. This now also covers `20260720000000_add_sales_order_edit_support.sql`, which has never been applied anywhere but local.
-3. Do a live browser pass on global search, notifications, the Sales Order edit dialog/inline item editor, the Sales Orders list's "Nama Product" column, and everything in the pipeline-permissions/FK session above before assuming any of it is fully correct — see both "Flagged, not yet acted on" sections.
+1. Read this file's most recent session first (2026-07-21 Client Detail/Client List real-data wiring, above) — it's the freshest state. Then the 2026-07-20 sessions (post-import UX/bugfix, pipeline permissions/FK bugfix). Then `.superpowers/sdd/p11-post-import-ux-fixes-report.md`, `.superpowers/sdd/p11-review-decisions-report.md`, `.superpowers/sdd/p11-task-8-report.md`, and `.superpowers/sdd/task-7-report.md` for the fuller history. Phases 11/12 are locally verified complete; the Phase 11 import review is fully decided (0 pending entries).
+2. Keep all remote work blocked until the user identifies the exact Supabase target and explicitly approves the reviewed migration/import commands. All 28 local migrations have been pushed to the remote project `qhtfixgbcpcitokeryxb` (DSM Sales Web App V2, Northeast Asia/Tokyo) — remote and local are now in sync.
+3. Do a live browser pass on global search, notifications, the Sales Order edit dialog/inline item editor, the Sales Orders list's "Nama Product" column, the Client Detail page (7 metric cards + 6 tabs), the Client List page (PPN/Non-PPN columns, Saved Views), and the client picker in all Create dialogs before assuming any of it is fully correct — see "Flagged, not yet acted on" sections in earlier sessions.
 4. Preserve Activity Log immutability, ownership attribution, task/follow-up/activity foreign keys, and archived legacy evidence. If asked to log the new SO edits to Activity Log, that needs a new `activity_kind` enum value (small migration) before wiring `logActivity()` calls.
-5. Git now has real commits through `48c1cd4` and a clean working tree (an untracked `.planning/` directory aside) — treat it normally (stage intentionally, don't `add -A` blindly, never force-push/rewrite history on this Lovable-connected repo). Nothing has been pushed to `origin` yet.
+5. Git now has real commits through `2c1c196` and a clean working tree (an untracked `.planning/` directory aside) — treat it normally (stage intentionally, don't `add -A` blindly, never force-push/rewrite history on this Lovable-connected repo). Nothing has been pushed to `origin` yet.
