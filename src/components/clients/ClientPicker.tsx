@@ -17,14 +17,19 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { listClients } from "@/lib/data/clients";
-import type { Client } from "@/lib/domain";
+import { searchClients } from "@/lib/data/clients";
 import { cn } from "@/lib/utils";
 
 // Shared by every "create X for a client" dialog that can be opened either
 // with a known client (from that client's own page — no picker needed) or
 // without one (from the global Quick Create menu — resolves which client
 // is effectively selected via a picker rendered as the form's first field).
+//
+// Uses searchClients() (client_search_index) instead of listClients()
+// (clients table with ownership RLS) so that the picker shows ALL clients
+// regardless of owner. This fixes the owner-mismatch case where a SO was
+// imported under one sales rep but its client is registered to another —
+// the client didn't appear in the picker because clients_select RLS hid it.
 export function useClientResolution(props: {
   clientId?: string;
   clientName?: string;
@@ -32,8 +37,8 @@ export function useClientResolution(props: {
 }) {
   const needsPicker = !props.clientId;
   const { data: clients = [] } = useQuery({
-    queryKey: ["clients", "all"],
-    queryFn: listClients,
+    queryKey: ["clients", "search"],
+    queryFn: searchClients,
     enabled: needsPicker,
   });
   const [pickedId, setPickedId] = useState("");

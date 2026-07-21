@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   Building2,
   Calendar,
+  CheckCircle2,
   Clock,
   FileText,
   Layers,
@@ -11,6 +12,7 @@ import {
   PhoneCall,
   ReceiptText,
   Sparkles,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -26,6 +28,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 import { useRole } from "@/context/role-context";
 import {
@@ -35,6 +45,13 @@ import {
 } from "@/lib/data/clients";
 import { getCurrentActorId, logActivity } from "@/lib/data/activity-log";
 import { listFollowUpsForClient } from "@/lib/data/follow-ups";
+import { listSalesOrders } from "@/lib/data/sales-orders";
+import { listCommercialItems } from "@/lib/data/commercial-items";
+import { listTasks } from "@/lib/data/tasks";
+import {
+  clientRevenueMetrics,
+  clientCommercialMetrics,
+} from "@/lib/data/dashboard-selectors";
 import { CLIENT_STATUSES } from "@/lib/business-rules";
 import { formatDateShort, formatRupiahShort, daysBetween } from "@/lib/format";
 import { StatusBadge } from "@/components/clients/StatusBadges";
@@ -46,7 +63,7 @@ import {
   CreatePrototypeDialog,
 } from "@/components/clients/CreateRecordDialogs";
 import { CreateTaskDialog } from "@/components/tasks/CreateTaskDialog";
-import { NOW } from "@/lib/domain";
+import { NOW, CURRENT_YEAR } from "@/lib/domain";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { ChangeStatusDialog } from "@/components/clients/ChangeStatusDialog";
@@ -56,18 +73,6 @@ export const Route = createFileRoute("/_app/clients/$clientId")({
   head: () => ({ meta: [{ title: "Client · DSM Sales Execution" }] }),
   component: ClientProfilePage,
 });
-
-// Sections below need tables that don't exist yet (commercial_items —
-// Phase 4, sales_orders — Phase 5, follow-up/task history — no table
-// planned yet). Shown as an honest "not connected yet" placeholder rather
-// than fake/mock numbers mixed in with the real client record above.
-function NotYetAvailable({ note }: { note: string }) {
-  return (
-    <div className="mt-3 rounded-md border border-dashed py-6 text-center text-xs text-muted-foreground">
-      Belum terhubung ke data real — {note}
-    </div>
-  );
-}
 
 function ClientProfilePage() {
   const { clientId } = Route.useParams();
@@ -89,6 +94,38 @@ function ClientProfilePage() {
     queryFn: () => listFollowUpsForClient(clientId),
     enabled: authReady,
   });
+  const { data: salesOrders = [] } = useQuery({
+    queryKey: ["sales-orders", "all"],
+    queryFn: listSalesOrders,
+    enabled: authReady,
+  });
+  const { data: commercialItems = [] } = useQuery({
+    queryKey: ["commercial-items", "all"],
+    queryFn: listCommercialItems,
+    enabled: authReady,
+  });
+  const { data: tasks = [] } = useQuery({
+    queryKey: ["tasks", "all"],
+    queryFn: listTasks,
+    enabled: authReady,
+  });
+
+  const revenue = clientRevenueMetrics(salesOrders, clientId);
+  const commercial = clientCommercialMetrics(commercialItems, clientId);
+
+  // Per-client filtered data
+  const clientOrders = salesOrders.filter((o) => o.clientId === clientId);
+  const clientCommercial = commercialItems.filter(
+    (i) => i.clientId === clientId,
+  );
+  const clientTasks = tasks.filter((t) => t.clientId === clientId);
+  const upcomingActions = clientTasks.filter(
+    (t) =>
+      t.status === "Today" || t.status === "Overdue" || t.status === "Upcoming",
+  );
+  const clientRfqQuotations = clientCommercial.filter(
+    (i) => i.type === "RFQ" || i.type === "Quotation",
+  );
 
   const [activeTab, setActiveTab] = useState("overview");
   const [pendingStatus, setPendingStatus] = useState<ClientStatus | null>(null);
@@ -282,45 +319,71 @@ function ClientProfilePage() {
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
             <MetricCard
               label="Total Revenue"
-              value="—"
+              value={formatRupiahShort(revenue.totalRevenue)}
               icon={ReceiptText}
-              hint="Butuh Sales Orders (Phase 5)"
+              hint={`${CURRENT_YEAR}`}
             />
             <MetricCard
               label="PPN"
-              value="—"
+              value={revenue.ppn > 0 ? formatRupiahShort(revenue.ppn) : "—"}
               icon={Layers}
-              hint="Butuh Sales Orders (Phase 5)"
+              hint={revenue.ppn > 0 ? "PPN" : "Belum ada PPN"}
             />
             <MetricCard
               label="Non-PPN"
-              value="—"
+              value={
+                revenue.nonPpn > 0 ? formatRupiahShort(revenue.nonPpn) : "—"
+              }
               icon={Layers}
-              hint="Butuh Sales Orders (Phase 5)"
+              hint={revenue.nonPpn > 0 ? "Non-PPN" : "Belum ada Non-PPN"}
             />
             <MetricCard
               label="RFQ Pipeline"
-              value="—"
+              value={
+                commercial.rfqPipeline > 0
+                  ? formatRupiahShort(commercial.rfqPipeline)
+                  : "—"
+              }
               icon={FileText}
-              hint="Butuh Commercial Items (Phase 4)"
+              hint={commercial.rfqPipeline > 0 ? "RFQ aktif" : "Belum ada RFQ"}
             />
             <MetricCard
-              label="Waiting PO"
-              value="—"
+              label="Commit"
+              value={
+                commercial.commit > 0
+                  ? formatRupiahShort(commercial.commit)
+                  : "—"
+              }
               icon={Clock}
-              hint="Butuh Commercial Items (Phase 4)"
+              hint={commercial.commit > 0 ? "Total Commit" : "Belum ada Commit"}
             />
             <MetricCard
               label="Prototype Paid"
-              value="—"
+              value={
+                revenue.prototypePaid > 0
+                  ? formatRupiahShort(revenue.prototypePaid)
+                  : "—"
+              }
               icon={Sparkles}
-              hint="Butuh Sales Orders (Phase 5)"
+              hint={
+                revenue.prototypePaid > 0
+                  ? "Prototype berbayar"
+                  : "Belum ada Prototype Paid"
+              }
             />
             <MetricCard
               label="Prototype FOC"
-              value="—"
+              value={
+                revenue.prototypeFocCount > 0
+                  ? `${revenue.prototypeFocCount} unit`
+                  : "—"
+              }
               icon={Sparkles}
-              hint="Butuh Sales Orders (Phase 5)"
+              hint={
+                revenue.prototypeFocCount > 0
+                  ? "Prototype FOC"
+                  : "Belum ada Prototype FOC"
+              }
             />
           </div>
 
@@ -365,7 +428,40 @@ function ClientProfilePage() {
             <Card>
               <CardContent className="p-4">
                 <SectionTitle icon={Calendar} title="Upcoming Actions" />
-                <NotYetAvailable note="menunggu migrasi Tasks (Phase 3)." />
+                {upcomingActions.length === 0 ? (
+                  <p className="mt-3 rounded-md border border-dashed py-6 text-center text-xs text-muted-foreground">
+                    Tidak ada action mendatang.
+                  </p>
+                ) : (
+                  <ul className="mt-3 flex flex-col gap-2">
+                    {upcomingActions.slice(0, 5).map((t) => (
+                      <li
+                        key={t.id}
+                        className="flex items-start gap-2 rounded-md border bg-muted/30 p-2.5 text-xs"
+                      >
+                        {t.status === "Overdue" ? (
+                          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-rose-500" />
+                        ) : (
+                          <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate font-medium">{t.title}</p>
+                          <p className="mt-0.5 text-muted-foreground">
+                            {t.method} · {formatDateShort(t.dueDate)}
+                          </p>
+                        </div>
+                        <Badge
+                          variant={
+                            t.status === "Overdue" ? "destructive" : "secondary"
+                          }
+                          className="shrink-0 text-[10px]"
+                        >
+                          {t.status}
+                        </Badge>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -375,7 +471,62 @@ function ClientProfilePage() {
           <Card>
             <CardContent className="p-4">
               <SectionTitle icon={Calendar} title="Semua Tasks" />
-              <NotYetAvailable note="menunggu migrasi Tasks (Phase 3)." />
+              {clientTasks.length === 0 ? (
+                <p className="mt-3 rounded-md border border-dashed py-6 text-center text-xs text-muted-foreground">
+                  Belum ada task untuk klien ini.
+                </p>
+              ) : (
+                <div className="mt-3 overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Title</TableHead>
+                        <TableHead>Method</TableHead>
+                        <TableHead>Due Date</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Priority</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {clientTasks.map((t) => (
+                        <TableRow key={t.id}>
+                          <TableCell className="font-medium">
+                            {t.title}
+                          </TableCell>
+                          <TableCell>{t.method}</TableCell>
+                          <TableCell>{formatDateShort(t.dueDate)}</TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={
+                                t.status === "Overdue"
+                                  ? "destructive"
+                                  : t.status === "Done"
+                                    ? "secondary"
+                                    : "default"
+                              }
+                              className="text-[10px]"
+                            >
+                              {t.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={
+                                t.priority === "High"
+                                  ? "destructive"
+                                  : "secondary"
+                              }
+                              className="text-[10px]"
+                            >
+                              {t.priority}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -384,7 +535,52 @@ function ClientProfilePage() {
           <Card>
             <CardContent className="p-4">
               <SectionTitle icon={Package} title="Commercial Items" />
-              <NotYetAvailable note="menunggu migrasi Commercial Items (Phase 4)." />
+              {clientCommercial.length === 0 ? (
+                <p className="mt-3 rounded-md border border-dashed py-6 text-center text-xs text-muted-foreground">
+                  Belum ada commercial item untuk klien ini.
+                </p>
+              ) : (
+                <div className="mt-3 overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Description</TableHead>
+                        <TableHead>Stage</TableHead>
+                        <TableHead className="text-right">Est. Value</TableHead>
+                        <TableHead>Updated</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {clientCommercial.map((ci) => (
+                        <TableRow key={ci.id}>
+                          <TableCell>
+                            <Badge variant="secondary" className="text-[10px]">
+                              {ci.type}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="max-w-[200px] truncate font-medium">
+                            {ci.description || ci.projectName || "—"}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="text-[10px]">
+                              {ci.stage}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {ci.estimatedValue > 0
+                              ? formatRupiahShort(ci.estimatedValue)
+                              : "—"}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {formatDateShort(ci.updatedAt)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -393,7 +589,52 @@ function ClientProfilePage() {
           <Card>
             <CardContent className="p-4">
               <SectionTitle icon={FileText} title="RFQ & Quotations" />
-              <NotYetAvailable note="menunggu migrasi Commercial Items (Phase 4)." />
+              {clientRfqQuotations.length === 0 ? (
+                <p className="mt-3 rounded-md border border-dashed py-6 text-center text-xs text-muted-foreground">
+                  Belum ada RFQ atau Quotation untuk klien ini.
+                </p>
+              ) : (
+                <div className="mt-3 overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Number</TableHead>
+                        <TableHead>Description</TableHead>
+                        <TableHead>Stage</TableHead>
+                        <TableHead className="text-right">Est. Value</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {clientRfqQuotations.map((ci) => (
+                        <TableRow key={ci.id}>
+                          <TableCell>
+                            <Badge variant="secondary" className="text-[10px]">
+                              {ci.type}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="font-medium">
+                            {ci.rfqNumber || ci.quotationNumber || "—"}
+                          </TableCell>
+                          <TableCell className="max-w-[200px] truncate">
+                            {ci.description || ci.projectName || "—"}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="text-[10px]">
+                              {ci.stage}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {ci.estimatedValue > 0
+                              ? formatRupiahShort(ci.estimatedValue)
+                              : "—"}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -402,7 +643,54 @@ function ClientProfilePage() {
           <Card>
             <CardContent className="p-4">
               <SectionTitle icon={ReceiptText} title="Sales Orders" />
-              <NotYetAvailable note="menunggu migrasi Sales Orders (Phase 5)." />
+              {clientOrders.length === 0 ? (
+                <p className="mt-3 rounded-md border border-dashed py-6 text-center text-xs text-muted-foreground">
+                  Belum ada Sales Order untuk klien ini.
+                </p>
+              ) : (
+                <div className="mt-3 overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>SO Number</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Tax</TableHead>
+                        <TableHead>Date</TableHead>
+                        <TableHead className="text-right">Value</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {clientOrders
+                        .slice()
+                        .sort((a, b) => b.date.localeCompare(a.date))
+                        .map((so) => (
+                          <TableRow key={so.id}>
+                            <TableCell className="font-medium">
+                              {so.soNumber}
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                variant="secondary"
+                                className="text-[10px]"
+                              >
+                                {so.type}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{so.taxType ?? "—"}</TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {formatDateShort(so.date)}
+                            </TableCell>
+                            <TableCell className="text-right tabular-nums">
+                              {so.value != null && so.value > 0
+                                ? formatRupiahShort(so.value)
+                                : "—"}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -411,7 +699,66 @@ function ClientProfilePage() {
           <Card>
             <CardContent className="p-4">
               <SectionTitle icon={ReceiptText} title="Revenue History" />
-              <NotYetAvailable note="menunggu migrasi Sales Orders (Phase 5)." />
+              {clientOrders.length === 0 ? (
+                <p className="mt-3 rounded-md border border-dashed py-6 text-center text-xs text-muted-foreground">
+                  Belum ada revenue tercatat untuk klien ini.
+                </p>
+              ) : (
+                <div className="mt-3 overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>SO Number</TableHead>
+                        <TableHead>Source</TableHead>
+                        <TableHead>Tax</TableHead>
+                        <TableHead>Prototype</TableHead>
+                        <TableHead>Date</TableHead>
+                        <TableHead className="text-right">Revenue</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {clientOrders
+                        .slice()
+                        .sort((a, b) => b.date.localeCompare(a.date))
+                        .map((so) => (
+                          <TableRow key={so.id}>
+                            <TableCell className="font-medium">
+                              {so.soNumber}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {so.source}
+                            </TableCell>
+                            <TableCell>{so.taxType ?? "—"}</TableCell>
+                            <TableCell>
+                              {so.type === "Prototype" && so.prototypeStatus ? (
+                                <Badge
+                                  variant={
+                                    so.prototypeStatus === "Paid"
+                                      ? "default"
+                                      : "secondary"
+                                  }
+                                  className="text-[10px]"
+                                >
+                                  {so.prototypeStatus}
+                                </Badge>
+                              ) : (
+                                "—"
+                              )}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {formatDateShort(so.date)}
+                            </TableCell>
+                            <TableCell className="text-right tabular-nums">
+                              {so.value != null && so.value > 0
+                                ? formatRupiahShort(so.value)
+                                : "—"}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

@@ -548,6 +548,7 @@ export function CreateSalesOrderDialog(props: SharedProps) {
         })),
       });
       await queryClient.invalidateQueries({ queryKey: ["sales-orders"] });
+      await queryClient.invalidateQueries({ queryKey: ["clients"] });
       await queryClient.invalidateQueries({ queryKey: ["activity-log"] });
       toast.success("Sales Order dicatat", {
         description: foc

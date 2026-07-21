@@ -526,6 +526,48 @@ export function activityCompliance(clients: Client[]) {
 }
 
 // ---------------------------------------------------------------------------
+// Per-client metrics (used by Client Detail overview cards)
+// ---------------------------------------------------------------------------
+
+export function clientRevenueMetrics(orders: SalesOrder[], clientId: string) {
+  const clientOrders = orders.filter((o) => o.clientId === clientId);
+  const yearOrders = clientOrders.filter(
+    (o) => new Date(o.date).getFullYear() === CURRENT_YEAR,
+  );
+  let ppn = 0;
+  let nonPpn = 0;
+  let totalRevenue = 0;
+  for (const o of yearOrders) {
+    const v = paidRevenue(o);
+    totalRevenue += v;
+    if (o.taxType === "PPN") ppn += v;
+    else if (o.taxType === "Non-PPN") nonPpn += v;
+  }
+  const prototypeOrders = yearOrders.filter((o) => o.type === "Prototype");
+  const prototypePaid = prototypeOrders
+    .filter((o) => o.prototypeStatus === "Paid")
+    .reduce((s, o) => s + paidRevenue(o), 0);
+  const prototypeFocCount = prototypeOrders.filter(
+    (o) => o.prototypeStatus === "FOC",
+  ).length;
+  return { totalRevenue, ppn, nonPpn, prototypePaid, prototypeFocCount };
+}
+
+export function clientCommercialMetrics(
+  items: CommercialItem[],
+  clientId: string,
+) {
+  const clientItems = items.filter((i) => i.clientId === clientId);
+  const rfqPipeline = clientItems
+    .filter((i) => i.type === "RFQ")
+    .reduce((s, i) => s + i.estimatedValue, 0);
+  const commit = clientItems
+    .filter((i) => i.stage === "Commit")
+    .reduce((s, i) => s + i.estimatedValue, 0);
+  return { rfqPipeline, commit };
+}
+
+// ---------------------------------------------------------------------------
 // Executive-specific
 // ---------------------------------------------------------------------------
 

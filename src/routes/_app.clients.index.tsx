@@ -43,6 +43,8 @@ import { toast } from "sonner";
 import { useRole } from "@/context/role-context";
 import { CLIENT_STATUSES } from "@/lib/business-rules";
 import { listClientRows, listSalesTeamProfiles } from "@/lib/data/clients";
+import { listSalesOrders } from "@/lib/data/sales-orders";
+import { revenueByTax } from "@/lib/data/dashboard-selectors";
 import { ClientsTable } from "@/components/clients/ClientsTable";
 import { AddClientDialog } from "@/components/clients/AddClientDialog";
 import { daysBetween, formatRupiahShort } from "@/lib/format";
@@ -86,6 +88,11 @@ function ClientListPage() {
     queryFn: listSalesTeamProfiles,
     enabled: authReady && role !== "sales",
   });
+  const { data: salesOrders = [] } = useQuery({
+    queryKey: ["sales-orders", "all"],
+    queryFn: listSalesOrders,
+    enabled: authReady,
+  });
 
   const [search, setSearch] = useState("");
   const [statuses, setStatuses] = useState<ClientStatus[]>([]);
@@ -102,9 +109,20 @@ function ClientListPage() {
   const [savedView, setSavedView] = useState<SavedView>(SAVED_VIEWS[0]);
   const pageSize = 10;
 
+  // Compute per-client PPN/Non-PPN from real Sales Orders data
+  const enrichedRows = useMemo(() => {
+    if (salesOrders.length === 0) return rows;
+    return rows.map((row) => {
+      const tax = revenueByTax(
+        salesOrders.filter((so) => so.clientId === row.client.id),
+      );
+      return { ...row, ppn: tax.ppn, nonPpn: tax.nonPpn };
+    });
+  }, [rows, salesOrders]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return rows.filter((r) => {
+    return enrichedRows.filter((r) => {
       if (q && !r.client.name.toLowerCase().includes(q)) return false;
       if (statuses.length && !statuses.includes(r.client.status)) return false;
       if (sources.length && !sources.includes(r.client.source)) return false;
@@ -115,12 +133,6 @@ function ClientListPage() {
       )
         return false;
       const spendJuta = r.spendingYtd / 1_000_000;
-      if (
-        spendJuta < spendingRange[0] ||
-        spendJuta > (spendingRange[1] * 1_000_000) / 1_000_000
-      ) {
-        // upper bound handled below
-      }
       if (spendJuta < spendingRange[0]) return false;
       if (spendingRange[1] < 3000 && spendJuta > spendingRange[1]) return false;
       if (overdueOnly) {
@@ -137,7 +149,7 @@ function ClientListPage() {
       return true;
     });
   }, [
-    rows,
+    enrichedRows,
     search,
     statuses,
     sources,
@@ -183,7 +195,32 @@ function ClientListPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <SavedViewsDropdown current={savedView} onPick={setSavedView} />
+          <SavedViewsDropdown
+            current={savedView}
+            onPick={(v) => {
+              setSavedView(v);
+              if (v.name === "Butuh Perhatian") {
+                setOverdueOnly(true);
+                setStatuses([]);
+                setSources([]);
+                setOwnerId("all");
+                setCommercialTypes([]);
+                setNextFuWindow("all");
+                setSpendingRange([0, 3000]);
+              } else if (v.name === "Prospect Aktif") {
+                setOverdueOnly(false);
+                setStatuses(["Prospect"]);
+                setSources([]);
+                setOwnerId("all");
+                setCommercialTypes([]);
+                setNextFuWindow("all");
+                setSpendingRange([0, 3000]);
+              } else {
+                resetFilters();
+              }
+              setPage(1);
+            }}
+          />
           <AddClientDialog />
         </div>
       </div>

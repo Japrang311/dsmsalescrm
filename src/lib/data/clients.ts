@@ -140,17 +140,24 @@ export async function listSalesTeamProfiles(): Promise<
     .map(({ id, name, initials, email }) => ({ id, name, initials, email }));
 }
 
-// Reads public.client_search_index (id + name only), not the clients table
-// directly — clients_select's RLS restricts a client row to its own
-// owner plus manager/executive/super_admin, but correcting which client a
-// Sales Order belongs to needs to find a client regardless of who owns it.
-// See supabase/migrations/20260720000000_add_sales_order_edit_support.sql.
-export async function searchClients(): Promise<{ id: string; name: string }[]> {
+// Reads public.client_search_index (id + name + owner_id), not the clients
+// table directly — clients_select's RLS restricts a client row to its own
+// owner plus manager/executive/super_admin, but the client picker in Create
+// dialogs and SO edit form need to find a client regardless of who owns it.
+// See supabase/migrations/20260720000000_add_sales_order_edit_support.sql
+// and 20260721000000_expand_client_search_index.sql.
+export async function searchClients(): Promise<
+  { id: string; name: string; ownerId: string }[]
+> {
   const { data, error } = await supabase
     .from("client_search_index")
-    .select("id, name");
+    .select("id, name, owner_id");
   if (error) throw error;
-  return data ?? [];
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    name: row.name,
+    ownerId: row.owner_id,
+  }));
 }
 
 export type ClientListRow = {
