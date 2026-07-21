@@ -24,7 +24,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { useRole } from "@/context/role-context";
-import dsmMark from "@/assets/dsm-mark.png.asset.json";
+import dsmMarkUrl from "/dsm-mark.svg";
 
 const NAV_FULL = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
@@ -61,7 +61,7 @@ export function AppSidebar() {
         <div className="flex items-center gap-2.5">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-zinc-100 to-zinc-300 p-1 shadow-sm ring-1 ring-zinc-400/40">
             <img
-              src={dsmMark.url}
+              src={dsmMarkUrl}
               alt="DSM"
               className="h-full w-full object-contain"
             />
