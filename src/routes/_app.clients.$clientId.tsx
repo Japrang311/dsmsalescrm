@@ -42,9 +42,9 @@ import {
   getClientById,
   listOwners,
   updateClientStatus,
-  updateClientOwner,
   listSalesTeamProfiles,
 } from "@/lib/data/clients";
+import { supabase } from "@/lib/supabase";
 import { getCurrentActorId, logActivity } from "@/lib/data/activity-log";
 import { listFollowUpsForClient } from "@/lib/data/follow-ups";
 import { listSalesOrders } from "@/lib/data/sales-orders";
@@ -844,22 +844,36 @@ function ClientProfilePage() {
           onConfirm={async (newOwnerId, note) => {
             try {
               const oldOwnerName = ownerName;
-              await updateClientOwner(client.id, newOwnerId);
-              const actorId = await getCurrentActorId();
+              const { error: updateErr } = await supabase
+                .from("clients")
+                .update({ owner_id: newOwnerId })
+                .eq("id", client.id);
+              if (updateErr) throw updateErr;
+
               const newOwnerName =
                 teamMembers.find((m) => m.id === newOwnerId)?.name ?? "—";
-              if (actorId) {
-                await logActivity({
-                  kind: "client_status_change",
-                  ownerId: newOwnerId,
-                  actorId,
-                  clientId: client.id,
-                  title: `${client.name} direassign ke ${newOwnerName}`,
-                  detail: note
-                    ? `${oldOwnerName} → ${newOwnerName}\n${note}`
-                    : `${oldOwnerName} → ${newOwnerName}`,
-                });
+
+              try {
+                const actorId = await getCurrentActorId();
+                if (actorId) {
+                  const { error: logErr } = await supabase
+                    .from("activity_log")
+                    .insert({
+                      kind: "client_status_change",
+                      owner_id: newOwnerId,
+                      actor_id: actorId,
+                      client_id: client.id,
+                      title: `${client.name} direassign ke ${newOwnerName}`,
+                      detail: note
+                        ? `${oldOwnerName} → ${newOwnerName}\n${note}`
+                        : `${oldOwnerName} → ${newOwnerName}`,
+                    });
+                  if (logErr) console.error("Activity log failed:", logErr);
+                }
+              } catch {
+                // Non-blocking — activity log failure shouldn't block the reassign
               }
+
               await queryClient.invalidateQueries({ queryKey: ["clients"] });
               await queryClient.invalidateQueries({
                 queryKey: ["profiles", "owners"],
