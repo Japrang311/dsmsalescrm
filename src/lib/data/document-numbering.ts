@@ -13,6 +13,21 @@ export type ParsedDocumentNumber = {
 const DOCUMENT_NUMBER_PATTERN =
   /^(DSM-(\d{2})(?:(QUO)-(\d{4})|(SO|NP|PROTY)(\d{3})))(?:_REV\.(\d+))?$/;
 
+export function yearCode(date = new Date()): string {
+  return String(date.getFullYear()).slice(-2);
+}
+
+export function documentNumberExample(
+  series: DocumentSeries,
+  date = new Date(),
+): string {
+  const year = yearCode(date);
+  if (series === "QUO") return `DSM-${year}QUO-0000`;
+  if (series === "SO") return `DSM-${year}SO000`;
+  if (series === "NP") return `DSM-${year}NP001`;
+  return `DSM-${year}PROTY000`;
+}
+
 export function parseDocumentNumber(raw: string): ParsedDocumentNumber | null {
   const match = DOCUMENT_NUMBER_PATTERN.exec(raw.trim());
   if (!match) return null;

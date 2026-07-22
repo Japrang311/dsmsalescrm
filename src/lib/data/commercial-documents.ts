@@ -219,6 +219,7 @@ export async function reviseQuotation(
 }
 
 export type CommercialDocumentPatch = Partial<{
+  rfqNumber: string | null;
   stage: string;
   ownerId: string;
   soNumber: string | null;
@@ -231,6 +232,8 @@ export async function updateCommercialDocument(
   patch: CommercialDocumentPatch,
 ): Promise<CommercialDocumentWithItems> {
   const update: Record<string, unknown> = {};
+  if (patch.rfqNumber !== undefined)
+    update.rfq_number = patch.rfqNumber || null;
   if (patch.stage !== undefined) update.stage = patch.stage;
   if (patch.ownerId !== undefined) update.owner_id = patch.ownerId;
   if (patch.soNumber !== undefined) update.so_number = patch.soNumber || null;
@@ -246,4 +249,37 @@ export async function updateCommercialDocument(
     .single();
   if (error) throw error;
   return toDocument(data as CommercialDocumentRow);
+}
+
+export type CommercialDocumentLineItemPatch = Partial<{
+  productName: string | null;
+  description: string | null;
+  qty: number;
+  uom: Uom;
+  unitPrice: number | null;
+  lineTotal: number | null;
+}>;
+
+export async function updateCommercialDocumentLineItem(
+  id: string,
+  patch: CommercialDocumentLineItemPatch,
+): Promise<CommercialDocumentLineItem> {
+  const update: Record<string, unknown> = {};
+  if (patch.productName !== undefined)
+    update.product_name = patch.productName || null;
+  if (patch.description !== undefined)
+    update.description = patch.description || null;
+  if (patch.qty !== undefined) update.qty = patch.qty;
+  if (patch.uom !== undefined) update.uom = patch.uom;
+  if (patch.unitPrice !== undefined) update.unit_price = patch.unitPrice;
+  if (patch.lineTotal !== undefined) update.line_total = patch.lineTotal;
+
+  const { data, error } = await supabase
+    .from("commercial_document_items")
+    .update(update)
+    .eq("id", id)
+    .select("*")
+    .single();
+  if (error) throw error;
+  return toLineItem(data as LineItemRow);
 }

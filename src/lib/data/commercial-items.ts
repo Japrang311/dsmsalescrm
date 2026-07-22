@@ -55,6 +55,7 @@ export async function listCommercialItems(): Promise<CommercialItem[]> {
 }
 
 export type CommercialItemPatch = Partial<{
+  rfqNumber: string | null;
   stage: string;
   ownerId: string;
   nextActionDate: string | null;
@@ -78,6 +79,7 @@ export async function updateCommercialItem(
   }
   return toCompatibilityItem(
     await updateCommercialDocument(id, {
+      rfqNumber: patch.rfqNumber,
       stage: patch.stage,
       ownerId: patch.ownerId,
       soNumber: patch.soNumber,

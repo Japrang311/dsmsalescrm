@@ -14,6 +14,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import {
   Table,
@@ -49,6 +51,8 @@ import {
   updateCommercialItem,
   describeCommercialItemChanges,
 } from "@/lib/data/commercial-items";
+import { updateCommercialDocumentLineItem } from "@/lib/data/commercial-documents";
+import { documentNumberExample } from "@/lib/data/document-numbering";
 import { listClients, listOwners } from "@/lib/data/clients";
 import { listTasks } from "@/lib/data/tasks";
 import {
@@ -56,6 +60,19 @@ import {
   listCommercialItemHistory,
   logActivity,
 } from "@/lib/data/activity-log";
+
+type LineItemEdit = {
+  qty: string;
+  unitPrice: string;
+};
+
+type LineItemChange = {
+  line: NonNullable<CommercialItem["lineItems"]>[number];
+  qty: number;
+  unitPrice: number;
+  qtyChanged: boolean;
+  priceChanged: boolean;
+};
 
 export function CommercialDetailPage({
   itemId,
@@ -105,11 +122,31 @@ export function CommercialDetailPage({
 
   const [stage, setStage] = useState(item?.stage ?? "");
   const [soNumber, setSoNumber] = useState(item?.soNumber ?? "");
+  const [rfqNumber, setRfqNumber] = useState(item?.rfqNumber ?? "");
+  const [lineEdits, setLineEdits] = useState<Record<string, LineItemEdit>>({});
+  const [priceReasonType, setPriceReasonType] = useState<string>("");
+  const [priceReasonOther, setPriceReasonOther] = useState("");
+  const [qtyReason, setQtyReason] = useState("");
 
   useEffect(() => {
     if (!item) return;
     setStage(item.stage);
     setSoNumber(item.soNumber ?? "");
+    setRfqNumber(item.rfqNumber ?? "");
+    setLineEdits(
+      Object.fromEntries(
+        (item.lineItems ?? []).map((line) => [
+          line.id,
+          {
+            qty: line.qty?.toString() ?? "",
+            unitPrice: line.unitPrice?.toString() ?? "",
+          },
+        ]),
+      ),
+    );
+    setPriceReasonType("");
+    setPriceReasonOther("");
+    setQtyReason("");
   }, [item]);
 
   if (!authReady) {
@@ -142,6 +179,27 @@ export function CommercialDetailPage({
   // available yet" placeholder below rather than mock SALES_ORDERS data.
   const canEdit = role !== "executive";
   const aging = Math.max(0, daysBetween(new Date(item.updatedAt), NOW));
+  const isFoc = item.prototypeStatus === "FOC";
+  const rfqNumberGuide = documentNumberExample("NP");
+  const soNumberGuide =
+    item.type === "Prototype"
+      ? documentNumberExample("PROTY")
+      : documentNumberExample("SO");
+  const quotationNumberGuide = documentNumberExample("QUO");
+  const lineChanges = (item.lineItems ?? [])
+    .map((line) => {
+      const edit = lineEdits[line.id];
+      if (!edit) return null;
+      const qty = Number(edit.qty);
+      const unitPrice = isFoc ? (line.unitPrice ?? 0) : Number(edit.unitPrice);
+      const qtyChanged = qty !== (line.qty ?? 0);
+      const priceChanged = !isFoc && unitPrice !== (line.unitPrice ?? 0);
+      if (!qtyChanged && !priceChanged) return null;
+      return { line, qty, unitPrice, qtyChanged, priceChanged };
+    })
+    .filter((change): change is LineItemChange => Boolean(change));
+  const hasQtyChanges = lineChanges.some((change) => change.qtyChanged);
+  const hasPriceChanges = lineChanges.some((change) => change.priceChanged);
   const quotationHistory =
     item.type === "Quotation" && item.quotationBaseNumber
       ? items
@@ -158,6 +216,13 @@ export function CommercialDetailPage({
   async function persist() {
     if (!item) return;
     const changes: { field: string; from?: string; to?: string }[] = [];
+    const normalizedRfq = rfqNumber.trim();
+    if (normalizedRfq !== (item.rfqNumber ?? ""))
+      changes.push({
+        field: "rfqNumber",
+        from: item.rfqNumber,
+        to: normalizedRfq || undefined,
+      });
     if (stage !== item.stage)
       changes.push({ field: "stage", from: item.stage, to: stage });
     if (soNumber !== (item.soNumber ?? ""))
@@ -166,19 +231,102 @@ export function CommercialDetailPage({
         from: item.soNumber,
         to: soNumber || undefined,
       });
+    for (const change of lineChanges) {
+      if (!Number.isFinite(change.qty) || change.qty <= 0) {
+        toast.error("Qty tidak valid", {
+          description: "Qty wajib lebih dari 0.",
+        });
+        return;
+      }
+      if (
+        !isFoc &&
+        (!Number.isFinite(change.unitPrice) || change.unitPrice <= 0)
+      ) {
+        toast.error("Harga tidak valid", {
+          description: "Unit price wajib lebih dari 0.",
+        });
+        return;
+      }
+      if (change.qtyChanged) {
+        changes.push({
+          field: `qty ${change.line.productName ?? "item"}`,
+          from: String(change.line.qty ?? "-"),
+          to: String(change.qty),
+        });
+      }
+      if (change.priceChanged) {
+        changes.push({
+          field: `unitPrice ${change.line.productName ?? "item"}`,
+          from:
+            change.line.unitPrice === null
+              ? "-"
+              : formatRupiahFull(change.line.unitPrice),
+          to: formatRupiahFull(change.unitPrice),
+        });
+      }
+    }
 
     if (changes.length === 0) {
       toast.info("Tidak ada perubahan");
       return;
     }
+    if (hasPriceChanges && !priceReasonType) {
+      toast.error("Alasan perubahan harga wajib diisi", {
+        description: "Pilih Discount atau Lainnya.",
+      });
+      return;
+    }
+    if (
+      hasPriceChanges &&
+      priceReasonType === "Lainnya" &&
+      !priceReasonOther.trim()
+    ) {
+      toast.error("Detail alasan harga wajib diisi", {
+        description: "Isi alasan lain perubahan harga.",
+      });
+      return;
+    }
+    if (hasQtyChanges && !qtyReason.trim()) {
+      toast.error("Alasan perubahan qty wajib diisi", {
+        description: "Jelaskan kenapa qty diubah.",
+      });
+      return;
+    }
 
     try {
-      await updateCommercialItem(item.id, {
-        stage: stage !== item.stage ? stage : undefined,
-        soNumber: soNumber !== (item.soNumber ?? "") ? soNumber : undefined,
-      });
+      const headerChanged =
+        normalizedRfq !== (item.rfqNumber ?? "") ||
+        stage !== item.stage ||
+        soNumber !== (item.soNumber ?? "");
+      if (headerChanged) {
+        await updateCommercialItem(item.id, {
+          rfqNumber:
+            normalizedRfq !== (item.rfqNumber ?? "")
+              ? normalizedRfq
+              : undefined,
+          stage: stage !== item.stage ? stage : undefined,
+          soNumber: soNumber !== (item.soNumber ?? "") ? soNumber : undefined,
+        });
+      }
+      for (const change of lineChanges) {
+        await updateCommercialDocumentLineItem(change.line.id, {
+          qty: change.qty,
+          unitPrice: isFoc ? null : change.unitPrice,
+          lineTotal: isFoc ? null : change.qty * change.unitPrice,
+        });
+      }
       const actorId = await getCurrentActorId();
       if (actorId) {
+        const reasonLines = [
+          hasPriceChanges
+            ? `Alasan harga: ${
+                priceReasonType === "Lainnya"
+                  ? priceReasonOther.trim()
+                  : priceReasonType
+              }`
+            : null,
+          hasQtyChanges ? `Alasan qty: ${qtyReason.trim()}` : null,
+        ].filter(Boolean);
         await logActivity({
           kind: "commercial_item_stage_change",
           ownerId: item.ownerId,
@@ -186,7 +334,9 @@ export function CommercialDetailPage({
           clientId: item.clientId,
           commercialDocumentId: item.id,
           title: `${item.description} diperbarui`,
-          detail: describeCommercialItemChanges(changes),
+          detail: [describeCommercialItemChanges(changes), ...reasonLines].join(
+            "\n",
+          ),
         });
       }
       await queryClient.invalidateQueries({ queryKey: ["commercial-items"] });
@@ -200,8 +350,6 @@ export function CommercialDetailPage({
       });
     }
   }
-
-  const isFoc = item.prototypeStatus === "FOC";
 
   return (
     <div className="flex flex-col gap-4">
@@ -365,23 +513,46 @@ export function CommercialDetailPage({
                 </span>
               </InfoCell>
               <InfoCell label="No. RFQ">
-                <span className="font-mono text-xs">
-                  {item.rfqNumber ?? "—"}
-                </span>
+                {canEdit ? (
+                  <>
+                    <Input
+                      value={rfqNumber}
+                      onChange={(e) => setRfqNumber(e.target.value)}
+                      placeholder={rfqNumberGuide}
+                      className="h-8 font-mono text-xs"
+                    />
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      Panduan NP: {rfqNumberGuide}. Tidak mengikat.
+                    </p>
+                  </>
+                ) : (
+                  <span className="font-mono text-xs">
+                    {item.rfqNumber ?? "—"}
+                  </span>
+                )}
               </InfoCell>
               <InfoCell label="No. Quotation">
                 <span className="font-mono text-xs">
                   {item.quotationNumber ?? "—"}
                 </span>
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  Panduan format: {quotationNumberGuide}
+                </p>
               </InfoCell>
               <InfoCell label="No. SO">
                 {canEdit ? (
-                  <Input
-                    value={soNumber}
-                    onChange={(e) => setSoNumber(e.target.value)}
-                    placeholder="SO-26-…"
-                    className="h-8 font-mono text-xs"
-                  />
+                  <>
+                    <Input
+                      value={soNumber}
+                      onChange={(e) => setSoNumber(e.target.value)}
+                      placeholder={soNumberGuide}
+                      className="h-8 font-mono text-xs"
+                    />
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      Panduan format: {soNumberGuide}. Tidak mengikat; SO khusus
+                      seperti Hariff boleh berbeda.
+                    </p>
+                  </>
                 ) : (
                   <span className="font-mono text-xs">
                     {item.soNumber ?? "—"}
@@ -406,7 +577,57 @@ export function CommercialDetailPage({
             <DocumentItemsTable
               items={item.lineItems ?? []}
               showMoney={!isFoc}
+              canEdit={canEdit}
+              lineEdits={lineEdits}
+              onLineEdit={(lineId, patch) =>
+                setLineEdits((current) => ({
+                  ...current,
+                  [lineId]: { ...current[lineId], ...patch },
+                }))
+              }
             />
+            {canEdit && (hasPriceChanges || hasQtyChanges) && (
+              <div className="grid gap-3 rounded-md border bg-muted/20 p-3">
+                {hasPriceChanges && (
+                  <div className="grid gap-2">
+                    <Label>Alasan perubahan harga</Label>
+                    <Select
+                      value={priceReasonType}
+                      onValueChange={setPriceReasonType}
+                    >
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue placeholder="Pilih alasan" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Discount">Discount</SelectItem>
+                        <SelectItem value="Lainnya">Lainnya</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {priceReasonType === "Lainnya" && (
+                      <Textarea
+                        value={priceReasonOther}
+                        onChange={(event) =>
+                          setPriceReasonOther(event.target.value)
+                        }
+                        placeholder="Tulis alasan perubahan harga"
+                        className="min-h-20 text-sm"
+                      />
+                    )}
+                  </div>
+                )}
+                {hasQtyChanges && (
+                  <div className="grid gap-2">
+                    <Label>Alasan perubahan qty</Label>
+                    <Textarea
+                      value={qtyReason}
+                      onChange={(event) => setQtyReason(event.target.value)}
+                      placeholder="Jelaskan kenapa qty diubah"
+                      className="min-h-20 text-sm"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -548,9 +769,15 @@ function InfoCell({
 function DocumentItemsTable({
   items,
   showMoney,
+  canEdit,
+  lineEdits,
+  onLineEdit,
 }: {
   items: NonNullable<CommercialItem["lineItems"]>;
   showMoney: boolean;
+  canEdit: boolean;
+  lineEdits: Record<string, LineItemEdit>;
+  onLineEdit: (lineId: string, patch: Partial<LineItemEdit>) => void;
 }) {
   return (
     <div>
@@ -581,20 +808,53 @@ function DocumentItemsTable({
                 </TableCell>
                 <TableCell>{line.description ?? "—"}</TableCell>
                 <TableCell className="text-right tabular-nums">
-                  {line.qty ?? "—"}
+                  {canEdit ? (
+                    <Input
+                      type="number"
+                      min={0}
+                      value={lineEdits[line.id]?.qty ?? ""}
+                      onChange={(event) =>
+                        onLineEdit(line.id, { qty: event.target.value })
+                      }
+                      className="ml-auto h-8 w-24 text-right text-xs"
+                      aria-label={`Qty ${line.productName ?? "item"}`}
+                    />
+                  ) : (
+                    (line.qty ?? "—")
+                  )}
                 </TableCell>
                 <TableCell>{line.uom ?? "—"}</TableCell>
                 {showMoney && (
                   <>
                     <TableCell className="text-right tabular-nums">
-                      {line.unitPrice === null
-                        ? "—"
-                        : formatRupiahFull(line.unitPrice)}
+                      {canEdit ? (
+                        <Input
+                          type="number"
+                          min={0}
+                          value={lineEdits[line.id]?.unitPrice ?? ""}
+                          onChange={(event) =>
+                            onLineEdit(line.id, {
+                              unitPrice: event.target.value,
+                            })
+                          }
+                          className="ml-auto h-8 w-32 text-right text-xs"
+                          aria-label={`Unit price ${line.productName ?? "item"}`}
+                        />
+                      ) : line.unitPrice === null ? (
+                        "—"
+                      ) : (
+                        formatRupiahFull(line.unitPrice)
+                      )}
                     </TableCell>
                     <TableCell className="text-right font-medium tabular-nums">
-                      {line.lineTotal === null
-                        ? "—"
-                        : formatRupiahFull(line.lineTotal)}
+                      {canEdit
+                        ? formatRupiahFull(
+                            (Number(lineEdits[line.id]?.qty) || 0) *
+                              (Number(lineEdits[line.id]?.unitPrice) || 0),
+                          )
+                        : line.lineTotal === null
+                          ? "—"
+                          : formatRupiahFull(line.lineTotal)}
                     </TableCell>
                   </>
                 )}

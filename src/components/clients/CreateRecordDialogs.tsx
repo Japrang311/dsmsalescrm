@@ -39,6 +39,7 @@ import {
 } from "@/lib/data/commercial-documents";
 import { createSalesOrder } from "@/lib/data/sales-orders";
 import { RFQ_INTAKE_STAGES } from "@/lib/business-rules";
+import { documentNumberExample } from "@/lib/data/document-numbering";
 import { useClientResolution, ClientPickerField } from "./ClientPicker";
 import {
   buildSalesOrderSchema,
@@ -136,6 +137,7 @@ export function CreateRfqDialog(props: SharedProps) {
     name: "lineItems",
   });
   const lineItems = form.watch("lineItems");
+  const npNumberGuide = documentNumberExample("NP");
   const onSubmit = form.handleSubmit(async (v) => {
     if (!clientId || !ownerId) return;
     try {
@@ -181,7 +183,9 @@ export function CreateRfqDialog(props: SharedProps) {
           )}
           <div className="grid grid-cols-2 gap-3">
             <FieldText
-              label="Nomor RFQ"
+              label="Nomor RFQ / NP"
+              placeholder={npNumberGuide}
+              description={`Panduan nomor New Product: ${npNumberGuide}. Tidak mengikat; nomor RFQ dari customer/internal tetap boleh berbeda.`}
               reg={form.register("rfqNumber")}
               error={msg(form.formState.errors, "rfqNumber")}
             />
@@ -256,6 +260,8 @@ export function CreateQuotationDialog(props: SharedProps) {
     name: "lineItems",
   });
   const lineItems = form.watch("lineItems");
+  const quotationNumberGuide = documentNumberExample("QUO");
+  const soNumberGuide = documentNumberExample("SO");
   const onSubmit = form.handleSubmit(async (v) => {
     if (!clientId || !ownerId) return;
     try {
@@ -304,7 +310,8 @@ export function CreateQuotationDialog(props: SharedProps) {
           <div className="rounded-md border bg-muted/40 p-3">
             <Label>Nomor Quotation</Label>
             <p className="text-sm text-muted-foreground">
-              Dibuat otomatis oleh sistem setelah disimpan
+              Dibuat otomatis oleh sistem setelah disimpan. Panduan format:{" "}
+              {quotationNumberGuide}.
             </p>
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -333,6 +340,8 @@ export function CreateQuotationDialog(props: SharedProps) {
             />
             <FieldText
               label="SO Number"
+              placeholder={soNumberGuide}
+              description={`Panduan format: ${soNumberGuide}. Tidak mengikat; SO khusus seperti Hariff boleh berbeda.`}
               reg={form.register("soNumber")}
               error={msg(form.formState.errors, "soNumber")}
             />
@@ -399,6 +408,7 @@ export function ReviseQuotationDialog({
     name: "lineItems",
   });
   const lineItems = form.watch("lineItems");
+  const soNumberGuide = documentNumberExample("SO");
   const onSubmit = form.handleSubmit(async (value) => {
     try {
       const revised = await reviseQuotation(document.id, {
@@ -449,6 +459,8 @@ export function ReviseQuotationDialog({
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <FieldText
               label="SO Number"
+              placeholder={soNumberGuide}
+              description={`Panduan format: ${soNumberGuide}. Tidak mengikat; SO khusus seperti Hariff boleh berbeda.`}
               reg={form.register("soNumber")}
               error={msg(form.formState.errors, "soNumber")}
             />
@@ -574,6 +586,10 @@ export function CreateSalesOrderDialog(props: SharedProps) {
     proto === "FOC" ? "Prototype FOC" : "Prototype Paid";
   const showTax =
     type === "Regular" || (type === "Prototype" && proto === "Paid");
+  const soNumberGuide =
+    type === "Prototype"
+      ? documentNumberExample("PROTY")
+      : documentNumberExample("SO");
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       {(props.trigger || !controlled) && (
@@ -596,8 +612,8 @@ export function CreateSalesOrderDialog(props: SharedProps) {
             <Label>Nomor SO</Label>
             <p className="text-sm text-muted-foreground">
               {form.watch("numberMode") === "Hariff Backdate"
-                ? "Gunakan nomor resmi historis di bawah"
-                : "Dibuat otomatis oleh sistem setelah disimpan"}
+                ? `Gunakan nomor resmi historis di bawah. Format ${soNumberGuide} hanya panduan umum.`
+                : `Dibuat otomatis oleh sistem setelah disimpan. Panduan format: ${soNumberGuide}.`}
             </p>
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -645,6 +661,8 @@ export function CreateSalesOrderDialog(props: SharedProps) {
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <FieldText
                 label="Nomor SO Manual"
+                placeholder={soNumberGuide}
+                description="Tidak mengikat; khusus Hariff dapat memakai nomor resmi historis yang berbeda."
                 reg={form.register("manualSoNumber")}
                 error={msg(form.formState.errors, "manualSoNumber")}
               />
@@ -905,12 +923,14 @@ function Footer({
 function FieldText({
   label,
   placeholder,
+  description,
   reg,
   error,
   type = "text",
 }: {
   label: string;
   placeholder?: string;
+  description?: string;
   reg: UseFormRegisterReturn;
   error?: string;
   type?: "text" | "date";
@@ -919,6 +939,9 @@ function FieldText({
     <div>
       <Label>{label}</Label>
       <Input type={type} placeholder={placeholder} {...reg} />
+      {description && (
+        <p className="mt-1 text-[11px] text-muted-foreground">{description}</p>
+      )}
       {error && <p className="mt-1 text-xs text-destructive">{error}</p>}
     </div>
   );
