@@ -1,0 +1,50 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-07-22T15:06:44Z",
+  "phase": null,
+  "phase_name": "default",
+  "phase_dir": ".planning",
+  "plan": null,
+  "task": null,
+  "total_tasks": null,
+  "status": "paused",
+  "completed_tasks": [
+    {
+      "id": 1,
+      "name": "Align RFQ, quotation, client, and SO form rules",
+      "status": "done",
+      "commit": "f4e46c9"
+    },
+    {
+      "id": 2,
+      "name": "Make create output appear without browser refresh",
+      "status": "done",
+      "commit": "9992ab3"
+    }
+  ],
+  "remaining_tasks": [],
+  "blockers": [],
+  "async_jobs": [],
+  "human_actions_pending": [],
+  "decisions": [
+    {
+      "decision": "RFQ create/edit does not use document numbers",
+      "rationale": "RFQ is the client request/specification stage; numbering belongs to quotation/SO flows."
+    },
+    {
+      "decision": "NP means Non-PPN Sales Order",
+      "rationale": "NP is not New Product and must not be connected to RFQ numbering."
+    },
+    {
+      "decision": "SO number belongs only to Sales Order",
+      "rationale": "Quotation create should not ask for SO because SO is created after PO/order."
+    },
+    {
+      "decision": "Realtime-for-own-input is handled by React Query cache updates after successful create",
+      "rationale": "The user requirement was no browser refresh after input; updating exact list caches gives immediate UI output while invalidateQueries keeps server data synchronized."
+    }
+  ],
+  "uncommitted_files": [],
+  "next_action": "If the user reports another stale list after create/edit, inspect the mutation path and ensure the exact query key displayed by that route is updated or invalidated.",
+  "context_notes": "Repo is on main at 9992ab3 pushed to origin/main. Current worktree was clean before this handoff file was created."
+}
