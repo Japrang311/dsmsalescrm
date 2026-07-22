@@ -1,8 +1,12 @@
 import { describe, test, expect } from "bun:test";
 import type { SalesOrder } from "@/lib/domain";
 import {
+  companyMonthlyTarget,
   monthlyRevenue,
+  monthlyTargetValue,
+  sumTargetsThroughMonth,
   ytdRevenue,
+  ytdTargetValue,
   revenueByTax,
   revenueBySource,
   prototypeSummary,
@@ -84,5 +88,32 @@ describe("dashboard-selectors FOC exclusion", () => {
     expect(summary.focCount).toBe(1);
     expect(summary.paidCount).toBe(1);
     expect(summary.supportActivity).toBe(2);
+  });
+});
+
+describe("dashboard-selectors dynamic monthly targets", () => {
+  test("reads target by month number instead of array position", () => {
+    const targetsByMember = {
+      "sales-1": [
+        { month: 3, target: 3_000 },
+        { month: 1, target: 1_000 },
+      ],
+      "sales-2": [{ month: 3, target: 30_000 }],
+    };
+    const companyTarget = companyMonthlyTarget(targetsByMember);
+
+    expect(
+      monthlyTargetValue("sales", "sales-1", targetsByMember, companyTarget, 1),
+    ).toBe(1_000);
+    expect(
+      monthlyTargetValue("sales", "sales-1", targetsByMember, companyTarget, 2),
+    ).toBe(0);
+    expect(
+      monthlyTargetValue("manager", "", targetsByMember, companyTarget, 3),
+    ).toBe(33_000);
+    expect(
+      ytdTargetValue("sales", "sales-1", targetsByMember, companyTarget, 3),
+    ).toBe(4_000);
+    expect(sumTargetsThroughMonth(targetsByMember["sales-2"], 3)).toBe(30_000);
   });
 });

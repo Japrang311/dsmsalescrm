@@ -71,7 +71,7 @@ import { formatRupiahShort } from "@/lib/format";
 import { listSalesTeamProfiles } from "@/lib/data/clients";
 import {
   listTargets,
-  upsertYearlyTarget,
+  upsertMonthlyTargets,
   type TargetsByMember,
 } from "@/lib/data/targets";
 import {
@@ -1082,6 +1082,27 @@ type TargetSalesMember = {
   initials: string;
 };
 
+const TARGET_MONTHS = Array.from({ length: 12 }, (_, i) => ({
+  month: i + 1,
+  label: new Date(CURRENT_YEAR, i, 1).toLocaleDateString("id-ID", {
+    month: "short",
+  }),
+}));
+
+function targetValueForMonth(
+  targets: TargetsByMember,
+  id: string,
+  month: number,
+) {
+  return targets[id]?.find((target) => target.month === month)?.target ?? 0;
+}
+
+function targetValuesForMember(targets: TargetsByMember, id: string) {
+  return TARGET_MONTHS.map(({ month }) =>
+    targetValueForMonth(targets, id, month),
+  );
+}
+
 function TargetsTab({
   team,
   targetsByMember,
@@ -1093,10 +1114,20 @@ function TargetsTab({
   canEdit: boolean;
   onSaved: () => void;
 }) {
-  const monthlyValueFor = (id: string) =>
-    targetsByMember[id]?.[CURRENT_MONTH - 1]?.target ?? 0;
-  const monthlyTotal = team.reduce((s, m) => s + monthlyValueFor(m.id), 0);
-  const yearlyTotal = monthlyTotal * 12;
+  const monthlyTotal = team.reduce(
+    (sum, member) =>
+      sum + targetValueForMonth(targetsByMember, member.id, CURRENT_MONTH),
+    0,
+  );
+  const yearlyTotal = team.reduce(
+    (sum, member) =>
+      sum +
+      targetValuesForMember(targetsByMember, member.id).reduce(
+        (s, value) => s + value,
+        0,
+      ),
+    0,
+  );
 
   return (
     <div className="space-y-4">
@@ -1109,7 +1140,7 @@ function TargetsTab({
         <SummaryCard
           label="Target tahunan tim"
           value={formatRupiahShort(yearlyTotal)}
-          hint="Bulanan × 12"
+          hint="Total Jan-Des"
         />
         <SummaryCard
           label="Jumlah sales aktif"
@@ -1122,46 +1153,49 @@ function TargetsTab({
         <CardHeader>
           <CardTitle>Target bulanan per sales</CardTitle>
           <CardDescription>
-            Nilai berlaku sama untuk 12 bulan tahun {CURRENT_YEAR}. Total tim
-            otomatis mengikuti perubahan.
+            Setiap bulan tahun {CURRENT_YEAR} bisa punya nilai berbeda. Total
+            tim otomatis mengikuti perubahan.
             {!canEdit && " Hanya Sales Manager yang bisa mengubah target."}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border border-border">
-            <Table>
+          <div className="overflow-x-auto rounded-md border border-border">
+            <Table className="min-w-[1320px]">
               <TableHeader>
                 <TableRow>
-                  <TableHead>Sales</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead className="w-[280px]">
-                    Target bulanan (Rp)
-                  </TableHead>
-                  <TableHead className="w-[180px] text-right">
-                    Preview
-                  </TableHead>
+                  <TableHead className="w-[180px]">Sales</TableHead>
+                  {TARGET_MONTHS.map(({ month, label }) => (
+                    <TableHead key={month} className="w-[84px] text-right">
+                      {label}
+                    </TableHead>
+                  ))}
+                  <TableHead className="w-[130px] text-right">Total</TableHead>
+                  <TableHead className="w-[96px] text-right">Aksi</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {team.length === 0 && (
                   <TableRow>
                     <TableCell
-                      colSpan={4}
+                      colSpan={15}
                       className="py-8 text-center text-sm text-muted-foreground"
                     >
                       Belum ada sales.
                     </TableCell>
                   </TableRow>
                 )}
-                {team.map((m) => (
-                  <TargetRow
-                    key={m.id}
-                    member={m}
-                    value={monthlyValueFor(m.id)}
-                    canEdit={canEdit}
-                    onSaved={onSaved}
-                  />
-                ))}
+                {team.map((m) => {
+                  const values = targetValuesForMember(targetsByMember, m.id);
+                  return (
+                    <TargetRow
+                      key={`${m.id}:${values.join(",")}`}
+                      member={m}
+                      values={values}
+                      canEdit={canEdit}
+                      onSaved={onSaved}
+                    />
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
@@ -1173,62 +1207,75 @@ function TargetsTab({
 
 function TargetRow({
   member,
-  value,
+  values,
   canEdit,
   onSaved,
 }: {
   member: TargetSalesMember;
-  value: number;
+  values: number[];
   canEdit: boolean;
   onSaved: () => void;
 }) {
-  const [draft, setDraft] = useState<string>(String(value));
+  const [drafts, setDrafts] = useState<string[]>(() =>
+    values.map((value) => String(value)),
+  );
   const [saving, setSaving] = useState(false);
-  const numeric = Number(draft.replace(/[^\d]/g, "")) || 0;
-  const dirty = numeric !== value;
+  const numbers = drafts.map(
+    (draft) => Number(draft.replace(/[^\d]/g, "")) || 0,
+  );
+  const dirtyMonths = numbers
+    .map((target, index) => ({ month: index + 1, target }))
+    .filter(({ target }, index) => target !== values[index]);
+  const dirty = dirtyMonths.length > 0;
+  const yearlyTotal = numbers.reduce((sum, value) => sum + value, 0);
 
   return (
     <TableRow>
       <TableCell className="font-medium">{member.name}</TableCell>
-      <TableCell className="text-muted-foreground">{member.email}</TableCell>
-      <TableCell>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground">Rp</span>
+      {TARGET_MONTHS.map(({ month }) => (
+        <TableCell key={month} className="p-1.5">
           <Input
-            value={draft}
-            onChange={(e) => setDraft(e.target.value.replace(/[^\d]/g, ""))}
-            className="tabular-nums"
+            aria-label={`Target ${member.name} bulan ${month}`}
+            value={drafts[month - 1] ?? "0"}
+            onChange={(e) => {
+              const next = [...drafts];
+              next[month - 1] = e.target.value.replace(/[^\d]/g, "");
+              setDrafts(next);
+            }}
+            className="h-8 px-2 text-right tabular-nums"
             inputMode="numeric"
             disabled={!canEdit}
           />
-          <Button
-            size="sm"
-            variant={dirty ? "default" : "outline"}
-            disabled={!canEdit || !dirty || saving}
-            onClick={async () => {
-              setSaving(true);
-              try {
-                await upsertYearlyTarget(member.id, numeric);
-                onSaved();
-                toast.success(`Target ${member.name} disimpan`);
-              } catch (error) {
-                toast.error("Gagal menyimpan target", {
-                  description:
-                    error instanceof Error
-                      ? error.message
-                      : "Terjadi kesalahan.",
-                });
-              } finally {
-                setSaving(false);
-              }
-            }}
-          >
-            Simpan
-          </Button>
-        </div>
-      </TableCell>
+        </TableCell>
+      ))}
       <TableCell className="text-right tabular-nums text-sm text-muted-foreground">
-        {formatRupiahShort(numeric)}
+        {formatRupiahShort(yearlyTotal)}
+      </TableCell>
+      <TableCell className="text-right">
+        <Button
+          size="icon"
+          variant={dirty ? "default" : "outline"}
+          disabled={!canEdit || !dirty || saving}
+          aria-label={`Simpan target ${member.name}`}
+          title={`Simpan target ${member.name}`}
+          onClick={async () => {
+            setSaving(true);
+            try {
+              await upsertMonthlyTargets(member.id, dirtyMonths);
+              onSaved();
+              toast.success(`Target ${member.name} disimpan`);
+            } catch (error) {
+              toast.error("Gagal menyimpan target", {
+                description:
+                  error instanceof Error ? error.message : "Terjadi kesalahan.",
+              });
+            } finally {
+              setSaving(false);
+            }
+          }}
+        >
+          <Save className="h-4 w-4" />
+        </Button>
       </TableCell>
     </TableRow>
   );

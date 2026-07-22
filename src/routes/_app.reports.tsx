@@ -54,6 +54,7 @@ import {
   dashboardSalesTeam,
   quotationFunnel,
   riskAlerts,
+  sumTargetsThroughMonth,
   targetsFor,
 } from "@/lib/data/dashboard-selectors";
 import { forecastValue } from "@/lib/data/commercial-stages";
@@ -154,16 +155,14 @@ function ReportsPage() {
     if (filters.ownerId !== "all") {
       const arr = targetsFor(targetsByMember, filters.ownerId);
       if (arr.length === 0) return 0;
-      return arr.slice(0, CURRENT_MONTH).reduce((s, m) => s + m.target, 0);
+      return sumTargetsThroughMonth(arr);
     }
     if (role === "sales") {
-      return targetsFor(targetsByMember, currentUserId ?? "")
-        .slice(0, CURRENT_MONTH)
-        .reduce((s, m) => s + m.target, 0);
+      return sumTargetsThroughMonth(
+        targetsFor(targetsByMember, currentUserId ?? ""),
+      );
     }
-    return companyTarget
-      .slice(0, CURRENT_MONTH)
-      .reduce((s, m) => s + m.target, 0);
+    return sumTargetsThroughMonth(companyTarget);
   }, [filters.ownerId, role, targetsByMember, companyTarget, currentUserId]);
 
   const ytdAchievementPct =
@@ -285,9 +284,9 @@ function ReportsPage() {
       .map((member) => {
         const orders = rows.filter((s) => s.ownerId === member.id);
         const revenue = orders.reduce((s, o) => s + (o.value ?? 0), 0);
-        const target = targetsFor(targetsByMember, member.id)
-          .slice(0, CURRENT_MONTH)
-          .reduce((s, m) => s + m.target, 0);
+        const target = sumTargetsThroughMonth(
+          targetsFor(targetsByMember, member.id),
+        );
         const openTasks = allTasks.filter(
           (t) => t.ownerId === member.id && t.status !== "Done",
         ).length;

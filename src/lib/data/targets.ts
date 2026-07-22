@@ -35,24 +35,25 @@ export async function listTargets(
   return byMember;
 }
 
-// Manager-only write (enforced by RLS) — applies the same value across all
-// 12 months of the year, matching the flat-monthly-target UX in Settings.
+// Manager-only write (enforced by RLS) — saves whichever months changed.
 // Phase 12 Task 6 verified this function needs no Super Admin exclusion
 // logic of its own: its only caller (Settings' Targets tab) always passes
 // a `salesId` sourced from listSalesTeamProfiles() (src/lib/data/clients.ts),
 // which is already filtered to role === "sales" — so a Super Admin id can
 // never reach this function's `sales_id` parameter in the first place.
-export async function upsertYearlyTarget(
+export async function upsertMonthlyTargets(
   salesId: string,
-  monthlyValue: number,
+  targets: MonthlyTarget[],
   year: number = CURRENT_YEAR,
 ): Promise<void> {
-  const rows = Array.from({ length: 12 }, (_, i) => ({
+  const rows = targets.map(({ month, target }) => ({
     sales_id: salesId,
     year,
-    month: i + 1,
-    target: monthlyValue,
+    month,
+    target,
   }));
+  if (rows.length === 0) return;
+
   const { error } = await supabase
     .from("targets")
     .upsert(rows, { onConflict: "sales_id,year,month" });

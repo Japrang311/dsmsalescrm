@@ -27,6 +27,19 @@ export function targetsFor(
   return byMember[memberId] ?? [];
 }
 
+export function targetForMonth(arr: MonthlyTarget[], month: number): number {
+  return arr.find((target) => target.month === month)?.target ?? 0;
+}
+
+export function sumTargetsThroughMonth(
+  arr: MonthlyTarget[],
+  throughMonth = CURRENT_MONTH,
+): number {
+  return Array.from({ length: throughMonth }, (_, i) =>
+    targetForMonth(arr, i + 1),
+  ).reduce((s, target) => s + target, 0);
+}
+
 // Company-wide monthly target = sum of every sales rep's target for that
 // month. Not stored as its own row — computed here so there's one source
 // of truth in the `targets` table.
@@ -36,7 +49,7 @@ export function companyMonthlyTarget(
   return Array.from({ length: 12 }, (_, i) => ({
     month: i + 1,
     target: Object.values(byMember).reduce(
-      (s, arr) => s + (arr[i]?.target ?? 0),
+      (s, arr) => s + targetForMonth(arr, i + 1),
       0,
     ),
   }));
@@ -59,7 +72,7 @@ export function monthlyTargetValue(
   month = CURRENT_MONTH,
 ): number {
   const arr = targetArrFor(role, salesUserId, byMember, companyTarget);
-  return arr[month - 1]?.target ?? 0;
+  return targetForMonth(arr, month);
 }
 
 export function ytdTargetValue(
@@ -70,7 +83,7 @@ export function ytdTargetValue(
   throughMonth = CURRENT_MONTH,
 ): number {
   const arr = targetArrFor(role, salesUserId, byMember, companyTarget);
-  return arr.slice(0, throughMonth).reduce((s, m) => s + m.target, 0);
+  return sumTargetsThroughMonth(arr, throughMonth);
 }
 
 export type SalesTeamMember = { id: string; name: string; initials: string };
@@ -190,7 +203,7 @@ export function monthlyRevenueTrend(
         month: "short",
       }),
       revenue: monthlyRevenue(orders, m),
-      target: targetArr[i]?.target ?? 0,
+      target: targetForMonth(targetArr, m),
     };
   });
 }
@@ -208,7 +221,7 @@ export function ytdCumulativeTrend(
   return Array.from({ length: CURRENT_MONTH }, (_, i) => {
     const m = i + 1;
     cumRev += monthlyRevenue(orders, m);
-    cumTgt += targetArr[i]?.target ?? 0;
+    cumTgt += targetForMonth(targetArr, m);
     return {
       month: new Date(CURRENT_YEAR, i, 1).toLocaleDateString("id-ID", {
         month: "short",
@@ -309,7 +322,7 @@ export function monthlyRevenueTrendInRange(
       rows.push({
         month: monthLabel,
         revenue: rev,
-        target: ((targetArr[m]?.target ?? 0) * covDays) / daysInMonth,
+        target: (targetForMonth(targetArr, m + 1) * covDays) / daysInMonth,
       });
     }
     cursor.setMonth(cursor.getMonth() + 1);
@@ -354,9 +367,7 @@ export function targetPerSales(
         new Date(s.date).getFullYear() === CURRENT_YEAR,
     );
     const achievement = memberOrders.reduce((s, o) => s + paidRevenue(o), 0);
-    const target = targetsFor(byMember, member.id)
-      .slice(0, CURRENT_MONTH)
-      .reduce((s, mm) => s + mm.target, 0);
+    const target = sumTargetsThroughMonth(targetsFor(byMember, member.id));
     return {
       name: member.name.split(" ")[0],
       fullName: member.name,
@@ -419,7 +430,7 @@ export function sumMonthlyProrated(
         0,
         Math.round((covEnd.getTime() - covStart.getTime()) / 86_400_000) + 1,
       );
-      total += ((arr[m]?.target ?? 0) * covDays) / monthEnd.getDate();
+      total += (targetForMonth(arr, m + 1) * covDays) / monthEnd.getDate();
     }
     cursor.setMonth(cursor.getMonth() + 1);
   }
@@ -494,9 +505,7 @@ export function salesPerformance(
           new Date(s.date).getFullYear() === CURRENT_YEAR,
       );
       const revenue = memberOrders.reduce((s, o) => s + paidRevenue(o), 0);
-      const target = targetsFor(byMember, member.id)
-        .slice(0, CURRENT_MONTH)
-        .reduce((s, mm) => s + mm.target, 0);
+      const target = sumTargetsThroughMonth(targetsFor(byMember, member.id));
       const overdue = tasks.filter(
         (t) => t.ownerId === member.id && t.status === "Overdue",
       ).length;

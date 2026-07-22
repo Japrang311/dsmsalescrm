@@ -147,8 +147,8 @@ VALUES
 -- -----------------------------------------------------------------------
 
 -- -----------------------------------------------------------------------
--- Targets (mirrors src/lib/mock/data.ts's MONTHLY_TARGETS_PER_SALES — same
--- flat monthly value per sales rep, applied across all 12 months of 2026).
+-- Targets. Seed uses an initial baseline for all months, but each row is
+-- independent and Settings can edit every month differently per sales rep.
 -- -----------------------------------------------------------------------
 
 insert into public.targets (sales_id, year, month, target)
