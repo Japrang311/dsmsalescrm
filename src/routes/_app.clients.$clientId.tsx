@@ -643,37 +643,51 @@ function ClientProfilePage() {
                       <TableRow>
                         <TableHead>Type</TableHead>
                         <TableHead>Number</TableHead>
+                        <TableHead>Nama Product</TableHead>
                         <TableHead>Description</TableHead>
                         <TableHead>Stage</TableHead>
                         <TableHead className="text-right">Est. Value</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {clientRfqQuotations.map((ci) => (
-                        <TableRow key={ci.id}>
-                          <TableCell>
-                            <Badge variant="secondary" className="text-[10px]">
-                              {ci.type}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="font-medium">
-                            {ci.rfqNumber || ci.quotationNumber || "—"}
-                          </TableCell>
-                          <TableCell className="max-w-[200px] truncate">
-                            {ci.description || ci.projectName || "—"}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className="text-[10px]">
-                              {ci.stage}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right tabular-nums">
-                            {ci.estimatedValue > 0
-                              ? formatRupiahShort(ci.estimatedValue)
-                              : "—"}
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {clientRfqQuotations.map((ci) => {
+                        const items = ci.lineItems ?? [];
+                        return (
+                          <TableRow key={ci.id}>
+                            <TableCell>
+                              <Badge
+                                variant="secondary"
+                                className="text-[10px]"
+                              >
+                                {ci.type}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="font-medium">
+                              {ci.rfqNumber || ci.quotationNumber || "—"}
+                            </TableCell>
+                            <TableCell className="max-w-[200px] truncate">
+                              {items.length === 0
+                                ? "—"
+                                : items.length === 1
+                                  ? (items[0].productName ?? "—")
+                                  : `${items[0].productName ?? "—"} +${items.length - 1} lainnya`}
+                            </TableCell>
+                            <TableCell className="max-w-[200px] truncate">
+                              {ci.description || ci.projectName || "—"}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="text-[10px]">
+                                {ci.stage}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right tabular-nums">
+                              {ci.estimatedValue > 0
+                                ? formatRupiahShort(ci.estimatedValue)
+                                : "—"}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>
@@ -696,6 +710,8 @@ function ClientProfilePage() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>SO Number</TableHead>
+                        <TableHead>Nama Product</TableHead>
+                        <TableHead>Deskripsi</TableHead>
                         <TableHead>Type</TableHead>
                         <TableHead>Tax</TableHead>
                         <TableHead>Date</TableHead>
@@ -706,30 +722,47 @@ function ClientProfilePage() {
                       {clientOrders
                         .slice()
                         .sort((a, b) => b.date.localeCompare(a.date))
-                        .map((so) => (
-                          <TableRow key={so.id}>
-                            <TableCell className="font-medium">
-                              {so.soNumber}
-                            </TableCell>
-                            <TableCell>
-                              <Badge
-                                variant="secondary"
-                                className="text-[10px]"
-                              >
-                                {so.type}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>{so.taxType ?? "—"}</TableCell>
-                            <TableCell className="text-muted-foreground">
-                              {formatDateShort(so.date)}
-                            </TableCell>
-                            <TableCell className="text-right tabular-nums">
-                              {so.value != null && so.value > 0
-                                ? formatRupiahShort(so.value)
-                                : "—"}
-                            </TableCell>
-                          </TableRow>
-                        ))}
+                        .map((so) => {
+                          const items = so.items ?? [];
+                          return (
+                            <TableRow key={so.id}>
+                              <TableCell className="font-medium">
+                                {so.soNumber}
+                              </TableCell>
+                              <TableCell className="max-w-[200px] truncate">
+                                {items.length === 0
+                                  ? "—"
+                                  : items.length === 1
+                                    ? (items[0].productName ?? "—")
+                                    : `${items[0].productName ?? "—"} +${items.length - 1} lainnya`}
+                              </TableCell>
+                              <TableCell className="max-w-[200px] truncate">
+                                {items.length === 0
+                                  ? "—"
+                                  : items.length === 1
+                                    ? (items[0].description ?? "—")
+                                    : `${items[0].description ?? "—"} +${items.length - 1} lainnya`}
+                              </TableCell>
+                              <TableCell>
+                                <Badge
+                                  variant="secondary"
+                                  className="text-[10px]"
+                                >
+                                  {so.type}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>{so.taxType ?? "—"}</TableCell>
+                              <TableCell className="text-muted-foreground">
+                                {formatDateShort(so.date)}
+                              </TableCell>
+                              <TableCell className="text-right tabular-nums">
+                                {so.value != null && so.value > 0
+                                  ? formatRupiahShort(so.value)
+                                  : "—"}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
                     </TableBody>
                   </Table>
                 </div>
