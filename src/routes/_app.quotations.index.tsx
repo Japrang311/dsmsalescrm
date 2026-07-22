@@ -8,12 +8,12 @@ export const Route = createFileRoute("/_app/quotations/")({
   component: () => (
     <CommercialViews
       title="Quotations"
-      subtitle="Penawaran resmi yang dikirim ke klien"
+      subtitle="RFQ yang sudah dihitung dan masuk proses penawaran"
       icon={<ReceiptText className="h-5 w-5 text-primary" />}
-      filter={{ types: ["Quotation"], stages: QUOTATION_STAGES }}
+      filter={{ types: ["RFQ", "Quotation"], stages: QUOTATION_STAGES }}
       stages={QUOTATION_STAGES}
       detailBasePath="/quotations"
-      emptyHint="Belum ada Quotation. Buat dokumen quotation dari client profile."
+      emptyHint="Belum ada penawaran. Hitung RFQ lalu lanjutkan ke proses quotation."
     />
   ),
 });

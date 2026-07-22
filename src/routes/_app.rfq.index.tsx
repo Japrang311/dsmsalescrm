@@ -8,7 +8,7 @@ export const Route = createFileRoute("/_app/rfq/")({
   component: () => (
     <CommercialViews
       title="RFQ / New Product"
-      subtitle="Semua permintaan penawaran dari klien"
+      subtitle="Permintaan harga dan spesifikasi dari klien"
       icon={<FileText className="h-5 w-5 text-primary" />}
       filter={{ types: ["RFQ"], stages: RFQ_INTAKE_STAGES }}
       stages={RFQ_INTAKE_STAGES}

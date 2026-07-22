@@ -42,9 +42,9 @@ import {
 } from "@/lib/data/clients";
 
 // RFQ and Quotations are the only remaining CommercialViews consumers
-// (Customer PO/Prototypes/Repeat Orders were removed 2026-07-20 — they
-// always read commercial_documents, which never carries those types for
-// real data), so `types` is the only filter still needed.
+// (Customer PO/Prototypes/Repeat Orders were removed 2026-07-20). RFQ intake
+// and quotation-stage work share the same source flow, so route-level filters
+// must combine document type and stage boundaries.
 export type CommercialViewFilter = {
   types?: CommercialItem["type"][];
   stages?: string[];
