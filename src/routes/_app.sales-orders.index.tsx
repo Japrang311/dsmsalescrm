@@ -1,10 +1,23 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Receipt, ArrowRight, Download, TrendingUp } from "lucide-react";
+import {
+  Receipt,
+  ArrowRight,
+  Download,
+  TrendingUp,
+  FileSpreadsheet,
+  FileText,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Table,
   TableBody,
@@ -30,6 +43,12 @@ import {
 import { filterSalesOrders } from "@/lib/report-selectors";
 import { ROLE_LABEL } from "@/context/role-context";
 import { useDashboardData } from "@/hooks/use-dashboard-data";
+import {
+  exportSalesOrdersPdf,
+  exportSalesOrdersXlsx,
+  type SalesOrdersExportContext,
+} from "@/lib/export-sales-orders";
+import { EmptyExportError } from "@/lib/export-csv";
 
 export const Route = createFileRoute("/_app/sales-orders/")({
   head: () => ({ meta: [{ title: "Sales Orders & Revenue · DSM" }] }),
@@ -87,10 +106,44 @@ function SalesOrdersRevenuePage() {
     return { ppn, nonPpn, total, rfq, existing, protoPaid, focCount };
   }, [rows]);
 
-  const handleMockExport = () => {
-    toast.success("Export siap (mock)", {
-      description: `${rows.length} SO · ${formatRupiahShort(summary.total)} akan dikirim ke Excel/PDF pada versi produksi.`,
-    });
+  const exportContext = useMemo<SalesOrdersExportContext>(
+    () => ({
+      role,
+      range: filters.range,
+      rows,
+      clientsById: clients,
+      ownersById,
+      summary,
+    }),
+    [role, filters.range, rows, clients, ownersById, summary],
+  );
+
+  const handleExport = (format: "xlsx" | "pdf") => {
+    try {
+      if (format === "xlsx") {
+        const rowCount = exportSalesOrdersXlsx(exportContext);
+        toast.success("Sales Orders Excel dibuat", {
+          description: `${rowCount} SO · ${formatRupiahShort(summary.total)}.`,
+        });
+        return;
+      }
+
+      exportSalesOrdersPdf(exportContext);
+      toast.success("Sales Orders PDF dibuat", {
+        description: `${rows.length} SO · ${formatRupiahShort(summary.total)}.`,
+      });
+    } catch (error) {
+      if (error instanceof EmptyExportError) {
+        toast.error("Tidak ada data untuk export", {
+          description: error.message,
+        });
+        return;
+      }
+      toast.error("Gagal membuat export", {
+        description:
+          error instanceof Error ? error.message : "Terjadi kesalahan.",
+      });
+    }
   };
 
   if (isLoading) {
@@ -113,14 +166,27 @@ function SalesOrdersRevenuePage() {
             sebagai Rp0 dan tidak masuk ke revenue.
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleMockExport}
-          className="gap-2"
-        >
-          <Download className="h-3.5 w-3.5" /> Export (mock)
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="gap-2">
+              <Download className="h-3.5 w-3.5" /> Export
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-44">
+            <DropdownMenuItem
+              className="gap-2"
+              onClick={() => handleExport("xlsx")}
+            >
+              <FileSpreadsheet className="h-4 w-4" /> Excel (.xlsx)
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="gap-2"
+              onClick={() => handleExport("pdf")}
+            >
+              <FileText className="h-4 w-4" /> PDF
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       <ReportFilterBar
