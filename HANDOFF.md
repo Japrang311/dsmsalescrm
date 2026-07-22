@@ -607,7 +607,36 @@ local-only, which was no longer true.
   stopped after it ran too long without output, so use targeted lint evidence
   unless rerunning full lint later.
 
-1. Read this file's most recent 2026-07-22 continuation first (dynamic monthly sales targets), then contact position + Client Detail product/description fixes + commercial item product-name migration reconciliation, then the unused-code cleanup + client database feature section, then the 2026-07-21 browser verification + spending_ytd fix + SO edit audit trail, then remote migration push + data restoration, then Client Detail/Client List wiring, then the 2026-07-20 sessions.
+### 2026 official sales target data (2026-07-22, remote applied and pending git commit at handoff edit time)
+
+- Owner provided `/Users/macbook/Downloads/Target_Penjualan_Tim_Sales_2026.md`
+  and asked to enter targets by sales name and month.
+- Added migration `supabase/migrations/20260722105512_seed_2026_sales_targets.sql`.
+  It upserts 60 target rows for 2026 by matching `public.profiles.name`:
+  Adhitya Wirambara, Leli Al, Nur Iman, Siti Zulaika (Ika), and Feni
+  Cahyaningtias. The migration raises an exception if fewer than all five names
+  are present, so target data cannot be partially seeded silently.
+- Updated `supabase/seed.sql` with the same month-by-month values so a future
+  local `db reset` starts with the official 2026 target baseline.
+- Local verification: `bunx supabase migration up --local` applied the target
+  migration; local query confirmed each sales has 12 months and yearly totals
+  match the source file (Adhitya 14.4B, Leli 12B, Nur 9.6B, Siti 6B, Feni 6B).
+  Monthly team totals also match the file: 2.5B, 3B, 3.5B, 4B, 4.5B, 5B, 4.5B,
+  4.5B, 5B, 4B, 3.5B, 4B.
+- Remote read-only verification before push: linked project profile names exist
+  and are active for all five target owners.
+- Remote migration was applied to linked project `qhtfixgbcpcitokeryxb` with
+  `bunx supabase db push --linked`; `bunx supabase migration list --linked`
+  confirmed local and remote match through `20260722105512`.
+- Remote post-apply verification query confirmed the same yearly totals and
+  monthly team totals as local/source file.
+- Validation: `bun --env-file=.env.local test src/lib/data/dashboard-selectors.test.ts`
+  passed 5/5; `bunx tsc --noEmit` passed; targeted `bunx eslint` passed;
+  `bun run build` passed. `bunx supabase db lint --local` still reports
+  pre-existing temp-table lint errors in historical import functions, unrelated
+  to this target migration.
+
+1. Read this file's most recent 2026-07-22 continuation first (official 2026 sales target data), then dynamic monthly sales targets, then contact position + Client Detail product/description fixes + commercial item product-name migration reconciliation, then the unused-code cleanup + client database feature section, then the 2026-07-21 browser verification + spending_ytd fix + SO edit audit trail, then remote migration push + data restoration, then Client Detail/Client List wiring, then the 2026-07-20 sessions.
 2. **Git push is not pending as of this refresh**: `main` matched `origin/main` at `816a7fe`. Recheck `git status --short --branch` before relying on this because it is runtime state.
 3. Remote Supabase migration status for the newest migrations (`20260722060000`, `20260722060001`, `20260722070000`, `20260722080000`) was verified in sync during this refresh. Still get explicit owner approval before any future remote mutation, then verify again with `bunx supabase migration list --linked`.
 4. **Before adding any new column to `clients`, `tasks`, `commercial_items`, or `sales_orders`, check the column-level UPDATE grant list in `20260718164503_apply_super_admin_rls_matrix.sql`** and add the new column to a `grant update (...)` statement in the same migration — these four tables do NOT have table-level UPDATE grants, only specific columns are grantable. This bit twice now (`sales_order_items.description` in the prior session, caught after the fact; `clients`' new columns this session, caught before shipping via local RLS tests).
