@@ -34,6 +34,17 @@ describe("Phase 11 commercial form schemas", () => {
     ).toBe(false);
   });
 
+  test("RFQ intake rejects quotation-stage values", () => {
+    expect(
+      rfqSchema.safeParse({
+        rfqNumber: "RFQ-001",
+        documentDate: "2026-07-19",
+        stage: "Negotiation",
+        lineItems: [paidItem],
+      }).success,
+    ).toBe(false);
+  });
+
   test("Quotation keeps Description optional and requires weighted stage", () => {
     const parsed = quotationSchema.safeParse({
       documentDate: "2026-07-19",

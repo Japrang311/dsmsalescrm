@@ -19,6 +19,17 @@ export const RFQ_STAGES: RfqStage[] = [
   "Closed Lost",
 ];
 
+export const RFQ_INTAKE_STAGES: RfqStage[] = ["Client Request for Quotes"];
+
+export const QUOTATION_STAGES: RfqStage[] = [
+  "Quotes Sent",
+  "Negotiation",
+  "Hot Prospect",
+  "Commit",
+  "Closed Won",
+  "Closed Lost",
+];
+
 export const REPEAT_STAGES: RepeatStage[] = [
   "Timeplan/Price Update Requested",
   "Waiting Client PO",

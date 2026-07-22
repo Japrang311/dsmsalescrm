@@ -38,6 +38,7 @@ import {
   reviseQuotation,
 } from "@/lib/data/commercial-documents";
 import { createSalesOrder } from "@/lib/data/sales-orders";
+import { RFQ_INTAKE_STAGES } from "@/lib/business-rules";
 import { useClientResolution, ClientPickerField } from "./ClientPicker";
 import {
   buildSalesOrderSchema,
@@ -192,7 +193,7 @@ export function CreateRfqDialog(props: SharedProps) {
                   shouldDirty: true,
                 })
               }
-              options={[...WEIGHTED_STAGES]}
+              options={[...RFQ_INTAKE_STAGES]}
             />
           </div>
           <FieldText

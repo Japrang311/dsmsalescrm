@@ -47,6 +47,7 @@ import {
 // real data), so `types` is the only filter still needed.
 export type CommercialViewFilter = {
   types?: CommercialItem["type"][];
+  stages?: string[];
 };
 
 export type CommercialViewsProps = {
@@ -104,6 +105,10 @@ export function CommercialViews(props: CommercialViewsProps) {
     if (props.filter.types) {
       const set = new Set(props.filter.types);
       items = items.filter((i) => set.has(i.type));
+    }
+    if (props.filter.stages) {
+      const set = new Set(props.filter.stages);
+      items = items.filter((i) => set.has(i.stage));
     }
     return items;
   }, [allItems, props.filter]);
