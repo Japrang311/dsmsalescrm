@@ -37,7 +37,6 @@ export const rfqSchema = z.object({
 
 export const quotationSchema = z.object({
   documentDate: z.string().min(10, "Date wajib diisi"),
-  clientAddress: z.string().trim().max(300).optional(),
   stage: z.enum([
     "Client Request for Quotes",
     "Quotes Sent",
@@ -47,7 +46,6 @@ export const quotationSchema = z.object({
     "Closed Won",
     "Closed Lost",
   ]),
-  soNumber: z.string().trim().max(60).optional(),
   note: z.string().trim().max(1000).optional(),
   lineItems: paidLineItemsSchema,
 });

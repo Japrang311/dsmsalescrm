@@ -238,9 +238,7 @@ export function CreateQuotationDialog(props: SharedProps) {
     resolver: zodResolver(quotationSchema),
     defaultValues: {
       documentDate: todayIso(),
-      clientAddress: "",
       stage: "Quotes Sent",
-      soNumber: "",
       note: "",
       lineItems: [emptyLineItem],
     },
@@ -251,16 +249,13 @@ export function CreateQuotationDialog(props: SharedProps) {
   });
   const lineItems = form.watch("lineItems");
   const quotationNumberGuide = documentNumberExample("QUO");
-  const soNumberGuide = documentNumberExample("SO");
   const onSubmit = form.handleSubmit(async (v) => {
     if (!clientId || !ownerId) return;
     try {
       const created = await createQuotation({
         clientId,
         documentDate: v.documentDate,
-        clientAddress: v.clientAddress,
         stage: v.stage,
-        soNumber: v.soNumber,
         note: v.note,
         items: v.lineItems,
       });
@@ -322,20 +317,6 @@ export function CreateQuotationDialog(props: SharedProps) {
               options={[...WEIGHTED_STAGES]}
             />
           </div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <FieldText
-              label="Address"
-              reg={form.register("clientAddress")}
-              error={msg(form.formState.errors, "clientAddress")}
-            />
-            <FieldText
-              label="SO Number"
-              placeholder={soNumberGuide}
-              description={`Panduan format: ${soNumberGuide}. Tidak mengikat; SO khusus seperti Hariff boleh berbeda.`}
-              reg={form.register("soNumber")}
-              error={msg(form.formState.errors, "soNumber")}
-            />
-          </div>
           <FieldText
             label="Note"
             reg={form.register("note")}
@@ -377,9 +358,7 @@ export function ReviseQuotationDialog({
     resolver: zodResolver(quotationSchema),
     defaultValues: {
       documentDate: todayIso(),
-      clientAddress: document.clientAddress ?? "",
       stage: "Quotes Sent",
-      soNumber: document.soNumber ?? "",
       note: document.note ?? "",
       lineItems:
         document.lineItems && document.lineItems.length > 0
@@ -398,13 +377,10 @@ export function ReviseQuotationDialog({
     name: "lineItems",
   });
   const lineItems = form.watch("lineItems");
-  const soNumberGuide = documentNumberExample("SO");
   const onSubmit = form.handleSubmit(async (value) => {
     try {
       const revised = await reviseQuotation(document.id, {
         documentDate: value.documentDate,
-        clientAddress: value.clientAddress,
-        soNumber: value.soNumber,
         note: value.note,
         items: value.lineItems,
       });
@@ -439,20 +415,6 @@ export function ReviseQuotationDialog({
               type="date"
               reg={form.register("documentDate")}
               error={msg(form.formState.errors, "documentDate")}
-            />
-            <FieldText
-              label="Address"
-              reg={form.register("clientAddress")}
-              error={msg(form.formState.errors, "clientAddress")}
-            />
-          </div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <FieldText
-              label="SO Number"
-              placeholder={soNumberGuide}
-              description={`Panduan format: ${soNumberGuide}. Tidak mengikat; SO khusus seperti Hariff boleh berbeda.`}
-              reg={form.register("soNumber")}
-              error={msg(form.formState.errors, "soNumber")}
             />
             <FieldText
               label="Note"
@@ -529,6 +491,7 @@ export function CreateSalesOrderDialog(props: SharedProps) {
   const lineItems = form.watch("lineItems");
   const type = form.watch("type");
   const proto = form.watch("prototypeStatus");
+  const taxType = form.watch("taxType");
   const isFoc = type === "Prototype" && proto === "FOC";
   const onSubmit = form.handleSubmit(async (v) => {
     if (!clientId || !ownerId) return;
@@ -579,7 +542,9 @@ export function CreateSalesOrderDialog(props: SharedProps) {
   const soNumberGuide =
     type === "Prototype"
       ? documentNumberExample("PROTY")
-      : documentNumberExample("SO");
+      : taxType === "Non-PPN"
+        ? documentNumberExample("NP")
+        : documentNumberExample("SO");
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       {(props.trigger || !controlled) && (

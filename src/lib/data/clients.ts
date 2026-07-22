@@ -88,7 +88,11 @@ export async function createClient(input: {
   source: ClientSource;
   ownerId: string;
   status?: ClientStatus;
+  address?: string;
+  contacts?: [ClientContact, ClientContact, ClientContact];
 }): Promise<Client> {
+  const blank = (v?: string) => (v && v.trim() ? v.trim() : null);
+  const [cp1, cp2, cp3] = input.contacts ?? [{}, {}, {}];
   const { data, error } = await supabase
     .from("clients")
     .insert({
@@ -96,6 +100,10 @@ export async function createClient(input: {
       source: input.source,
       owner_id: input.ownerId,
       status: input.status ?? "Prospect",
+      address: blank(input.address),
+      cp1_name: blank(cp1.name),
+      cp2_name: blank(cp2.name),
+      cp3_name: blank(cp3.name),
     })
     .select("*")
     .single();

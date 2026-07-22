@@ -121,7 +121,6 @@ export function CommercialDetailPage({
   });
 
   const [stage, setStage] = useState(item?.stage ?? "");
-  const [soNumber, setSoNumber] = useState(item?.soNumber ?? "");
   const [quotationNumber, setQuotationNumber] = useState(
     item?.quotationNumber ?? "",
   );
@@ -133,7 +132,6 @@ export function CommercialDetailPage({
   useEffect(() => {
     if (!item) return;
     setStage(item.stage);
-    setSoNumber(item.soNumber ?? "");
     setQuotationNumber(item.quotationNumber ?? "");
     setLineEdits(
       Object.fromEntries(
@@ -182,10 +180,6 @@ export function CommercialDetailPage({
   const canEdit = role !== "executive";
   const aging = Math.max(0, daysBetween(new Date(item.updatedAt), NOW));
   const isFoc = item.prototypeStatus === "FOC";
-  const soNumberGuide =
-    item.type === "Prototype"
-      ? documentNumberExample("PROTY")
-      : documentNumberExample("SO");
   const quotationNumberGuide = documentNumberExample("QUO");
   const lineChanges = (item.lineItems ?? [])
     .map((line) => {
@@ -229,12 +223,6 @@ export function CommercialDetailPage({
       });
     if (stage !== item.stage)
       changes.push({ field: "stage", from: item.stage, to: stage });
-    if (soNumber !== (item.soNumber ?? ""))
-      changes.push({
-        field: "soNumber",
-        from: item.soNumber,
-        to: soNumber || undefined,
-      });
     for (const change of lineChanges) {
       if (!Number.isFinite(change.qty) || change.qty <= 0) {
         toast.error("Qty tidak valid", {
@@ -301,8 +289,7 @@ export function CommercialDetailPage({
       const headerChanged =
         (item.type === "Quotation" &&
           normalizedQuotation !== (item.quotationNumber ?? "")) ||
-        stage !== item.stage ||
-        soNumber !== (item.soNumber ?? "");
+        stage !== item.stage;
       if (headerChanged) {
         await updateCommercialItem(item.id, {
           quotationNumber:
@@ -311,7 +298,6 @@ export function CommercialDetailPage({
               ? normalizedQuotation
               : undefined,
           stage: stage !== item.stage ? stage : undefined,
-          soNumber: soNumber !== (item.soNumber ?? "") ? soNumber : undefined,
         });
       }
       for (const change of lineChanges) {
@@ -539,34 +525,6 @@ export function CommercialDetailPage({
                   )}
                 </InfoCell>
               )}
-              <InfoCell label="No. SO">
-                {canEdit ? (
-                  <>
-                    <Input
-                      value={soNumber}
-                      onChange={(e) => setSoNumber(e.target.value)}
-                      placeholder={soNumberGuide}
-                      className="h-8 font-mono text-xs"
-                    />
-                    <p className="mt-1 text-[11px] text-muted-foreground">
-                      Panduan format: {soNumberGuide}. Tidak mengikat; SO khusus
-                      seperti Hariff boleh berbeda.
-                    </p>
-                  </>
-                ) : (
-                  <span className="font-mono text-xs">
-                    {item.soNumber ?? "—"}
-                  </span>
-                )}
-                {isFoc && (
-                  <p className="mt-1 text-[11px] text-muted-foreground">
-                    FOC: SO value kosong, tidak masuk revenue.
-                  </p>
-                )}
-              </InfoCell>
-              <InfoCell label="Address">
-                <span className="text-sm">{item.clientAddress ?? "—"}</span>
-              </InfoCell>
               <InfoCell label="Note">
                 <span className="text-sm">{item.note ?? "—"}</span>
               </InfoCell>

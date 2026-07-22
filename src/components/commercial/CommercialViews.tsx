@@ -125,7 +125,6 @@ export function CommercialViews(props: CommercialViewsProps) {
           it.projectName,
           it.quotationNumber,
           it.customerPoNumber,
-          it.soNumber,
         ]
           .filter(Boolean)
           .join(" ")
@@ -286,7 +285,6 @@ export function CommercialViews(props: CommercialViewsProps) {
                     <TableHead className="text-right">Forecast</TableHead>
                     <TableHead>No. Quotation</TableHead>
                     <TableHead>No. Customer PO</TableHead>
-                    <TableHead>No. SO</TableHead>
                     <TableHead>Next FU</TableHead>
                     <TableHead>Aging</TableHead>
                     <TableHead />
@@ -363,9 +361,6 @@ export function CommercialViews(props: CommercialViewsProps) {
                         </TableCell>
                         <TableCell className="whitespace-nowrap font-mono text-[11px]">
                           {it.customerPoNumber ?? "—"}
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap font-mono text-[11px]">
-                          {it.soNumber ?? "—"}
                         </TableCell>
                         <TableCell className="whitespace-nowrap text-xs">
                           {next ? (

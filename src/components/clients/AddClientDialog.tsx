@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -55,6 +56,19 @@ const schema = z.object({
     "Repeat",
   ]),
   ownerId: z.string().min(1, { message: "Pilih sales pemilik akun" }),
+  address: z.string().trim().max(500, { message: "Alamat terlalu panjang" }),
+  cp1Name: z
+    .string()
+    .trim()
+    .max(120, { message: "Contact Person 1 terlalu panjang" }),
+  cp2Name: z
+    .string()
+    .trim()
+    .max(120, { message: "Contact Person 2 terlalu panjang" }),
+  cp3Name: z
+    .string()
+    .trim()
+    .max(120, { message: "Contact Person 3 terlalu panjang" }),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -104,6 +118,10 @@ export function AddClientDialog({
       status: "Prospect",
       source: "Referral",
       ownerId: "",
+      address: "",
+      cp1Name: "",
+      cp2Name: "",
+      cp3Name: "",
     },
   });
 
@@ -129,6 +147,12 @@ export function AddClientDialog({
         source: values.source,
         ownerId: values.ownerId,
         status: values.status,
+        address: values.address,
+        contacts: [
+          { name: values.cp1Name },
+          { name: values.cp2Name },
+          { name: values.cp3Name },
+        ],
       });
       const actorId = await getCurrentActorId();
       if (actorId) {
@@ -200,6 +224,46 @@ export function AddClientDialog({
                 {errors.name.message}
               </p>
             )}
+          </div>
+
+          <div>
+            <Label htmlFor="address">Address</Label>
+            <Textarea id="address" rows={2} {...register("address")} />
+            {errors.address && (
+              <p className="mt-1 text-xs text-destructive">
+                {errors.address.message}
+              </p>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div>
+              <Label htmlFor="cp1Name">Contact Person 1</Label>
+              <Input id="cp1Name" {...register("cp1Name")} />
+              {errors.cp1Name && (
+                <p className="mt-1 text-xs text-destructive">
+                  {errors.cp1Name.message}
+                </p>
+              )}
+            </div>
+            <div>
+              <Label htmlFor="cp2Name">Contact Person 2</Label>
+              <Input id="cp2Name" {...register("cp2Name")} />
+              {errors.cp2Name && (
+                <p className="mt-1 text-xs text-destructive">
+                  {errors.cp2Name.message}
+                </p>
+              )}
+            </div>
+            <div>
+              <Label htmlFor="cp3Name">Contact Person 3</Label>
+              <Input id="cp3Name" {...register("cp3Name")} />
+              {errors.cp3Name && (
+                <p className="mt-1 text-xs text-destructive">
+                  {errors.cp3Name.message}
+                </p>
+              )}
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">

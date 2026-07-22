@@ -45,9 +45,7 @@ describe("Phase 11 commercial form schemas", () => {
   test("Quotation keeps Description optional and requires weighted stage", () => {
     const parsed = quotationSchema.safeParse({
       documentDate: "2026-07-19",
-      clientAddress: "",
       stage: "Quotes Sent",
-      soNumber: "",
       note: "",
       lineItems: [paidItem],
     });
