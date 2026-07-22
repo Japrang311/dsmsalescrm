@@ -3,8 +3,23 @@ import { NOW } from "@/lib/app-time";
 import type { CommercialItem, SalesOrder } from "@/lib/domain";
 
 function inRange(dateStr: string, from: Date, to: Date) {
-  const date = new Date(dateStr).getTime();
-  return date >= from.getTime() && date <= to.getTime();
+  const [year, month, day] = dateStr.split("-").map(Number);
+  const date = new Date(year, month - 1, day).getTime();
+  const fromDay = new Date(
+    from.getFullYear(),
+    from.getMonth(),
+    from.getDate(),
+  ).getTime();
+  const toDay = new Date(
+    to.getFullYear(),
+    to.getMonth(),
+    to.getDate(),
+    23,
+    59,
+    59,
+    999,
+  ).getTime();
+  return date >= fromDay && date <= toDay;
 }
 
 export function filterSalesOrders<T extends SalesOrder>(

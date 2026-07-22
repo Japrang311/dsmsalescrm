@@ -87,7 +87,12 @@ function GlobalSearch() {
   const matchedRfq = q
     ? items
         .filter(
-          (i) => i.type === "RFQ" && i.rfqNumber?.toLowerCase().includes(q),
+          (i) =>
+            i.type === "RFQ" &&
+            (i.description.toLowerCase().includes(q) ||
+              (i.lineItems ?? []).some((line) =>
+                (line.productName ?? "").toLowerCase().includes(q),
+              )),
         )
         .slice(0, MAX_RESULTS_PER_GROUP)
     : [];
@@ -177,7 +182,7 @@ function GlobalSearch() {
                       void navigate({ to: "/rfq/$id", params: { id: i.id } });
                     }}
                   >
-                    {i.rfqNumber}
+                    {i.description}
                   </CommandItem>
                 ))}
               </CommandGroup>

@@ -30,7 +30,6 @@ const paidLineItemsSchema = z
   });
 
 export const rfqSchema = z.object({
-  rfqNumber: z.string().trim().min(3, "Nomor RFQ minimal 3 karakter").max(60),
   documentDate: z.string().min(10, "Date wajib diisi"),
   stage: z.enum(["Client Request for Quotes"]),
   lineItems: paidLineItemsSchema,

@@ -663,7 +663,9 @@ function ClientProfilePage() {
                               </Badge>
                             </TableCell>
                             <TableCell className="font-medium">
-                              {ci.rfqNumber || ci.quotationNumber || "—"}
+                              {ci.type === "RFQ"
+                                ? "RFQ intake"
+                                : (ci.quotationNumber ?? "—")}
                             </TableCell>
                             <TableCell className="max-w-[200px] truncate">
                               {items.length === 0

@@ -126,7 +126,6 @@ export function CreateRfqDialog(props: SharedProps) {
   const form = useForm<RfqValues>({
     resolver: zodResolver(rfqSchema),
     defaultValues: {
-      rfqNumber: `RFQ-${new Date().getFullYear().toString().slice(2)}-${Math.floor(1000 + Math.random() * 8999)}`,
       documentDate: todayIso(),
       stage: "Client Request for Quotes",
       lineItems: [emptyLineItem],
@@ -137,13 +136,11 @@ export function CreateRfqDialog(props: SharedProps) {
     name: "lineItems",
   });
   const lineItems = form.watch("lineItems");
-  const npNumberGuide = documentNumberExample("NP");
   const onSubmit = form.handleSubmit(async (v) => {
     if (!clientId || !ownerId) return;
     try {
-      const created = await createRfq({
+      await createRfq({
         clientId,
-        rfqNumber: v.rfqNumber,
         documentDate: v.documentDate,
         stage: v.stage,
         items: v.lineItems,
@@ -151,7 +148,7 @@ export function CreateRfqDialog(props: SharedProps) {
       await queryClient.invalidateQueries({ queryKey: ["commercial-items"] });
       await queryClient.invalidateQueries({ queryKey: ["activity-log"] });
       toast.success("RFQ dibuat", {
-        description: `${clientName} · ${created.rfqNumber} · ${v.lineItems.length} item`,
+        description: `${clientName} · ${v.lineItems.length} item`,
       });
       form.reset();
       setPickedId("");
@@ -181,14 +178,7 @@ export function CreateRfqDialog(props: SharedProps) {
               onChange={setPickedId}
             />
           )}
-          <div className="grid grid-cols-2 gap-3">
-            <FieldText
-              label="Nomor RFQ / NP"
-              placeholder={npNumberGuide}
-              description={`Panduan nomor New Product: ${npNumberGuide}. Tidak mengikat; nomor RFQ dari customer/internal tetap boleh berbeda.`}
-              reg={form.register("rfqNumber")}
-              error={msg(form.formState.errors, "rfqNumber")}
-            />
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <FieldSelect
               label="Stage awal"
               value={form.watch("stage")}

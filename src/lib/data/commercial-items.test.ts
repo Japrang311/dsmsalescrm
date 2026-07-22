@@ -92,7 +92,7 @@ describe("commercial-items compatibility facade", () => {
       (await updateCommercialItem(documentId, { stage: "Negotiation" })).stage,
     ).toBe("Negotiation");
     await expect(
-      updateCommercialItem(documentId, { quotationNumber: "MANUAL" }),
+      updateCommercialItem(documentId, { customerPoNumber: "MANUAL" }),
     ).rejects.toThrow("UNSUPPORTED_NORMALIZED_DOCUMENT_PATCH");
     await supabase.auth.signOut();
   });

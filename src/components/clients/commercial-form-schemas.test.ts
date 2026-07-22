@@ -18,7 +18,6 @@ describe("Phase 11 commercial form schemas", () => {
   test("RFQ requires Date, Product, Qty, UOM, and paid price", () => {
     expect(
       rfqSchema.safeParse({
-        rfqNumber: "RFQ-001",
         documentDate: "2026-07-19",
         stage: "Client Request for Quotes",
         lineItems: [paidItem],
@@ -26,7 +25,6 @@ describe("Phase 11 commercial form schemas", () => {
     ).toBe(true);
     expect(
       rfqSchema.safeParse({
-        rfqNumber: "RFQ-001",
         documentDate: "",
         stage: "Client Request for Quotes",
         lineItems: [{ ...paidItem, productName: "", uom: "" }],
@@ -37,7 +35,6 @@ describe("Phase 11 commercial form schemas", () => {
   test("RFQ intake rejects quotation-stage values", () => {
     expect(
       rfqSchema.safeParse({
-        rfqNumber: "RFQ-001",
         documentDate: "2026-07-19",
         stage: "Negotiation",
         lineItems: [paidItem],

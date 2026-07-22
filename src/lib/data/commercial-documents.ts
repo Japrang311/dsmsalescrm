@@ -134,7 +134,7 @@ export async function listCommercialDocuments(): Promise<
 
 export type CreateRfqInput = {
   clientId: string;
-  rfqNumber: string;
+  rfqNumber?: string | null;
   documentDate: string;
   stage?: string;
   items: LineItemInput[];
@@ -145,7 +145,7 @@ export async function createRfq(
 ): Promise<CommercialDocumentWithItems> {
   const { data, error } = await supabase.rpc("create_rfq", {
     p_client_id: input.clientId,
-    p_rfq_number: input.rfqNumber,
+    p_rfq_number: input.rfqNumber ?? null,
     p_document_date: input.documentDate,
     p_stage: input.stage ?? "Client Request for Quotes",
     p_items: input.items,
@@ -220,6 +220,7 @@ export async function reviseQuotation(
 
 export type CommercialDocumentPatch = Partial<{
   rfqNumber: string | null;
+  quotationNumber: string | null;
   stage: string;
   ownerId: string;
   soNumber: string | null;
@@ -234,6 +235,8 @@ export async function updateCommercialDocument(
   const update: Record<string, unknown> = {};
   if (patch.rfqNumber !== undefined)
     update.rfq_number = patch.rfqNumber || null;
+  if (patch.quotationNumber !== undefined)
+    update.quotation_number = patch.quotationNumber || null;
   if (patch.stage !== undefined) update.stage = patch.stage;
   if (patch.ownerId !== undefined) update.owner_id = patch.ownerId;
   if (patch.soNumber !== undefined) update.so_number = patch.soNumber || null;

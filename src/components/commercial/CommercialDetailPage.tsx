@@ -122,7 +122,9 @@ export function CommercialDetailPage({
 
   const [stage, setStage] = useState(item?.stage ?? "");
   const [soNumber, setSoNumber] = useState(item?.soNumber ?? "");
-  const [rfqNumber, setRfqNumber] = useState(item?.rfqNumber ?? "");
+  const [quotationNumber, setQuotationNumber] = useState(
+    item?.quotationNumber ?? "",
+  );
   const [lineEdits, setLineEdits] = useState<Record<string, LineItemEdit>>({});
   const [priceReasonType, setPriceReasonType] = useState<string>("");
   const [priceReasonOther, setPriceReasonOther] = useState("");
@@ -132,7 +134,7 @@ export function CommercialDetailPage({
     if (!item) return;
     setStage(item.stage);
     setSoNumber(item.soNumber ?? "");
-    setRfqNumber(item.rfqNumber ?? "");
+    setQuotationNumber(item.quotationNumber ?? "");
     setLineEdits(
       Object.fromEntries(
         (item.lineItems ?? []).map((line) => [
@@ -180,7 +182,6 @@ export function CommercialDetailPage({
   const canEdit = role !== "executive";
   const aging = Math.max(0, daysBetween(new Date(item.updatedAt), NOW));
   const isFoc = item.prototypeStatus === "FOC";
-  const rfqNumberGuide = documentNumberExample("NP");
   const soNumberGuide =
     item.type === "Prototype"
       ? documentNumberExample("PROTY")
@@ -216,12 +217,15 @@ export function CommercialDetailPage({
   async function persist() {
     if (!item) return;
     const changes: { field: string; from?: string; to?: string }[] = [];
-    const normalizedRfq = rfqNumber.trim();
-    if (normalizedRfq !== (item.rfqNumber ?? ""))
+    const normalizedQuotation = quotationNumber.trim();
+    if (
+      item.type === "Quotation" &&
+      normalizedQuotation !== (item.quotationNumber ?? "")
+    )
       changes.push({
-        field: "rfqNumber",
-        from: item.rfqNumber,
-        to: normalizedRfq || undefined,
+        field: "quotationNumber",
+        from: item.quotationNumber,
+        to: normalizedQuotation || undefined,
       });
     if (stage !== item.stage)
       changes.push({ field: "stage", from: item.stage, to: stage });
@@ -295,14 +299,16 @@ export function CommercialDetailPage({
 
     try {
       const headerChanged =
-        normalizedRfq !== (item.rfqNumber ?? "") ||
+        (item.type === "Quotation" &&
+          normalizedQuotation !== (item.quotationNumber ?? "")) ||
         stage !== item.stage ||
         soNumber !== (item.soNumber ?? "");
       if (headerChanged) {
         await updateCommercialItem(item.id, {
-          rfqNumber:
-            normalizedRfq !== (item.rfqNumber ?? "")
-              ? normalizedRfq
+          quotationNumber:
+            item.type === "Quotation" &&
+            normalizedQuotation !== (item.quotationNumber ?? "")
+              ? normalizedQuotation
               : undefined,
           stage: stage !== item.stage ? stage : undefined,
           soNumber: soNumber !== (item.soNumber ?? "") ? soNumber : undefined,
@@ -512,33 +518,27 @@ export function CommercialDetailPage({
                     : formatRupiahFull(item.forecastValue)}
                 </span>
               </InfoCell>
-              <InfoCell label="No. RFQ">
-                {canEdit ? (
-                  <>
-                    <Input
-                      value={rfqNumber}
-                      onChange={(e) => setRfqNumber(e.target.value)}
-                      placeholder={rfqNumberGuide}
-                      className="h-8 font-mono text-xs"
-                    />
-                    <p className="mt-1 text-[11px] text-muted-foreground">
-                      Panduan NP: {rfqNumberGuide}. Tidak mengikat.
-                    </p>
-                  </>
-                ) : (
-                  <span className="font-mono text-xs">
-                    {item.rfqNumber ?? "—"}
-                  </span>
-                )}
-              </InfoCell>
-              <InfoCell label="No. Quotation">
-                <span className="font-mono text-xs">
-                  {item.quotationNumber ?? "—"}
-                </span>
-                <p className="mt-1 text-[11px] text-muted-foreground">
-                  Panduan format: {quotationNumberGuide}
-                </p>
-              </InfoCell>
+              {item.type === "Quotation" && (
+                <InfoCell label="No. Quotation">
+                  {canEdit ? (
+                    <>
+                      <Input
+                        value={quotationNumber}
+                        onChange={(e) => setQuotationNumber(e.target.value)}
+                        placeholder={quotationNumberGuide}
+                        className="h-8 font-mono text-xs"
+                      />
+                      <p className="mt-1 text-[11px] text-muted-foreground">
+                        Panduan format: {quotationNumberGuide}. Tidak mengikat.
+                      </p>
+                    </>
+                  ) : (
+                    <span className="font-mono text-xs">
+                      {item.quotationNumber ?? "—"}
+                    </span>
+                  )}
+                </InfoCell>
+              )}
               <InfoCell label="No. SO">
                 {canEdit ? (
                   <>

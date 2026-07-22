@@ -71,7 +71,6 @@ export async function updateCommercialItem(
 ): Promise<CommercialItem> {
   if (
     patch.nextActionDate !== undefined ||
-    patch.quotationNumber !== undefined ||
     patch.customerPoNumber !== undefined ||
     patch.taxType !== undefined
   ) {
@@ -80,6 +79,7 @@ export async function updateCommercialItem(
   return toCompatibilityItem(
     await updateCommercialDocument(id, {
       rfqNumber: patch.rfqNumber,
+      quotationNumber: patch.quotationNumber,
       stage: patch.stage,
       ownerId: patch.ownerId,
       soNumber: patch.soNumber,
