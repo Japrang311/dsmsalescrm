@@ -109,7 +109,7 @@ describe("clients RLS", () => {
     const { data, error } = await adminClient
       .from("clients")
       .select(
-        "address, industry, website, notes, cp1_name, cp1_email, cp1_phone, cp1_mobile",
+        "address, industry, website, notes, cp1_name, cp1_position, cp1_email, cp1_phone, cp1_mobile",
       )
       .eq("id", clientIds.own)
       .single();
@@ -119,6 +119,7 @@ describe("clients RLS", () => {
     expect(data.website).toBeNull();
     expect(data.notes).toBeNull();
     expect(data.cp1_name).toBeNull();
+    expect(data.cp1_position).toBeNull();
     expect(data.cp1_email).toBeNull();
     expect(data.cp1_phone).toBeNull();
     expect(data.cp1_mobile).toBeNull();
@@ -134,13 +135,14 @@ describe("clients RLS", () => {
         website: "https://example.com",
         notes: "Klien lama, respons cepat",
         cp1_name: "Budi Santoso",
+        cp1_position: "Purchasing Manager",
         cp1_email: "budi@example.com",
         cp1_phone: "031-1234567",
         cp1_mobile: "0812-3456-7890",
       })
       .eq("id", clientIds.own)
       .select(
-        "address, industry, website, notes, cp1_name, cp1_email, cp1_phone, cp1_mobile",
+        "address, industry, website, notes, cp1_name, cp1_position, cp1_email, cp1_phone, cp1_mobile",
       )
       .single();
     if (error) throw error;
@@ -149,6 +151,7 @@ describe("clients RLS", () => {
     expect(data.website).toBe("https://example.com");
     expect(data.notes).toBe("Klien lama, respons cepat");
     expect(data.cp1_name).toBe("Budi Santoso");
+    expect(data.cp1_position).toBe("Purchasing Manager");
     expect(data.cp1_email).toBe("budi@example.com");
     expect(data.cp1_phone).toBe("031-1234567");
     expect(data.cp1_mobile).toBe("0812-3456-7890");
@@ -166,12 +169,18 @@ describe("clients RLS", () => {
   });
 
   test("executive role cannot update company/contact info", async () => {
+    // clients_update's USING clause excludes executive entirely, so the row
+    // is never matched for update — RLS silently filters it out (0 rows),
+    // the same "no rows changed" signal as the sales-on-other-client case
+    // above, not a thrown error.
     const client = await signInAs(fixtures.executive);
-    const { error } = await client
+    const { data, error } = await client
       .from("clients")
       .update({ address: "Should Fail" })
-      .eq("id", clientIds.own);
-    expect(error).not.toBeNull();
+      .eq("id", clientIds.own)
+      .select("id");
+    if (error) throw error;
+    expect(data).toHaveLength(0);
   });
 
   test("manager role can update company/contact info on any client", async () => {

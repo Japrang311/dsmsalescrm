@@ -33,6 +33,7 @@ const emailField = z
 
 const contactSchema = z.object({
   name: z.string().trim(),
+  position: z.string().trim(),
   email: emailField,
   phone: z.string().trim(),
   mobile: z.string().trim(),
@@ -54,6 +55,7 @@ function toFormValues(client: Client): FormValues {
   const [cp1, cp2, cp3] = client.contacts;
   const toContact = (c: (typeof client.contacts)[number]) => ({
     name: c.name ?? "",
+    position: c.position ?? "",
     email: c.email ?? "",
     phone: c.phone ?? "",
     mobile: c.mobile ?? "",
@@ -121,6 +123,7 @@ export function EditClientInfoDialog({
           const before = client.contacts[i];
           const isDirty =
             cp.name !== (before.name ?? "") ||
+            cp.position !== (before.position ?? "") ||
             cp.email !== (before.email ?? "") ||
             cp.phone !== (before.phone ?? "") ||
             cp.mobile !== (before.mobile ?? "");
@@ -212,6 +215,13 @@ export function EditClientInfoDialog({
                   <div>
                     <Label htmlFor={`${key}-name`}>Nama</Label>
                     <Input id={`${key}-name`} {...register(`${key}.name`)} />
+                  </div>
+                  <div>
+                    <Label htmlFor={`${key}-position`}>Jabatan</Label>
+                    <Input
+                      id={`${key}-position`}
+                      {...register(`${key}.position`)}
+                    />
                   </div>
                   <div>
                     <Label htmlFor={`${key}-email`}>Email</Label>

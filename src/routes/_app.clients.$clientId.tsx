@@ -1012,7 +1012,7 @@ function ClientInfoCard({
   const hasCompanyInfo =
     client.address || client.industry || client.website || client.notes;
   const filledContacts = client.contacts.filter(
-    (c) => c.name || c.email || c.phone || c.mobile,
+    (c) => c.name || c.position || c.email || c.phone || c.mobile,
   );
 
   return (
@@ -1047,7 +1047,7 @@ function ClientInfoCard({
               </p>
             ) : (
               client.contacts.map((c, i) =>
-                c.name || c.email || c.phone || c.mobile ? (
+                c.name || c.position || c.email || c.phone || c.mobile ? (
                   <div
                     key={i}
                     className="rounded-md border bg-muted/30 p-2.5 text-xs"
@@ -1055,6 +1055,9 @@ function ClientInfoCard({
                     <p className="font-medium">
                       {c.name || `Kontak Person ${i + 1}`}
                     </p>
+                    {c.position && (
+                      <p className="text-muted-foreground">{c.position}</p>
+                    )}
                     <div className="mt-1 flex flex-col gap-0.5 text-muted-foreground">
                       {c.email && (
                         <span className="flex items-center gap-1.5">

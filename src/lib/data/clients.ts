@@ -20,14 +20,17 @@ type ClientRow = {
   website: string | null;
   notes: string | null;
   cp1_name: string | null;
+  cp1_position: string | null;
   cp1_email: string | null;
   cp1_phone: string | null;
   cp1_mobile: string | null;
   cp2_name: string | null;
+  cp2_position: string | null;
   cp2_email: string | null;
   cp2_phone: string | null;
   cp2_mobile: string | null;
   cp3_name: string | null;
+  cp3_position: string | null;
   cp3_email: string | null;
   cp3_phone: string | null;
   cp3_mobile: string | null;
@@ -35,10 +38,11 @@ type ClientRow = {
 
 function toContact(row: ClientRow, position: 1 | 2 | 3): ClientContact {
   const name = row[`cp${position}_name`] ?? undefined;
+  const jabatan = row[`cp${position}_position`] ?? undefined;
   const email = row[`cp${position}_email`] ?? undefined;
   const phone = row[`cp${position}_phone`] ?? undefined;
   const mobile = row[`cp${position}_mobile`] ?? undefined;
-  return { name, email, phone, mobile };
+  return { name, position: jabatan, email, phone, mobile };
 }
 
 function toClient(row: ClientRow): Client {
@@ -138,14 +142,17 @@ export async function updateClientDetails(
       website: blank(patch.website),
       notes: blank(patch.notes),
       cp1_name: blank(cp1.name),
+      cp1_position: blank(cp1.position),
       cp1_email: blank(cp1.email),
       cp1_phone: blank(cp1.phone),
       cp1_mobile: blank(cp1.mobile),
       cp2_name: blank(cp2.name),
+      cp2_position: blank(cp2.position),
       cp2_email: blank(cp2.email),
       cp2_phone: blank(cp2.phone),
       cp2_mobile: blank(cp2.mobile),
       cp3_name: blank(cp3.name),
+      cp3_position: blank(cp3.position),
       cp3_email: blank(cp3.email),
       cp3_phone: blank(cp3.phone),
       cp3_mobile: blank(cp3.mobile),
