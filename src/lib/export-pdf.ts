@@ -46,6 +46,23 @@ function tableDefaults() {
 }
 
 export function exportDashboardPdf(context: DashboardExportContext) {
+  exportReportPdf(context, {
+    reportLabel: "Dashboard Report",
+    filenamePrefix: "dsm-dashboard",
+  });
+}
+
+export function exportExecutiveReportPdf(context: DashboardExportContext) {
+  exportReportPdf(context, {
+    reportLabel: "Executive Report",
+    filenamePrefix: "dsm-executive-report",
+  });
+}
+
+function exportReportPdf(
+  context: DashboardExportContext,
+  options: { reportLabel: string; filenamePrefix: string },
+) {
   const { role, range } = context;
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   const pageW = doc.internal.pageSize.getWidth();
@@ -60,7 +77,7 @@ export function exportDashboardPdf(context: DashboardExportContext) {
   doc.text("DSM Sales Execution", MARGIN_X, 32);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
-  doc.text("Dashboard Report", MARGIN_X, 50);
+  doc.text(options.reportLabel, MARGIN_X, 50);
   doc.setFontSize(9);
   const stamp = `Generated ${formatDateShort(new Date())} · Scope: ${ROLE_LABEL[role]} · Periode ${periodLabel}`;
   doc.text(stamp, pageW - MARGIN_X, 50, { align: "right" });
@@ -271,7 +288,7 @@ export function exportDashboardPdf(context: DashboardExportContext) {
   }
 
   const iso = (d: Date) => d.toISOString().slice(0, 10);
-  const filename = `dsm-dashboard-${role}-${iso(range.from)}_${iso(range.to)}.pdf`;
+  const filename = `${options.filenamePrefix}-${role}-${iso(range.from)}_${iso(range.to)}.pdf`;
   doc.save(filename);
 }
 

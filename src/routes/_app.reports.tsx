@@ -3,6 +3,8 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   BarChart3,
   Download,
+  FileSpreadsheet,
+  FileText,
   TrendingUp,
   Users,
   AlertTriangle,
@@ -31,6 +33,12 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -55,6 +63,7 @@ import {
   quotationFunnel,
   riskAlerts,
   sumTargetsThroughMonth,
+  targetForMonth,
   targetsFor,
 } from "@/lib/data/dashboard-selectors";
 import { forecastValue } from "@/lib/data/commercial-stages";
@@ -69,6 +78,10 @@ import {
   filterCommercialItems,
   filterSalesOrders,
 } from "@/lib/report-selectors";
+import { exportExecutiveReportXlsx } from "@/lib/export-xlsx";
+import { exportExecutiveReportPdf } from "@/lib/export-pdf";
+import type { DashboardExportContext } from "@/lib/dashboard-export-data";
+import { EmptyExportError } from "@/lib/export-csv";
 
 export const Route = createFileRoute("/_app/reports")({
   head: () => ({ meta: [{ title: "Executive Reports · DSM" }] }),
@@ -186,7 +199,7 @@ function ReportsPage() {
     let ct = 0;
     return Array.from({ length: CURRENT_MONTH }, (_, i) => {
       cr += monthRev[i];
-      ct += targetsArr[i].target;
+      ct += targetForMonth(targetsArr, i + 1);
       return {
         month: new Date(CURRENT_YEAR, i, 1).toLocaleDateString("id-ID", {
           month: "short",
@@ -214,7 +227,7 @@ function ReportsPage() {
         month: "short",
       }),
       revenue: monthRev[i],
-      target: targetsArr[i].target,
+      target: targetForMonth(targetsArr, i + 1),
     }));
   }, [rows, filters.ownerId, targetsByMember, companyTarget]);
 
@@ -318,10 +331,61 @@ function ReportsPage() {
     [allTasks, allItems, clientList],
   );
 
-  const handleMockExport = () => {
-    toast.success("Executive Report siap (mock)", {
-      description: `Rentang ${formatDateShort(filters.range.from)} – ${formatDateShort(filters.range.to)} · ${rows.length} SO · ${formatRupiahShort(totals.revenue)}.`,
-    });
+  const exportContext = useMemo<DashboardExportContext>(
+    () => ({
+      role,
+      range: filters.range,
+      salesUserId: currentUserId ?? "",
+      orders: rows,
+      tasks: allTasks,
+      items: commercial,
+      clients: clientList,
+      ownersById,
+      salesTeam: displayTeam,
+      targetsByMember,
+      companyTarget,
+    }),
+    [
+      role,
+      filters.range,
+      currentUserId,
+      rows,
+      allTasks,
+      commercial,
+      clientList,
+      ownersById,
+      displayTeam,
+      targetsByMember,
+      companyTarget,
+    ],
+  );
+
+  const handleExport = (format: "xlsx" | "pdf") => {
+    try {
+      if (format === "xlsx") {
+        const rowCount = exportExecutiveReportXlsx(exportContext);
+        toast.success("Executive Report Excel dibuat", {
+          description: `Rentang ${formatDateShort(filters.range.from)} – ${formatDateShort(filters.range.to)} · ${rowCount} baris laporan.`,
+        });
+        return;
+      }
+
+      exportExecutiveReportPdf(exportContext);
+      toast.success("Executive Report PDF dibuat", {
+        description: `Rentang ${formatDateShort(filters.range.from)} – ${formatDateShort(filters.range.to)} · ${rows.length} SO · ${formatRupiahShort(totals.revenue)}.`,
+      });
+    } catch (error) {
+      if (error instanceof EmptyExportError) {
+        toast.error("Tidak ada data untuk export", {
+          description: error.message,
+        });
+        return;
+      }
+      toast.error("Gagal membuat export", {
+        description:
+          error instanceof Error ? error.message : "Terjadi kesalahan.",
+      });
+    }
   };
 
   const filterContext = [
@@ -358,14 +422,27 @@ function ReportsPage() {
             revenue.
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleMockExport}
-          className="gap-2"
-        >
-          <Download className="h-3.5 w-3.5" /> Export (mock)
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="gap-2">
+              <Download className="h-3.5 w-3.5" /> Export
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-44">
+            <DropdownMenuItem
+              className="gap-2"
+              onClick={() => handleExport("xlsx")}
+            >
+              <FileSpreadsheet className="h-4 w-4" /> Excel (.xlsx)
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="gap-2"
+              onClick={() => handleExport("pdf")}
+            >
+              <FileText className="h-4 w-4" /> PDF
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       <ReportFilterBar
