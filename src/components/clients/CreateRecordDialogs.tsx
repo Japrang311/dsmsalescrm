@@ -37,7 +37,9 @@ import {
   createRfq,
   reviseQuotation,
 } from "@/lib/data/commercial-documents";
+import { toCommercialItem } from "@/lib/data/commercial-items";
 import { createSalesOrder } from "@/lib/data/sales-orders";
+import { cacheListRecord } from "@/lib/query-cache-updates";
 import { RFQ_INTAKE_STAGES } from "@/lib/business-rules";
 import { documentNumberExample } from "@/lib/data/document-numbering";
 import { useClientResolution, ClientPickerField } from "./ClientPicker";
@@ -139,12 +141,17 @@ export function CreateRfqDialog(props: SharedProps) {
   const onSubmit = form.handleSubmit(async (v) => {
     if (!clientId || !ownerId) return;
     try {
-      await createRfq({
+      const created = await createRfq({
         clientId,
         documentDate: v.documentDate,
         stage: v.stage,
         items: v.lineItems,
       });
+      cacheListRecord(
+        queryClient,
+        ["commercial-items", "all"],
+        toCommercialItem(created),
+      );
       await queryClient.invalidateQueries({ queryKey: ["commercial-items"] });
       await queryClient.invalidateQueries({ queryKey: ["activity-log"] });
       toast.success("RFQ dibuat", {
@@ -259,6 +266,11 @@ export function CreateQuotationDialog(props: SharedProps) {
         note: v.note,
         items: v.lineItems,
       });
+      cacheListRecord(
+        queryClient,
+        ["commercial-items", "all"],
+        toCommercialItem(created),
+      );
       await queryClient.invalidateQueries({ queryKey: ["commercial-items"] });
       await queryClient.invalidateQueries({ queryKey: ["activity-log"] });
       toast.success("Quotation dibuat", {
@@ -384,6 +396,11 @@ export function ReviseQuotationDialog({
         note: value.note,
         items: value.lineItems,
       });
+      cacheListRecord(
+        queryClient,
+        ["commercial-items", "all"],
+        toCommercialItem(revised),
+      );
       await queryClient.invalidateQueries({ queryKey: ["commercial-items"] });
       await queryClient.invalidateQueries({ queryKey: ["activity-log"] });
       toast.success("Revisi Quotation dibuat", {
@@ -513,6 +530,7 @@ export function CreateSalesOrderDialog(props: SharedProps) {
           unitPrice: foc ? undefined : item.unitPrice,
         })),
       });
+      cacheListRecord(queryClient, ["sales-orders", "all"], created);
       await queryClient.invalidateQueries({ queryKey: ["sales-orders"] });
       await queryClient.invalidateQueries({ queryKey: ["clients"] });
       await queryClient.invalidateQueries({ queryKey: ["activity-log"] });
@@ -774,6 +792,11 @@ export function CreatePrototypeDialog(props: SharedProps) {
         documentDate: v.documentDate,
         items: v.lineItems,
       });
+      cacheListRecord(
+        queryClient,
+        ["commercial-items", "all"],
+        toCommercialItem(created),
+      );
       await queryClient.invalidateQueries({ queryKey: ["commercial-items"] });
       await queryClient.invalidateQueries({ queryKey: ["activity-log"] });
       toast.success("Prototype Request dibuat", {

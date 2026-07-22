@@ -6,7 +6,7 @@ import {
 } from "./commercial-documents";
 import { forecastValue } from "./commercial-stages";
 
-function toCompatibilityItem(
+export function toCommercialItem(
   document: CommercialDocumentWithItems,
 ): CommercialItem {
   const firstItem = document.items[0];
@@ -51,7 +51,7 @@ function toCompatibilityItem(
  * Each result is now one normalized document header, never one line row.
  */
 export async function listCommercialItems(): Promise<CommercialItem[]> {
-  return (await listCommercialDocuments()).map(toCompatibilityItem);
+  return (await listCommercialDocuments()).map(toCommercialItem);
 }
 
 export type CommercialItemPatch = Partial<{
@@ -76,7 +76,7 @@ export async function updateCommercialItem(
   ) {
     throw new Error("UNSUPPORTED_NORMALIZED_DOCUMENT_PATCH");
   }
-  return toCompatibilityItem(
+  return toCommercialItem(
     await updateCommercialDocument(id, {
       rfqNumber: patch.rfqNumber,
       quotationNumber: patch.quotationNumber,

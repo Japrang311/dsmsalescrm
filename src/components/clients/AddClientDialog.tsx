@@ -31,10 +31,12 @@ import {
   listSalesTeamProfiles,
   listOwners,
   createClient,
+  type ClientListRow,
 } from "@/lib/data/clients";
 import { getCurrentActorId, logActivity } from "@/lib/data/activity-log";
 import { CLIENT_STATUSES } from "@/lib/business-rules";
 import { useRole } from "@/context/role-context";
+import { cacheListRecord } from "@/lib/query-cache-updates";
 
 const schema = z.object({
   name: z
@@ -164,14 +166,42 @@ export function AddClientDialog({
           title: `Klien baru: ${created.name}`,
         });
       }
+      const ownerName =
+        (isSales
+          ? owners[values.ownerId]?.name
+          : salesTeam.find((m) => m.id === values.ownerId)?.name) ?? "—";
+      cacheListRecord(queryClient, ["clients", "all"], created);
+      cacheListRecord(queryClient, ["clients", "search"], {
+        id: created.id,
+        name: created.name,
+        ownerId: created.ownerId,
+      });
+      queryClient.setQueriesData<ClientListRow[]>(
+        { queryKey: ["clients", "rows"], exact: true },
+        (rows) =>
+          rows
+            ? [
+                {
+                  client: created,
+                  ownerName,
+                  spendingYtd: created.spendingYtd,
+                  lastFu: created.lastFu,
+                  nextFu: created.nextFu,
+                  ppn: 0,
+                  nonPpn: 0,
+                  activeCommercialCount: 0,
+                  activeCommercialTypes: [],
+                  risk: "Unknown",
+                  advisories: 0,
+                },
+                ...rows.filter((row) => row.client.id !== created.id),
+              ]
+            : rows,
+      );
       await queryClient.invalidateQueries({ queryKey: ["clients"] });
       await queryClient.invalidateQueries({ queryKey: ["activity-log"] });
       toast.success("Klien berhasil ditambahkan", {
-        description: `${values.name} — assigned to ${
-          (isSales
-            ? owners[values.ownerId]?.name
-            : salesTeam.find((m) => m.id === values.ownerId)?.name) ?? "-"
-        }`,
+        description: `${values.name} — assigned to ${ownerName}`,
         action: {
           label: "Buka klien",
           onClick: () => {
