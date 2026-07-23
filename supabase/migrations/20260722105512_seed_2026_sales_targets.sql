@@ -81,7 +81,18 @@ begin
   from (select distinct name from target_values) tv
   join public.profiles p on p.name = tv.name;
 
-  if matched_profiles <> 5 then
+  -- On a fresh local `db reset`, migrations always run before seed.sql, so
+  -- `profiles` is still empty here — that's expected, not an error. Skip
+  -- quietly in that case; supabase/seed.sql already inserts this same 2026
+  -- target data directly (after the profiles insert), so local databases
+  -- still end up correct. Only raise if profiles exist but the names don't
+  -- match (a real data problem, e.g. on remote where profiles pre-date
+  -- this migration).
+  if matched_profiles = 0 then
+    raise notice
+      'Skipping 2026 sales targets seed: no profiles found yet (expected during a fresh local db reset; see supabase/seed.sql).';
+    return;
+  elsif matched_profiles <> 5 then
     raise exception
       'Expected 5 target sales profiles, found %. Check profile names before seeding 2026 targets.',
       matched_profiles;
