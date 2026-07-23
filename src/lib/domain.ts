@@ -33,6 +33,8 @@ export type Client = {
   lastFu?: string;
   nextFu?: string;
   address?: string;
+  province?: string;
+  city?: string;
   industry?: string;
   website?: string;
   notes?: string;

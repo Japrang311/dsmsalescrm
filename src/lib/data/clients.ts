@@ -16,6 +16,8 @@ type ClientRow = {
   last_fu: string | null;
   next_fu: string | null;
   address: string | null;
+  province: string | null;
+  city: string | null;
   industry: string | null;
   website: string | null;
   notes: string | null;
@@ -56,6 +58,8 @@ function toClient(row: ClientRow): Client {
     lastFu: row.last_fu ?? undefined,
     nextFu: row.next_fu ?? undefined,
     address: row.address ?? undefined,
+    province: row.province ?? undefined,
+    city: row.city ?? undefined,
     industry: row.industry ?? undefined,
     website: row.website ?? undefined,
     notes: row.notes ?? undefined,
@@ -127,6 +131,8 @@ export async function updateClientStatus(
 
 export type UpdateClientDetailsInput = {
   address?: string;
+  province?: string;
+  city?: string;
   industry?: string;
   website?: string;
   notes?: string;
@@ -146,6 +152,8 @@ export async function updateClientDetails(
     .from("clients")
     .update({
       address: blank(patch.address),
+      province: blank(patch.province),
+      city: blank(patch.city),
       industry: blank(patch.industry),
       website: blank(patch.website),
       notes: blank(patch.notes),

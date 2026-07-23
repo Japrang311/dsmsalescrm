@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQueryClient } from "@tanstack/react-query";
@@ -17,6 +17,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { RegionCombobox } from "@/components/clients/RegionCombobox";
+import { PROVINCES, REGENCIES } from "@/lib/indonesia-regions";
 import { updateClientDetails } from "@/lib/data/clients";
 import { getCurrentActorId, logActivity } from "@/lib/data/activity-log";
 import type { Client } from "@/lib/domain";
@@ -41,6 +43,8 @@ const contactSchema = z.object({
 
 const schema = z.object({
   address: z.string().trim(),
+  province: z.string().trim(),
+  city: z.string().trim(),
   industry: z.string().trim(),
   website: z.string().trim(),
   notes: z.string().trim(),
@@ -62,6 +66,8 @@ function toFormValues(client: Client): FormValues {
   });
   return {
     address: client.address ?? "",
+    province: client.province ?? "",
+    city: client.city ?? "",
     industry: client.industry ?? "",
     website: client.website ?? "",
     notes: client.notes ?? "",
@@ -93,6 +99,8 @@ export function EditClientInfoDialog({
     handleSubmit,
     formState: { errors, isSubmitting },
     reset,
+    watch,
+    setValue,
   } = form;
 
   // Re-sync the form whenever the dialog is (re)opened for this client —
@@ -101,10 +109,22 @@ export function EditClientInfoDialog({
     if (open) reset(toFormValues(client));
   }, [open, client, reset]);
 
+  // Kota is filtered by the selected Propinsi (cascading, per owner's
+  // choice) — falls back to every kota/kabupaten in Indonesia when no
+  // Propinsi is picked yet, so the field is still usable standalone.
+  const selectedProvince = watch("province");
+  const filteredRegencies = useMemo(() => {
+    const province = PROVINCES.find((p) => p.name === selectedProvince);
+    if (!province) return REGENCIES;
+    return REGENCIES.filter((r) => r.provinceCode === province.code);
+  }, [selectedProvince]);
+
   const onSubmit = handleSubmit(async (values) => {
     try {
       const updated = await updateClientDetails(client.id, {
         address: values.address,
+        province: values.province,
+        city: values.city,
         industry: values.industry,
         website: values.website,
         notes: values.notes,
@@ -115,6 +135,9 @@ export function EditClientInfoDialog({
       if (actorId) {
         const changed: string[] = [];
         if (values.address !== (client.address ?? "")) changed.push("Alamat");
+        if (values.province !== (client.province ?? ""))
+          changed.push("Propinsi");
+        if (values.city !== (client.city ?? "")) changed.push("Kota");
         if (values.industry !== (client.industry ?? ""))
           changed.push("Bidang Usaha");
         if (values.website !== (client.website ?? "")) changed.push("Website");
@@ -173,6 +196,40 @@ export function EditClientInfoDialog({
                 rows={2}
                 placeholder="Jl. Contoh No. 1, Kota"
                 {...register("address")}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <RegionCombobox
+                label="Propinsi"
+                placeholder="Pilih propinsi…"
+                searchPlaceholder="Cari propinsi…"
+                emptyText="Propinsi tidak ditemukan."
+                items={PROVINCES}
+                value={selectedProvince}
+                onChange={(name) => {
+                  setValue("province", name, { shouldDirty: true });
+                  // Clear Kota if it no longer belongs to the newly picked
+                  // Propinsi, so the two fields can't end up mismatched.
+                  const province = PROVINCES.find((p) => p.name === name);
+                  const currentCity = watch("city");
+                  const stillValid = REGENCIES.some(
+                    (r) =>
+                      r.name === currentCity &&
+                      r.provinceCode === province?.code,
+                  );
+                  if (!stillValid) setValue("city", "", { shouldDirty: true });
+                }}
+              />
+              <RegionCombobox
+                label="Kota"
+                placeholder="Pilih kota…"
+                searchPlaceholder="Cari kota…"
+                emptyText="Kota tidak ditemukan."
+                items={filteredRegencies}
+                value={watch("city")}
+                onChange={(name) =>
+                  setValue("city", name, { shouldDirty: true })
+                }
               />
             </div>
             <div className="grid grid-cols-2 gap-3">

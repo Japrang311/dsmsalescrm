@@ -1045,7 +1045,12 @@ function ClientInfoCard({
   onEdit: () => void;
 }) {
   const hasCompanyInfo =
-    client.address || client.industry || client.website || client.notes;
+    client.address ||
+    client.city ||
+    client.province ||
+    client.industry ||
+    client.website ||
+    client.notes;
   const filledContacts = client.contacts.filter(
     (c) => c.name || c.position || c.email || c.phone || c.mobile,
   );
@@ -1065,6 +1070,14 @@ function ClientInfoCard({
         <div className="mt-3 grid grid-cols-1 gap-4 lg:grid-cols-2">
           <div className="grid gap-2 text-xs">
             <InfoRow label="Alamat" value={client.address} />
+            <InfoRow
+              label="Kota / Propinsi"
+              value={
+                client.city && client.province
+                  ? `${client.city}, ${client.province}`
+                  : (client.city ?? client.province)
+              }
+            />
             <InfoRow label="Bidang Usaha" value={client.industry} />
             <InfoRow label="Website" value={client.website} />
             <InfoRow label="Catatan" value={client.notes} />

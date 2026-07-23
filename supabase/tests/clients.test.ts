@@ -109,12 +109,14 @@ describe("clients RLS", () => {
     const { data, error } = await adminClient
       .from("clients")
       .select(
-        "address, industry, website, notes, cp1_name, cp1_position, cp1_email, cp1_phone, cp1_mobile",
+        "address, province, city, industry, website, notes, cp1_name, cp1_position, cp1_email, cp1_phone, cp1_mobile",
       )
       .eq("id", clientIds.own)
       .single();
     if (error) throw error;
     expect(data.address).toBeNull();
+    expect(data.province).toBeNull();
+    expect(data.city).toBeNull();
     expect(data.industry).toBeNull();
     expect(data.website).toBeNull();
     expect(data.notes).toBeNull();
@@ -131,6 +133,8 @@ describe("clients RLS", () => {
       .from("clients")
       .update({
         address: "Jl. Industri No. 1, Surabaya",
+        province: "Jawa Timur",
+        city: "Kota Surabaya",
         industry: "Panel Maker",
         website: "https://example.com",
         notes: "Klien lama, respons cepat",
@@ -142,11 +146,13 @@ describe("clients RLS", () => {
       })
       .eq("id", clientIds.own)
       .select(
-        "address, industry, website, notes, cp1_name, cp1_position, cp1_email, cp1_phone, cp1_mobile",
+        "address, province, city, industry, website, notes, cp1_name, cp1_position, cp1_email, cp1_phone, cp1_mobile",
       )
       .single();
     if (error) throw error;
     expect(data.address).toBe("Jl. Industri No. 1, Surabaya");
+    expect(data.province).toBe("Jawa Timur");
+    expect(data.city).toBe("Kota Surabaya");
     expect(data.industry).toBe("Panel Maker");
     expect(data.website).toBe("https://example.com");
     expect(data.notes).toBe("Klien lama, respons cepat");
