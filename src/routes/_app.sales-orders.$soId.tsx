@@ -40,11 +40,14 @@ import {
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  deleteSalesOrder,
   updateSalesOrderHeader,
   updateSalesOrderItem,
   updateSalesOrderTax,
   type SalesOrderLineItem,
 } from "@/lib/data/sales-orders";
+import { SoftDeleteAction } from "@/components/commercial/SoftDeleteAction";
+import { canManageSoftDeletedRecord } from "@/components/commercial/soft-delete-controls";
 import { searchClients } from "@/lib/data/clients";
 import type { Uom } from "@/lib/data/document-numbering";
 import {
@@ -119,10 +122,19 @@ function SalesOrderDetail() {
   const foc = so.type === "Prototype" && so.prototypeStatus === "FOC";
   const effectiveTax = so.taxType;
   const canEditTax = role === "manager" || role === "super_admin";
-  const canEditOwnSo =
-    role === "manager" ||
-    role === "super_admin" ||
-    (role === "sales" && so.ownerId === currentUserId);
+  const canEditOwnSo = canManageSoftDeletedRecord(
+    role,
+    so.ownerId,
+    currentUserId,
+  );
+
+  async function deleteOrder(id: string) {
+    await deleteSalesOrder(id);
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["sales-orders"] }),
+      queryClient.invalidateQueries({ queryKey: ["activity-log"] }),
+    ]);
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -151,15 +163,25 @@ function SalesOrderDetail() {
           </p>
         </div>
         {canEditOwnSo && (
-          <EditSalesOrderHeaderDialog
-            soId={so.id}
-            soNumber={so.soNumber}
-            clientId={so.clientId}
-            ownerId={so.ownerId}
-            customerPoNumber={so.customerPoNumber}
-            date={so.date}
-            canEditOwner={role === "manager" || role === "super_admin"}
-          />
+          <div className="flex items-center gap-2">
+            <SoftDeleteAction
+              label={`Sales Order ${so.soNumber}`}
+              onDelete={() => deleteOrder(so.id)}
+              onDeleted={() => {
+                toast.success("Sales Order dihapus");
+                navigate({ to: "/sales-orders" });
+              }}
+            />
+            <EditSalesOrderHeaderDialog
+              soId={so.id}
+              soNumber={so.soNumber}
+              clientId={so.clientId}
+              ownerId={so.ownerId}
+              customerPoNumber={so.customerPoNumber}
+              date={so.date}
+              canEditOwner={role === "manager" || role === "super_admin"}
+            />
+          </div>
         )}
       </div>
 

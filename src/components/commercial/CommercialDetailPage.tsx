@@ -44,6 +44,8 @@ import { useRole, ROLE_LABEL } from "@/context/role-context";
 import { NOW } from "@/lib/domain";
 import { StatusBadge } from "@/components/clients/StatusBadges";
 import { LogCommercialFollowUpDialog } from "@/components/commercial/LogCommercialFollowUpDialog";
+import { SoftDeleteAction } from "@/components/commercial/SoftDeleteAction";
+import { canManageSoftDeletedRecord } from "@/components/commercial/soft-delete-controls";
 import { ReviseQuotationDialog } from "@/components/clients/CreateRecordDialogs";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -51,7 +53,10 @@ import {
   updateCommercialItem,
   describeCommercialItemChanges,
 } from "@/lib/data/commercial-items";
-import { updateCommercialDocumentLineItem } from "@/lib/data/commercial-documents";
+import {
+  deleteCommercialDocument,
+  updateCommercialDocumentLineItem,
+} from "@/lib/data/commercial-documents";
 import { documentNumberExample } from "@/lib/data/document-numbering";
 import { listClients, listOwners } from "@/lib/data/clients";
 import { listTasks } from "@/lib/data/tasks";
@@ -119,6 +124,11 @@ export function CommercialDetailPage({
     queryFn: () => listCommercialItemHistory(itemId),
     enabled: authReady,
   });
+  const { data: currentUserId } = useQuery({
+    queryKey: ["current-user-id"],
+    queryFn: getCurrentActorId,
+    enabled: authReady,
+  });
 
   const [stage, setStage] = useState(item?.stage ?? "");
   const [quotationNumber, setQuotationNumber] = useState(
@@ -177,7 +187,7 @@ export function CommercialDetailPage({
   );
   // Sales Orders don't exist yet (Phase 5) — shown as an honest "not
   // available yet" placeholder below rather than mock SALES_ORDERS data.
-  const canEdit = role !== "executive";
+  const canEdit = canManageSoftDeletedRecord(role, item.ownerId, currentUserId);
   const aging = Math.max(0, daysBetween(new Date(item.updatedAt), NOW));
   const isFoc = item.prototypeStatus === "FOC";
   const quotationNumberGuide = documentNumberExample("QUO");
@@ -343,6 +353,18 @@ export function CommercialDetailPage({
     }
   }
 
+  async function deleteItem(id: string) {
+    await deleteCommercialDocument(id);
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["commercial-items"] }),
+      queryClient.invalidateQueries({ queryKey: ["activity-log"] }),
+    ]);
+  }
+
+  const deleteLabel = `${item.type} ${
+    item.quotationNumber ?? item.rfqNumber ?? item.projectName ?? item.id
+  }`;
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
@@ -379,6 +401,16 @@ export function CommercialDetailPage({
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {canEdit && (item.type === "RFQ" || item.type === "Quotation") && (
+            <SoftDeleteAction
+              label={deleteLabel}
+              onDelete={() => deleteItem(item.id)}
+              onDeleted={() => {
+                toast.success(`${item.type} dihapus`);
+                navigate({ to: backHref });
+              }}
+            />
+          )}
           {canEdit && item.type === "Quotation" && item.isCurrentRevision && (
             <ReviseQuotationDialog
               document={item}
