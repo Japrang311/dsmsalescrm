@@ -2,6 +2,7 @@ import type { CommercialItem } from "@/lib/domain";
 import {
   listCommercialDocuments,
   updateCommercialDocument,
+  type CommercialDocumentQuery,
   type CommercialDocumentWithItems,
 } from "./commercial-documents";
 import { forecastValue } from "./commercial-stages";
@@ -50,8 +51,15 @@ export function toCommercialItem(
  * Transitional read facade for routes that still consume CommercialItem.
  * Each result is now one normalized document header, never one line row.
  */
-export async function listCommercialItems(): Promise<CommercialItem[]> {
-  return (await listCommercialDocuments()).map(toCommercialItem);
+type CommercialItemsQueryInput =
+  | CommercialDocumentQuery
+  | { queryKey: readonly unknown[] };
+
+export async function listCommercialItems(
+  input: CommercialItemsQueryInput = {},
+): Promise<CommercialItem[]> {
+  const options = "queryKey" in input ? {} : input;
+  return (await listCommercialDocuments(options)).map(toCommercialItem);
 }
 
 export type CommercialItemPatch = Partial<{

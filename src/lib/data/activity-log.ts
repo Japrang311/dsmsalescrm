@@ -14,6 +14,10 @@ export type ActivityKind =
   | "sales_order_tax_change"
   | "sales_order_header_change"
   | "sales_order_item_change"
+  | "commercial_document_deleted"
+  | "commercial_document_restored"
+  | "sales_order_deleted"
+  | "sales_order_restored"
   | "team_member_created"
   | "team_member_profile_updated"
   | "team_member_role_changed"
@@ -34,6 +38,10 @@ export const ACTIVITY_KIND_LABELS: Record<ActivityKind, string> = {
   sales_order_tax_change: "Koreksi Pajak Sales Order",
   sales_order_header_change: "Perubahan Detail Sales Order",
   sales_order_item_change: "Perubahan Item Sales Order",
+  commercial_document_deleted: "RFQ/Quotation Dihapus",
+  commercial_document_restored: "RFQ/Quotation Dipulihkan",
+  sales_order_deleted: "Sales Order Dihapus",
+  sales_order_restored: "Sales Order Dipulihkan",
   team_member_created: "Anggota Tim Dibuat",
   team_member_profile_updated: "Profil Anggota Tim Diperbarui",
   team_member_role_changed: "Role Anggota Tim Diubah",

@@ -41,6 +41,8 @@ export type CommercialDocumentWithItems = {
   note: string | null;
   createdAt: string;
   updatedAt: string;
+  deletedAt: string | null;
+  deletedBy: string | null;
   totalValue: number;
   items: CommercialDocumentLineItem[];
 };
@@ -76,6 +78,8 @@ type CommercialDocumentRow = {
   note: string | null;
   created_at: string;
   updated_at: string;
+  deleted_at: string | null;
+  deleted_by: string | null;
   commercial_document_items?: LineItemRow[];
   items?: LineItemRow[];
 };
@@ -117,19 +121,63 @@ function toDocument(row: CommercialDocumentRow): CommercialDocumentWithItems {
     note: row.note,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    deletedAt: row.deleted_at,
+    deletedBy: row.deleted_by,
     totalValue: items.reduce((sum, item) => sum + (item.lineTotal ?? 0), 0),
     items,
   };
 }
 
-export async function listCommercialDocuments(): Promise<
+export type CommercialDocumentQuery = {
+  deleted?: boolean;
+};
+
+export async function listCommercialDocuments(
+  options: CommercialDocumentQuery = {},
+): Promise<
   CommercialDocumentWithItems[]
 > {
-  const { data, error } = await supabase
+  let query = supabase
     .from("commercial_documents")
     .select("*, commercial_document_items(*)");
+  query = options.deleted
+    ? query.not("deleted_at", "is", null)
+    : query.is("deleted_at", null);
+  const { data, error } = await query;
   if (error) throw error;
   return ((data ?? []) as CommercialDocumentRow[]).map(toDocument);
+}
+
+export async function getCommercialDocument(
+  id: string,
+  options: CommercialDocumentQuery = {},
+): Promise<CommercialDocumentWithItems | null> {
+  let query = supabase
+    .from("commercial_documents")
+    .select("*, commercial_document_items(*)")
+    .eq("id", id);
+  query = options.deleted
+    ? query.not("deleted_at", "is", null)
+    : query.is("deleted_at", null);
+  const { data, error } = await query.maybeSingle();
+  if (error) throw error;
+  return data ? toDocument(data as CommercialDocumentRow) : null;
+}
+
+export async function deleteCommercialDocument(id: string): Promise<void> {
+  const { error } = await supabase.rpc("set_commercial_document_deleted", {
+    p_document_id: id,
+    p_deleted: true,
+  });
+  if (error) throw error;
+}
+
+export async function restoreCommercialDocument(id: string): Promise<void> {
+  const { error } = await supabase.rpc("set_commercial_document_deleted", {
+    p_document_id: id,
+    p_deleted: false,
+  });
+  if (error) throw error;
 }
 
 export type CreateRfqInput = {

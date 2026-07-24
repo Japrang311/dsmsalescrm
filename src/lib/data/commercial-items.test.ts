@@ -78,6 +78,30 @@ describe("commercial-items compatibility facade", () => {
       qty: 2,
       unitPrice: 5000,
     });
+
+    const { error: deleteError } = await adminClient
+      .from("commercial_documents")
+      .update({
+        deleted_at: "2026-07-24T06:00:00.000Z",
+        deleted_by: fixtures.sales.id,
+      })
+      .eq("id", documentId);
+    if (deleteError) throw deleteError;
+
+    expect(
+      (await listCommercialItems()).some((item) => item.id === documentId),
+    ).toBe(false);
+    expect(
+      (await listCommercialItems({ deleted: true })).some(
+        (item) => item.id === documentId,
+      ),
+    ).toBe(true);
+
+    const { error: restoreError } = await adminClient
+      .from("commercial_documents")
+      .update({ deleted_at: null, deleted_by: null })
+      .eq("id", documentId);
+    if (restoreError) throw restoreError;
     await supabase.auth.signOut();
   });
 

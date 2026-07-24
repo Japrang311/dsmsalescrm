@@ -10,8 +10,11 @@ import {
 import { supabase } from "@/lib/supabase";
 import {
   createQuotation,
+  deleteCommercialDocument,
+  getCommercialDocument,
   listCommercialDocuments,
   reviseQuotation,
+  restoreCommercialDocument,
 } from "./commercial-documents";
 
 let fixtures: RoleFixtureUsers;
@@ -113,6 +116,63 @@ describe("normalized commercial document adapter", () => {
     await supabase.auth.signOut();
   });
 
+  test("soft-deletes and restores an RFQ with active/deleted visibility and audit", async () => {
+    const authClient = await signInAs(fixtures.sales);
+    const session = (await authClient.auth.getSession()).data.session!;
+    await supabase.auth.setSession({
+      access_token: session.access_token,
+      refresh_token: session.refresh_token,
+    });
+
+    await deleteCommercialDocument(legacyDocumentId);
+
+    expect(await getCommercialDocument(legacyDocumentId)).toBeNull();
+    const deleted = await getCommercialDocument(legacyDocumentId, {
+      deleted: true,
+    });
+    expect(deleted?.deletedBy).toBe(fixtures.sales.id);
+    expect(deleted?.deletedAt).not.toBeNull();
+    expect(
+      (await listCommercialDocuments()).some(
+        (entry) => entry.id === legacyDocumentId,
+      ),
+    ).toBe(false);
+    expect(
+      (await listCommercialDocuments({ deleted: true })).some(
+        (entry) => entry.id === legacyDocumentId,
+      ),
+    ).toBe(true);
+
+    await restoreCommercialDocument(legacyDocumentId);
+
+    expect(await getCommercialDocument(legacyDocumentId)).not.toBeNull();
+    expect(
+      await getCommercialDocument(legacyDocumentId, { deleted: true }),
+    ).toBeNull();
+
+    const { data: activity, error } = await adminClient
+      .from("activity_log")
+      .select("kind, commercial_document_id")
+      .eq("commercial_document_id", legacyDocumentId)
+      .in("kind", [
+        "commercial_document_deleted",
+        "commercial_document_restored",
+      ])
+      .order("created_at");
+    if (error) throw error;
+    expect(activity).toEqual([
+      {
+        kind: "commercial_document_deleted",
+        commercial_document_id: legacyDocumentId,
+      },
+      {
+        kind: "commercial_document_restored",
+        commercial_document_id: legacyDocumentId,
+      },
+    ]);
+    await supabase.auth.signOut();
+  });
+
   test("creates and revises Quotation through transactional RPCs", async () => {
     const authClient = await signInAs(fixtures.sales);
     const session = (await authClient.auth.getSession()).data.session!;
@@ -156,6 +216,9 @@ describe("normalized commercial document adapter", () => {
     expect(revised.quotationNumber).toBe(`${created.quotationNumber}_REV.1`);
     expect(revised.supersedesDocumentId).toBe(created.id);
     expect(revised.isCurrentRevision).toBe(true);
+    await expect(deleteCommercialDocument(created.id)).rejects.toThrow(
+      "Quotation ini tidak dapat dihapus karena sudah memiliki revisi yang lebih baru.",
+    );
     await supabase.auth.signOut();
   });
 });
