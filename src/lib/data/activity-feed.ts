@@ -21,6 +21,7 @@ export type FeedEvent = {
     | "order_created"
     | "task_created"
     | "so_tax_change"
+    | "record_lifecycle"
     | "team_admin";
   clientId?: string;
   ownerName?: string;
@@ -144,6 +145,36 @@ export function buildActivityFeed({
               label: "Buka Sales Order",
             }
           : undefined,
+      });
+    } else if (
+      entry.kind === "commercial_document_deleted" ||
+      entry.kind === "commercial_document_restored"
+    ) {
+      events.push({
+        ...base,
+        kind: "record_lifecycle",
+        link:
+          entry.kind === "commercial_document_restored"
+            ? commercialLink(
+                commercialIndex.get(entry.commercialDocumentId ?? ""),
+              )
+            : undefined,
+      });
+    } else if (
+      entry.kind === "sales_order_deleted" ||
+      entry.kind === "sales_order_restored"
+    ) {
+      events.push({
+        ...base,
+        kind: "record_lifecycle",
+        link:
+          entry.kind === "sales_order_restored" && entry.salesOrderId
+            ? {
+                to: "/sales-orders/$soId",
+                params: { soId: entry.salesOrderId },
+                label: "Buka Sales Order",
+              }
+            : undefined,
       });
     } else if (entry.kind.startsWith("team_member_")) {
       events.push({

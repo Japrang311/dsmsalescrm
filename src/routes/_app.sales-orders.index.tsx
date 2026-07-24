@@ -260,57 +260,69 @@ function SalesOrdersRevenuePage() {
         salesTeam={salesTeam}
       />
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <KpiTile
-          label="Total Revenue"
-          value={formatRupiahShort(summary.total)}
-          sub={formatRupiahFull(summary.total)}
-          accent
-        />
-        <KpiTile
-          label="PPN"
-          value={formatRupiahShort(summary.ppn)}
-          sub={`${formatPercent(summary.total ? summary.ppn / summary.total : 0)} dari total`}
-        />
-        <KpiTile
-          label="Non-PPN"
-          value={formatRupiahShort(summary.nonPpn)}
-          sub={`${formatPercent(summary.total ? summary.nonPpn / summary.total : 0)} dari total`}
-        />
-        <KpiTile
-          label="Prototype FOC"
-          value={`${summary.focCount} SO`}
-          sub="Tidak berkontribusi ke revenue"
-        />
-      </div>
+      {deletedMode ? (
+        <Card className="border-amber-200 bg-amber-50/60">
+          <CardContent className="py-3 text-sm text-amber-900">
+            Sales Order terhapus tidak dihitung sebagai revenue dan tidak
+            disertakan dalam laporan atau export aktif.
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <KpiTile
+              label="Total Revenue"
+              value={formatRupiahShort(summary.total)}
+              sub={formatRupiahFull(summary.total)}
+              accent
+            />
+            <KpiTile
+              label="PPN"
+              value={formatRupiahShort(summary.ppn)}
+              sub={`${formatPercent(summary.total ? summary.ppn / summary.total : 0)} dari total`}
+            />
+            <KpiTile
+              label="Non-PPN"
+              value={formatRupiahShort(summary.nonPpn)}
+              sub={`${formatPercent(summary.total ? summary.nonPpn / summary.total : 0)} dari total`}
+            />
+            <KpiTile
+              label="Prototype FOC"
+              value={`${summary.focCount} SO`}
+              sub="Tidak berkontribusi ke revenue"
+            />
+          </div>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-sm font-semibold">
-            <TrendingUp className="h-4 w-4 text-primary" /> Revenue by Source
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-2 sm:grid-cols-3">
-          <SourceRow
-            label="RFQ / New Product"
-            value={summary.rfq}
-            total={summary.total}
-            tone="sky"
-          />
-          <SourceRow
-            label="Existing / Repeat Order"
-            value={summary.existing}
-            total={summary.total}
-            tone="emerald"
-          />
-          <SourceRow
-            label="Prototype Paid"
-            value={summary.protoPaid}
-            total={summary.total}
-            tone="violet"
-          />
-        </CardContent>
-      </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+                <TrendingUp className="h-4 w-4 text-primary" /> Revenue by
+                Source
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-2 sm:grid-cols-3">
+              <SourceRow
+                label="RFQ / New Product"
+                value={summary.rfq}
+                total={summary.total}
+                tone="sky"
+              />
+              <SourceRow
+                label="Existing / Repeat Order"
+                value={summary.existing}
+                total={summary.total}
+                tone="emerald"
+              />
+              <SourceRow
+                label="Prototype Paid"
+                value={summary.protoPaid}
+                total={summary.total}
+                tone="violet"
+              />
+            </CardContent>
+          </Card>
+        </>
+      )}
 
       {rows.length === 0 ? (
         <Card>

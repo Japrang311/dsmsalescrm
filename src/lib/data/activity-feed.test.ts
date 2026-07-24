@@ -65,4 +65,39 @@ describe("buildActivityFeed", () => {
 
     expect(feed.map((event) => event.id)).toEqual(["follow-up-follow-up-1"]);
   });
+
+  test("maps commercial and Sales Order delete/restore audit events", () => {
+    const kinds: ActivityLogEntry["kind"][] = [
+      "commercial_document_deleted",
+      "commercial_document_restored",
+      "sales_order_deleted",
+      "sales_order_restored",
+    ];
+    const activity: ActivityLogEntry[] = kinds.map((kind, index) => ({
+      id: String(index),
+      kind,
+      kindLabel: "Lifecycle",
+      ownerId: "sales-1",
+      actorId: "manager-1",
+      commercialDocumentId: kind.startsWith("commercial") ? "doc-1" : undefined,
+      salesOrderId: kind.startsWith("sales_order") ? "so-1" : undefined,
+      title: kind,
+      createdAt: `2026-07-24T0${index}:00:00.000Z`,
+    }));
+
+    const feed = buildActivityFeed({
+      activity,
+      followUps: [],
+      owners: { "manager-1": { name: "Manager" } },
+      commercialItems: [],
+    });
+
+    expect(feed).toHaveLength(4);
+    expect(feed.map((event) => event.kind)).toEqual([
+      "record_lifecycle",
+      "record_lifecycle",
+      "record_lifecycle",
+      "record_lifecycle",
+    ]);
+  });
 });

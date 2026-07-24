@@ -13,7 +13,10 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { softDeleteConfirmationDescription } from "./soft-delete-controls";
+import {
+  softDeleteConfirmationDescription,
+  softDeleteErrorMessage,
+} from "./soft-delete-controls";
 
 export function SoftDeleteAction({
   label,
@@ -37,11 +40,7 @@ export function SoftDeleteAction({
       setOpen(false);
       onDeleted();
     } catch (caught) {
-      setError(
-        caught instanceof Error
-          ? caught.message
-          : "Penghapusan gagal. Silakan coba lagi.",
-      );
+      setError(softDeleteErrorMessage(caught));
     } finally {
       setPending(false);
     }

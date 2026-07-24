@@ -125,6 +125,11 @@ const KIND_META: Record<
     icon: ShoppingCart,
     color: "bg-rose-100 text-rose-700",
   },
+  record_lifecycle: {
+    label: "Hapus / Pulihkan",
+    icon: ArrowRightLeft,
+    color: "bg-orange-100 text-orange-700",
+  },
   team_admin: {
     label: "Administrasi Tim & Role",
     icon: Users,

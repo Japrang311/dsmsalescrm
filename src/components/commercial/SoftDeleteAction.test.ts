@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   canManageSoftDeletedRecord,
   softDeleteConfirmationDescription,
+  softDeleteErrorMessage,
 } from "./soft-delete-controls";
 
 describe("commercial soft-delete controls", () => {
@@ -26,6 +27,18 @@ describe("commercial soft-delete controls", () => {
   test("confirmation copy explicitly promises restore and no permanent deletion", () => {
     expect(softDeleteConfirmationDescription("Quotation DSM-26QUO-0001")).toBe(
       "Quotation DSM-26QUO-0001 akan disembunyikan dari tampilan dan laporan aktif. Data tidak dihapus permanen dan dapat dipulihkan kembali.",
+    );
+  });
+
+  test("surfaces structured Supabase error messages", () => {
+    expect(
+      softDeleteErrorMessage({
+        code: "23514",
+        message:
+          "Quotation ini tidak dapat dihapus karena sudah memiliki revisi yang lebih baru.",
+      }),
+    ).toBe(
+      "Quotation ini tidak dapat dihapus karena sudah memiliki revisi yang lebih baru.",
     );
   });
 });
