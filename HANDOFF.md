@@ -1,48 +1,42 @@
 # Handoff — DSM Sales Web App V2
 
-Context dump for continuing this work in another tool (Codex). Written 2026-07-18; Phase 11/12 status refreshed 2026-07-19; Phase 11 import-review reconciliation session added 2026-07-19; post-import UX/bugfix session added 2026-07-20; second 2026-07-20 session (pipeline permissions/FK bugfixes) added 2026-07-20; Client Detail/Client List real-data wiring session added 2026-07-21; remote-migration-push + data-restoration session added 2026-07-21; browser-verification + spending_ytd fix + SO edit audit trail session added 2026-07-21; unused-code cleanup + client database (company info/contacts) feature session added 2026-07-22; contact position + Client Detail product/description fixes + commercial item product-name migration reconciliation added 2026-07-22; dynamic per-month sales target UI/calculation update added 2026-07-22; soft-delete design (spec only, not yet implemented) added 2026-07-24.
+Context dump for continuing this work in another tool (Codex). Written 2026-07-18; Phase 11/12 status refreshed 2026-07-19; Phase 11 import-review reconciliation session added 2026-07-19; post-import UX/bugfix session added 2026-07-20; second 2026-07-20 session (pipeline permissions/FK bugfixes) added 2026-07-20; Client Detail/Client List real-data wiring session added 2026-07-21; remote-migration-push + data-restoration session added 2026-07-21; browser-verification + spending_ytd fix + SO edit audit trail session added 2026-07-21; unused-code cleanup + client database (company info/contacts) feature session added 2026-07-22; contact position + Client Detail product/description fixes + commercial item product-name migration reconciliation added 2026-07-22; dynamic per-month sales target UI/calculation update added 2026-07-22; soft-delete implementation and local verification added 2026-07-24.
 
 ## HANDOFF TO CODEX — read this first (2026-07-24)
 
-Owner is switching tools for the next piece of work: **soft delete for RFQ,
-Quotation, and Sales Order.** Only a design spec exists so far — **no code,
-no migration has been written yet.**
+Soft delete for RFQ, Quotation, and Sales Order is **implemented and verified
+locally** on branch `codex/soft-delete-commercial`.
 
-- Spec (bilingual, Indonesian is the version the owner reviewed last):
+- Source documents:
   `docs/superpowers/specs/2026-07-24-soft-delete-rfq-quotation-sales-order-design.md`
-  — committed to git already.
-- Status: design approved by owner. **Not yet turned into an implementation
-  plan or any code.** Next step in the normal workflow here is
-  `writing-plans` → `incremental-implementation`, not started.
-- Feature summary: add `deleted_at`/`deleted_by` to `commercial_documents`
-  (covers both RFQ and Quotation, via the `type` column) and `sales_orders`.
-  Soft delete only — no hard `DELETE`, following the existing "archive over
-  hard delete" pattern used everywhere else in this app. Restorable. Sales
-  can delete/restore only their own records; Manager/Super Admin any record;
-  Executive unchanged (read-only, no access to delete/restore at all).
-- **Critical gotcha already identified in the spec, don't skip it**:
-  `commercial_documents` and `sales_orders` do NOT have table-level UPDATE
-  grants to `authenticated` — only specific columns are grantable (see
-  `20260719041351_harden_normalized_document_permissions.sql`, and gotcha
-  note #4 further down this file — this has bitten the project twice
-  already). The new migration must explicitly
-  `grant update (deleted_at, deleted_by) on table ... to authenticated`
-  for both tables, or RLS will allow the update but Postgres will still
-  reject it for missing column grants.
-- Also block deleting a Quotation revision if a newer revision already
-  supersedes it (`supersedes_document_id`). No such check for RFQ or Sales
-  Order — full rationale (including why an RFQ/Quotation → Sales Order link
-  can't be checked at all, since that relationship doesn't exist in the
-  schema) is in the spec.
-- Uncommitted local changes at handoff time unrelated to this feature (do
-  not lose them, but they are a separate task — see `git status` before
-  starting): `src/lib/data/sales-orders.ts`,
-  `src/routes/_app.sales-orders.$soId.tsx`, and a new untracked migration
-  `supabase/migrations/20260724000000_allow_sales_order_number_edit.sql`.
-  These were mid-edit for a different, unrelated change (making the SO
-  number field editable) when the handoff happened — confirm with the owner
-  whether to finish, discard, or fold that in before or alongside the
-  soft-delete work.
+  and
+  `docs/superpowers/plans/2026-07-24-soft-delete-rfq-quotation-sales-order-implementation.md`.
+- Local migrations add `deleted_at`/`deleted_by`, the four immutable lifecycle
+  event kinds, scoped column grants, and atomic `security invoker` delete/restore
+  RPCs. No browser-accessible hard-delete path was added.
+- Active lists/details exclude deleted rows by default. Operational roles can
+  open a separate deleted-only mode and restore records. Deleted Sales Orders
+  are explicitly excluded from active revenue, reports, KPIs, and export.
+- Authorization was verified in the browser: Sales can manage only their own
+  records; Manager and Super Admin can act company-wide; Executive has no
+  delete/restore controls. Deleting a superseded Quotation revision is blocked.
+- Delete/restore writes immutable audit rows. Activity Log now renders all four
+  lifecycle kinds; restored records link back to their detail pages.
+- Browser QA also found and fixed two issues: structured Supabase errors now
+  show their real message, and deleted Sales Orders no longer display active
+  revenue KPI cards.
+- Browser fixture cleanup is complete: the exact QA audit rows, documents,
+  Sales Order, client, profile, and local Auth user were removed and rechecked
+  as absent.
+- Final local gate: `346 pass / 0 fail / 1798 assertions`,
+  `bunx tsc --noEmit` passed, scoped source lint completed with `0 errors`
+  and 12 pre-existing warnings, and `bun run build` passed.
+- Feature commits after the original design:
+  `ba4c487`, `e5c6873`, `8444fd6`, `3f7602c`, `4c79f41`, `2c8e1ae`,
+  `e77c131`, and `92ee99e`.
+- **Deployment state:** commits and migrations are local only. Nothing from
+  this feature has been pushed, and no linked/remote Supabase migration has
+  been applied. Obtain explicit owner approval before either action.
 
 ## Project basics
 
@@ -58,7 +52,7 @@ no migration has been written yet.**
 - Remote Supabase target in prior sessions was `qhtfixgbcpcitokeryxb` (DSM Sales
   Web App V2). Never run remote schema/data mutations without an explicit owner
   approval for that target. During this handoff refresh, `bunx supabase migration
-  list --linked` confirmed local and remote migrations matched through
+list --linked` confirmed local and remote migrations matched through
   `20260722080000`.
 - The user (Aditya) is not a programmer — explain things in plain terms, avoid silently making irreversible calls (schema changes, deleting data).
 
@@ -374,7 +368,7 @@ via screenshots. Three commits landed: `77d637a`, `aad642f`, `48c1cd4`.
    views — now redundant, removed to avoid double-counting.
 5. **Fixed the Pipeline card drawer failing on every single save** —
    `"Gagal menyimpan perubahan" / permission denied for table
-   commercial_documents`. Root cause: `PipelineCardDrawer.tsx`'s
+commercial_documents`. Root cause: `PipelineCardDrawer.tsx`'s
    `saveChanges()` always sent `ownerId` in the update patch, even when
    unchanged — but a Phase 11 hardening migration
    (`20260719041351_harden_normalized_document_permissions.sql`)
@@ -388,8 +382,8 @@ via screenshots. Three commits landed: `77d637a`, `aad642f`, `48c1cd4`.
    this isn't a UI bug, it's DB-enforced by design).
 6. **Fixed a systemic `commercial_item_id`/`commercial_document_id` FK
    mismatch** — `"Gagal memindahkan pipeline card" / insert or update on
-   table "activity_log" violates foreign key constraint
-   "activity_log_commercial_item_id_fkey"`. The legacy `commercial_item_id`
+table "activity_log" violates foreign key constraint
+"activity_log_commercial_item_id_fkey"`. The legacy `commercial_item_id`
    column on `activity_log`, `tasks`, and `follow_up_logs` now only
    references a **frozen historical snapshot table**
    (`private.legacy_commercial_items_20260718`) created during Phase 11
@@ -407,7 +401,7 @@ via screenshots. Three commits landed: `77d637a`, `aad642f`, `48c1cd4`.
    — all now pass `commercialDocumentId:` instead. Also fixed
    `LogCommercialFollowUpDialog.tsx`'s "Perbarui Next follow-up" checkbox,
    which called the same broken `updateCommercialItem(..., {
-   nextActionDate })` pattern already fixed in Pipeline earlier this
+nextActionDate })` pattern already fixed in Pipeline earlier this
    session — it now creates a follow-up task instead (same as the adjacent
    "Buat task follow-up berikutnya" checkbox), without double-creating a
    task if both boxes are checked.
@@ -436,7 +430,7 @@ work, left alone). **Not pushed to `origin`.**
 - Given how many call sites shared the exact same
   `commercial_item_id`/`commercial_document_id` bug (item 6), it's worth
   grepping for `commercialItemId:` as a literal object-key pattern
-  periodically — any *new* code that copies an older call site risks
+  periodically — any _new_ code that copies an older call site risks
   reintroducing it. There is no lint rule or type-level guard against it;
   the two fields are both optional strings on the same input type, so
   TypeScript can't catch the mix-up.
@@ -451,6 +445,7 @@ Starting point: all 41 tasks in `tasks/todo.md` were complete (Phases 0–12), b
 ### Changes committed as `2c1c196`:
 
 **Client Detail page (`_app.clients.$clientId.tsx`):**
+
 - All 7 MetricCards (Total Revenue, PPN, Non-PPN, RFQ Pipeline, Commit, Prototype Paid, Prototype FOC) wired to real data via `clientRevenueMetrics()` / `clientCommercialMetrics()` selectors in `dashboard-selectors.ts`
 - "Waiting PO" card renamed to "Commit" — shows all commercial items at Commit stage (not just Quotation type)
 - 6 tabs replaced hardcoded `NotYetAvailable` placeholders:
@@ -463,11 +458,13 @@ Starting point: all 41 tasks in `tasks/todo.md` were complete (Phases 0–12), b
 - Dead `NotYetAvailable` component removed
 
 **Client List page (`_app.clients.index.tsx`):**
+
 - PPN/Non-PPN columns computed from real `sales_orders` data via `enrichedRows` + `revenueByTax()`
 - Saved Views dropdown wired to actual filters: "Butuh Perhatian" sets `overdueOnly`, "Prospect Aktif" sets `statuses=["Prospect"]`, "Semua Semua" calls `resetFilters()`
 - Dead spending-range code block removed (incomplete refactor from earlier)
 
 **Owner-mismatch fix (PT. PUTRA ARGA BINANGIN not in client picker):**
+
 - Root cause: the `client_search_index` view only exposed `id` + `name`. `useClientResolution()` used `listClients()` (RLS-scoped by `clients_select`), so clients owned by another sales rep didn't appear in Create dialog pickers
 - Scale check: the SO edit support migration already documented "21 of 189 imported Sales Orders and 74 of 400 commercial documents have this same owner mismatch"
 - New migration `20260721000000_expand_client_search_index.sql` adds `owner_id` to the view
@@ -475,9 +472,11 @@ Starting point: all 41 tasks in `tasks/todo.md` were complete (Phases 0–12), b
 - `useClientResolution()` in `ClientPicker.tsx` switched from `listClients()` to `searchClients()` — the picker now shows ALL clients regardless of owner
 
 **CreateRecordDialogs:**
+
 - Added `["clients"]` query invalidation after SO creation so `spendingYtd` stays fresh
 
 **Code review findings fixed (same commit):**
+
 - WR-01: Removed dead spending-range code block in `_app.clients.index.tsx:135-141`
 - WR-02: Saved Views dropdown wired to actual filters
 - WR-03: Added `["clients"]` query invalidation in `CreateRecordDialogs.tsx`
@@ -537,7 +536,7 @@ Starting point: commit `1ecb133` (client owner reassign/handover feature, 4 iter
 While locally verifying the SO edit Activity Log wiring end-to-end (couldn't test on production — auto-mode correctly blocks form submissions/clicks against live business data), found that **Sales Order item editing was completely broken on production**, unrelated to this session's other work:
 
 - Root cause: `sales_order_items.description` had column-level `UPDATE` grant to `authenticated` since `20260719041351`. Earlier the same day, `20260721000001_merge_description_into_product_name.sql` dropped the column, and `20260721000002_add_description_to_sales_order_items.sql` re-added it — but Postgres column privileges don't survive `DROP COLUMN`/`ADD COLUMN`, and the re-add never restored the grant.
-- Impact: `updateSalesOrderItem()` always includes `description` in its `UPDATE` SET list, and Postgres denies the *entire* statement if privilege is missing on *any* column in the SET list — so every SO item edit failed with "permission denied for table sales_order_items" for every role.
+- Impact: `updateSalesOrderItem()` always includes `description` in its `UPDATE` SET list, and Postgres denies the _entire_ statement if privilege is missing on _any_ column in the SET list — so every SO item edit failed with "permission denied for table sales_order_items" for every role.
 - Fix: one-line migration `20260721110000_fix_sales_order_items_description_grant.sql` (`grant update (description) on table public.sales_order_items to authenticated;`).
 - Verified by seeding a throwaway test SO directly in local Postgres (local dev server's `.env.local` currently points `VITE_SUPABASE_URL` at the **production** REST API, not local — see note below — so browser-driven local testing wasn't possible; a standalone script signing in as the `leli@local.dsm.test` seed account exercised the exact same mutation + `logActivity()` calls the UI makes). Confirmed both the item update and the new `sales_order_item_change` log row succeed only after the grant fix; failed with the same "permission denied" error before it. Test fixture data deleted afterward.
 - Post-push production spot-check (after the owner ran `bunx supabase db push --linked` themselves, since the agent is blocked from running it): Client List and Client Detail both show correct non-zero Spending YTD matching PPN totals; latest Vercel deployment confirmed `Ready`.
@@ -566,6 +565,7 @@ Owner request (Indonesian): turn the existing 69 clients into a real client data
 **Design**: flat nullable columns on `clients` (not a child table — exactly 3 fixed UI slots, so flat columns let `select("*")`/RLS/grants absorb them with zero policy changes). New columns: `address`, `industry`, `website`, `notes`, `cp1_name/email/phone/mobile`, `cp2_*`, `cp3_*` (16 total). New `activity_kind` value `client_details_change`, logged once per save with a coarse "what changed" summary (field-group names only, never phone/email values in the log).
 
 **Migrations**:
+
 - `supabase/migrations/20260722060000_add_client_company_details.sql` — the 16 columns AND a column-level `grant update (...) on table public.clients to authenticated`
 - `supabase/migrations/20260722060001_add_client_details_activity_kind.sql` — the enum value, own transaction boundary (Postgres rule)
 

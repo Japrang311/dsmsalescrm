@@ -1,7 +1,7 @@
 # Soft Delete untuk RFQ, Quotation, dan Sales Order
 
 Tanggal: 2026-07-24
-Status: Disetujui
+Status: Diimplementasikan dan diverifikasi secara lokal
 
 ## Masalah
 
