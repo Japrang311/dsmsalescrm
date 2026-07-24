@@ -78,6 +78,24 @@ type SalesOrderRow = {
   items?: SalesOrderItemRow[];
 };
 
+const salesOrderNumberCollator = new Intl.Collator("en", {
+  numeric: true,
+  sensitivity: "base",
+});
+
+export function compareSalesOrdersByNewestNumber(
+  a: Pick<SalesOrderDocument, "date" | "soNumber" | "createdAt">,
+  b: Pick<SalesOrderDocument, "date" | "soNumber" | "createdAt">,
+): number {
+  const dateOrder = b.date.localeCompare(a.date);
+  if (dateOrder !== 0) return dateOrder;
+
+  const numberOrder = salesOrderNumberCollator.compare(b.soNumber, a.soNumber);
+  if (numberOrder !== 0) return numberOrder;
+
+  return b.createdAt.localeCompare(a.createdAt);
+}
+
 function toLineItem(row: SalesOrderItemRow): SalesOrderLineItem {
   return {
     id: row.id,
@@ -144,7 +162,9 @@ export async function listSalesOrders(
     : query.is("deleted_at", null);
   const { data, error } = await query;
   if (error) throw error;
-  return ((data ?? []) as SalesOrderRow[]).map(toSalesOrder);
+  return ((data ?? []) as SalesOrderRow[])
+    .map(toSalesOrder)
+    .sort(compareSalesOrdersByNewestNumber);
 }
 
 export async function getSalesOrder(

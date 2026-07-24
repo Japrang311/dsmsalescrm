@@ -46,7 +46,11 @@ import { filterSalesOrders } from "@/lib/report-selectors";
 import { ROLE_LABEL } from "@/context/role-context";
 import { useDashboardData } from "@/hooks/use-dashboard-data";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { listSalesOrders, restoreSalesOrder } from "@/lib/data/sales-orders";
+import {
+  compareSalesOrdersByNewestNumber,
+  listSalesOrders,
+  restoreSalesOrder,
+} from "@/lib/data/sales-orders";
 import {
   canShowDeletedMode,
   salesOrdersQueryKey,
@@ -101,8 +105,8 @@ function SalesOrdersRevenuePage() {
 
   const rows = useMemo(
     () =>
-      filterSalesOrders(sourceOrders, filters).sort((a, b) =>
-        b.date.localeCompare(a.date),
+      filterSalesOrders(sourceOrders, filters).sort(
+        compareSalesOrdersByNewestNumber,
       ),
     [sourceOrders, filters],
   );
