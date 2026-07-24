@@ -1,5 +1,7 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
+  Check,
+  ChevronsUpDown,
   Filter,
   User2,
   Building2,
@@ -14,12 +16,28 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   DateRangePicker,
   type PeriodRange,
 } from "@/components/dashboard/DateRangePicker";
 import type { Client } from "@/lib/domain";
 import type { Role } from "@/lib/domain";
+import { cn } from "@/lib/utils";
+import { filterClientOptions } from "@/components/reports/client-filter";
 
 export type ReportFilters = {
   range: PeriodRange;
@@ -58,10 +76,18 @@ export function ReportFilterBar({
   clients,
   salesTeam,
 }: Props) {
+  const [clientPickerOpen, setClientPickerOpen] = useState(false);
+  const [clientQuery, setClientQuery] = useState("");
   const clientOptions = useMemo(
-    () => clients.slice().sort((a, b) => a.name.localeCompare(b.name)),
-    [clients],
+    () => filterClientOptions(clients, clientQuery),
+    [clients, clientQuery],
   );
+  const selectedClient = clients.find((client) => client.id === value.clientId);
+
+  const setClientPickerVisibility = (open: boolean) => {
+    setClientPickerOpen(open);
+    if (!open) setClientQuery("");
+  };
 
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-card p-2.5">
@@ -95,23 +121,82 @@ export function ReportFilterBar({
       )}
 
       {!hideClient && (
-        <Select
-          value={value.clientId}
-          onValueChange={(v) => onChange({ clientId: v })}
+        <Popover
+          open={clientPickerOpen}
+          onOpenChange={setClientPickerVisibility}
         >
-          <SelectTrigger className="h-8 w-[220px] text-xs">
-            <Building2 className="h-3.5 w-3.5" />
-            <SelectValue placeholder="Klien" />
-          </SelectTrigger>
-          <SelectContent className="max-h-72">
-            <SelectItem value="all">Semua klien</SelectItem>
-            {clientOptions.map((c) => (
-              <SelectItem key={c.id} value={c.id}>
-                {c.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          <PopoverTrigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              role="combobox"
+              aria-expanded={clientPickerOpen}
+              aria-label="Filter klien"
+              className="h-8 w-[220px] justify-between px-3 text-xs font-normal"
+            >
+              <span className="flex min-w-0 items-center gap-2">
+                <Building2 className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">
+                  {selectedClient?.name ?? "Semua klien"}
+                </span>
+              </span>
+              <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-(--radix-popover-trigger-width) p-0">
+            <Command shouldFilter={false}>
+              <CommandInput
+                placeholder="Cari nama klien…"
+                value={clientQuery}
+                onValueChange={setClientQuery}
+              />
+              <CommandList className="max-h-72">
+                <CommandEmpty>Klien tidak ditemukan.</CommandEmpty>
+                <CommandGroup>
+                  {!clientQuery.trim() && (
+                    <CommandItem
+                      value="Semua klien"
+                      onSelect={() => {
+                        onChange({ clientId: "all" });
+                        setClientPickerVisibility(false);
+                      }}
+                    >
+                      <Check
+                        className={cn(
+                          "mr-2 h-4 w-4",
+                          value.clientId === "all"
+                            ? "opacity-100"
+                            : "opacity-0",
+                        )}
+                      />
+                      Semua klien
+                    </CommandItem>
+                  )}
+                  {clientOptions.map((client) => (
+                    <CommandItem
+                      key={client.id}
+                      value={client.name}
+                      onSelect={() => {
+                        onChange({ clientId: client.id });
+                        setClientPickerVisibility(false);
+                      }}
+                    >
+                      <Check
+                        className={cn(
+                          "mr-2 h-4 w-4",
+                          client.id === value.clientId
+                            ? "opacity-100"
+                            : "opacity-0",
+                        )}
+                      />
+                      {client.name}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
       )}
 
       <Select
