@@ -71,8 +71,8 @@ export function ReassignOwnerDialog({
           <AlertDialogTitle>Reassign / Handover Klien</AlertDialogTitle>
           <AlertDialogDescription>
             Pindahkan{" "}
-            <span className="font-medium text-foreground">{clientName}</span>{" "}
-            ke sales lain. Perubahan ini akan tercatat pada audit trail.
+            <span className="font-medium text-foreground">{clientName}</span> ke
+            sales lain. Perubahan ini akan tercatat pada audit trail.
           </AlertDialogDescription>
         </AlertDialogHeader>
 
