@@ -1,11 +1,11 @@
 # Handoff — DSM Sales Web App V2
 
-Context dump for continuing this work in another tool (Codex). Written 2026-07-18; Phase 11/12 status refreshed 2026-07-19; Phase 11 import-review reconciliation session added 2026-07-19; post-import UX/bugfix session added 2026-07-20; second 2026-07-20 session (pipeline permissions/FK bugfixes) added 2026-07-20; Client Detail/Client List real-data wiring session added 2026-07-21; remote-migration-push + data-restoration session added 2026-07-21; browser-verification + spending_ytd fix + SO edit audit trail session added 2026-07-21; unused-code cleanup + client database (company info/contacts) feature session added 2026-07-22; contact position + Client Detail product/description fixes + commercial item product-name migration reconciliation added 2026-07-22; dynamic per-month sales target UI/calculation update added 2026-07-22; soft-delete implementation and local verification added 2026-07-24.
+Context dump for continuing this work in another tool (Codex). Written 2026-07-18; Phase 11/12 status refreshed 2026-07-19; Phase 11 import-review reconciliation session added 2026-07-19; post-import UX/bugfix session added 2026-07-20; second 2026-07-20 session (pipeline permissions/FK bugfixes) added 2026-07-20; Client Detail/Client List real-data wiring session added 2026-07-21; remote-migration-push + data-restoration session added 2026-07-21; browser-verification + spending_ytd fix + SO edit audit trail session added 2026-07-21; unused-code cleanup + client database (company info/contacts) feature session added 2026-07-22; contact position + Client Detail product/description fixes + commercial item product-name migration reconciliation added 2026-07-22; dynamic per-month sales target UI/calculation update added 2026-07-22; soft-delete implementation, remote Supabase apply, and main/live push closeout added 2026-07-24.
 
 ## HANDOFF TO CODEX — read this first (2026-07-24)
 
-Soft delete for RFQ, Quotation, and Sales Order is **implemented and verified
-locally** on branch `codex/soft-delete-commercial`.
+Soft delete for RFQ, Quotation, and Sales Order is **implemented, verified,
+pushed, and remote-applied**.
 
 - Source documents:
   `docs/superpowers/specs/2026-07-24-soft-delete-rfq-quotation-sales-order-design.md`
@@ -33,10 +33,26 @@ locally** on branch `codex/soft-delete-commercial`.
   and 12 pre-existing warnings, and `bun run build` passed.
 - Feature commits after the original design:
   `ba4c487`, `e5c6873`, `8444fd6`, `3f7602c`, `4c79f41`, `2c8e1ae`,
-  `e77c131`, and `92ee99e`.
-- **Deployment state:** commits and migrations are local only. Nothing from
-  this feature has been pushed, and no linked/remote Supabase migration has
-  been applied. Obtain explicit owner approval before either action.
+  `e77c131`, `92ee99e`, and `007b7c5`.
+- **Git deployment state:** branch `codex/soft-delete-commercial` was pushed to
+  `origin`, then `main` was fast-forwarded to `007b7c5` and pushed to
+  `origin/main`. Production URL `https://dsmsalescrm.vercel.app` responded with
+  HTTP 200 after redirect to `/dashboard` after the push. This confirms the
+  live site is reachable; it does not prove Vercel has completed every build
+  step because dashboard deployment status was not available in this session.
+- **Supabase deployment state:** with explicit owner approval, `supabase db push
+  --linked` was applied to project `qhtfixgbcpcitokeryxb` (DSM Sales Web App
+  V2). Applied migrations:
+  `20260724094444_fix_normalized_import_supersedes_column.sql`,
+  `20260724094906_add_commercial_soft_delete_activity_kinds.sql`,
+  `20260724094907_add_commercial_soft_delete_columns.sql`,
+  `20260724095232_add_atomic_commercial_soft_delete.sql`, and
+  `20260724095521_add_atomic_sales_order_soft_delete.sql`.
+  Post-apply dry-run reported: `Remote database is up to date`.
+- **Operational caveat:** the Supabase CLI printed a non-fatal warning after
+  apply: caching the pg-delta catalog failed because a temporary certificate
+  file was missing. Remote migration history and dry-run verification both
+  showed the migrations were applied.
 
 ## Project basics
 
@@ -44,16 +60,15 @@ locally** on branch `codex/soft-delete-commercial`.
 - Package manager: **bun**. Key commands: `bun run dev`, `bun run test` (needs local Supabase running), `bun run lint`, `bun run build`, `bunx tsc --noEmit`.
 - Local Supabase: `bunx supabase start` / `bunx supabase db reset` (rebuilds from `supabase/migrations/*.sql` + `supabase/seed.sql`) / `bunx supabase stop`.
 - Git is present on branch `main`, connected to `github.com/Japrang311/dsmsalescrm`
-  (the Lovable-connected remote). Working tree was clean and `main` matched
-  `origin/main` at commit `816a7fe` on 2026-07-22 during this handoff refresh
-  (`git status --short --branch` showed `## main...origin/main`). Do not trust
-  older "local-only / pending push" notes below without rechecking git first.
+  (the Lovable-connected remote). On 2026-07-24, `main` and `origin/main`
+  matched at `007b7c5` before the session-handoff documentation commit. Do not
+  trust older "local-only / pending push" notes below without rechecking git first.
   Still never rewrite history, rebase, amend, squash, or force-push on this repo.
-- Remote Supabase target in prior sessions was `qhtfixgbcpcitokeryxb` (DSM Sales
-  Web App V2). Never run remote schema/data mutations without an explicit owner
-  approval for that target. During this handoff refresh, `bunx supabase migration
-list --linked` confirmed local and remote migrations matched through
-  `20260722080000`.
+- Remote Supabase target is `qhtfixgbcpcitokeryxb` (DSM Sales Web App V2).
+  Never run future remote schema/data mutations without fresh explicit owner
+  approval for that exact target. On 2026-07-24, `supabase db push --linked
+  --dry-run` reported `Remote database is up to date` after the soft-delete
+  migrations were applied.
 - The user (Aditya) is not a programmer — explain things in plain terms, avoid silently making irreversible calls (schema changes, deleting data).
 
 ## Latest accepted direction — supersedes older deferred notes below
