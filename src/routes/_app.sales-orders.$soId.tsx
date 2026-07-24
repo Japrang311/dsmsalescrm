@@ -324,10 +324,10 @@ function SalesOrderDetail() {
 }
 
 // ---------------------------------------------------------------------------
-// Header edit dialog — Klien, Customer PO, Tanggal, Sales Owner. Klien uses
-// searchClients() (public.client_search_index), not the RLS-scoped clients
-// list, so a sales user correcting their own SO can find a client even when
-// it's registered to a different owner — see
+// Header edit dialog — Nomor SO, Klien, Customer PO, Tanggal, Sales Owner.
+// Klien uses searchClients() (public.client_search_index), not the RLS-scoped
+// clients list, so a sales user correcting their own SO can find a client
+// even when it's registered to a different owner — see
 // supabase/migrations/20260720000000_add_sales_order_edit_support.sql.
 // ---------------------------------------------------------------------------
 
@@ -353,6 +353,7 @@ function EditSalesOrderHeaderDialog({
   const [open, setOpen] = useState(false);
   const [draftClientId, setDraftClientId] = useState(clientId);
   const [draftOwnerId, setDraftOwnerId] = useState(ownerId);
+  const [draftSoNumber, setDraftSoNumber] = useState(soNumber);
   const [draftPo, setDraftPo] = useState(customerPoNumber ?? "");
   const [draftDate, setDraftDate] = useState(date);
   const [saving, setSaving] = useState(false);
@@ -370,16 +371,24 @@ function EditSalesOrderHeaderDialog({
   function openDialog() {
     setDraftClientId(clientId);
     setDraftOwnerId(ownerId);
+    setDraftSoNumber(soNumber);
     setDraftPo(customerPoNumber ?? "");
     setDraftDate(date);
     setOpen(true);
   }
 
   async function save() {
+    const nextSoNumber = draftSoNumber.trim();
+    if (!nextSoNumber) {
+      toast.error("Nomor SO wajib diisi");
+      return;
+    }
+
     setSaving(true);
     try {
       const newOwnerId = canEditOwner ? draftOwnerId : ownerId;
       await updateSalesOrderHeader(soId, {
+        soNumber: nextSoNumber,
         clientId: draftClientId,
         ownerId: newOwnerId,
         customerPoNumber: draftPo,
@@ -389,6 +398,8 @@ function EditSalesOrderHeaderDialog({
       const actorId = await getCurrentActorId();
       if (actorId) {
         const changes: string[] = [];
+        if (nextSoNumber !== soNumber)
+          changes.push(`Nomor SO ${soNumber} → ${nextSoNumber}`);
         if (draftClientId !== clientId) changes.push("Klien diubah");
         if (newOwnerId !== ownerId) changes.push("Sales Owner diubah");
         if (draftPo !== (customerPoNumber ?? ""))
@@ -400,7 +411,7 @@ function EditSalesOrderHeaderDialog({
           actorId,
           clientId: draftClientId,
           salesOrderId: soId,
-          title: `Detail SO ${soNumber} diperbarui`,
+          title: `Detail SO ${nextSoNumber} diperbarui`,
           detail: changes.length ? changes.join("; ") : undefined,
         });
       }
@@ -434,11 +445,20 @@ function EditSalesOrderHeaderDialog({
           <DialogHeader>
             <DialogTitle>Edit Sales Order</DialogTitle>
             <DialogDescription>
-              Perbaiki data Klien, Customer PO, Tanggal, atau Sales Owner untuk
-              SO ini.
+              Perbaiki Nomor SO, Klien, Customer PO, Tanggal, atau Sales Owner
+              untuk SO ini.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-3">
+            <div>
+              <Label>Nomor SO</Label>
+              <Input
+                value={draftSoNumber}
+                onChange={(e) => setDraftSoNumber(e.target.value)}
+                placeholder="Nomor Sales Order"
+                className="font-mono"
+              />
+            </div>
             <ClientPickerField
               clients={searchableClients}
               value={draftClientId}

@@ -73,8 +73,12 @@ export function buildSalesOrderSchema(isHariffClient: boolean) {
         "Prototype Paid",
         "Prototype FOC",
       ]),
-      numberMode: z.enum(["Auto", "Hariff Backdate"]),
-      manualSoNumber: z.string().trim().max(80).optional(),
+      numberMode: z.enum(["Manual", "Hariff Backdate"]),
+      manualSoNumber: z
+        .string()
+        .trim()
+        .min(1, "Nomor SO wajib diisi manual")
+        .max(80),
       backdateReason: z.string().trim().max(500).optional(),
       lineItems: z.array(lineItemSchema).min(1, "Minimal 1 item"),
     })
@@ -148,13 +152,6 @@ export function buildSalesOrderSchema(isHariffClient: boolean) {
             message: "Mode Backdate hanya untuk client HARIFF",
           });
         }
-        if (!value.manualSoNumber) {
-          context.addIssue({
-            code: "custom",
-            path: ["manualSoNumber"],
-            message: "Nomor SO manual wajib diisi",
-          });
-        }
         if (!value.backdateReason) {
           context.addIssue({
             code: "custom",
@@ -162,11 +159,11 @@ export function buildSalesOrderSchema(isHariffClient: boolean) {
             message: "Alasan Backdate wajib diisi",
           });
         }
-      } else if (value.manualSoNumber || value.backdateReason) {
+      } else if (value.backdateReason) {
         context.addIssue({
           code: "custom",
-          path: ["numberMode"],
-          message: "Nomor manual hanya untuk mode Backdate",
+          path: ["backdateReason"],
+          message: "Alasan Backdate hanya untuk mode Hariff Backdate",
         });
       }
     });

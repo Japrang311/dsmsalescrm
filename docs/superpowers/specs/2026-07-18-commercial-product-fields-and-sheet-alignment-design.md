@@ -1,5 +1,10 @@
 # Commercial Documents, Product Fields, and Automatic Numbering Design
 
+> **Update 2026-07-24:** Bagian penomoran otomatis Sales Order dalam dokumen
+> historis ini telah digantikan oleh input nomor SO manual dengan panduan
+> format. Penomoran Quotation tetap otomatis. Data SO lama bermode `Auto`
+> tidak diubah.
+
 Date: 2026-07-18
 Status: Accepted; documentation synchronization authorized 2026-07-18
 

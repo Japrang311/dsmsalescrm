@@ -67,8 +67,8 @@ describe("normalized Sales Order adapter", () => {
       type: "Regular",
       taxType: "PPN",
       source: "Existing / Repeat Order",
-      numberMode: "Auto",
-      manualSoNumber: "",
+      numberMode: "Manual",
+      manualSoNumber: "DSM-96SO901",
       backdateReason: "",
       items: [
         {
@@ -87,7 +87,7 @@ describe("normalized Sales Order adapter", () => {
       ],
     });
 
-    expect(created.soNumber).toMatch(/^DSM-96SO\d{3}$/);
+    expect(created.soNumber).toBe("DSM-96SO901");
     expect(created.customerPoNumber).toBe("PO-ADAPTER-PAID");
     expect(created.date).toBe("2096-02-18");
     expect(created.totalValue).toBe(25_000);
@@ -110,6 +110,8 @@ describe("normalized Sales Order adapter", () => {
       type: "Prototype",
       prototypeStatus: "FOC",
       source: "Prototype FOC",
+      numberMode: "Manual",
+      manualSoNumber: "DSM-96PROTY901",
       items: [
         {
           productName: "Prototype bracket",
@@ -120,7 +122,7 @@ describe("normalized Sales Order adapter", () => {
       ],
     });
 
-    expect(created.soNumber).toMatch(/^DSM-96PROTY\d{3}$/);
+    expect(created.soNumber).toBe("DSM-96PROTY901");
     expect(created.totalValue).toBeNull();
     expect(created.value).toBeNull();
     expect(created.items[0]).toMatchObject({

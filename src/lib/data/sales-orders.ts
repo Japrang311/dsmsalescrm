@@ -31,7 +31,7 @@ export type SalesOrderDocument = {
   taxType?: TaxType;
   prototypeStatus?: PrototypeStatus;
   source: RevenueSource | "Prototype FOC";
-  numberMode: "Auto" | "Imported" | "Hariff Backdate";
+  numberMode: "Auto" | "Manual" | "Imported" | "Hariff Backdate";
   backdateReason?: string;
   totalValue: number | null;
   value: number | null;
@@ -134,8 +134,8 @@ export type CreateSalesOrderInput = {
   taxType?: TaxType;
   prototypeStatus?: PrototypeStatus;
   source: RevenueSource | "Prototype FOC";
-  numberMode?: "Auto" | "Hariff Backdate";
-  manualSoNumber?: string;
+  numberMode?: "Manual" | "Hariff Backdate";
+  manualSoNumber: string;
   backdateReason?: string;
   items: LineItemInput[];
 };
@@ -153,7 +153,7 @@ export async function createSalesOrder(
     p_tax_type: input.taxType ?? null,
     p_prototype_status: input.prototypeStatus ?? null,
     p_source: input.source,
-    p_number_mode: input.numberMode ?? "Auto",
+    p_number_mode: input.numberMode ?? "Manual",
     p_manual_so_number: manualSoNumber || null,
     p_backdate_reason: backdateReason || null,
     p_items: input.items,
@@ -177,6 +177,7 @@ export async function updateSalesOrderTax(
 }
 
 export type UpdateSalesOrderHeaderInput = Partial<{
+  soNumber: string;
   clientId: string;
   ownerId: string;
   customerPoNumber: string;
@@ -193,6 +194,7 @@ export async function updateSalesOrderHeader(
   patch: UpdateSalesOrderHeaderInput,
 ): Promise<SalesOrderDocument> {
   const row: Record<string, string> = {};
+  if (patch.soNumber !== undefined) row.so_number = patch.soNumber.trim();
   if (patch.clientId !== undefined) row.client_id = patch.clientId;
   if (patch.ownerId !== undefined) row.owner_id = patch.ownerId;
   if (patch.customerPoNumber !== undefined)

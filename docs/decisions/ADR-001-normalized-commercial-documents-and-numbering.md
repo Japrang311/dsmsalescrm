@@ -1,5 +1,10 @@
 # ADR-001: Normalize Commercial Documents and Generate Numbers Atomically
 
+> **Update 2026-07-24:** Keputusan penomoran otomatis untuk Sales Order
+> digantikan oleh input manual dengan panduan format. Penomoran Quotation tetap
+> otomatis dan PostgreSQL-owned. Data Sales Order lama dengan mode `Auto`
+> dipertahankan sebagai histori.
+
 ## Status
 
 Accepted

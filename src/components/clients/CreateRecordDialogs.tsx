@@ -495,7 +495,7 @@ export function CreateSalesOrderDialog(props: SharedProps) {
       prototypeStatus: undefined,
       source: "Existing / Repeat Order",
       date: todayIso(),
-      numberMode: "Auto",
+      numberMode: "Manual",
       manualSoNumber: "",
       backdateReason: "",
       lineItems: [emptySoLineItem],
@@ -509,6 +509,7 @@ export function CreateSalesOrderDialog(props: SharedProps) {
   const type = form.watch("type");
   const proto = form.watch("prototypeStatus");
   const taxType = form.watch("taxType");
+  const soDate = form.watch("date");
   const isFoc = type === "Prototype" && proto === "FOC";
   const onSubmit = form.handleSubmit(async (v) => {
     if (!clientId || !ownerId) return;
@@ -557,12 +558,15 @@ export function CreateSalesOrderDialog(props: SharedProps) {
     proto === "FOC" ? "Prototype FOC" : "Prototype Paid";
   const showTax =
     type === "Regular" || (type === "Prototype" && proto === "Paid");
+  const soNumberGuideDate = /^\d{4}-\d{2}-\d{2}$/.test(soDate)
+    ? new Date(`${soDate}T00:00:00`)
+    : new Date();
   const soNumberGuide =
     type === "Prototype"
-      ? documentNumberExample("PROTY")
+      ? documentNumberExample("PROTY", soNumberGuideDate)
       : taxType === "Non-PPN"
-        ? documentNumberExample("NP")
-        : documentNumberExample("SO");
+        ? documentNumberExample("NP", soNumberGuideDate)
+        : documentNumberExample("SO", soNumberGuideDate);
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       {(props.trigger || !controlled) && (
@@ -586,9 +590,16 @@ export function CreateSalesOrderDialog(props: SharedProps) {
             <p className="text-sm text-muted-foreground">
               {form.watch("numberMode") === "Hariff Backdate"
                 ? `Gunakan nomor resmi historis di bawah. Format ${soNumberGuide} hanya panduan umum.`
-                : `Dibuat otomatis oleh sistem setelah disimpan. Panduan format: ${soNumberGuide}.`}
+                : `Isi nomor secara manual. Panduan format: ${soNumberGuide}.`}
             </p>
           </div>
+          <FieldText
+            label="Nomor SO"
+            placeholder={soNumberGuide}
+            description="Panduan format tidak diisi otomatis; masukkan nomor SO resmi."
+            reg={form.register("manualSoNumber")}
+            error={msg(form.formState.errors, "manualSoNumber")}
+          />
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <FieldText
               label="Nomor PO Customer"
@@ -621,24 +632,16 @@ export function CreateSalesOrderDialog(props: SharedProps) {
               onChange={(value) => {
                 const mode = value as SoValues["numberMode"];
                 form.setValue("numberMode", mode, { shouldDirty: true });
-                if (mode === "Auto") {
-                  form.setValue("manualSoNumber", "");
+                if (mode === "Manual") {
                   form.setValue("backdateReason", "");
                 }
               }}
-              options={["Auto", "Hariff Backdate"]}
+              options={["Manual", "Hariff Backdate"]}
               error={msg(form.formState.errors, "numberMode")}
             />
           )}
           {isHariffClient && form.watch("numberMode") === "Hariff Backdate" && (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <FieldText
-                label="Nomor SO Manual"
-                placeholder={soNumberGuide}
-                description="Tidak mengikat; khusus Hariff dapat memakai nomor resmi historis yang berbeda."
-                reg={form.register("manualSoNumber")}
-                error={msg(form.formState.errors, "manualSoNumber")}
-              />
+            <div>
               <FieldText
                 label="Alasan Backdate"
                 reg={form.register("backdateReason")}

@@ -68,7 +68,8 @@ describe("Phase 11 commercial form schemas", () => {
         type: "Regular",
         taxType: "PPN",
         source: "Existing / Repeat Order",
-        numberMode: "Auto",
+        numberMode: "Manual",
+        manualSoNumber: "DSM-26SO123",
         lineItems: [paidItem],
       }).success,
     ).toBe(true);
@@ -79,10 +80,32 @@ describe("Phase 11 commercial form schemas", () => {
         type: "Regular",
         taxType: "PPN",
         source: "Existing / Repeat Order",
-        numberMode: "Auto",
+        numberMode: "Manual",
+        manualSoNumber: "",
         lineItems: [{ ...paidItem, unitPrice: 0 }],
       }).success,
     ).toBe(false);
+  });
+
+  test("normal SO requires a manually entered number", () => {
+    const schema = buildSalesOrderSchema(false);
+    const regular = {
+      customerPoNumber: "PO-MANUAL",
+      date: "2026-07-19",
+      type: "Regular",
+      taxType: "PPN",
+      source: "Existing / Repeat Order",
+      numberMode: "Manual",
+      lineItems: [paidItem],
+    };
+
+    expect(
+      schema.safeParse({
+        ...regular,
+        manualSoNumber: "DSM-26SO124",
+      }).success,
+    ).toBe(true);
+    expect(schema.safeParse(regular).success).toBe(false);
   });
 
   test("Prototype FOC requires item identity but rejects money", () => {
@@ -93,7 +116,8 @@ describe("Phase 11 commercial form schemas", () => {
       type: "Prototype",
       prototypeStatus: "FOC",
       source: "Prototype FOC",
-      numberMode: "Auto",
+      numberMode: "Manual",
+      manualSoNumber: "DSM-26PROTY124",
     };
     expect(
       schema.safeParse({
