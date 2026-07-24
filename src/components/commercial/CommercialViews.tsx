@@ -7,11 +7,14 @@ import {
   Filter,
   User2,
   ArrowRight,
+  RotateCcw,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -33,8 +36,13 @@ import { NOW } from "@/lib/domain";
 import { useRole } from "@/context/role-context";
 import type { CommercialItem } from "@/lib/domain";
 import { StatusBadge } from "@/components/clients/StatusBadges";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { listCommercialItems } from "@/lib/data/commercial-items";
+import { restoreCommercialDocument } from "@/lib/data/commercial-documents";
+import {
+  canShowDeletedMode,
+  commercialItemsQueryKey,
+} from "@/components/commercial/deleted-mode";
 import {
   listClients,
   listOwners,
@@ -65,11 +73,27 @@ type ViewMode = "table" | "board";
 
 export function CommercialViews(props: CommercialViewsProps) {
   const { role, authReady } = useRole();
-  const { data: allItems = [], isLoading } = useQuery({
-    queryKey: ["commercial-items", "all"],
+  const queryClient = useQueryClient();
+  const [showDeleted, setShowDeleted] = useState(false);
+  const [restoringId, setRestoringId] = useState<string>();
+  const deletedMode = showDeleted && canShowDeletedMode(role);
+  const activeItems = useQuery({
+    queryKey: commercialItemsQueryKey(false),
     queryFn: listCommercialItems,
     enabled: authReady,
   });
+  const deletedItems = useQuery({
+    queryKey: commercialItemsQueryKey(true),
+    queryFn: () => listCommercialItems({ deleted: true }),
+    enabled: authReady && deletedMode,
+  });
+  const allItems = useMemo(
+    () => (deletedMode ? (deletedItems.data ?? []) : (activeItems.data ?? [])),
+    [activeItems.data, deletedItems.data, deletedMode],
+  );
+  const isLoading = deletedMode
+    ? deletedItems.isLoading
+    : activeItems.isLoading;
   const [view, setView] = useState<ViewMode>("table");
   const [q, setQ] = useState("");
   const [ownerFilter, setOwnerFilter] = useState<string>("all");
@@ -147,6 +171,32 @@ export function CommercialViews(props: CommercialViewsProps) {
     return m;
   }, [filtered, props.stages]);
 
+  async function restoreItem(id: string) {
+    setRestoringId(id);
+    try {
+      await restoreCommercialDocument(id);
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: commercialItemsQueryKey(false),
+          exact: true,
+        }),
+        queryClient.invalidateQueries({
+          queryKey: commercialItemsQueryKey(true),
+          exact: true,
+        }),
+        queryClient.invalidateQueries({ queryKey: ["activity-log"] }),
+      ]);
+      toast.success("Dokumen dipulihkan");
+    } catch (error) {
+      toast.error("Gagal memulihkan dokumen", {
+        description:
+          error instanceof Error ? error.message : "Terjadi kesalahan.",
+      });
+    } finally {
+      setRestoringId(undefined);
+    }
+  }
+
   if (!authReady || isLoading) {
     return (
       <div className="flex items-center justify-center rounded-lg border border-dashed py-16 text-sm text-muted-foreground">
@@ -164,38 +214,50 @@ export function CommercialViews(props: CommercialViewsProps) {
             {props.title}
           </h1>
           <p className="text-sm text-muted-foreground">
-            {filtered.length} dokumen · Total estimasi{" "}
-            {formatRupiahShort(totalValue)}
+            {filtered.length} dokumen {deletedMode ? "terhapus" : "aktif"} ·
+            Total estimasi {formatRupiahShort(totalValue)}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {props.headerAction}
-          <div className="inline-flex rounded-md border bg-card p-0.5">
-            <button
-              type="button"
-              onClick={() => setView("table")}
-              className={cn(
-                "flex items-center gap-1.5 rounded px-2.5 py-1 text-xs",
-                view === "table"
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              <TableIcon className="h-3.5 w-3.5" /> Table
-            </button>
-            <button
-              type="button"
-              onClick={() => setView("board")}
-              className={cn(
-                "flex items-center gap-1.5 rounded px-2.5 py-1 text-xs",
-                view === "board"
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              <LayoutGrid className="h-3.5 w-3.5" /> Stage
-            </button>
-          </div>
+          {canShowDeletedMode(role) && (
+            <label className="flex items-center gap-2 rounded-md border bg-card px-2.5 py-1.5 text-xs font-medium">
+              <Switch
+                aria-label="Show deleted"
+                checked={deletedMode}
+                onCheckedChange={setShowDeleted}
+              />
+              Show deleted
+            </label>
+          )}
+          {!deletedMode && props.headerAction}
+          {!deletedMode && (
+            <div className="inline-flex rounded-md border bg-card p-0.5">
+              <button
+                type="button"
+                onClick={() => setView("table")}
+                className={cn(
+                  "flex items-center gap-1.5 rounded px-2.5 py-1 text-xs",
+                  view === "table"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <TableIcon className="h-3.5 w-3.5" /> Table
+              </button>
+              <button
+                type="button"
+                onClick={() => setView("board")}
+                className={cn(
+                  "flex items-center gap-1.5 rounded px-2.5 py-1 text-xs",
+                  view === "board"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <LayoutGrid className="h-3.5 w-3.5" /> Stage
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -267,7 +329,7 @@ export function CommercialViews(props: CommercialViewsProps) {
             </p>
           </CardContent>
         </Card>
-      ) : view === "table" ? (
+      ) : deletedMode || view === "table" ? (
         <Card>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
@@ -385,18 +447,33 @@ export function CommercialViews(props: CommercialViewsProps) {
                           {aging}h
                         </TableCell>
                         <TableCell className="w-[80px]">
-                          <Button
-                            asChild
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 px-2 text-xs"
-                          >
-                            <Link
-                              to={`${props.detailBasePath}/${it.id}` as never}
+                          {deletedMode ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 gap-1 px-2 text-xs"
+                              disabled={restoringId === it.id}
+                              onClick={() => void restoreItem(it.id)}
                             >
-                              Detail <ArrowRight className="ml-1 h-3 w-3" />
-                            </Link>
-                          </Button>
+                              <RotateCcw className="h-3 w-3" />
+                              {restoringId === it.id
+                                ? "Memulihkan…"
+                                : "Restore"}
+                            </Button>
+                          ) : (
+                            <Button
+                              asChild
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 px-2 text-xs"
+                            >
+                              <Link
+                                to={`${props.detailBasePath}/${it.id}` as never}
+                              >
+                                Detail <ArrowRight className="ml-1 h-3 w-3" />
+                              </Link>
+                            </Button>
+                          )}
                         </TableCell>
                       </TableRow>
                     );

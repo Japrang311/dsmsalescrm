@@ -7,11 +7,13 @@ import {
   TrendingUp,
   FileSpreadsheet,
   FileText,
+  RotateCcw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -43,6 +45,12 @@ import {
 import { filterSalesOrders } from "@/lib/report-selectors";
 import { ROLE_LABEL } from "@/context/role-context";
 import { useDashboardData } from "@/hooks/use-dashboard-data";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { listSalesOrders, restoreSalesOrder } from "@/lib/data/sales-orders";
+import {
+  canShowDeletedMode,
+  salesOrdersQueryKey,
+} from "@/components/commercial/deleted-mode";
 import {
   exportSalesOrdersPdf,
   exportSalesOrdersXlsx,
@@ -56,7 +64,8 @@ export const Route = createFileRoute("/_app/sales-orders/")({
 });
 
 function SalesOrdersRevenuePage() {
-  const { role } = useRole();
+  const { role, authReady } = useRole();
+  const queryClient = useQueryClient();
   const {
     orders,
     clients: clientList,
@@ -64,6 +73,18 @@ function SalesOrdersRevenuePage() {
     salesTeam,
     isLoading,
   } = useDashboardData();
+  const [showDeleted, setShowDeleted] = useState(false);
+  const [restoringId, setRestoringId] = useState<string>();
+  const deletedMode = showDeleted && canShowDeletedMode(role);
+  const deletedOrders = useQuery({
+    queryKey: salesOrdersQueryKey(true),
+    queryFn: () => listSalesOrders({ deleted: true }),
+    enabled: authReady && deletedMode,
+  });
+  const sourceOrders = useMemo(
+    () => (deletedMode ? (deletedOrders.data ?? []) : orders),
+    [deletedMode, deletedOrders.data, orders],
+  );
 
   const [filters, setFilters] = useState<ReportFilters>(() =>
     defaultReportFilters({ from: new Date(CURRENT_YEAR, 0, 1), to: NOW }),
@@ -80,10 +101,10 @@ function SalesOrdersRevenuePage() {
 
   const rows = useMemo(
     () =>
-      filterSalesOrders(orders, filters).sort((a, b) =>
+      filterSalesOrders(sourceOrders, filters).sort((a, b) =>
         b.date.localeCompare(a.date),
       ),
-    [orders, filters],
+    [sourceOrders, filters],
   );
 
   const summary = useMemo(() => {
@@ -146,7 +167,33 @@ function SalesOrdersRevenuePage() {
     }
   };
 
-  if (isLoading) {
+  async function restoreOrder(id: string) {
+    setRestoringId(id);
+    try {
+      await restoreSalesOrder(id);
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: salesOrdersQueryKey(false),
+          exact: true,
+        }),
+        queryClient.invalidateQueries({
+          queryKey: salesOrdersQueryKey(true),
+          exact: true,
+        }),
+        queryClient.invalidateQueries({ queryKey: ["activity-log"] }),
+      ]);
+      toast.success("Sales Order dipulihkan");
+    } catch (error) {
+      toast.error("Gagal memulihkan Sales Order", {
+        description:
+          error instanceof Error ? error.message : "Terjadi kesalahan.",
+      });
+    } finally {
+      setRestoringId(undefined);
+    }
+  }
+
+  if (isLoading || (deletedMode && deletedOrders.isLoading)) {
     return (
       <div className="flex items-center justify-center rounded-lg border border-dashed py-16 text-sm text-muted-foreground">
         Loading sales orders…
@@ -162,31 +209,47 @@ function SalesOrdersRevenuePage() {
             <Receipt className="h-5 w-5 text-primary" /> Sales Orders & Revenue
           </h1>
           <p className="text-sm text-muted-foreground">
-            {rows.length} SO · Scope: {ROLE_LABEL[role]} · SO FOC ditampilkan
-            sebagai Rp0 dan tidak masuk ke revenue.
+            {rows.length} SO {deletedMode ? "terhapus" : "aktif"} · Scope:{" "}
+            {ROLE_LABEL[role]}
+            {!deletedMode &&
+              " · SO FOC ditampilkan sebagai Rp0 dan tidak masuk ke revenue."}
           </p>
         </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="gap-2">
-              <Download className="h-3.5 w-3.5" /> Export
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-44">
-            <DropdownMenuItem
-              className="gap-2"
-              onClick={() => handleExport("xlsx")}
-            >
-              <FileSpreadsheet className="h-4 w-4" /> Excel (.xlsx)
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              className="gap-2"
-              onClick={() => handleExport("pdf")}
-            >
-              <FileText className="h-4 w-4" /> PDF
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div className="flex items-center gap-2">
+          {canShowDeletedMode(role) && (
+            <label className="flex items-center gap-2 rounded-md border bg-card px-2.5 py-1.5 text-xs font-medium">
+              <Switch
+                aria-label="Show deleted"
+                checked={deletedMode}
+                onCheckedChange={setShowDeleted}
+              />
+              Show deleted
+            </label>
+          )}
+          {!deletedMode && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2">
+                  <Download className="h-3.5 w-3.5" /> Export
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-44">
+                <DropdownMenuItem
+                  className="gap-2"
+                  onClick={() => handleExport("xlsx")}
+                >
+                  <FileSpreadsheet className="h-4 w-4" /> Excel (.xlsx)
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="gap-2"
+                  onClick={() => handleExport("pdf")}
+                >
+                  <FileText className="h-4 w-4" /> PDF
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
       </div>
 
       <ReportFilterBar
@@ -335,19 +398,34 @@ function SalesOrdersRevenuePage() {
                           )}
                         </TableCell>
                         <TableCell className="w-[80px]">
-                          <Button
-                            asChild
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 px-2 text-xs"
-                          >
-                            <Link
-                              to="/sales-orders/$soId"
-                              params={{ soId: so.id }}
+                          {deletedMode ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 gap-1 px-2 text-xs"
+                              disabled={restoringId === so.id}
+                              onClick={() => void restoreOrder(so.id)}
                             >
-                              Detail <ArrowRight className="ml-1 h-3 w-3" />
-                            </Link>
-                          </Button>
+                              <RotateCcw className="h-3 w-3" />
+                              {restoringId === so.id
+                                ? "Memulihkan…"
+                                : "Restore"}
+                            </Button>
+                          ) : (
+                            <Button
+                              asChild
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 px-2 text-xs"
+                            >
+                              <Link
+                                to="/sales-orders/$soId"
+                                params={{ soId: so.id }}
+                              >
+                                Detail <ArrowRight className="ml-1 h-3 w-3" />
+                              </Link>
+                            </Button>
+                          )}
                         </TableCell>
                       </TableRow>
                     );
@@ -360,7 +438,7 @@ function SalesOrdersRevenuePage() {
       )}
 
       {/** Manager / executive can jump into the full executive report */}
-      {role !== "sales" && (
+      {!deletedMode && role !== "sales" && (
         <div className="flex justify-end">
           <Button asChild variant="link" size="sm" className="text-xs">
             <Link to="/reports">Lihat Executive Report lengkap →</Link>
