@@ -8,7 +8,7 @@ const order = (date: string, soNumber: string, createdAt = date) => ({
 });
 
 describe("compareSalesOrdersByNewestNumber", () => {
-  test("sorts by newest date then descending natural SO number", () => {
+  test("sorts by descending natural SO number before date", () => {
     const sorted = [
       order("2026-07-01", "DSM-26SO99"),
       order("2026-08-01", "DSM-26SO001"),
@@ -18,11 +18,11 @@ describe("compareSalesOrdersByNewestNumber", () => {
     ].sort(compareSalesOrdersByNewestNumber);
 
     expect(sorted.map((item) => item.soNumber)).toEqual([
-      "DSM-26SO001",
       "DSM-26SO152",
       "DSM-26SO151",
       "DSM-26SO100",
       "DSM-26SO99",
+      "DSM-26SO001",
     ]);
   });
 });
