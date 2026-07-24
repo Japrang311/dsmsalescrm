@@ -128,9 +128,7 @@ export type SalesOrderQuery = {
   deleted?: boolean;
 };
 
-type SalesOrderQueryInput =
-  | SalesOrderQuery
-  | { queryKey: readonly unknown[] };
+type SalesOrderQueryInput = SalesOrderQuery | { queryKey: readonly unknown[] };
 
 function salesOrderQueryOptions(input: SalesOrderQueryInput): SalesOrderQuery {
   return "queryKey" in input ? {} : input;
@@ -140,9 +138,7 @@ export async function listSalesOrders(
   input: SalesOrderQueryInput = {},
 ): Promise<SalesOrderDocument[]> {
   const options = salesOrderQueryOptions(input);
-  let query = supabase
-    .from("sales_orders")
-    .select("*, sales_order_items(*)");
+  let query = supabase.from("sales_orders").select("*, sales_order_items(*)");
   query = options.deleted
     ? query.not("deleted_at", "is", null)
     : query.is("deleted_at", null);

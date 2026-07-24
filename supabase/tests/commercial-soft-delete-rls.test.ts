@@ -148,12 +148,14 @@ describe("commercial soft-delete schema and RLS", () => {
         )
       order by e.enumlabel
     `;
-    expect(enumRows.map((row: { enumlabel: string }) => row.enumlabel)).toEqual([
-      "commercial_document_deleted",
-      "commercial_document_restored",
-      "sales_order_deleted",
-      "sales_order_restored",
-    ]);
+    expect(enumRows.map((row: { enumlabel: string }) => row.enumlabel)).toEqual(
+      [
+        "commercial_document_deleted",
+        "commercial_document_restored",
+        "sales_order_deleted",
+        "sales_order_restored",
+      ],
+    );
   });
 
   test("Sales can soft-delete and restore only their own rows", async () => {
@@ -171,7 +173,9 @@ describe("commercial soft-delete schema and RLS", () => {
         .select("deleted_at, deleted_by")
         .single();
       expect(ownDelete.error).toBeNull();
-      expect(new Date(ownDelete.data!.deleted_at).toISOString()).toBe(deletedAt);
+      expect(new Date(ownDelete.data!.deleted_at).toISOString()).toBe(
+        deletedAt,
+      );
       expect(ownDelete.data!.deleted_by).toBe(fixtures.sales.id);
 
       const ownRestore = await salesClient

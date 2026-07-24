@@ -134,9 +134,7 @@ export type CommercialDocumentQuery = {
 
 export async function listCommercialDocuments(
   options: CommercialDocumentQuery = {},
-): Promise<
-  CommercialDocumentWithItems[]
-> {
+): Promise<CommercialDocumentWithItems[]> {
   let query = supabase
     .from("commercial_documents")
     .select("*, commercial_document_items(*)");
