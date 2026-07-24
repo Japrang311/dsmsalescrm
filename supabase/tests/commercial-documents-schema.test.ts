@@ -48,6 +48,8 @@ const EXPECTED_TABLES: Record<string, ExpectedTable> = {
     actualName: "commercial_documents",
     authenticatedUpdateColumns: [
       "client_address",
+      "deleted_at",
+      "deleted_by",
       "note",
       "so_number",
       "stage",
@@ -80,6 +82,8 @@ const EXPECTED_TABLES: Record<string, ExpectedTable> = {
       note: { dataType: "text", nullable: true },
       created_at: { dataType: "timestamp with time zone", nullable: false },
       updated_at: { dataType: "timestamp with time zone", nullable: false },
+      deleted_at: { dataType: "timestamp with time zone", nullable: true },
+      deleted_by: { dataType: "uuid", nullable: true },
     },
   },
   commercial_document_items: {
@@ -117,6 +121,8 @@ const EXPECTED_TABLES: Record<string, ExpectedTable> = {
       "owner_id",
       "customer_po_number",
       "date",
+      "deleted_at",
+      "deleted_by",
       "so_number",
       "tax_type",
       "updated_at",
@@ -153,6 +159,8 @@ const EXPECTED_TABLES: Record<string, ExpectedTable> = {
       total_value: { dataType: "numeric", nullable: true },
       created_at: { dataType: "timestamp with time zone", nullable: false },
       updated_at: { dataType: "timestamp with time zone", nullable: false },
+      deleted_at: { dataType: "timestamp with time zone", nullable: true },
+      deleted_by: { dataType: "uuid", nullable: true },
     },
   },
   sales_order_items: {
