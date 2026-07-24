@@ -1,53 +1,58 @@
-# Soft Delete for RFQ, Quotation, and Sales Order
+# Soft Delete untuk RFQ, Quotation, dan Sales Order
 
-Date: 2026-07-24
-Status: Accepted
+Tanggal: 2026-07-24
+Status: Disetujui
 
-## Problem
+## Masalah
 
-There is currently no way to remove an RFQ, Quotation, or Sales Order from
-the app once created, even if it was created by mistake or is a duplicate.
-The user asked for a delete feature, available to every role except
-Executive.
+Saat ini tidak ada cara untuk menghapus RFQ, Quotation, atau Sales Order
+dari aplikasi setelah dibuat, meskipun record tersebut dibuat karena
+kesalahan atau merupakan duplikat. Pengguna meminta fitur hapus, yang
+tersedia untuk semua role kecuali Executive.
 
-## Constraint discovered during design
+## Batasan yang ditemukan saat proses desain
 
-Every exposed table in this app deliberately has **no hard DELETE policy**
-(PRD §9: "archive over hard delete" — see comments in
-`clients.sql`, `tasks.sql`, `commercial_items.sql`, `sales_orders.sql`,
-`normalize_commercial_documents.sql`). Revenue records (Sales Orders)
-especially must not disappear silently from historical reports. This
-feature follows that existing pattern: **soft delete**, not a SQL `DELETE`.
+Setiap tabel yang terekspos di aplikasi ini sengaja **tidak memiliki
+kebijakan DELETE permanen** (PRD §9: "archive over hard delete" — lihat
+komentar di `clients.sql`, `tasks.sql`, `commercial_items.sql`,
+`sales_orders.sql`, `normalize_commercial_documents.sql`). Data revenue
+(Sales Order) khususnya tidak boleh hilang begitu saja dari laporan
+historis. Fitur ini mengikuti pola yang sudah ada tersebut: **soft
+delete**, bukan `DELETE` SQL biasa.
 
-## Scope
+## Cakupan (Scope)
 
-- RFQ and Quotation are both rows in `public.commercial_documents`
-  (distinguished by `type`). Sales Order is `public.sales_orders`.
-- Roles: Sales, Manager, Super Admin can delete/restore. Executive is
-  unchanged (read-only).
-- Sales may only delete/restore their own records (`owner_id` match).
-  Manager and Super Admin may delete/restore any record. This exactly
-  matches the existing UPDATE RLS policies on both tables — no RLS changes
-  are required for permission enforcement.
-- Deletes are restorable (a "Restore" action), not one-way.
+- RFQ dan Quotation sama-sama berupa baris di `public.commercial_documents`
+  (dibedakan lewat kolom `type`). Sales Order berada di
+  `public.sales_orders`.
+- Role: Sales, Manager, Super Admin bisa menghapus/memulihkan. Executive
+  tidak berubah (tetap read-only).
+- Sales hanya bisa menghapus/memulihkan record miliknya sendiri (dicocokkan
+  lewat `owner_id`). Manager dan Super Admin bisa menghapus/memulihkan
+  record siapa saja. Ini persis sama dengan kebijakan RLS UPDATE yang
+  sudah ada di kedua tabel — tidak perlu ada perubahan RLS untuk
+  penegakan izin akses.
+- Penghapusan bersifat bisa dipulihkan (ada aksi "Restore"), bukan
+  penghapusan permanen satu arah.
 
-## Out of scope (explicitly)
+## Di luar cakupan (secara eksplisit)
 
-- **No block on deleting an RFQ/Quotation that a Sales Order was created
-  from.** Checked the schema: there is no foreign key or any other link
-  from `sales_orders` back to the `commercial_documents` row it
-  conceptually originated from. Enforcing that would require adding a new
-  tracked relationship, which is a separate, larger feature. Restore is the
-  safety net if this turns out to matter in practice.
-- No changes to dashboard/report selectors beyond the natural effect of
-  deleted rows being excluded once list/detail queries filter on
-  `deleted_at`.
-- No permanent/hard delete path in this feature.
+- **Tidak ada pemblokiran saat menghapus RFQ/Quotation yang sudah punya
+  Sales Order turunan.** Sudah dicek di skema database: tidak ada foreign
+  key atau relasi apa pun dari `sales_orders` yang mengarah balik ke baris
+  `commercial_documents` asal-usulnya secara konsep. Untuk menegakkan
+  aturan ini perlu menambah relasi baru yang dilacak di database, yang
+  merupakan fitur terpisah dan jauh lebih besar. Fitur "Restore" menjadi
+  jaring pengaman kalau ternyata ini jadi masalah di praktiknya.
+- Tidak ada perubahan pada selector dashboard/laporan, selain efek alami
+  dari baris yang terhapus otomatis dikecualikan begitu query
+  list/detail memfilter berdasarkan `deleted_at`.
+- Tidak ada jalur hapus permanen (hard delete) dalam fitur ini.
 
-## Schema changes
+## Perubahan skema database
 
-New migration adds to both `public.commercial_documents` and
-`public.sales_orders`:
+Migration baru menambahkan kolom berikut ke `public.commercial_documents`
+dan `public.sales_orders`:
 
 ```sql
 alter table public.commercial_documents
@@ -59,80 +64,108 @@ alter table public.sales_orders
   add column deleted_by uuid references public.profiles(id);
 ```
 
-No RLS policy changes. The existing UPDATE policies on both tables already
-read:
+Tidak ada perubahan kebijakan RLS. Kebijakan UPDATE yang sudah ada di
+kedua tabel sudah berbunyi:
 
-```
+```text
 (role = 'sales' and owner_id = auth.uid()) or role in ('manager', 'super_admin')
 ```
 
-Soft delete/restore is implemented as an UPDATE against these two columns,
-so this policy already enforces exactly the permission set requested.
+Soft delete/restore diimplementasikan sebagai UPDATE terhadap dua kolom
+ini, sehingga kebijakan yang sudah ada ini otomatis menegakkan persis
+set izin akses yang diminta.
 
-A second migration (its own transaction, per the existing pattern for enum
-value additions — see `20260721100000_add_sales_order_edit_activity_kinds.sql`)
-adds to `public.activity_kind`:
+**Catatan penting (ditemukan saat pengecekan skema):** `commercial_documents`
+dan `sales_orders` TIDAK punya table-level UPDATE grant ke role
+`authenticated` — hanya kolom tertentu yang di-grant secara eksplisit
+(lihat `20260719041351_harden_normalized_document_permissions.sql`). Migrasi
+baru untuk fitur ini **wajib** menambahkan `deleted_at` dan `deleted_by` ke
+grant tersebut, contoh:
+
+```sql
+grant update (deleted_at, deleted_by) on table public.commercial_documents to authenticated;
+grant update (deleted_at, deleted_by) on table public.sales_orders to authenticated;
+```
+
+Kalau langkah ini terlewat, RLS policy akan mengizinkan tapi UPDATE tetap
+gagal karena kekurangan grant kolom di level Postgres — ini sudah dua kali
+terjadi di proyek ini sebelumnya (lihat `HANDOFF.md` poin gotcha soal grant
+kolom).
+
+Migration kedua (transaksi terpisah, mengikuti pola yang sudah ada untuk
+penambahan nilai enum — lihat
+`20260721100000_add_sales_order_edit_activity_kinds.sql`) menambahkan ke
+`public.activity_kind`:
 
 - `commercial_document_deleted`
 - `commercial_document_restored`
 - `sales_order_deleted`
 - `sales_order_restored`
 
-## Data layer changes
+## Perubahan data layer
 
 `src/lib/data/commercial-documents.ts`:
 
-- `deleteCommercialDocument(id)`: sets `deleted_at = now()`,
-  `deleted_by = current user`. Before writing, checks whether any other
-  `commercial_documents` row has `supersedes_document_id = id` (i.e. a
-  newer Quotation revision exists) — if so, rejects with a clear error
-  message rather than deleting. This check applies to both RFQ and
-  Quotation rows (it will simply never match for RFQ, since RFQs don't
-  participate in the revision chain).
-- `restoreCommercialDocument(id)`: clears both columns.
-- Both write one `activity_log` row (actor, target document, kind).
-- Existing fetch functions used by list/detail views add
-  `.is("deleted_at", null)` so deleted rows disappear from normal views
-  without touching every call site's business logic.
-- A new fetch function (or an optional parameter on the existing one)
-  returns only rows where `deleted_at is not null`, for the "Show deleted"
-  view.
+- `deleteCommercialDocument(id)`: mengisi `deleted_at = now()`,
+  `deleted_by = user saat ini`. Sebelum menyimpan, dicek dulu apakah ada
+  baris `commercial_documents` lain yang punya
+  `supersedes_document_id = id` (artinya sudah ada revisi Quotation yang
+  lebih baru) — jika ada, permintaan hapus ditolak dengan pesan error
+  yang jelas. Pengecekan ini berlaku untuk baris RFQ maupun Quotation
+  (untuk RFQ pengecekan ini otomatis tidak pernah cocok, karena RFQ tidak
+  ikut dalam rantai revisi).
+- `restoreCommercialDocument(id)`: mengosongkan kedua kolom tersebut.
+- Keduanya menulis satu baris `activity_log` (aktor, dokumen target,
+  jenis aksi).
+- Fungsi fetch yang sudah ada, yang dipakai oleh tampilan list/detail,
+  ditambahkan `.is("deleted_at", null)` supaya baris yang terhapus
+  otomatis hilang dari tampilan normal tanpa perlu menyentuh logika
+  bisnis di setiap tempat pemanggilan.
+- Fungsi fetch baru (atau parameter opsional pada fungsi yang sudah ada)
+  mengembalikan hanya baris dengan `deleted_at is not null`, untuk
+  tampilan "Show deleted".
 
-`src/lib/data/sales-orders.ts`: same shape —
-`deleteSalesOrder(id)` / `restoreSalesOrder(id)`, no revision check (Sales
-Orders don't have a revision chain), existing fetch functions filter
-`deleted_at is null` by default, new fetch path for deleted-only.
+`src/lib/data/sales-orders.ts`: bentuknya sama —
+`deleteSalesOrder(id)` / `restoreSalesOrder(id)`, tanpa pengecekan
+revisi (Sales Order tidak punya rantai revisi), fungsi fetch yang sudah
+ada memfilter `deleted_at is null` secara default, ditambah jalur fetch
+baru khusus untuk yang terhapus.
 
-## UI changes
+## Perubahan UI
 
-Detail pages (`_app.rfq.$id.tsx`, `_app.quotations.$id.tsx`,
+Halaman detail (`_app.rfq.$id.tsx`, `_app.quotations.$id.tsx`,
 `_app.sales-orders.$soId.tsx`):
 
-- Add a "Delete" button next to existing edit controls, gated by the same
-  ownership check already used for editing (e.g. `canEditOwnSo` in the SO
-  detail page — sales sees it only on their own records, manager/super
-  admin always see it, executive never sees it).
-- Clicking opens a shadcn `AlertDialog` confirmation. On confirm, calls the
-  delete function and navigates back to the corresponding list page.
-- If a Quotation delete is rejected because a newer revision exists, show
-  that error message inline instead of navigating away.
+- Menambahkan tombol "Delete" di sebelah kontrol edit yang sudah ada,
+  dengan pengecekan kepemilikan yang sama seperti yang sudah dipakai
+  untuk edit (contoh: `canEditOwnSo` di halaman detail SO — sales hanya
+  melihatnya di record miliknya sendiri, manager/super admin selalu
+  melihatnya, executive tidak pernah melihatnya).
+- Klik tombol membuka dialog konfirmasi `AlertDialog` dari shadcn. Setelah
+  dikonfirmasi, memanggil fungsi delete lalu kembali ke halaman list
+  terkait.
+- Jika penghapusan Quotation ditolak karena ada revisi yang lebih baru,
+  pesan error tersebut ditampilkan langsung di halaman, bukan berpindah
+  halaman.
 
-List pages (`_app.rfq.index.tsx`, `_app.quotations.index.tsx`,
+Halaman list (`_app.rfq.index.tsx`, `_app.quotations.index.tsx`,
 `_app.sales-orders.index.tsx`):
 
-- Add a "Show deleted" toggle, visible only to Sales/Manager/Super Admin
-  (hidden for Executive), that switches the list query to the
-  deleted-only fetch path.
-- In that mode, the per-row action becomes "Restore" instead of the normal
-  row actions.
+- Menambahkan toggle "Show deleted", hanya terlihat untuk
+  Sales/Manager/Super Admin (disembunyikan untuk Executive), yang
+  mengganti query list ke jalur fetch khusus data terhapus.
+- Dalam mode ini, aksi per baris berubah menjadi "Restore", menggantikan
+  aksi baris normal.
 
-## Testing
+## Pengujian
 
-- RLS/data-layer tests (`bun run test`) covering: sales can delete/restore
-  own records, cannot delete others'; manager/super_admin can
-  delete/restore any record; executive cannot delete or restore (no UPDATE
-  policy applies to executive today, so this should already fail closed —
-  confirm with a test); deleted rows are excluded from normal fetch
-  functions and included in the deleted-only fetch path; deleting a
-  Quotation with a newer revision is rejected; restoring clears both
-  columns and makes the row visible again in normal fetches.
+- Test RLS/data-layer (`bun run test`) yang mencakup: sales bisa
+  menghapus/memulihkan record miliknya sendiri, tidak bisa menghapus
+  milik orang lain; manager/super_admin bisa menghapus/memulihkan record
+  siapa saja; executive tidak bisa menghapus atau memulihkan (saat ini
+  tidak ada kebijakan UPDATE yang berlaku untuk executive, jadi seharusnya
+  sudah otomatis gagal/fail-closed — perlu dikonfirmasi dengan test);
+  baris yang terhapus dikecualikan dari fungsi fetch normal dan muncul di
+  jalur fetch khusus data terhapus; menghapus Quotation yang punya revisi
+  lebih baru akan ditolak; memulihkan record mengosongkan kedua kolom dan
+  membuat baris terlihat kembali di fetch normal.

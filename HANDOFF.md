@@ -1,6 +1,48 @@
 # Handoff — DSM Sales Web App V2
 
-Context dump for continuing this work in another tool (Codex). Written 2026-07-18; Phase 11/12 status refreshed 2026-07-19; Phase 11 import-review reconciliation session added 2026-07-19; post-import UX/bugfix session added 2026-07-20; second 2026-07-20 session (pipeline permissions/FK bugfixes) added 2026-07-20; Client Detail/Client List real-data wiring session added 2026-07-21; remote-migration-push + data-restoration session added 2026-07-21; browser-verification + spending_ytd fix + SO edit audit trail session added 2026-07-21; unused-code cleanup + client database (company info/contacts) feature session added 2026-07-22; contact position + Client Detail product/description fixes + commercial item product-name migration reconciliation added 2026-07-22; dynamic per-month sales target UI/calculation update added 2026-07-22.
+Context dump for continuing this work in another tool (Codex). Written 2026-07-18; Phase 11/12 status refreshed 2026-07-19; Phase 11 import-review reconciliation session added 2026-07-19; post-import UX/bugfix session added 2026-07-20; second 2026-07-20 session (pipeline permissions/FK bugfixes) added 2026-07-20; Client Detail/Client List real-data wiring session added 2026-07-21; remote-migration-push + data-restoration session added 2026-07-21; browser-verification + spending_ytd fix + SO edit audit trail session added 2026-07-21; unused-code cleanup + client database (company info/contacts) feature session added 2026-07-22; contact position + Client Detail product/description fixes + commercial item product-name migration reconciliation added 2026-07-22; dynamic per-month sales target UI/calculation update added 2026-07-22; soft-delete design (spec only, not yet implemented) added 2026-07-24.
+
+## HANDOFF TO CODEX — read this first (2026-07-24)
+
+Owner is switching tools for the next piece of work: **soft delete for RFQ,
+Quotation, and Sales Order.** Only a design spec exists so far — **no code,
+no migration has been written yet.**
+
+- Spec (bilingual, Indonesian is the version the owner reviewed last):
+  `docs/superpowers/specs/2026-07-24-soft-delete-rfq-quotation-sales-order-design.md`
+  — committed to git already.
+- Status: design approved by owner. **Not yet turned into an implementation
+  plan or any code.** Next step in the normal workflow here is
+  `writing-plans` → `incremental-implementation`, not started.
+- Feature summary: add `deleted_at`/`deleted_by` to `commercial_documents`
+  (covers both RFQ and Quotation, via the `type` column) and `sales_orders`.
+  Soft delete only — no hard `DELETE`, following the existing "archive over
+  hard delete" pattern used everywhere else in this app. Restorable. Sales
+  can delete/restore only their own records; Manager/Super Admin any record;
+  Executive unchanged (read-only, no access to delete/restore at all).
+- **Critical gotcha already identified in the spec, don't skip it**:
+  `commercial_documents` and `sales_orders` do NOT have table-level UPDATE
+  grants to `authenticated` — only specific columns are grantable (see
+  `20260719041351_harden_normalized_document_permissions.sql`, and gotcha
+  note #4 further down this file — this has bitten the project twice
+  already). The new migration must explicitly
+  `grant update (deleted_at, deleted_by) on table ... to authenticated`
+  for both tables, or RLS will allow the update but Postgres will still
+  reject it for missing column grants.
+- Also block deleting a Quotation revision if a newer revision already
+  supersedes it (`supersedes_document_id`). No such check for RFQ or Sales
+  Order — full rationale (including why an RFQ/Quotation → Sales Order link
+  can't be checked at all, since that relationship doesn't exist in the
+  schema) is in the spec.
+- Uncommitted local changes at handoff time unrelated to this feature (do
+  not lose them, but they are a separate task — see `git status` before
+  starting): `src/lib/data/sales-orders.ts`,
+  `src/routes/_app.sales-orders.$soId.tsx`, and a new untracked migration
+  `supabase/migrations/20260724000000_allow_sales_order_number_edit.sql`.
+  These were mid-edit for a different, unrelated change (making the SO
+  number field editable) when the handoff happened — confirm with the owner
+  whether to finish, discard, or fold that in before or alongside the
+  soft-delete work.
 
 ## Project basics
 
