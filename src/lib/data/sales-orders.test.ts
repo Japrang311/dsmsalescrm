@@ -8,7 +8,13 @@ import {
   type RoleFixtureUsers,
 } from "../../../supabase/tests/helpers";
 import { supabase } from "@/lib/supabase";
-import { createSalesOrder, listSalesOrders } from "./sales-orders";
+import {
+  createSalesOrder,
+  deleteSalesOrder,
+  getSalesOrder,
+  listSalesOrders,
+  restoreSalesOrder,
+} from "./sales-orders";
 
 let fixtures: RoleFixtureUsers;
 let clientId: string;
@@ -98,6 +104,36 @@ describe("normalized Sales Order adapter", () => {
     expect(listed.find((order) => order.id === created.id)?.items).toHaveLength(
       2,
     );
+
+    await deleteSalesOrder(created.id);
+    expect(await getSalesOrder(created.id)).toBeNull();
+    const deleted = await getSalesOrder(created.id, { deleted: true });
+    expect(deleted?.deletedAt).not.toBeNull();
+    expect(deleted?.deletedBy).toBe(fixtures.sales.id);
+    expect(
+      (await listSalesOrders()).some((order) => order.id === created.id),
+    ).toBe(false);
+    expect(
+      (await listSalesOrders({ deleted: true })).some(
+        (order) => order.id === created.id,
+      ),
+    ).toBe(true);
+
+    await restoreSalesOrder(created.id);
+    expect(await getSalesOrder(created.id)).not.toBeNull();
+    expect(await getSalesOrder(created.id, { deleted: true })).toBeNull();
+
+    const { data: activity, error: activityError } = await adminClient
+      .from("activity_log")
+      .select("kind, sales_order_id")
+      .eq("sales_order_id", created.id)
+      .in("kind", ["sales_order_deleted", "sales_order_restored"])
+      .order("created_at");
+    if (activityError) throw activityError;
+    expect(activity).toEqual([
+      { kind: "sales_order_deleted", sales_order_id: created.id },
+      { kind: "sales_order_restored", sales_order_id: created.id },
+    ]);
     await supabase.auth.signOut();
   });
 

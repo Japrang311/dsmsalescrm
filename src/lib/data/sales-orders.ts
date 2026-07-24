@@ -39,6 +39,8 @@ export type SalesOrderDocument = {
   unitPrice?: number;
   createdAt: string;
   updatedAt: string;
+  deletedAt: string | null;
+  deletedBy: string | null;
   items: SalesOrderLineItem[];
 };
 
@@ -70,6 +72,8 @@ type SalesOrderRow = {
   total_value: number | null;
   created_at: string;
   updated_at: string;
+  deleted_at: string | null;
+  deleted_by: string | null;
   sales_order_items?: SalesOrderItemRow[];
   items?: SalesOrderItemRow[];
 };
@@ -114,16 +118,69 @@ function toSalesOrder(row: SalesOrderRow): SalesOrderDocument {
       items.length === 1 ? (items[0].unitPrice ?? undefined) : undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    deletedAt: row.deleted_at,
+    deletedBy: row.deleted_by,
     items,
   };
 }
 
-export async function listSalesOrders(): Promise<SalesOrderDocument[]> {
-  const { data, error } = await supabase
+export type SalesOrderQuery = {
+  deleted?: boolean;
+};
+
+type SalesOrderQueryInput =
+  | SalesOrderQuery
+  | { queryKey: readonly unknown[] };
+
+function salesOrderQueryOptions(input: SalesOrderQueryInput): SalesOrderQuery {
+  return "queryKey" in input ? {} : input;
+}
+
+export async function listSalesOrders(
+  input: SalesOrderQueryInput = {},
+): Promise<SalesOrderDocument[]> {
+  const options = salesOrderQueryOptions(input);
+  let query = supabase
     .from("sales_orders")
     .select("*, sales_order_items(*)");
+  query = options.deleted
+    ? query.not("deleted_at", "is", null)
+    : query.is("deleted_at", null);
+  const { data, error } = await query;
   if (error) throw error;
   return ((data ?? []) as SalesOrderRow[]).map(toSalesOrder);
+}
+
+export async function getSalesOrder(
+  id: string,
+  options: SalesOrderQuery = {},
+): Promise<SalesOrderDocument | null> {
+  let query = supabase
+    .from("sales_orders")
+    .select("*, sales_order_items(*)")
+    .eq("id", id);
+  query = options.deleted
+    ? query.not("deleted_at", "is", null)
+    : query.is("deleted_at", null);
+  const { data, error } = await query.maybeSingle();
+  if (error) throw error;
+  return data ? toSalesOrder(data as SalesOrderRow) : null;
+}
+
+export async function deleteSalesOrder(id: string): Promise<void> {
+  const { error } = await supabase.rpc("set_sales_order_deleted", {
+    p_sales_order_id: id,
+    p_deleted: true,
+  });
+  if (error) throw error;
+}
+
+export async function restoreSalesOrder(id: string): Promise<void> {
+  const { error } = await supabase.rpc("set_sales_order_deleted", {
+    p_sales_order_id: id,
+    p_deleted: false,
+  });
+  if (error) throw error;
 }
 
 export type CreateSalesOrderInput = {
