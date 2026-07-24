@@ -117,6 +117,7 @@ const EXPECTED_TABLES: Record<string, ExpectedTable> = {
       "owner_id",
       "customer_po_number",
       "date",
+      "so_number",
       "tax_type",
       "updated_at",
     ],
@@ -303,7 +304,7 @@ describe("commercial-documents-schema contract", () => {
     ]);
   });
 
-  test("public.document_number_mode enum has exactly Auto, Imported, Hariff Backdate", async () => {
+  test("public.document_number_mode enum includes manual administrative numbering", async () => {
     const rows = await db`
       select e.enumlabel
       from pg_type t
@@ -314,6 +315,7 @@ describe("commercial-documents-schema contract", () => {
     `;
     expect(rows.map((r: Row) => r.enumlabel)).toEqual([
       "Auto",
+      "Manual",
       "Imported",
       "Hariff Backdate",
     ]);

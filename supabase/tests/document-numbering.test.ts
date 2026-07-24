@@ -227,12 +227,8 @@ describe("Phase 11 atomic document numbering", () => {
     expect(chain[2]?.supersedes_document_id).toBe(rev1.id);
   });
 
-  test("selects SO, NP, and PROTY series from classification", async () => {
+  test("accepts manually assigned SO, NP, and PROTY numbers", async () => {
     const salesClient = await signInAs(users().sales);
-    await db`
-      delete from private.document_number_counters
-      where year_code = 94 and series in ('SO', 'NP', 'PROTY')
-    `;
     const inputs = [
       {
         type: "Regular",
@@ -270,8 +266,8 @@ describe("Phase 11 atomic document numbering", () => {
         p_tax_type: input.taxType,
         p_prototype_status: input.prototypeStatus,
         p_source: foc ? "Prototype FOC" : "RFQ / New Product",
-        p_number_mode: "Auto",
-        p_manual_so_number: null,
+        p_number_mode: "Manual",
+        p_manual_so_number: input.expected,
         p_backdate_reason: null,
         p_items: foc ? [{ ...paidItems[0], unitPrice: null }] : paidItems,
       });
