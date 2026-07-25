@@ -52,6 +52,30 @@ export function toCommercialItem(
   };
 }
 
+const quotationNumberCollator = new Intl.Collator("en", {
+  numeric: true,
+  sensitivity: "base",
+});
+
+export function compareCommercialItemsByNewestQuotationNumber(
+  a: Pick<CommercialItem, "documentDate" | "quotationNumber" | "updatedAt">,
+  b: Pick<CommercialItem, "documentDate" | "quotationNumber" | "updatedAt">,
+): number {
+  const aNumber = a.quotationNumber ?? "";
+  const bNumber = b.quotationNumber ?? "";
+  if (aNumber || bNumber) {
+    if (!aNumber) return 1;
+    if (!bNumber) return -1;
+    const numberOrder = quotationNumberCollator.compare(bNumber, aNumber);
+    if (numberOrder !== 0) return numberOrder;
+  }
+
+  const dateOrder = (b.documentDate ?? "").localeCompare(a.documentDate ?? "");
+  if (dateOrder !== 0) return dateOrder;
+
+  return b.updatedAt.localeCompare(a.updatedAt);
+}
+
 /**
  * Transitional read facade for routes that still consume CommercialItem.
  * Each result is now one normalized document header, never one line row.
@@ -64,7 +88,9 @@ export async function listCommercialItems(
   input: CommercialItemsQueryInput = {},
 ): Promise<CommercialItem[]> {
   const options = "queryKey" in input ? {} : input;
-  return (await listCommercialDocuments(options)).map(toCommercialItem);
+  return (await listCommercialDocuments(options))
+    .map(toCommercialItem)
+    .sort(compareCommercialItemsByNewestQuotationNumber);
 }
 
 export type CommercialItemPatch = Partial<{
