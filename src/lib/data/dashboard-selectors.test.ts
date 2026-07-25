@@ -1,6 +1,7 @@
 import { describe, test, expect } from "bun:test";
-import type { SalesOrder } from "@/lib/domain";
+import type { CommercialItem, SalesOrder } from "@/lib/domain";
 import {
+  clientCommercialMetrics,
   companyMonthlyTarget,
   monthlyRevenue,
   monthlyTargetValue,
@@ -62,6 +63,23 @@ const prototypeFoc: SalesOrder = {
 
 const orders = [regularPaid, prototypePaid, prototypeFoc];
 
+const commercialItem = (
+  id: string,
+  type: CommercialItem["type"],
+  estimatedValue: number,
+  clientId = "client-1",
+): CommercialItem => ({
+  id,
+  clientId,
+  ownerId: "owner-1",
+  type,
+  sourceFlow: "RFQ / New Product",
+  stage: "Quotation Sent",
+  description: id,
+  estimatedValue,
+  updatedAt: dateInCurrentMonth,
+});
+
 describe("dashboard-selectors FOC exclusion", () => {
   test("monthlyRevenue and ytdRevenue exclude the FOC order", () => {
     expect(monthlyRevenue(orders)).toBe(1_500_000);
@@ -88,6 +106,21 @@ describe("dashboard-selectors FOC exclusion", () => {
     expect(summary.focCount).toBe(1);
     expect(summary.paidCount).toBe(1);
     expect(summary.supportActivity).toBe(2);
+  });
+});
+
+describe("clientCommercialMetrics", () => {
+  test("uses Quotation value for client quotation pipeline", () => {
+    const metrics = clientCommercialMetrics(
+      [
+        commercialItem("rfq", "RFQ", 1_000_000),
+        commercialItem("quotation", "Quotation", 2_500_000),
+        commercialItem("other-client", "Quotation", 9_000_000, "client-2"),
+      ],
+      "client-1",
+    );
+
+    expect(metrics.quotationPipeline).toBe(2_500_000);
   });
 });
 

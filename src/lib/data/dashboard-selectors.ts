@@ -567,13 +567,13 @@ export function clientCommercialMetrics(
   clientId: string,
 ) {
   const clientItems = items.filter((i) => i.clientId === clientId);
-  const rfqPipeline = clientItems
-    .filter((i) => i.type === "RFQ")
+  const quotationPipeline = clientItems
+    .filter((i) => i.type === "Quotation")
     .reduce((s, i) => s + i.estimatedValue, 0);
   const commit = clientItems
     .filter((i) => i.stage === "Commit")
     .reduce((s, i) => s + i.estimatedValue, 0);
-  return { rfqPipeline, commit };
+  return { quotationPipeline, commit };
 }
 
 // ---------------------------------------------------------------------------

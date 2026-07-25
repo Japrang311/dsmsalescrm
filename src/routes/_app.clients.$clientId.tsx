@@ -388,14 +388,18 @@ function ClientProfilePage() {
               hint={revenue.nonPpn > 0 ? "Non-PPN" : "Belum ada Non-PPN"}
             />
             <MetricCard
-              label="RFQ Pipeline"
+              label="Quotation Pipeline"
               value={
-                commercial.rfqPipeline > 0
-                  ? formatRupiahShort(commercial.rfqPipeline)
+                commercial.quotationPipeline > 0
+                  ? formatRupiahShort(commercial.quotationPipeline)
                   : "—"
               }
               icon={FileText}
-              hint={commercial.rfqPipeline > 0 ? "RFQ aktif" : "Belum ada RFQ"}
+              hint={
+                commercial.quotationPipeline > 0
+                  ? "Quotation aktif"
+                  : "Belum ada Quotation"
+              }
             />
             <MetricCard
               label="Commit"
