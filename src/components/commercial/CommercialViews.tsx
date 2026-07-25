@@ -333,16 +333,16 @@ export function CommercialViews(props: CommercialViewsProps) {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Klien</TableHead>
-                    <TableHead>Project</TableHead>
                     <TableHead>Date</TableHead>
+                    <TableHead>No. Quotation</TableHead>
+                    <TableHead>Project</TableHead>
+                    <TableHead>Klien</TableHead>
                     <TableHead className="text-right">Items</TableHead>
+                    <TableHead className="text-right">Estimasi</TableHead>
+                    <TableHead className="text-right">Forecast</TableHead>
                     <TableHead>Owner</TableHead>
                     <TableHead>Source flow</TableHead>
                     <TableHead>Stage</TableHead>
-                    <TableHead className="text-right">Estimasi</TableHead>
-                    <TableHead className="text-right">Forecast</TableHead>
-                    <TableHead>No. Quotation</TableHead>
                     <TableHead>No. Customer PO</TableHead>
                     <TableHead>Next FU</TableHead>
                     <TableHead>Aging</TableHead>
@@ -359,6 +359,22 @@ export function CommercialViews(props: CommercialViewsProps) {
                     const overdue = nextDays !== null && nextDays < 0;
                     return (
                       <TableRow key={it.id} className="hover:bg-muted/40">
+                        <TableCell className="whitespace-nowrap text-xs">
+                          {it.documentDate
+                            ? formatDateShort(it.documentDate)
+                            : "—"}
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap font-mono text-[11px]">
+                          {it.quotationNumber ?? "—"}
+                        </TableCell>
+                        <TableCell className="max-w-[220px]">
+                          <div className="truncate text-sm">
+                            {it.projectName ?? it.description}
+                          </div>
+                          <div className="mt-0.5 line-clamp-1 text-[11px] text-muted-foreground">
+                            {it.description}
+                          </div>
+                        </TableCell>
                         <TableCell className="max-w-[200px]">
                           <div className="truncate font-medium">
                             {client?.name ?? "-"}
@@ -369,34 +385,8 @@ export function CommercialViews(props: CommercialViewsProps) {
                             </div>
                           )}
                         </TableCell>
-                        <TableCell className="max-w-[220px]">
-                          <div className="truncate text-sm">
-                            {it.projectName ?? it.description}
-                          </div>
-                          <div className="mt-0.5 line-clamp-1 text-[11px] text-muted-foreground">
-                            {it.description}
-                          </div>
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap text-xs">
-                          {it.documentDate
-                            ? formatDateShort(it.documentDate)
-                            : "—"}
-                        </TableCell>
                         <TableCell className="text-right tabular-nums">
                           {it.itemCount ?? 0}
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap text-sm">
-                          {owner?.name ?? "-"}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="text-[10px]">
-                            {it.sourceFlow}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="secondary" className="text-[10px]">
-                            {it.stage}
-                          </Badge>
                         </TableCell>
                         <TableCell className="whitespace-nowrap text-right font-medium tabular-nums">
                           {it.prototypeStatus === "FOC" ? (
@@ -415,8 +405,18 @@ export function CommercialViews(props: CommercialViewsProps) {
                               : formatRupiahShort(it.forecastValue)
                             : "—"}
                         </TableCell>
-                        <TableCell className="whitespace-nowrap font-mono text-[11px]">
-                          {it.quotationNumber ?? "—"}
+                        <TableCell className="whitespace-nowrap text-sm">
+                          {owner?.name ?? "-"}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="text-[10px]">
+                            {it.sourceFlow}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary" className="text-[10px]">
+                            {it.stage}
+                          </Badge>
                         </TableCell>
                         <TableCell className="whitespace-nowrap font-mono text-[11px]">
                           {it.customerPoNumber ?? "—"}
