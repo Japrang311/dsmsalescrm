@@ -2,8 +2,11 @@ import { describe, expect, test } from "bun:test";
 
 import { defaultReportFilters } from "@/components/reports/ReportFilterBar";
 import { CURRENT_YEAR, NOW, PINNED_TODAY } from "@/lib/domain";
-import type { SalesOrder } from "@/lib/domain";
-import { filterSalesOrders } from "./report-selectors";
+import type { CommercialItem, SalesOrder } from "@/lib/domain";
+import {
+  filterSalesOrders,
+  quotationLostReasonBreakdown,
+} from "./report-selectors";
 
 function order(date: string): SalesOrder {
   return {
@@ -43,5 +46,42 @@ describe("report selectors", () => {
     });
 
     expect(filterSalesOrders([order(futureIso)], filters)).toHaveLength(0);
+  });
+
+  test("summarizes lost quotation count and value for dashboard reporting", () => {
+    const lostQuotation = (
+      id: string,
+      reason: CommercialItem["lostReason"],
+      estimatedValue: number,
+    ): CommercialItem => ({
+      id,
+      clientId: "client-1",
+      ownerId: "owner-1",
+      type: "Quotation",
+      sourceFlow: "RFQ / New Product",
+      stage: "Closed Lost",
+      description: id,
+      estimatedValue,
+      updatedAt: "2026-07-25T00:00:00.000Z",
+      lostReason: reason,
+    });
+
+    expect(
+      quotationLostReasonBreakdown([
+        lostQuotation("quo-1", "Tidak ada respons", 4_000_000),
+        lostQuotation("quo-2", "Harga tidak kompetitif", 8_000_000),
+      ]),
+    ).toEqual([
+      {
+        reason: "Harga tidak kompetitif",
+        quotationCount: 1,
+        lostValue: 8_000_000,
+      },
+      {
+        reason: "Tidak ada respons",
+        quotationCount: 1,
+        lostValue: 4_000_000,
+      },
+    ]);
   });
 });

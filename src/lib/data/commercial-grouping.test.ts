@@ -29,6 +29,8 @@ function document(
     clientAddress: null,
     soNumber: null,
     note: null,
+    lostReason: null,
+    lostReasonDetail: null,
     createdAt: "2026-07-18T00:00:00Z",
     updatedAt: "2026-07-18T00:00:00Z",
     deletedAt: null,

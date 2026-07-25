@@ -14,7 +14,11 @@ import { PipelineAnalytics } from "@/components/pipeline/PipelineAnalytics";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRole } from "@/context/role-context";
-import { NOW, type Role } from "@/lib/domain";
+import {
+  NOW,
+  type QuotationLostReason,
+  type Role,
+} from "@/lib/domain";
 import {
   listCommercialItems,
   updateCommercialItem,
@@ -47,8 +51,14 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { cn, getErrorMessage } from "@/lib/utils";
 import { getCurrentActorId, logActivity } from "@/lib/data/activity-log";
+import {
+  activeLostReasonPatch,
+  QUOTATION_LOST_REASONS,
+  validateQuotationLostReason,
+} from "@/lib/data/quotation-lost-reasons";
 
 export const Route = createFileRoute("/_app/pipeline")({
   head: () => ({
@@ -118,6 +128,8 @@ function PipelineBoard({ role }: { role: Role }) {
     currentNext?: string;
   } | null>(null);
   const [nextDateInput, setNextDateInput] = useState<string>("");
+  const [lostReason, setLostReason] = useState<QuotationLostReason | "">("");
+  const [lostReasonDetail, setLostReasonDetail] = useState("");
   const [drawerItemId, setDrawerItemId] = useState<string | null>(null);
 
   const { data: clientList = [] } = useQuery({
@@ -229,6 +241,8 @@ function PipelineBoard({ role }: { role: Role }) {
     const client = clientById[item.clientId];
     const currentNext = nextByItem.get(item.id);
     setNextDateInput(currentNext ?? addDaysISO(NOW, 3));
+    setLostReason("");
+    setLostReasonDetail("");
     setPendingMove({
       itemId: item.id,
       fromStage,
@@ -242,6 +256,22 @@ function PipelineBoard({ role }: { role: Role }) {
     if (!pendingMove) return;
     const item = items.find((i) => i.id === pendingMove.itemId);
     if (!item) return;
+    const lostReasonError = validateQuotationLostReason({
+      type: item.type,
+      stage: pendingMove.toStage,
+      lostReason: lostReason || null,
+      lostReasonDetail,
+    });
+    if (lostReasonError) {
+      toast.error(lostReasonError);
+      return;
+    }
+    const reasonPatch = activeLostReasonPatch({
+      type: item.type,
+      stage: pendingMove.toStage,
+      lostReason: lostReason || null,
+      lostReasonDetail,
+    });
     try {
       // commercial_documents has no next_action_date column post-Phase-11
       // normalization — updateCommercialItem() rejects that field outright
@@ -250,6 +280,10 @@ function PipelineBoard({ role }: { role: Role }) {
       // here; a changed date creates/logs a follow-up task instead.
       await updateCommercialItem(pendingMove.itemId, {
         stage: pendingMove.toStage,
+        lostReason:
+          item.type === "Quotation" ? reasonPatch.lostReason : undefined,
+        lostReasonDetail:
+          item.type === "Quotation" ? reasonPatch.lostReasonDetail : undefined,
       });
       const actorId = await getCurrentActorId();
       if (actorId) {
@@ -260,7 +294,19 @@ function PipelineBoard({ role }: { role: Role }) {
           clientId: item.clientId,
           commercialDocumentId: item.id,
           title: `${item.description} diperbarui`,
-          detail: `stage: ${pendingMove.fromStage} → ${pendingMove.toStage}`,
+          detail: [
+            `stage: ${pendingMove.fromStage} → ${pendingMove.toStage}`,
+            pendingMove.toStage === "Closed Lost" &&
+            item.type === "Quotation"
+              ? `Alasan lost: ${reasonPatch.lostReason}${
+                  reasonPatch.lostReasonDetail
+                    ? ` — ${reasonPatch.lostReasonDetail}`
+                    : ""
+                }`
+              : null,
+          ]
+            .filter(Boolean)
+            .join("\n"),
         });
       }
       if (nextDateInput && nextDateInput !== pendingMove.currentNext) {
@@ -621,6 +667,49 @@ function PipelineBoard({ role }: { role: Role }) {
                   </Button>
                 </div>
               </div>
+              {pendingMove.toStage === "Closed Lost" &&
+                items.find((item) => item.id === pendingMove.itemId)?.type ===
+                  "Quotation" && (
+                  <div className="grid gap-3 rounded-md border bg-muted/20 p-3">
+                    <div className="grid gap-1.5">
+                      <Label htmlFor="pipeline-lost-reason">
+                        Alasan quotation lost
+                      </Label>
+                      <Select
+                        value={lostReason}
+                        onValueChange={(value) =>
+                          setLostReason(value as QuotationLostReason)
+                        }
+                      >
+                        <SelectTrigger id="pipeline-lost-reason">
+                          <SelectValue placeholder="Pilih alasan lost" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {QUOTATION_LOST_REASONS.map((reason) => (
+                            <SelectItem key={reason} value={reason}>
+                              {reason}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid gap-1.5">
+                      <Label htmlFor="pipeline-lost-reason-detail">
+                        Detail alasan
+                        {lostReason === "Lainnya" ? " (wajib)" : " (opsional)"}
+                      </Label>
+                      <Textarea
+                        id="pipeline-lost-reason-detail"
+                        value={lostReasonDetail}
+                        onChange={(event) =>
+                          setLostReasonDetail(event.target.value)
+                        }
+                        placeholder="Tambahkan konteks untuk analisis"
+                        className="min-h-20"
+                      />
+                    </div>
+                  </div>
+                )}
             </div>
           )}
 

@@ -2,6 +2,8 @@ import type { ReportFilters } from "@/components/reports/ReportFilterBar";
 import { NOW } from "@/lib/app-time";
 import type { CommercialItem, SalesOrder } from "@/lib/domain";
 
+export { quotationLostReasonBreakdown } from "@/lib/data/quotation-lost-reasons";
+
 function inRange(dateStr: string, from: Date, to: Date) {
   const [year, month, day] = dateStr.split("-").map(Number);
   const date = new Date(year, month - 1, day).getTime();

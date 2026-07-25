@@ -39,7 +39,7 @@ import {
   daysBetween,
 } from "@/lib/format";
 import { stagesForFlow } from "@/lib/business-rules";
-import type { CommercialItem } from "@/lib/domain";
+import type { CommercialItem, QuotationLostReason } from "@/lib/domain";
 import { useRole, ROLE_LABEL } from "@/context/role-context";
 import { NOW } from "@/lib/domain";
 import { StatusBadge } from "@/components/clients/StatusBadges";
@@ -65,6 +65,11 @@ import {
   listCommercialItemHistory,
   logActivity,
 } from "@/lib/data/activity-log";
+import {
+  activeLostReasonPatch,
+  QUOTATION_LOST_REASONS,
+  validateQuotationLostReason,
+} from "@/lib/data/quotation-lost-reasons";
 
 type LineItemEdit = {
   qty: string;
@@ -138,6 +143,12 @@ export function CommercialDetailPage({
   const [priceReasonType, setPriceReasonType] = useState<string>("");
   const [priceReasonOther, setPriceReasonOther] = useState("");
   const [qtyReason, setQtyReason] = useState("");
+  const [lostReason, setLostReason] = useState<QuotationLostReason | "">(
+    item?.lostReason ?? "",
+  );
+  const [lostReasonDetail, setLostReasonDetail] = useState(
+    item?.lostReasonDetail ?? "",
+  );
 
   useEffect(() => {
     if (!item) return;
@@ -157,6 +168,8 @@ export function CommercialDetailPage({
     setPriceReasonType("");
     setPriceReasonOther("");
     setQtyReason("");
+    setLostReason(item.lostReason ?? "");
+    setLostReasonDetail(item.lostReasonDetail ?? "");
   }, [item]);
 
   if (!authReady) {
@@ -222,6 +235,22 @@ export function CommercialDetailPage({
     if (!item) return;
     const changes: { field: string; from?: string; to?: string }[] = [];
     const normalizedQuotation = quotationNumber.trim();
+    const reasonPatch = activeLostReasonPatch({
+      type: item.type,
+      stage,
+      lostReason: lostReason || null,
+      lostReasonDetail,
+    });
+    const lostReasonError = validateQuotationLostReason({
+      type: item.type,
+      stage,
+      lostReason: lostReason || null,
+      lostReasonDetail,
+    });
+    if (lostReasonError) {
+      toast.error(lostReasonError);
+      return;
+    }
     if (
       item.type === "Quotation" &&
       normalizedQuotation !== (item.quotationNumber ?? "")
@@ -233,6 +262,22 @@ export function CommercialDetailPage({
       });
     if (stage !== item.stage)
       changes.push({ field: "stage", from: item.stage, to: stage });
+    if (reasonPatch.lostReason !== (item.lostReason ?? null)) {
+      changes.push({
+        field: "lostReason",
+        from: item.lostReason,
+        to: reasonPatch.lostReason ?? undefined,
+      });
+    }
+    if (
+      reasonPatch.lostReasonDetail !== (item.lostReasonDetail ?? null)
+    ) {
+      changes.push({
+        field: "lostReasonDetail",
+        from: item.lostReasonDetail,
+        to: reasonPatch.lostReasonDetail ?? undefined,
+      });
+    }
     for (const change of lineChanges) {
       if (!Number.isFinite(change.qty) || change.qty <= 0) {
         toast.error("Qty tidak valid", {
@@ -299,7 +344,9 @@ export function CommercialDetailPage({
       const headerChanged =
         (item.type === "Quotation" &&
           normalizedQuotation !== (item.quotationNumber ?? "")) ||
-        stage !== item.stage;
+        stage !== item.stage ||
+        reasonPatch.lostReason !== (item.lostReason ?? null) ||
+        reasonPatch.lostReasonDetail !== (item.lostReasonDetail ?? null);
       if (headerChanged) {
         await updateCommercialItem(item.id, {
           quotationNumber:
@@ -308,6 +355,8 @@ export function CommercialDetailPage({
               ? normalizedQuotation
               : undefined,
           stage: stage !== item.stage ? stage : undefined,
+          lostReason: reasonPatch.lostReason,
+          lostReasonDetail: reasonPatch.lostReasonDetail,
         });
       }
       for (const change of lineChanges) {
@@ -328,6 +377,13 @@ export function CommercialDetailPage({
               }`
             : null,
           hasQtyChanges ? `Alasan qty: ${qtyReason.trim()}` : null,
+          item.type === "Quotation" && stage === "Closed Lost"
+            ? `Alasan lost: ${reasonPatch.lostReason}${
+                reasonPatch.lostReasonDetail
+                  ? ` — ${reasonPatch.lostReasonDetail}`
+                  : ""
+              }`
+            : null,
         ].filter(Boolean);
         await logActivity({
           kind: "commercial_item_stage_change",
@@ -492,6 +548,55 @@ export function CommercialDetailPage({
                   <Badge variant="secondary">{item.stage}</Badge>
                 )}
               </InfoCell>
+              {item.type === "Quotation" && stage === "Closed Lost" && (
+                <>
+                  <InfoCell label="Lost reason">
+                    {canEdit ? (
+                      <Select
+                        value={lostReason}
+                        onValueChange={(value) =>
+                          setLostReason(value as QuotationLostReason)
+                        }
+                      >
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue placeholder="Pilih alasan lost" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {QUOTATION_LOST_REASONS.map((reason) => (
+                            <SelectItem key={reason} value={reason}>
+                              {reason}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <span className="text-sm">
+                        {item.lostReason ?? "Belum diklasifikasi"}
+                      </span>
+                    )}
+                  </InfoCell>
+                  <InfoCell label="Detail alasan">
+                    {canEdit ? (
+                      <Textarea
+                        value={lostReasonDetail}
+                        onChange={(event) =>
+                          setLostReasonDetail(event.target.value)
+                        }
+                        placeholder={
+                          lostReason === "Lainnya"
+                            ? "Wajib jelaskan alasan lainnya"
+                            : "Tambahkan konteks bila diperlukan"
+                        }
+                        className="min-h-20 text-sm"
+                      />
+                    ) : (
+                      <span className="text-sm">
+                        {item.lostReasonDetail ?? "—"}
+                      </span>
+                    )}
+                  </InfoCell>
+                </>
+              )}
               <InfoCell
                 icon={<Calendar className="h-3.5 w-3.5" />}
                 label="Date"

@@ -1,5 +1,9 @@
 import { supabase } from "@/lib/supabase";
-import type { CommercialType, SourceFlow } from "@/lib/domain";
+import type {
+  CommercialType,
+  QuotationLostReason,
+  SourceFlow,
+} from "@/lib/domain";
 import type { Uom } from "./document-numbering";
 
 export type LineItemInput = {
@@ -39,6 +43,8 @@ export type CommercialDocumentWithItems = {
   clientAddress: string | null;
   soNumber: string | null;
   note: string | null;
+  lostReason: QuotationLostReason | null;
+  lostReasonDetail: string | null;
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
@@ -76,6 +82,8 @@ type CommercialDocumentRow = {
   client_address: string | null;
   so_number: string | null;
   note: string | null;
+  lost_reason: QuotationLostReason | null;
+  lost_reason_detail: string | null;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
@@ -119,6 +127,8 @@ function toDocument(row: CommercialDocumentRow): CommercialDocumentWithItems {
     clientAddress: row.client_address,
     soNumber: row.so_number,
     note: row.note,
+    lostReason: row.lost_reason,
+    lostReasonDetail: row.lost_reason_detail,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     deletedAt: row.deleted_at,
@@ -272,6 +282,8 @@ export type CommercialDocumentPatch = Partial<{
   soNumber: string | null;
   note: string | null;
   clientAddress: string | null;
+  lostReason: QuotationLostReason | null;
+  lostReasonDetail: string | null;
 }>;
 
 export async function updateCommercialDocument(
@@ -287,6 +299,10 @@ export async function updateCommercialDocument(
   if (patch.ownerId !== undefined) update.owner_id = patch.ownerId;
   if (patch.soNumber !== undefined) update.so_number = patch.soNumber || null;
   if (patch.note !== undefined) update.note = patch.note || null;
+  if (patch.lostReason !== undefined)
+    update.lost_reason = patch.lostReason || null;
+  if (patch.lostReasonDetail !== undefined)
+    update.lost_reason_detail = patch.lostReasonDetail?.trim() || null;
   if (patch.clientAddress !== undefined)
     update.client_address = patch.clientAddress || null;
 

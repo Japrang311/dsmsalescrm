@@ -109,7 +109,6 @@ const WEIGHTED_STAGES = [
   "Hot Prospect",
   "Commit",
   "Closed Won",
-  "Closed Lost",
 ] as const;
 
 export function CreateRfqDialog(props: SharedProps) {

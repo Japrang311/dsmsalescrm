@@ -28,6 +28,8 @@ export function toCommercialItem(
     quotationRevision: document.quotationRevision,
     clientAddress: document.clientAddress ?? undefined,
     note: document.note ?? undefined,
+    lostReason: document.lostReason ?? undefined,
+    lostReasonDetail: document.lostReasonDetail ?? undefined,
     soNumber: document.soNumber ?? undefined,
     qty:
       document.items.length === 1 ? (firstItem?.qty ?? undefined) : undefined,
@@ -71,6 +73,8 @@ export type CommercialItemPatch = Partial<{
   customerPoNumber: string | null;
   soNumber: string | null;
   taxType: CommercialItem["taxType"] | null;
+  lostReason: CommercialItem["lostReason"] | null;
+  lostReasonDetail: string | null;
 }>;
 
 export async function updateCommercialItem(
@@ -91,6 +95,8 @@ export async function updateCommercialItem(
       stage: patch.stage,
       ownerId: patch.ownerId,
       soNumber: patch.soNumber,
+      lostReason: patch.lostReason,
+      lostReasonDetail: patch.lostReasonDetail,
     }),
   );
 }

@@ -67,6 +67,17 @@ export type RfqStage =
   | "Closed Won"
   | "Closed Lost";
 
+export type QuotationLostReason =
+  | "Harga tidak kompetitif"
+  | "Kalah tender/kompetitor"
+  | "Spesifikasi tidak sesuai"
+  | "Project ditunda/dibatalkan"
+  | "Tidak ada respons"
+  | "Lead time"
+  | "Anggaran"
+  | "Lainnya"
+  | "Belum diklasifikasi";
+
 export type RepeatStage =
   | "Timeplan/Price Update Requested"
   | "Waiting Client PO"
@@ -99,6 +110,8 @@ export type CommercialItem = {
   quotationRevision?: number;
   clientAddress?: string;
   note?: string;
+  lostReason?: QuotationLostReason;
+  lostReasonDetail?: string;
   customerPoNumber?: string;
   soNumber?: string;
   qty?: number;

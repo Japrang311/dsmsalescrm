@@ -15,6 +15,7 @@ import {
   listCommercialDocuments,
   reviseQuotation,
   restoreCommercialDocument,
+  updateCommercialDocument,
 } from "./commercial-documents";
 
 let fixtures: RoleFixtureUsers;
@@ -219,6 +220,48 @@ describe("normalized commercial document adapter", () => {
     await expect(deleteCommercialDocument(created.id)).rejects.toThrow(
       "Quotation ini tidak dapat dihapus karena sudah memiliki revisi yang lebih baru.",
     );
+    await supabase.auth.signOut();
+  });
+
+  test("requires a structured lost reason and clears it when reopened", async () => {
+    const authClient = await signInAs(fixtures.sales);
+    const session = (await authClient.auth.getSession()).data.session!;
+    await supabase.auth.setSession({
+      access_token: session.access_token,
+      refresh_token: session.refresh_token,
+    });
+    const created = await createQuotation({
+      clientId,
+      documentDate: "2095-02-01",
+      items: [
+        {
+          productName: "Lost reason contract",
+          qty: 1,
+          uom: "Unit",
+          unitPrice: 50_000,
+        },
+      ],
+    });
+
+    await expect(
+      updateCommercialDocument(created.id, { stage: "Closed Lost" }),
+    ).rejects.toThrow();
+
+    const closed = await updateCommercialDocument(created.id, {
+      stage: "Closed Lost",
+      lostReason: "Harga tidak kompetitif",
+      lostReasonDetail: "Selisih harga 12%",
+    });
+    expect(closed.lostReason).toBe("Harga tidak kompetitif");
+    expect(closed.lostReasonDetail).toBe("Selisih harga 12%");
+
+    const reopened = await updateCommercialDocument(created.id, {
+      stage: "Negotiation",
+      lostReason: null,
+      lostReasonDetail: null,
+    });
+    expect(reopened.lostReason).toBeNull();
+    expect(reopened.lostReasonDetail).toBeNull();
     await supabase.auth.signOut();
   });
 });
