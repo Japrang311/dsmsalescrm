@@ -1,6 +1,11 @@
 # Google Sheets Import: Normalized Document Mapping
 
-Status: Accepted target mapping, 2026-07-18
+Status: Accepted target mapping, 2026-07-18; RFQ compatibility note added 2026-07-25
+
+> RFQ is retired as an active app feature by ADR-003. Historical Quotation rows
+> may still carry the legacy stored source value `RFQ / New Product`; the app
+> maps that boundary value to user-facing `New Product`. Do not add active RFQ
+> import/create behavior from this historical label.
 
 This document is the source of truth for the next revision of `scripts/import-sheets.ts`. The current importer still writes one Sheet row to one legacy `sales_orders` row and must not be used for the real migration until Task 33 updates it to this normalized mapping.
 

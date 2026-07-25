@@ -227,6 +227,30 @@ describe("normalized Sheet import classification and grouping", () => {
     });
   });
 
+  test("finds the real Quotation header after summary rows and skips blank tail rows", () => {
+    const parsed = parseSheetCsv(
+      "QUOTATION",
+      [
+        ",,,,,,,,,TOTAL PIPELINE,QUOTES WON,QUOTES OPEN,QUOTES LOST,",
+        ",,,,,,,,,Rp108.605.945.041,Rp10.284.307.541,Rp 10.501.678.250,Rp87.528.609.250,",
+        ",,,,,,,,,,9.47%,,,,",
+        "Quotation Number,Date,Account,Product Name,Clients,Address,QTY,UOM,Harga satuan,Harga total,Status,SO Number,Note,Column 1",
+        "DSM-26QUO-0001,05/01/2026,Feni Cahyaningtias,BLANK MCB,CV. LEUWIANYAR TEKNIK,CV. LEUWI ANYAR TEKNIK (Workshop),22,Unit,Rp98.000,Rp2.156.000,Closed Won,DSM-26NP001,,",
+        ",,,,,,,,,,,,,",
+        ",,,,,,,,,Rp0,,,,",
+      ].join("\n"),
+    );
+
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0]).toMatchObject({
+      sourceIndex: 5,
+      documentNumber: "DSM-26QUO-0001",
+      description: "BLANK MCB",
+      customerName: "CV. LEUWIANYAR TEKNIK",
+      ownerName: "Feni Cahyaningtias",
+    });
+  });
+
   test("forward-fills one unambiguous customer PO across SO line items", () => {
     const parsed = parseSheetCsv(
       "SO 2026",
