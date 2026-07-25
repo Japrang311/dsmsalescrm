@@ -2,7 +2,6 @@ import { useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQueryClient } from "@tanstack/react-query";
-import { z } from "zod";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -22,40 +21,12 @@ import { PROVINCES, REGENCIES } from "@/lib/indonesia-regions";
 import { updateClientDetails } from "@/lib/data/clients";
 import { getCurrentActorId, logActivity } from "@/lib/data/activity-log";
 import type { Client } from "@/lib/domain";
+import {
+  editClientInfoSchema,
+  type EditClientInfoFormValues,
+} from "@/components/clients/edit-client-info-schema";
 
-// Empty string ("") is how a cleared input reaches the form — treat it the
-// same as "not provided" rather than failing email validation on a blank
-// field, since every contact field here is optional.
-const emailField = z
-  .string()
-  .trim()
-  .refine((v) => v === "" || z.string().email().safeParse(v).success, {
-    message: "Format email tidak valid",
-  });
-
-const contactSchema = z.object({
-  name: z.string().trim(),
-  position: z.string().trim(),
-  email: emailField,
-  phone: z.string().trim(),
-  mobile: z.string().trim(),
-});
-
-const schema = z.object({
-  address: z.string().trim(),
-  province: z.string().trim(),
-  city: z.string().trim(),
-  industry: z.string().trim(),
-  website: z.string().trim(),
-  notes: z.string().trim(),
-  cp1: contactSchema,
-  cp2: contactSchema,
-  cp3: contactSchema,
-});
-
-type FormValues = z.infer<typeof schema>;
-
-function toFormValues(client: Client): FormValues {
+function toFormValues(client: Client): EditClientInfoFormValues {
   const [cp1, cp2, cp3] = client.contacts;
   const toContact = (c: (typeof client.contacts)[number]) => ({
     name: c.name ?? "",
@@ -65,6 +36,7 @@ function toFormValues(client: Client): FormValues {
     mobile: c.mobile ?? "",
   });
   return {
+    name: client.name,
     address: client.address ?? "",
     province: client.province ?? "",
     city: client.city ?? "",
@@ -90,8 +62,8 @@ export function EditClientInfoDialog({
 }) {
   const queryClient = useQueryClient();
 
-  const form = useForm<FormValues>({
-    resolver: zodResolver(schema),
+  const form = useForm<EditClientInfoFormValues>({
+    resolver: zodResolver(editClientInfoSchema),
     defaultValues: toFormValues(client),
   });
   const {
@@ -122,6 +94,7 @@ export function EditClientInfoDialog({
   const onSubmit = handleSubmit(async (values) => {
     try {
       const updated = await updateClientDetails(client.id, {
+        name: values.name,
         address: values.address,
         province: values.province,
         city: values.city,
@@ -134,6 +107,7 @@ export function EditClientInfoDialog({
       const actorId = await getCurrentActorId();
       if (actorId) {
         const changed: string[] = [];
+        if (values.name !== client.name) changed.push("Nama Client");
         if (values.address !== (client.address ?? "")) changed.push("Alamat");
         if (values.province !== (client.province ?? ""))
           changed.push("Propinsi");
@@ -157,17 +131,17 @@ export function EditClientInfoDialog({
           ownerId: updated.ownerId,
           actorId,
           clientId: client.id,
-          title: `Info klien ${client.name} diperbarui`,
+          title: `Info client ${updated.name} diperbarui`,
           detail: changed.length ? changed.join(", ") : undefined,
         });
       }
 
       await queryClient.invalidateQueries({ queryKey: ["clients"] });
       await queryClient.invalidateQueries({ queryKey: ["activity-log"] });
-      toast.success("Info klien diperbarui");
+      toast.success("Info client diperbarui");
       onOpenChange(false);
     } catch (error) {
-      toast.error("Gagal menyimpan info klien", {
+      toast.error("Gagal menyimpan info client", {
         description: error instanceof Error ? error.message : "Unknown error",
       });
     }
@@ -177,10 +151,10 @@ export function EditClientInfoDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Edit Info Perusahaan &amp; Kontak</DialogTitle>
+          <DialogTitle>Edit Info Client &amp; Kontak</DialogTitle>
           <DialogDescription>
-            Alamat, bidang usaha, dan hingga 3 kontak person untuk {client.name}
-            . Dicatat sebagai {actorName}.
+            Nama client, info perusahaan, dan hingga 3 kontak person. Dicatat
+            sebagai {actorName}.
           </DialogDescription>
         </DialogHeader>
 
@@ -189,6 +163,20 @@ export function EditClientInfoDialog({
             <p className="text-xs font-semibold text-muted-foreground">
               Perusahaan
             </p>
+            <div>
+              <Label htmlFor="client-name">Nama Client</Label>
+              <Input
+                id="client-name"
+                autoComplete="organization"
+                aria-invalid={Boolean(errors.name)}
+                {...register("name")}
+              />
+              {errors.name && (
+                <p className="mt-1 text-xs text-destructive">
+                  {errors.name.message}
+                </p>
+              )}
+            </div>
             <div>
               <Label htmlFor="address">Alamat</Label>
               <Textarea

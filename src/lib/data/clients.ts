@@ -130,6 +130,7 @@ export async function updateClientStatus(
 }
 
 export type UpdateClientDetailsInput = {
+  name: string;
   address?: string;
   province?: string;
   city?: string;
@@ -151,6 +152,7 @@ export async function updateClientDetails(
   const { data, error } = await supabase
     .from("clients")
     .update({
+      name: patch.name.trim(),
       address: blank(patch.address),
       province: blank(patch.province),
       city: blank(patch.city),
