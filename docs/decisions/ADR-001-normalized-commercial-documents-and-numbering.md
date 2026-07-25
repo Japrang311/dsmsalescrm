@@ -4,6 +4,10 @@
 > digantikan oleh input manual dengan panduan format. Penomoran Quotation tetap
 > otomatis dan PostgreSQL-owned. Data Sales Order lama dengan mode `Auto`
 > dipertahankan sebagai histori.
+>
+> **Update 2026-07-25:** ADR-003 mempensiunkan RFQ sebagai fitur aktif. Bagian
+> RFQ dalam ADR ini tetap menjadi konteks histori dan kompatibilitas data lama,
+> bukan instruksi untuk mengembalikan RFQ ke UI aktif.
 
 ## Status
 

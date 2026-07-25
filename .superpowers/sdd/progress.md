@@ -1,5 +1,9 @@
 # Subagent-Driven Development Progress
 
+Current update 2026-07-25: RFQ is retired as an active app feature by ADR-003.
+Older completed task references to RFQ are historical and must not be used to
+restore RFQ routes, quick-create, filters, dropdowns, or stages.
+
 ## Plan 1: `docs/superpowers/plans/2026-07-18-super-admin-team-role-management-implementation.md` (Phase 12) — COMPLETE 2026-07-19
 
 Started: 2026-07-18

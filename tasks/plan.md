@@ -1,5 +1,10 @@
 # Implementation Plan: Supabase Backend & Data Layer
 
+> **Current update 2026-07-25:** RFQ is retired as an active application
+> feature by ADR-003. RFQ-related completed tasks below remain historical
+> implementation record only; do not restore RFQ routes, quick-create, filters,
+> dropdowns, or stages from this plan.
+
 Spec: `specs/backend-data-layer.md`
 
 ## Overview
@@ -67,7 +72,8 @@ Replace the mock data layer (`src/lib/mock/`) with a real Supabase backend, one 
 
 ### Checkpoint 4: Commercial Pipeline fully live
 
-- [x] RFQ / Quotation / Prototype pipeline views read from Postgres
+- [x] Historical RFQ / Quotation / Prototype pipeline views read from Postgres
+  at the time; RFQ active surfaces were later retired by ADR-003.
 - [x] `bun test` passes (commercial_items RLS test)
 
 ### Phase 5: Sales Orders & Revenue Vertical Slice

@@ -1,5 +1,10 @@
 # Soft Delete RFQ, Quotation, and Sales Order Implementation Plan
 
+> **Update 2026-07-25:** RFQ is retired as an active app feature by ADR-003.
+> This plan remains historical implementation evidence for soft-delete behavior;
+> do not use it to restore active RFQ routes, forms, filters, stages, or
+> dropdowns.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add reversible, permission-safe soft delete and restore flows for RFQ, Quotation, and Sales Order, with deleted records excluded from normal business views and every transition recorded in the immutable activity log.

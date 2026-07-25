@@ -1,6 +1,6 @@
 # Quick Create Label Fix and Verification Design
 
-> **Historical completed design.** This document records the narrow Quick Create label/verification pass as executed. Its “no schema/form/grouping change” boundary and external-number rationale are superseded for future work by ADR-001 and `2026-07-18-commercial-product-fields-and-sheet-alignment-design.md`. Do not edit the historical verification evidence to pretend Phase 11 was already implemented.
+> **Historical completed design.** This document records the narrow Quick Create label/verification pass as executed. Its “no schema/form/grouping change” boundary and external-number rationale are superseded for future work by ADR-001 and `2026-07-18-commercial-product-fields-and-sheet-alignment-design.md`. As of ADR-003 on 2026-07-25, the RFQ Quick Create item is also retired and must not be restored from this historical plan. Do not edit the historical verification evidence to pretend Phase 11 or RFQ retirement was already implemented at the time.
 
 Date: 2026-07-18
 

@@ -1,5 +1,10 @@
 # Task List: Supabase Backend & Data Layer
 
+> **Current update 2026-07-25:** RFQ is retired as an active app feature by
+> ADR-003. RFQ mentions in older completed tasks are historical implementation
+> record only; they are not instructions to restore RFQ routes, forms,
+> quick-create entries, dropdowns, filters, or stages.
+
 Plan: `tasks/plan.md` · Spec: `specs/backend-data-layer.md`
 
 ---

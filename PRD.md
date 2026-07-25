@@ -2,19 +2,25 @@
 
 ## 1. Purpose
 
-Build a web app UI/UX prototype in Lovable for a sheet metal fabricator sales team. The app is an account-centric sales execution and revenue control workspace: it helps sales manage customer follow-ups, RFQ and quotation work, direct orders from existing clients, prototype orders, Sales Orders, and performance against target.
+Build a web app UI/UX prototype in Lovable for a sheet metal fabricator sales team. The app is an account-centric sales execution and revenue control workspace: it helps sales manage customer follow-ups, quotation work, direct orders from existing clients, prototype orders, Sales Orders, and performance against target.
 
 Lovable is used for UI/UX, screen flow, navigation, and component layout. Codex/Claude owns the real Supabase backend, authentication, permissions, Google Sheets historical import, validation, migrations, and production implementation. The local application is fully migrated to the real backend as of 2026-07-19; remote migration/import remains separately gated.
+
+> Current product update, 2026-07-25: RFQ is retired as an active application
+> feature. Historical RFQ database rows and old import records may remain for
+> compatibility, but current UI/UX, routes, creation flows, dropdowns, filters,
+> pipeline stages, and status configuration must start from Quotation instead of
+> RFQ. See ADR-003 and `specs/remove-rfq.md`.
 
 ## 2. Business Context
 
 DSM is a sheet metal fabricator with more than 12 years of operations. Sales activity is rarely driven by canvassing or cold lead hunting. Most clients come from referrals, website inquiries, and business relationships. Around 80% of revenue comes from existing clients.
 
-The app must therefore avoid a generic lead-heavy CRM model and must not imitate Salesforce's prospecting-oriented information architecture. The core problem is controlling follow-up, active commercial work, RFQ, quotation, customer PO, Sales Order, prototype support, and revenue tracking for existing and incoming clients.
+The app must therefore avoid a generic lead-heavy CRM model and must not imitate Salesforce's prospecting-oriented information architecture. The core problem is controlling follow-up, active commercial work, quotation, customer PO, Sales Order, prototype support, and revenue tracking for existing and incoming clients.
 
 Revenue is recognized from the paid Product line items recorded in the single Create Sales Order transaction. The administrative SO number identifies the document but does not create, move, or change revenue. Commercial work reaches Sales Order through two primary paths:
 
-1. RFQ / new product: Client -> RFQ -> Quotation -> Customer PO -> Sales Order -> Revenue.
+1. New product: Client -> Quotation -> Customer PO -> Sales Order -> Revenue.
 2. Existing client / direct or repeat order: Existing Client -> Customer PO -> Sales Order -> Revenue.
 
 Prototype work is a supporting commercial path. Every prototype, whether paid or free, must be released as an `SO Prototype`. A paid prototype has priced line items and contributes their total to revenue. A free prototype has Product/Description/Qty/UOM items but no Unit Price or Total, is labeled `FOC`, and contributes zero to revenue achievement.
@@ -83,7 +89,7 @@ Prototype work is a supporting commercial path. Every prototype, whether paid or
 Historical sales data is currently in Google Sheets:
 
 - `DASHBOARD SALES`: executive-style dashboard and charts.
-- `DAILY ACTIVITY`: sales activity logs with fields such as date, PIC/sales, activity category, customer, project/RFQ, daily activity, expected output, status, next follow-up date, notes, activity ID, aging days, SLA status, and compliance flag.
+- `DAILY ACTIVITY`: sales activity logs with fields such as date, PIC/sales, activity category, customer, project reference, daily activity, expected output, status, next follow-up date, notes, activity ID, aging days, SLA status, and compliance flag.
 - `QUOTATION`: quotation pipeline with quotation number, date, account, description, client, address, quantity, UOM, unit price, total price, status, SO number, and note. The application adds a separate required Product Name.
 - `SO 2026`: PPN Sales Order/revenue data with PO number, SO number, customer, sales, project description, quantity, unit price, and total price. The application uses one compact Date (`18 Jul 2026`) instead of separate Month/Week/Year fields and adds Product Name plus a separate UOM.
 - `NP 2026`: Non-PPN Sales Orders and the seed source for the `DSM-YYNPnnn` series.
@@ -96,9 +102,9 @@ The web app should use Google Sheet data as historical import/sync source. New F
 
 ## 6. Core Business Flows
 
-### Flow A: RFQ / New Product Revenue
+### Flow A: New Product Revenue
 
-Client -> RFQ -> Quotation -> Customer PO -> Sales Order -> Revenue
+Client -> Quotation -> Customer PO -> Sales Order -> Revenue
 
 ### Flow B: Existing Client / Direct Or Repeat Order Revenue
 
@@ -180,16 +186,14 @@ Commercial item represents active business work attached to a client.
 
 Types:
 
-- RFQ
 - Quotation
 - Direct / Repeat Order Request
 - Prototype Request
 - PO
 - Sales Order
 
-RFQ/Quotation forecast stages and weights:
+Quotation forecast stages and weights:
 
-- Client Request for Quotes — 15%
 - Quotes Sent — 30%
 - Negotiation — 55%
 - Hot Prospect — 75%
@@ -197,7 +201,7 @@ RFQ/Quotation forecast stages and weights:
 - Closed Won — 100%
 - Closed Lost — 0%
 
-RFQ defaults to `Client Request for Quotes`. A new Quotation or Quotation revision defaults to `Quotes Sent`. Only the latest Quotation revision contributes to pipeline forecast.
+A new Quotation or Quotation revision defaults to `Quotes Sent`. Only the latest Quotation revision contributes to pipeline forecast.
 
 Repeat order stages:
 
@@ -252,7 +256,7 @@ Revenue must support:
 - Non-PPN revenue
 - Sales owner
 - Client
-- Commercial source flow: RFQ / New Product, Existing Client / Direct or Repeat Order, or Prototype Paid
+- Commercial source flow: New Product, Existing Client / Direct or Repeat Order, or Prototype Paid
 - Sales Order reference
 - Sales Order type: Regular or Prototype
 - Prototype commercial status: Paid or FOC when Sales Order type is Prototype
@@ -273,11 +277,11 @@ All roles must see:
 - Monthly Achievement vs Monthly Target
 - Total revenue
 - PPN vs Non-PPN breakdown
-- Revenue source breakdown: RFQ, Existing/Repeat Order, and Prototype Paid
+- Revenue source breakdown: New Product, Existing/Repeat Order, and Prototype Paid
 - Prototype summary: Paid value, FOC count, and FOC support activity
 - Open follow-up/task count
 - Overdue follow-up/task count
-- Active quotation/RFQ pipeline
+- Active quotation pipeline
 - Waiting PO value
 - Sales Order/revenue trend
 
@@ -400,7 +404,7 @@ The Lovable prototype is successful when:
 - Revenue cards show both total revenue and PPN/non-PPN breakdown.
 - Paid SO Prototype contributes to revenue and achievement.
 - FOC SO Prototype remains traceable with an empty SO value, contributes zero revenue, and does not increase achievement.
-- UI makes it clear that the system is built around existing clients, inbound/referred opportunities, RFQ, direct/repeat order, prototype support, Sales Order, and revenue, not generic cold lead hunting.
+- UI makes it clear that the system is built around existing clients, inbound/referred opportunities, quotation work, direct/repeat order, prototype support, Sales Order, and revenue, not generic cold lead hunting.
 - The experience does not look or behave like a Salesforce clone.
 - The prototype can be handed off to Codex/Claude for database/backend implementation without redesigning the core screens.
 
@@ -426,7 +430,7 @@ Create the app shell:
 - Dashboard as the first screen, not a landing page.
 - Apply a Salesforce-inspired visual theme: bright enterprise surfaces, confident blue actions, dark navy text, compact spacing, subtle gray borders, restrained shadows, crisp tables, and clear status badges.
 - Salesforce is a visual reference only. Do not copy Salesforce branding, logos, page composition, terminology, or lead-centric workflows.
-- Keep DSM's own information architecture: Client, FU/Task, RFQ, Quotation, Customer PO, Sales Order, Prototype, and Revenue.
+- Keep DSM's own information architecture: Client, FU/Task, Quotation, Customer PO, Sales Order, Prototype, and Revenue.
 
 Dashboard requirements:
 
@@ -439,7 +443,7 @@ Dashboard requirements:
 - Top Executive shows read-only company-wide executive dashboard.
 - Super Admin shows company-wide system-administration scope, including Settings → Tim & Role, but is not shown as a Sales owner or performance participant.
 
-Use realistic Indonesian business labels where helpful: Target YTD, Achievement YTD, Monthly Target, Monthly Achievement, PPN, Non-PPN, Follow Up, RFQ, Quotation, Customer PO, Sales Order, SO Prototype, Paid, and FOC.
+Use realistic Indonesian business labels where helpful: Target YTD, Achievement YTD, Monthly Target, Monthly Achievement, PPN, Non-PPN, Follow Up, Quotation, Customer PO, Sales Order, SO Prototype, Paid, and FOC.
 
 ### Phase 2 Prompt: Client List And Client Profile
 
@@ -466,7 +470,7 @@ Client profile must show:
 - Last FU and next FU.
 - Active commercial items.
 - Follow-up history timeline.
-- Related RFQ, Quotation, PO, and Sales Order records.
+- Related Quotation, PO, and Sales Order records.
 - Related prototype requests and SO Prototype records, clearly labeled Paid or FOC.
 
 The client page must make it clear that DSM's system is not lead-hunting first. It is mainly for tracking existing, referred, web-inquiry, and relationship-based clients, along with their activity, commercial items, prototypes, Sales Orders, and revenue.
@@ -519,7 +523,7 @@ Use quick actions such as Mark Done, Schedule Next FU, Create Quotation Task, Mo
 
 Also provide `Create Prototype Task` for prototype requests and keep the task attached to the client and prototype commercial item.
 
-### Phase 4 Prompt: Commercial Pipeline For RFQ, Existing Orders, Prototype, And Sales Order
+### Phase 4 Prompt: Commercial Pipeline For Quotations, Existing Orders, Prototype, And Sales Order
 
 Continue the DSM Sales Execution prototype. Add commercial item pipeline screens.
 
@@ -530,7 +534,6 @@ Preserve the Salesforce-inspired visual theme from Phase 1. The commercial pipel
 Create:
 
 - Commercial Pipeline page.
-- RFQ list/detail.
 - Quotation list/detail.
 - Direct / Repeat Order list/detail.
 - Prototype Request list/detail.
@@ -539,8 +542,8 @@ Create:
 
 Business flows:
 
-New RFQ flow:
-Client -> RFQ -> Quotation -> PO -> Sales Order -> Revenue
+New product flow:
+Client -> Quotation -> PO -> Sales Order -> Revenue
 
 Repeat order flow:
 Client asks for timeplan or updated price -> Client PO -> Sales releases Sales Order -> Revenue
@@ -548,9 +551,8 @@ Client asks for timeplan or updated price -> Client PO -> Sales releases Sales O
 Prototype flow:
 Client -> Prototype Request -> Prototype Follow-Up -> SO Prototype -> Delivered
 
-Weighted stages for RFQ/Quotation pipeline:
+Weighted stages for Quotation pipeline:
 
-- Client Request for Quotes — 15%.
 - Quotes Sent — 30%.
 - Negotiation — 55%.
 - Hot Prospect — 75%.
@@ -558,7 +560,7 @@ Weighted stages for RFQ/Quotation pipeline:
 - Closed Won — 100%.
 - Closed Lost — 0%.
 
-These exact labels and weights are the current forecast source of truth. They supersede the earlier mock-only RFQ stage list.
+These exact labels and weights are the current forecast source of truth. They supersede the earlier mock-only RFQ stage list and the retired `Client Request for Quotes` stage.
 
 Stages for Repeat Order:
 
@@ -599,7 +601,7 @@ Create:
 - Revenue page.
 - Executive Reports page.
 - PPN vs Non-PPN breakdown.
-- Revenue source breakdown: RFQ / New Product, Existing Client / Direct or Repeat Order, and Prototype Paid.
+- Revenue source breakdown: New Product, Existing Client / Direct or Repeat Order, and Prototype Paid.
 - Prototype report showing Paid value, FOC count, and FOC support activity without adding FOC to revenue.
 - Monthly achievement vs target chart.
 - YTD achievement vs target chart.
@@ -695,7 +697,7 @@ These decisions were confirmed during product discovery and must be treated as i
 
 ### Document Header And Line Items
 
-- The user records each RFQ, Quotation, or Sales Order once in one form.
+- The user records each Quotation or Sales Order once in one form.
 - Internally, PostgreSQL stores one document header plus one or more line-item rows. This prevents repeated header data and allows unique document-number enforcement.
 - Target tables are `public.commercial_documents`, `public.commercial_document_items`, `public.sales_orders`, and `public.sales_order_items`.
 - Atomic counter state lives in non-exposed `private.document_number_counters`.

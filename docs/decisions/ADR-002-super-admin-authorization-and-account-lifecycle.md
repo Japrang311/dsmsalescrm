@@ -1,5 +1,10 @@
 # ADR-002: Explicit Super Admin Authorization and Safe Account Lifecycle
 
+> **Update 2026-07-25:** ADR-003 retires RFQ as an active app feature. Any
+> statement below about RFQ ownership is historical compatibility context; Super
+> Admin still must not become owner of clients, Quotations, Sales Orders,
+> targets, pipeline, or revenue.
+
 ## Status
 
 Accepted

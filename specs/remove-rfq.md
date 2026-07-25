@@ -1,5 +1,10 @@
 # Spec: Remove RFQ
 
+Status update 2026-07-25: implemented and pushed to `origin/main` as
+`b0dc808 refactor: retire RFQ workflow`. The two RFQ-retirement migrations are
+committed and verified locally, but still require a separate approved Supabase
+remote apply.
+
 ## Objective
 
 Retire RFQ as an application feature while preserving historical database rows.
@@ -50,6 +55,8 @@ const source = row.source === LEGACY_NEW_PRODUCT_SOURCE ? "New Product" : row.so
 - Quotation stages start at `Quotes Sent`; `Client Request for Quotes` is gone.
 - User-facing revenue source is `New Product`, with legacy storage mapping.
 - RFQ creation/conversion RPCs are removed by a new forward migration.
+- Authenticated attempts to create new RFQ documents are rejected by a forward
+  migration.
 - Tests, typecheck, lint, and build pass.
 
 ## Open Questions

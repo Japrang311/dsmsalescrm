@@ -1,6 +1,8 @@
 # Quick Create Label Fix and Verification Implementation Plan
 
 > **Historical completed plan.** The constraints below describe the label/verification task at execution time. They do not block the accepted Phase 11 schema, form, numbering, revision, or grouped-view work documented in ADR-001 and the current commercial design.
+> As of ADR-003 on 2026-07-25, RFQ Quick Create is retired; do not restore the
+> `rfq` quick-create kind from this historical plan.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

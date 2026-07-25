@@ -1,6 +1,11 @@
 # Spec: Supabase Backend & Data Layer
 
-> **Current architecture update (2026-07-19):** The normalized commercial schema, four-role authorization model, safe account lifecycle, and full mock-layer removal are implemented and verified locally. ADR-001 and ADR-002 remain the decision sources. Remote migration/import remains separately gated.
+> **Current architecture update (2026-07-25):** The normalized commercial
+> schema, four-role authorization model, safe account lifecycle, and full
+> mock-layer removal are implemented. RFQ is retired as an active app feature
+> by ADR-003; historical RFQ database compatibility remains. RFQ-retirement
+> migrations are committed, but remote Supabase application remains separately
+> gated.
 
 ## Objective
 
@@ -48,7 +53,7 @@ scripts/
   import-sheets.ts    → one-time/manual Google Sheets → Postgres import (service-role key, run via bun, never in the browser bundle)
 src/lib/data/         → NEW: real Supabase query/mutation layer, one module per domain
   clients.ts
-  commercial-documents.ts → target normalized RFQ/Quotation header+item access
+  commercial-documents.ts → target normalized Quotation header+item access; excludes historical RFQ from active surfaces
   sales-orders.ts
   tasks.ts
   team.ts
@@ -112,6 +117,18 @@ No permanent E2E framework is required, but the normalization/numbering phase in
 - HARIFF supports normal automatic numbering or an audited manual backdate exception; the number never changes the revenue period.
 - FOC items retain Product/Description/Qty/UOM but all money remains `NULL`.
 - Legacy task/follow-up/activity references move to document headers; legacy source tables remain read-only until UAT approves deletion.
+
+### Addendum: RFQ retirement (accepted 2026-07-25)
+
+ADR-003 retires RFQ as an active application feature. Quotation is now the first
+active commercial document in the new-product flow. The app must not expose RFQ
+routes, navigation, quick-create, search, filters, dropdown options, creation
+RPCs, conversion RPCs, or RFQ-only stages such as `Client Request for Quotes`.
+
+Historical RFQ rows and enum/schema compatibility are preserved for audit and
+rollback safety. Active data-layer reads exclude RFQ documents, and legacy stored
+source values such as `RFQ / New Product` are mapped to user-facing `New Product`
+at the boundary.
 
 ### Addendum: Super Admin authorization and account lifecycle (accepted 2026-07-18)
 

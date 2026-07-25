@@ -4,6 +4,11 @@
 > historis ini telah digantikan oleh input nomor SO manual dengan panduan
 > format. Penomoran Quotation tetap otomatis. Data SO lama bermode `Auto`
 > tidak diubah.
+>
+> **Update 2026-07-25:** RFQ telah dipensiunkan sebagai fitur aktif oleh
+> ADR-003. Bagian RFQ di dokumen ini hanya berlaku sebagai histori desain dan
+> kompatibilitas data lama; jangan gunakan untuk mengembalikan route, form,
+> dropdown, stage, atau flow RFQ aktif.
 
 Date: 2026-07-18
 Status: Accepted; documentation synchronization authorized 2026-07-18

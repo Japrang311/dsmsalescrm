@@ -1,6 +1,37 @@
 # Handoff — DSM Sales Web App V2
 
-Context dump for continuing this work in another tool (Codex). Written 2026-07-18; Phase 11/12 status refreshed 2026-07-19; Phase 11 import-review reconciliation session added 2026-07-19; post-import UX/bugfix session added 2026-07-20; second 2026-07-20 session (pipeline permissions/FK bugfixes) added 2026-07-20; Client Detail/Client List real-data wiring session added 2026-07-21; remote-migration-push + data-restoration session added 2026-07-21; browser-verification + spending_ytd fix + SO edit audit trail session added 2026-07-21; unused-code cleanup + client database (company info/contacts) feature session added 2026-07-22; contact position + Client Detail product/description fixes + commercial item product-name migration reconciliation added 2026-07-22; dynamic per-month sales target UI/calculation update added 2026-07-22; soft-delete implementation, remote Supabase apply, and main/live push closeout added 2026-07-24.
+Context dump for continuing this work in another tool (Codex). Written 2026-07-18; Phase 11/12 status refreshed 2026-07-19; Phase 11 import-review reconciliation session added 2026-07-19; post-import UX/bugfix session added 2026-07-20; second 2026-07-20 session (pipeline permissions/FK bugfixes) added 2026-07-20; Client Detail/Client List real-data wiring session added 2026-07-21; remote-migration-push + data-restoration session added 2026-07-21; browser-verification + spending_ytd fix + SO edit audit trail session added 2026-07-21; unused-code cleanup + client database (company info/contacts) feature session added 2026-07-22; contact position + Client Detail product/description fixes + commercial item product-name migration reconciliation added 2026-07-22; dynamic per-month sales target UI/calculation update added 2026-07-22; soft-delete implementation, remote Supabase apply, and main/live push closeout added 2026-07-24; RFQ retirement and documentation refresh added 2026-07-25.
+
+## HANDOFF TO CODEX — read this first (2026-07-25)
+
+RFQ is retired as an active application feature. Treat every older RFQ workflow
+description below as historical unless a newer note explicitly says otherwise.
+
+- Source of truth:
+  `docs/decisions/ADR-003-retire-rfq-workflow.md`,
+  `specs/remove-rfq.md`, and `tasks/rfq-removal-todo.md`.
+- Active UI no longer exposes RFQ routes, sidebar navigation, global search,
+  quick-create, client actions, dropdown options, pipeline filters, or RFQ-only
+  stages/statuses.
+- Quotation is the first active commercial document in the new-product flow.
+  Quotation stages start at `Quotes Sent`; `Client Request for Quotes` is no
+  longer an active stage.
+- Historical RFQ rows, enum values, old migrations, and legacy stored source
+  values remain for compatibility. Application queries exclude historical RFQ
+  documents from active business surfaces.
+- Git state: RFQ retirement was committed and pushed to `origin/main` as
+  `b0dc808 refactor: retire RFQ workflow`.
+- Supabase state: local migrations
+  `20260725151142_retire_rfq_rpcs.sql` and
+  `20260725152241_block_authenticated_rfq_creation.sql` exist and were applied
+  locally during implementation, but `supabase migration list --linked` showed
+  both migrations still pending on remote immediately after the Git push. Do not
+  run `supabase db push --linked` without fresh explicit approval naming the
+  exact project target.
+- Verification recorded for the RFQ retirement implementation: full test suite
+  `364 pass / 0 fail / 1825 assertions`, `bunx tsc --noEmit`, changed-file
+  ESLint with 0 errors and 1 existing Fast Refresh warning, `git diff --check`,
+  and `bun run build`.
 
 ## HANDOFF TO CODEX — read this first (2026-07-24)
 

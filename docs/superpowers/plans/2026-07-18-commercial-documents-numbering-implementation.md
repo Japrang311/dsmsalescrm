@@ -1,5 +1,10 @@
 # Commercial Documents and Atomic Numbering Implementation Plan
 
+> **Update 2026-07-25:** RFQ is retired as an active app feature by ADR-003.
+> RFQ references in this plan are historical migration/design context only.
+> Current product work must not restore RFQ forms, routes, stages, filters, or
+> dropdowns.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Normalize RFQ/Quotation/Sales Order headers and line items, migrate historical data safely, allocate QUO/SO/NP/PROTY numbers atomically, and deliver the approved forms, revisions, forecast, and grouped views.

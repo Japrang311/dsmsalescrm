@@ -1,5 +1,10 @@
 # Soft Delete untuk RFQ, Quotation, dan Sales Order
 
+> **Update 2026-07-25:** RFQ sudah dipensiunkan sebagai fitur aktif oleh
+> ADR-003. Dokumen ini tetap menjadi histori desain soft-delete untuk data RFQ
+> lama dan Quotation/Sales Order, tetapi jangan gunakan untuk mengembalikan
+> route, list, filter, form, atau stage RFQ aktif.
+
 Tanggal: 2026-07-24
 Status: Diimplementasikan dan diverifikasi secara lokal
 
