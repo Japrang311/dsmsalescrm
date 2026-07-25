@@ -211,6 +211,19 @@ function ClientProfilePage() {
                 <h1 className="truncate text-lg font-semibold text-foreground">
                   {client.name}
                 </h1>
+                {canEditStatus && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    aria-label={`Edit nama client ${client.name}`}
+                    title="Edit nama client"
+                    onClick={() => setShowEditInfo(true)}
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                )}
                 <StatusBadge status={client.status} />
                 <Badge variant="outline" className="text-[11px] font-normal">
                   {client.source}
