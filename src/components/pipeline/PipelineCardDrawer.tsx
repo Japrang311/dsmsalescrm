@@ -38,6 +38,7 @@ import {
   type CommercialItem,
   type Client,
   type ClientStatus,
+  type QuotationLostReason,
 } from "@/lib/domain";
 import { updateClientStatus } from "@/lib/data/clients";
 import {
@@ -47,6 +48,21 @@ import {
 import { listSalesOrders } from "@/lib/data/sales-orders";
 import { createTask } from "@/lib/data/tasks";
 import { COMMERCIAL_STAGES } from "@/lib/data/commercial-stages";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  activeLostReasonPatch,
+  isLostReasonTracked,
+  QUOTATION_LOST_REASONS,
+  validateQuotationLostReason,
+} from "@/lib/data/quotation-lost-reasons";
 import {
   getCurrentActorId,
   listClientStatusHistory,
@@ -78,6 +94,8 @@ const FIELD_LABEL: Record<string, string> = {
   stage: "Stage",
   nextActionDate: "Next action",
   ownerId: "Owner",
+  lostReason: "Alasan closed lost",
+  lostReasonDetail: "Detail alasan",
 };
 
 export function PipelineCardDrawer({
@@ -129,6 +147,13 @@ export function PipelineCardDrawer({
   const [stage, setStage] = useState(currentStage);
   const [nextDate, setNextDate] = useState(currentNext ?? "");
   const [status, setStatus] = useState<ClientStatus>(currentStatus);
+  const [lostReason, setLostReason] = useState<QuotationLostReason | "">(
+    item?.lostReason ?? "",
+  );
+  const [lostReasonDetail, setLostReasonDetail] = useState(
+    item?.lostReasonDetail ?? "",
+  );
+  const [lostReasonDialogOpen, setLostReasonDialogOpen] = useState(false);
 
   // Reset form state when a different item opens.
   useEffect(() => {
@@ -136,6 +161,9 @@ export function PipelineCardDrawer({
     setStage(currentStage);
     setNextDate(currentNext ?? "");
     setStatus(currentStatus);
+    setLostReason(item.lostReason ?? "");
+    setLostReasonDetail(item.lostReasonDetail ?? "");
+    setLostReasonDialogOpen(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, item?.id, client?.id]);
 
@@ -212,14 +240,68 @@ export function PipelineCardDrawer({
   }
 
   const dirty =
-    stage !== currentStage || (nextDate || "") !== (currentNext ?? "");
+    stage !== currentStage ||
+    (nextDate || "") !== (currentNext ?? "") ||
+    (isLostReasonTracked(item.type, stage) &&
+      ((lostReason || null) !== (item.lostReason ?? null) ||
+        (lostReasonDetail.trim() || null) !== (item.lostReasonDetail ?? null)));
   const statusDirty = status !== currentStatus;
+  const reasonPatch = activeLostReasonPatch({
+    type: item.type,
+    stage,
+    lostReason: lostReason || null,
+    lostReasonDetail,
+  });
+  const collectsLostReason = isLostReasonTracked(item.type, stage);
+  const supportsLostReasonFields =
+    item.type === "RFQ" || item.type === "Quotation";
+
+  function handleStageChange(nextStage: string) {
+    if (!item) return;
+    setStage(nextStage);
+    if (isLostReasonTracked(item.type, nextStage)) {
+      setLostReason(item.lostReason ?? "");
+      setLostReasonDetail(item.lostReasonDetail ?? "");
+      setLostReasonDialogOpen(true);
+    }
+  }
 
   async function saveChanges() {
     if (!item || !client) return;
     const changes: { field: string; from?: string; to?: string }[] = [];
     if (stage !== currentStage)
       changes.push({ field: "stage", from: currentStage, to: stage });
+    const lostReasonError = validateQuotationLostReason({
+      type: item.type,
+      stage,
+      lostReason: lostReason || null,
+      lostReasonDetail,
+    });
+    if (lostReasonError) {
+      setLostReasonDialogOpen(true);
+      toast.error(lostReasonError);
+      return;
+    }
+    if (
+      supportsLostReasonFields &&
+      reasonPatch.lostReason !== (item.lostReason ?? null)
+    ) {
+      changes.push({
+        field: "lostReason",
+        from: item.lostReason,
+        to: reasonPatch.lostReason ?? undefined,
+      });
+    }
+    if (
+      supportsLostReasonFields &&
+      reasonPatch.lostReasonDetail !== (item.lostReasonDetail ?? null)
+    ) {
+      changes.push({
+        field: "lostReasonDetail",
+        from: item.lostReasonDetail,
+        to: reasonPatch.lostReasonDetail ?? undefined,
+      });
+    }
     const nd = nextDate || undefined;
     const cn = currentNext || undefined;
     if (nd !== cn) changes.push({ field: "nextActionDate", from: cn, to: nd });
@@ -238,6 +320,12 @@ export function PipelineCardDrawer({
       // commercial_documents", even when only the stage changed.
       await updateCommercialItem(item.id, {
         stage,
+        lostReason: supportsLostReasonFields
+          ? reasonPatch.lostReason
+          : undefined,
+        lostReasonDetail: supportsLostReasonFields
+          ? reasonPatch.lostReasonDetail
+          : undefined,
       });
       const actorId = await getCurrentActorId();
       if (actorId) {
@@ -349,7 +437,7 @@ export function PipelineCardDrawer({
               <Label className="text-[11px]">Stage</Label>
               <Select
                 value={stage}
-                onValueChange={setStage}
+                onValueChange={handleStageChange}
                 disabled={!canEdit}
               >
                 <SelectTrigger className="h-8 text-xs">
@@ -387,6 +475,31 @@ export function PipelineCardDrawer({
             </div>
           </div>
 
+          {collectsLostReason && (
+            <div className="rounded-md border bg-background px-2.5 py-2 text-xs">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-medium text-foreground">
+                    {lostReason || "Alasan closed lost belum diisi"}
+                  </p>
+                  <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                    {lostReasonDetail || "Detail alasan opsional"}
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-7 shrink-0 text-xs"
+                  disabled={!canEdit}
+                  onClick={() => setLostReasonDialogOpen(true)}
+                >
+                  Isi alasan
+                </Button>
+              </div>
+            </div>
+          )}
+
           <div className="flex items-center justify-end gap-2 pt-1">
             {dirty && (
               <Button
@@ -397,6 +510,9 @@ export function PipelineCardDrawer({
                 onClick={() => {
                   setStage(currentStage);
                   setNextDate(currentNext ?? "");
+                  setLostReason(item.lostReason ?? "");
+                  setLostReasonDetail(item.lostReasonDetail ?? "");
+                  setLostReasonDialogOpen(false);
                 }}
               >
                 Reset
@@ -445,6 +561,96 @@ export function PipelineCardDrawer({
             </div>
           </div>
         </section>
+
+        <Dialog
+          open={lostReasonDialogOpen}
+          onOpenChange={setLostReasonDialogOpen}
+        >
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Alasan closed lost</DialogTitle>
+              <DialogDescription>
+                Pilih alasan sebelum menyimpan stage Closed Lost.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="grid gap-3">
+              <div className="grid gap-1.5">
+                <Label htmlFor="drawer-lost-reason">Alasan</Label>
+                <Select
+                  value={lostReason}
+                  onValueChange={(value) =>
+                    setLostReason(value as QuotationLostReason)
+                  }
+                >
+                  <SelectTrigger id="drawer-lost-reason">
+                    <SelectValue placeholder="Pilih alasan closed lost" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {QUOTATION_LOST_REASONS.map((reason) => (
+                      <SelectItem key={reason} value={reason}>
+                        {reason}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid gap-1.5">
+                <Label htmlFor="drawer-lost-reason-detail">
+                  Detail alasan
+                  {lostReason === "Lainnya" ? " (wajib)" : " (opsional)"}
+                </Label>
+                <Textarea
+                  id="drawer-lost-reason-detail"
+                  value={lostReasonDetail}
+                  onChange={(event) => setLostReasonDetail(event.target.value)}
+                  placeholder={
+                    lostReason === "Lainnya"
+                      ? "Jelaskan alasan lainnya"
+                      : "Tambahkan konteks bila diperlukan"
+                  }
+                  className="min-h-24"
+                />
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  if (!item.lostReason) {
+                    setStage(currentStage);
+                    setLostReason("");
+                    setLostReasonDetail("");
+                  }
+                  setLostReasonDialogOpen(false);
+                }}
+              >
+                Batal
+              </Button>
+              <Button
+                type="button"
+                onClick={() => {
+                  const error = validateQuotationLostReason({
+                    type: item.type,
+                    stage,
+                    lostReason: lostReason || null,
+                    lostReasonDetail,
+                  });
+                  if (error) {
+                    toast.error(error);
+                    return;
+                  }
+                  setLostReasonDialogOpen(false);
+                }}
+              >
+                Simpan alasan
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Linked documents */}
         <section className="mt-5 space-y-2">
