@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowRight,
@@ -41,10 +41,8 @@ import {
   type QuotationLostReason,
 } from "@/lib/domain";
 import { updateClientStatus } from "@/lib/data/clients";
-import {
-  updateCommercialItem,
-  describeCommercialItemChanges,
-} from "@/lib/data/commercial-items";
+import { describeCommercialItemChanges } from "@/lib/data/commercial-items";
+import { transitionCommercialItemStage } from "@/lib/data/commercial-stage-transition";
 import { listSalesOrders } from "@/lib/data/sales-orders";
 import { createTask } from "@/lib/data/tasks";
 import { COMMERCIAL_STAGES } from "@/lib/data/commercial-stages";
@@ -108,6 +106,7 @@ export function PipelineCardDrawer({
   currentNext,
 }: Props) {
   const { role, authReady } = useRole();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   const { data: commercialHistory = [] } = useQuery({
@@ -167,14 +166,19 @@ export function PipelineCardDrawer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, item?.id, client?.id]);
 
-  // Linked docs: quotations = CommercialItems of type Quotation for this
-  // client, orders = real SalesOrders for this client.
   const linkedQuotations = useMemo(() => {
-    if (!client) return [];
+    if (!client || !item) return [];
+    if (item.type === "RFQ") {
+      return allItems.filter(
+        (candidate) =>
+          candidate.type === "Quotation" &&
+          candidate.sourceRfqDocumentId === item.id,
+      );
+    }
     return allItems.filter(
       (c) => c.clientId === client.id && c.type === "Quotation",
     );
-  }, [client, allItems]);
+  }, [client, item, allItems]);
 
   const linkedOrders = useMemo(() => {
     if (!client) return [];
@@ -239,9 +243,14 @@ export function PipelineCardDrawer({
     );
   }
 
+  const needsQuotation =
+    item.type === "RFQ" &&
+    stage === "Quotes Sent" &&
+    linkedQuotations.length === 0;
   const dirty =
     stage !== currentStage ||
     (nextDate || "") !== (currentNext ?? "") ||
+    needsQuotation ||
     (isLostReasonTracked(item.type, stage) &&
       ((lostReason || null) !== (item.lostReason ?? null) ||
         (lostReasonDetail.trim() || null) !== (item.lostReasonDetail ?? null)));
@@ -306,7 +315,7 @@ export function PipelineCardDrawer({
     const cn = currentNext || undefined;
     if (nd !== cn) changes.push({ field: "nextActionDate", from: cn, to: nd });
 
-    if (changes.length === 0) return;
+    if (changes.length === 0 && !needsQuotation) return;
     try {
       // commercial_documents has no next_action_date column post-Phase-11
       // normalization — updateCommercialItem() rejects that field outright
@@ -318,8 +327,7 @@ export function PipelineCardDrawer({
       // documents; sending it unconditionally previously made every save
       // through this drawer fail with "permission denied for table
       // commercial_documents", even when only the stage changed.
-      await updateCommercialItem(item.id, {
-        stage,
+      const transition = await transitionCommercialItemStage(item, stage, {
         lostReason: supportsLostReasonFields
           ? reasonPatch.lostReason
           : undefined,
@@ -327,14 +335,16 @@ export function PipelineCardDrawer({
           ? reasonPatch.lostReasonDetail
           : undefined,
       });
-      const actorId = await getCurrentActorId();
+      const actorId = transition.transitionedToQuotation
+        ? null
+        : await getCurrentActorId();
       if (actorId) {
         await logActivity({
           kind: "commercial_item_stage_change",
           ownerId: currentOwnerId,
           actorId,
           clientId: item.clientId,
-          commercialDocumentId: item.id,
+          commercialDocumentId: transition.item.id,
           title: `${item.description} diperbarui`,
           detail: describeCommercialItemChanges(changes),
         });
@@ -343,8 +353,8 @@ export function PipelineCardDrawer({
         await createTask({
           clientId: item.clientId,
           ownerId: currentOwnerId,
-          commercialDocumentId: item.id,
-          title: `Follow-up · ${item.type} — ${client.name}`,
+          commercialDocumentId: transition.item.id,
+          title: `Follow-up · ${transition.item.type} — ${client.name}`,
           dueDate: nd,
           method: "Phone",
           priority: "Normal",
@@ -354,6 +364,17 @@ export function PipelineCardDrawer({
       }
       await queryClient.invalidateQueries({ queryKey: ["commercial-items"] });
       await queryClient.invalidateQueries({ queryKey: ["activity-log"] });
+      if (transition.transitionedToQuotation) {
+        toast.success("Quotation dibuat dari RFQ", {
+          description: "Lanjutkan pengisian data di module Quotation.",
+        });
+        onOpenChange(false);
+        await navigate({
+          to: "/quotations/$id",
+          params: { id: transition.item.id },
+        });
+        return;
+      }
       toast.success("Pipeline card diperbarui", {
         description: changes
           .map((c) => FIELD_LABEL[c.field] ?? c.field)
@@ -525,7 +546,7 @@ export function PipelineCardDrawer({
               disabled={!canEdit || !dirty}
               onClick={() => void saveChanges()}
             >
-              Simpan perubahan
+              {needsQuotation ? "Buat Quotation" : "Simpan perubahan"}
             </Button>
           </div>
 

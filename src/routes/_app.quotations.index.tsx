@@ -10,7 +10,7 @@ export const Route = createFileRoute("/_app/quotations/")({
       title="Quotations"
       subtitle="RFQ yang sudah dihitung dan masuk proses penawaran"
       icon={<ReceiptText className="h-5 w-5 text-primary" />}
-      filter={{ types: ["RFQ", "Quotation"], stages: QUOTATION_STAGES }}
+      filter={{ types: ["Quotation"], stages: QUOTATION_STAGES }}
       stages={QUOTATION_STAGES}
       detailBasePath="/quotations"
       emptyHint="Belum ada penawaran. Hitung RFQ lalu lanjutkan ke proses quotation."

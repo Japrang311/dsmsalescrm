@@ -108,6 +108,8 @@ export type CommercialItem = {
   quotationNumber?: string;
   quotationBaseNumber?: string;
   quotationRevision?: number;
+  sourceRfqDocumentId?: string;
+  quotationExpiredDate?: string;
   clientAddress?: string;
   note?: string;
   lostReason?: QuotationLostReason;

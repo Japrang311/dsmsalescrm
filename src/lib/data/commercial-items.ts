@@ -1,5 +1,6 @@
 import type { CommercialItem } from "@/lib/domain";
 import {
+  createQuotationFromRfq,
   listCommercialDocuments,
   updateCommercialDocument,
   type CommercialDocumentQuery,
@@ -26,6 +27,8 @@ export function toCommercialItem(
     quotationNumber: document.quotationNumber ?? undefined,
     quotationBaseNumber: document.quotationBaseNumber ?? undefined,
     quotationRevision: document.quotationRevision,
+    sourceRfqDocumentId: document.sourceRfqDocumentId ?? undefined,
+    quotationExpiredDate: document.quotationExpiredDate ?? undefined,
     clientAddress: document.clientAddress ?? undefined,
     note: document.note ?? undefined,
     lostReason: document.lostReason ?? undefined,
@@ -68,10 +71,14 @@ export type CommercialItemPatch = Partial<{
   rfqNumber: string | null;
   stage: string;
   ownerId: string;
+  documentDate: string;
   nextActionDate: string | null;
   quotationNumber: string | null;
+  quotationBaseNumber: string | null;
+  quotationExpiredDate: string | null;
   customerPoNumber: string | null;
   soNumber: string | null;
+  note: string | null;
   taxType: CommercialItem["taxType"] | null;
   lostReason: CommercialItem["lostReason"] | null;
   lostReasonDetail: string | null;
@@ -92,13 +99,23 @@ export async function updateCommercialItem(
     await updateCommercialDocument(id, {
       rfqNumber: patch.rfqNumber,
       quotationNumber: patch.quotationNumber,
+      quotationBaseNumber: patch.quotationBaseNumber,
+      documentDate: patch.documentDate,
+      quotationExpiredDate: patch.quotationExpiredDate,
       stage: patch.stage,
       ownerId: patch.ownerId,
       soNumber: patch.soNumber,
+      note: patch.note,
       lostReason: patch.lostReason,
       lostReasonDetail: patch.lostReasonDetail,
     }),
   );
+}
+
+export async function convertRfqToQuotation(
+  id: string,
+): Promise<CommercialItem> {
+  return toCommercialItem(await createQuotationFromRfq(id));
 }
 
 export async function createCommercialItem(_input: {

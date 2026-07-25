@@ -39,6 +39,8 @@ export type CommercialDocumentWithItems = {
   quotationRevision: number;
   isCurrentRevision: boolean;
   supersedesDocumentId: string | null;
+  sourceRfqDocumentId: string | null;
+  quotationExpiredDate: string | null;
   stage: string;
   clientAddress: string | null;
   soNumber: string | null;
@@ -78,6 +80,8 @@ type CommercialDocumentRow = {
   quotation_revision: number;
   is_current_revision: boolean;
   supersedes_document_id: string | null;
+  source_rfq_document_id: string | null;
+  quotation_expired_date: string | null;
   stage: string;
   client_address: string | null;
   so_number: string | null;
@@ -123,6 +127,8 @@ function toDocument(row: CommercialDocumentRow): CommercialDocumentWithItems {
     quotationRevision: row.quotation_revision,
     isCurrentRevision: row.is_current_revision,
     supersedesDocumentId: row.supersedes_document_id,
+    sourceRfqDocumentId: row.source_rfq_document_id,
+    quotationExpiredDate: row.quotation_expired_date,
     stage: row.stage,
     clientAddress: row.client_address,
     soNumber: row.so_number,
@@ -250,6 +256,16 @@ export async function createQuotation(
   return toDocument(data as CommercialDocumentRow);
 }
 
+export async function createQuotationFromRfq(
+  rfqDocumentId: string,
+): Promise<CommercialDocumentWithItems> {
+  const { data, error } = await supabase.rpc("create_quotation_from_rfq", {
+    p_rfq_document_id: rfqDocumentId,
+  });
+  if (error) throw error;
+  return toDocument(data as CommercialDocumentRow);
+}
+
 export type ReviseQuotationInput = {
   documentDate: string;
   clientAddress?: string;
@@ -277,6 +293,9 @@ export async function reviseQuotation(
 export type CommercialDocumentPatch = Partial<{
   rfqNumber: string | null;
   quotationNumber: string | null;
+  quotationBaseNumber: string | null;
+  documentDate: string;
+  quotationExpiredDate: string | null;
   stage: string;
   ownerId: string;
   soNumber: string | null;
@@ -295,6 +314,12 @@ export async function updateCommercialDocument(
     update.rfq_number = patch.rfqNumber || null;
   if (patch.quotationNumber !== undefined)
     update.quotation_number = patch.quotationNumber || null;
+  if (patch.quotationBaseNumber !== undefined)
+    update.quotation_base_number = patch.quotationBaseNumber || null;
+  if (patch.documentDate !== undefined)
+    update.document_date = patch.documentDate;
+  if (patch.quotationExpiredDate !== undefined)
+    update.quotation_expired_date = patch.quotationExpiredDate || null;
   if (patch.stage !== undefined) update.stage = patch.stage;
   if (patch.ownerId !== undefined) update.owner_id = patch.ownerId;
   if (patch.soNumber !== undefined) update.so_number = patch.soNumber || null;

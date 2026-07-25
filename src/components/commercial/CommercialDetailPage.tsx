@@ -52,6 +52,7 @@ import {
   listCommercialItems,
   updateCommercialItem,
   describeCommercialItemChanges,
+  convertRfqToQuotation,
 } from "@/lib/data/commercial-items";
 import {
   deleteCommercialDocument,
@@ -140,6 +141,11 @@ export function CommercialDetailPage({
   const [quotationNumber, setQuotationNumber] = useState(
     item?.quotationNumber ?? "",
   );
+  const [quotationDate, setQuotationDate] = useState(item?.documentDate ?? "");
+  const [quotationExpiredDate, setQuotationExpiredDate] = useState(
+    item?.quotationExpiredDate ?? "",
+  );
+  const [note, setNote] = useState(item?.note ?? "");
   const [lineEdits, setLineEdits] = useState<Record<string, LineItemEdit>>({});
   const [priceReasonType, setPriceReasonType] = useState<string>("");
   const [priceReasonOther, setPriceReasonOther] = useState("");
@@ -155,6 +161,9 @@ export function CommercialDetailPage({
     if (!item) return;
     setStage(item.stage);
     setQuotationNumber(item.quotationNumber ?? "");
+    setQuotationDate(item.documentDate ?? "");
+    setQuotationExpiredDate(item.quotationExpiredDate ?? "");
+    setNote(item.note ?? "");
     setLineEdits(
       Object.fromEntries(
         (item.lineItems ?? []).map((line) => [
@@ -236,6 +245,9 @@ export function CommercialDetailPage({
     if (!item) return;
     const changes: { field: string; from?: string; to?: string }[] = [];
     const normalizedQuotation = quotationNumber.trim();
+    const normalizedQuotationDate = quotationDate.trim();
+    const normalizedExpiredDate = quotationExpiredDate.trim();
+    const normalizedNote = note.trim();
     const reasonPatch = activeLostReasonPatch({
       type: item.type,
       stage,
@@ -260,6 +272,30 @@ export function CommercialDetailPage({
         field: "quotationNumber",
         from: item.quotationNumber,
         to: normalizedQuotation || undefined,
+      });
+    if (
+      item.type === "Quotation" &&
+      normalizedQuotationDate !== (item.documentDate ?? "")
+    )
+      changes.push({
+        field: "quotationDate",
+        from: item.documentDate,
+        to: normalizedQuotationDate || undefined,
+      });
+    if (
+      item.type === "Quotation" &&
+      normalizedExpiredDate !== (item.quotationExpiredDate ?? "")
+    )
+      changes.push({
+        field: "quotationExpiredDate",
+        from: item.quotationExpiredDate,
+        to: normalizedExpiredDate || undefined,
+      });
+    if (item.type === "Quotation" && normalizedNote !== (item.note ?? ""))
+      changes.push({
+        field: "note",
+        from: item.note,
+        to: normalizedNote || undefined,
       });
     if (stage !== item.stage)
       changes.push({ field: "stage", from: item.stage, to: stage });
@@ -338,11 +374,56 @@ export function CommercialDetailPage({
       });
       return;
     }
+    if (
+      item.type === "Quotation" &&
+      normalizedQuotationDate.length > 0 &&
+      Number.isNaN(new Date(normalizedQuotationDate).getTime())
+    ) {
+      toast.error("Quotation Date tidak valid");
+      return;
+    }
+    if (
+      item.type === "Quotation" &&
+      normalizedExpiredDate.length > 0 &&
+      Number.isNaN(new Date(normalizedExpiredDate).getTime())
+    ) {
+      toast.error("Expired Date tidak valid");
+      return;
+    }
 
     try {
+      const convertingRfqToQuotation =
+        item.type === "RFQ" &&
+        item.stage !== "Quotes Sent" &&
+        stage === "Quotes Sent";
+      for (const change of lineChanges) {
+        await updateCommercialDocumentLineItem(change.line.id, {
+          qty: change.qty,
+          unitPrice: isFoc ? null : change.unitPrice,
+          lineTotal: isFoc ? null : change.qty * change.unitPrice,
+        });
+      }
+      if (convertingRfqToQuotation) {
+        const quotation = await convertRfqToQuotation(item.id);
+        await queryClient.invalidateQueries({ queryKey: ["commercial-items"] });
+        await queryClient.invalidateQueries({ queryKey: ["activity-log"] });
+        toast.success("Quotation dibuat dari RFQ", {
+          description: "Lanjutkan pengisian data di module Quotation.",
+        });
+        navigate({
+          to: "/quotations/$id",
+          params: { id: quotation.id },
+        });
+        return;
+      }
       const headerChanged =
         (item.type === "Quotation" &&
           normalizedQuotation !== (item.quotationNumber ?? "")) ||
+        (item.type === "Quotation" &&
+          normalizedQuotationDate !== (item.documentDate ?? "")) ||
+        (item.type === "Quotation" &&
+          normalizedExpiredDate !== (item.quotationExpiredDate ?? "")) ||
+        (item.type === "Quotation" && normalizedNote !== (item.note ?? "")) ||
         stage !== item.stage ||
         reasonPatch.lostReason !== (item.lostReason ?? null) ||
         reasonPatch.lostReasonDetail !== (item.lostReasonDetail ?? null);
@@ -353,16 +434,29 @@ export function CommercialDetailPage({
             normalizedQuotation !== (item.quotationNumber ?? "")
               ? normalizedQuotation
               : undefined,
+          quotationBaseNumber:
+            item.type === "Quotation" &&
+            !item.quotationBaseNumber &&
+            normalizedQuotation
+              ? normalizedQuotation
+              : undefined,
+          documentDate:
+            item.type === "Quotation" &&
+            normalizedQuotationDate !== (item.documentDate ?? "")
+              ? normalizedQuotationDate
+              : undefined,
+          quotationExpiredDate:
+            item.type === "Quotation" &&
+            normalizedExpiredDate !== (item.quotationExpiredDate ?? "")
+              ? normalizedExpiredDate || null
+              : undefined,
+          note:
+            item.type === "Quotation" && normalizedNote !== (item.note ?? "")
+              ? normalizedNote
+              : undefined,
           stage: stage !== item.stage ? stage : undefined,
           lostReason: reasonPatch.lostReason,
           lostReasonDetail: reasonPatch.lostReasonDetail,
-        });
-      }
-      for (const change of lineChanges) {
-        await updateCommercialDocumentLineItem(change.line.id, {
-          qty: change.qty,
-          unitPrice: isFoc ? null : change.unitPrice,
-          lineTotal: isFoc ? null : change.qty * change.unitPrice,
         });
       }
       const actorId = await getCurrentActorId();
@@ -598,12 +692,46 @@ export function CommercialDetailPage({
               )}
               <InfoCell
                 icon={<Calendar className="h-3.5 w-3.5" />}
-                label="Date"
+                label={item.type === "Quotation" ? "Quotation Date" : "Date"}
               >
-                <span className="text-sm">
-                  {item.documentDate ? formatDateShort(item.documentDate) : "—"}
-                </span>
+                {canEdit && item.type === "Quotation" ? (
+                  <Input
+                    type="date"
+                    value={quotationDate}
+                    onChange={(event) => setQuotationDate(event.target.value)}
+                    className="h-8 text-xs"
+                  />
+                ) : (
+                  <span className="text-sm">
+                    {item.documentDate
+                      ? formatDateShort(item.documentDate)
+                      : "—"}
+                  </span>
+                )}
               </InfoCell>
+              {item.type === "Quotation" && (
+                <InfoCell
+                  icon={<Calendar className="h-3.5 w-3.5" />}
+                  label="Expired Date"
+                >
+                  {canEdit ? (
+                    <Input
+                      type="date"
+                      value={quotationExpiredDate}
+                      onChange={(event) =>
+                        setQuotationExpiredDate(event.target.value)
+                      }
+                      className="h-8 text-xs"
+                    />
+                  ) : (
+                    <span className="text-sm">
+                      {item.quotationExpiredDate
+                        ? formatDateShort(item.quotationExpiredDate)
+                        : "—"}
+                    </span>
+                  )}
+                </InfoCell>
+              )}
               <InfoCell
                 icon={<Calendar className="h-3.5 w-3.5" />}
                 label="Aging (sejak update terakhir)"
@@ -662,7 +790,16 @@ export function CommercialDetailPage({
                 </InfoCell>
               )}
               <InfoCell label="Note">
-                <span className="text-sm">{item.note ?? "—"}</span>
+                {canEdit && item.type === "Quotation" ? (
+                  <Textarea
+                    value={note}
+                    onChange={(event) => setNote(event.target.value)}
+                    placeholder="Catatan quotation"
+                    className="min-h-20 text-sm"
+                  />
+                ) : (
+                  <span className="text-sm">{item.note ?? "—"}</span>
+                )}
               </InfoCell>
             </div>
 

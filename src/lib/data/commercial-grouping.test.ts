@@ -25,6 +25,8 @@ function document(
     quotationRevision: 0,
     isCurrentRevision: true,
     supersedesDocumentId: null,
+    sourceRfqDocumentId: null,
+    quotationExpiredDate: null,
     stage: "Quotes Sent",
     clientAddress: null,
     soNumber: null,
