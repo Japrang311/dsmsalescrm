@@ -2,12 +2,13 @@ import { describe, expect, test } from "bun:test";
 import type { CommercialItem } from "@/lib/domain";
 import {
   activeLostReasonPatch,
+  isLostReasonTracked,
   quotationLostReasonBreakdown,
   validateQuotationLostReason,
 } from "./quotation-lost-reasons";
 
 describe("quotation lost reason rules", () => {
-  test("requires a category when a quotation moves to Closed Lost", () => {
+  test("requires a category when RFQ or quotation moves to Closed Lost", () => {
     expect(
       validateQuotationLostReason({
         type: "Quotation",
@@ -15,7 +16,16 @@ describe("quotation lost reason rules", () => {
         lostReason: null,
         lostReasonDetail: null,
       }),
-    ).toBe("Pilih alasan quotation lost.");
+    ).toBe("Pilih alasan closed lost.");
+    expect(
+      validateQuotationLostReason({
+        type: "RFQ",
+        stage: "Closed Lost",
+        lostReason: null,
+        lostReasonDetail: null,
+      }),
+    ).toBe("Pilih alasan closed lost.");
+    expect(isLostReasonTracked("Direct Order", "Closed Lost")).toBe(false);
   });
 
   test("requires detail only for Lainnya", () => {
@@ -48,9 +58,10 @@ describe("quotation lost reason rules", () => {
     ).toEqual({ lostReason: null, lostReasonDetail: null });
   });
 
-  test("aggregates Closed Lost quotation count and value by reason", () => {
+  test("aggregates Closed Lost count and value by reason", () => {
     const item = (
       id: string,
+      type: CommercialItem["type"],
       stage: string,
       reason: CommercialItem["lostReason"],
       estimatedValue: number,
@@ -58,7 +69,7 @@ describe("quotation lost reason rules", () => {
       id,
       clientId: "client-1",
       ownerId: "owner-1",
-      type: "Quotation",
+      type,
       sourceFlow: "RFQ / New Product",
       stage,
       description: id,
@@ -69,9 +80,15 @@ describe("quotation lost reason rules", () => {
 
     expect(
       quotationLostReasonBreakdown([
-        item("lost-1", "Closed Lost", "Harga tidak kompetitif", 10_000),
-        item("lost-2", "Closed Lost", "Harga tidak kompetitif", 20_000),
-        item("open", "Negotiation", undefined, 50_000),
+        item(
+          "lost-1",
+          "Quotation",
+          "Closed Lost",
+          "Harga tidak kompetitif",
+          10_000,
+        ),
+        item("lost-2", "RFQ", "Closed Lost", "Harga tidak kompetitif", 20_000),
+        item("open", "Quotation", "Negotiation", undefined, 50_000),
       ]),
     ).toEqual([
       {

@@ -25,17 +25,18 @@ type LostReasonState = {
   lostReasonDetail?: string | null;
 };
 
+export function isLostReasonTracked(type: CommercialType, stage: string) {
+  return (type === "RFQ" || type === "Quotation") && stage === "Closed Lost";
+}
+
 export function validateQuotationLostReason(
   state: LostReasonState,
 ): string | null {
-  if (state.type !== "Quotation" || state.stage !== "Closed Lost") return null;
+  if (!isLostReasonTracked(state.type, state.stage)) return null;
   if (!state.lostReason || state.lostReason === "Belum diklasifikasi") {
-    return "Pilih alasan quotation lost.";
+    return "Pilih alasan closed lost.";
   }
-  if (
-    state.lostReason === "Lainnya" &&
-    !state.lostReasonDetail?.trim()
-  ) {
+  if (state.lostReason === "Lainnya" && !state.lostReasonDetail?.trim()) {
     return "Jelaskan alasan lainnya.";
   }
   return null;
@@ -45,7 +46,7 @@ export function activeLostReasonPatch(state: LostReasonState): {
   lostReason: QuotationLostReason | null;
   lostReasonDetail: string | null;
 } {
-  if (state.type !== "Quotation" || state.stage !== "Closed Lost") {
+  if (!isLostReasonTracked(state.type, state.stage)) {
     return { lostReason: null, lostReasonDetail: null };
   }
   return {
@@ -61,7 +62,7 @@ export function quotationLostReasonBreakdown(items: CommercialItem[]) {
   >();
   for (const item of items) {
     if (
-      item.type !== "Quotation" ||
+      !isLostReasonTracked(item.type, item.stage) ||
       item.stage !== "Closed Lost" ||
       !item.lostReason
     ) {

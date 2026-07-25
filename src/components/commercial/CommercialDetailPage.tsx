@@ -67,6 +67,7 @@ import {
 } from "@/lib/data/activity-log";
 import {
   activeLostReasonPatch,
+  isLostReasonTracked,
   QUOTATION_LOST_REASONS,
   validateQuotationLostReason,
 } from "@/lib/data/quotation-lost-reasons";
@@ -269,9 +270,7 @@ export function CommercialDetailPage({
         to: reasonPatch.lostReason ?? undefined,
       });
     }
-    if (
-      reasonPatch.lostReasonDetail !== (item.lostReasonDetail ?? null)
-    ) {
+    if (reasonPatch.lostReasonDetail !== (item.lostReasonDetail ?? null)) {
       changes.push({
         field: "lostReasonDetail",
         from: item.lostReasonDetail,
@@ -377,7 +376,7 @@ export function CommercialDetailPage({
               }`
             : null,
           hasQtyChanges ? `Alasan qty: ${qtyReason.trim()}` : null,
-          item.type === "Quotation" && stage === "Closed Lost"
+          isLostReasonTracked(item.type, stage)
             ? `Alasan lost: ${reasonPatch.lostReason}${
                 reasonPatch.lostReasonDetail
                   ? ` — ${reasonPatch.lostReasonDetail}`
@@ -548,7 +547,7 @@ export function CommercialDetailPage({
                   <Badge variant="secondary">{item.stage}</Badge>
                 )}
               </InfoCell>
-              {item.type === "Quotation" && stage === "Closed Lost" && (
+              {isLostReasonTracked(item.type, stage) && (
                 <>
                   <InfoCell label="Lost reason">
                     {canEdit ? (
