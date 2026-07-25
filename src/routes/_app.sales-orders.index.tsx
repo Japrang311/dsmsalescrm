@@ -114,7 +114,7 @@ function SalesOrdersRevenuePage() {
   const summary = useMemo(() => {
     let ppn = 0;
     let nonPpn = 0;
-    let rfq = 0;
+    let newProduct = 0;
     let existing = 0;
     let protoPaid = 0;
     let focCount = 0;
@@ -122,13 +122,13 @@ function SalesOrdersRevenuePage() {
       const v = s.value ?? 0;
       if (s.taxType === "PPN") ppn += v;
       else if (s.taxType === "Non-PPN") nonPpn += v;
-      if (s.source === "RFQ / New Product") rfq += v;
+      if (s.source === "New Product") newProduct += v;
       else if (s.source === "Existing / Repeat Order") existing += v;
       else if (s.source === "Prototype Paid") protoPaid += v;
       if (s.type === "Prototype" && s.prototypeStatus === "FOC") focCount += 1;
     }
     const total = ppn + nonPpn;
-    return { ppn, nonPpn, total, rfq, existing, protoPaid, focCount };
+    return { ppn, nonPpn, total, newProduct, existing, protoPaid, focCount };
   }, [rows]);
 
   const exportContext = useMemo<SalesOrdersExportContext>(
@@ -306,8 +306,8 @@ function SalesOrdersRevenuePage() {
             </CardHeader>
             <CardContent className="grid gap-2 sm:grid-cols-3">
               <SourceRow
-                label="RFQ / New Product"
-                value={summary.rfq}
+                label="New Product"
+                value={summary.newProduct}
                 total={summary.total}
                 tone="sky"
               />

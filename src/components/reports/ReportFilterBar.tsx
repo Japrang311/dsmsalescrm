@@ -44,7 +44,7 @@ export type ReportFilters = {
   ownerId: string; // "all" or user id
   clientId: string; // "all" or client id
   taxType: string; // "all" | "PPN" | "Non-PPN"
-  source: string; // "all" | "RFQ / New Product" | "Existing / Repeat Order" | "Prototype Paid" | "Prototype FOC"
+  source: string; // "all" | "New Product" | "Existing / Repeat Order" | "Prototype Paid" | "Prototype FOC"
   soType: string; // "all" | "Regular" | "Prototype"
 };
 
@@ -224,7 +224,7 @@ export function ReportFilterBar({
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">Semua source</SelectItem>
-          <SelectItem value="RFQ / New Product">RFQ / New Product</SelectItem>
+          <SelectItem value="New Product">New Product</SelectItem>
           <SelectItem value="Existing / Repeat Order">
             Existing / Repeat Order
           </SelectItem>

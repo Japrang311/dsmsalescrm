@@ -34,23 +34,19 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   createPrototypeRequest,
   createQuotation,
-  createRfq,
   reviseQuotation,
 } from "@/lib/data/commercial-documents";
 import { toCommercialItem } from "@/lib/data/commercial-items";
 import { createSalesOrder } from "@/lib/data/sales-orders";
 import { cacheListRecord } from "@/lib/query-cache-updates";
-import { RFQ_INTAKE_STAGES } from "@/lib/business-rules";
 import { documentNumberExample } from "@/lib/data/document-numbering";
 import { useClientResolution, ClientPickerField } from "./ClientPicker";
 import {
   buildSalesOrderSchema,
   prototypeRequestSchema,
   quotationSchema,
-  rfqSchema,
   type PrototypeRequestValues,
   type QuotationValues,
-  type RfqValues,
   type SalesOrderValues,
 } from "./commercial-form-schemas";
 
@@ -91,10 +87,6 @@ function errorMessage(error: unknown): string {
   return "Unknown error";
 }
 
-// ---------------------------------------------------------------------------
-// RFQ
-// ---------------------------------------------------------------------------
-
 const emptyLineItem = {
   productName: "",
   description: "",
@@ -103,125 +95,12 @@ const emptyLineItem = {
   unitPrice: 0,
 };
 const WEIGHTED_STAGES = [
-  "Client Request for Quotes",
   "Quotes Sent",
   "Negotiation",
   "Hot Prospect",
   "Commit",
   "Closed Won",
 ] as const;
-
-export function CreateRfqDialog(props: SharedProps) {
-  const { open, setOpen, controlled } = useDialogState(props);
-  const queryClient = useQueryClient();
-  const {
-    needsPicker,
-    clients,
-    pickedId,
-    setPickedId,
-    clientId,
-    clientName,
-    ownerId,
-    resolved,
-  } = useClientResolution(props);
-  const form = useForm<RfqValues>({
-    resolver: zodResolver(rfqSchema),
-    defaultValues: {
-      documentDate: todayIso(),
-      stage: "Client Request for Quotes",
-      lineItems: [emptyLineItem],
-    },
-  });
-  const { fields, append, remove } = useFieldArray({
-    control: form.control,
-    name: "lineItems",
-  });
-  const lineItems = form.watch("lineItems");
-  const onSubmit = form.handleSubmit(async (v) => {
-    if (!clientId || !ownerId) return;
-    try {
-      const created = await createRfq({
-        clientId,
-        documentDate: v.documentDate,
-        stage: v.stage,
-        items: v.lineItems,
-      });
-      cacheListRecord(
-        queryClient,
-        ["commercial-items", "all"],
-        toCommercialItem(created),
-      );
-      await queryClient.invalidateQueries({ queryKey: ["commercial-items"] });
-      await queryClient.invalidateQueries({ queryKey: ["activity-log"] });
-      toast.success("RFQ dibuat", {
-        description: `${clientName} · ${v.lineItems.length} item`,
-      });
-      form.reset();
-      setPickedId("");
-      setOpen(false);
-      props.onCreated?.();
-    } catch (error) {
-      toast.error("Gagal membuat RFQ", {
-        description: errorMessage(error),
-      });
-    }
-  });
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      {(props.trigger || !controlled) && (
-        <DialogTrigger asChild>{props.trigger}</DialogTrigger>
-      )}
-      <DialogContent className="max-w-xl">
-        <DialogHeader>
-          <DialogTitle>Tambah RFQ</DialogTitle>
-          <DialogDescription>{clientName ?? "Pilih klien"}</DialogDescription>
-        </DialogHeader>
-        <form onSubmit={onSubmit} className="grid gap-3">
-          {needsPicker && (
-            <ClientPickerField
-              clients={clients}
-              value={pickedId}
-              onChange={setPickedId}
-            />
-          )}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <FieldSelect
-              label="Stage awal"
-              value={form.watch("stage")}
-              onChange={(v) =>
-                form.setValue("stage", v as RfqValues["stage"], {
-                  shouldDirty: true,
-                })
-              }
-              options={[...RFQ_INTAKE_STAGES]}
-            />
-          </div>
-          <FieldText
-            label="Date"
-            reg={form.register("documentDate")}
-            error={msg(form.formState.errors, "documentDate")}
-            type="date"
-          />
-          <LineItemsSection
-            fields={fields}
-            append={() => append(emptyLineItem)}
-            remove={remove}
-            register={form.register}
-            lineItems={lineItems}
-            errorMessage={form.formState.errors.lineItems?.message as string}
-            showMoney
-          />
-          <Footer
-            onCancel={() => setOpen(false)}
-            submitting={form.formState.isSubmitting}
-            label="Simpan RFQ"
-            disabled={!resolved}
-          />
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-}
 
 // ---------------------------------------------------------------------------
 // Quotation
@@ -550,7 +429,7 @@ export function CreateSalesOrderDialog(props: SharedProps) {
     }
   });
   const regularSources: SoValues["source"][] = [
-    "RFQ / New Product",
+    "New Product",
     "Existing / Repeat Order",
   ];
   const prototypeSource: SoValues["source"] =

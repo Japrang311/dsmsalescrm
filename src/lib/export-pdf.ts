@@ -111,8 +111,8 @@ function exportReportPdf(
       ["Revenue PPN", formatRupiahShort(tax.ppn), "Termasuk pajak"],
       ["Revenue Non-PPN", formatRupiahShort(tax.nonPpn), "Tanpa pajak"],
       [
-        "Revenue from RFQ / New Product",
-        formatRupiahShort(src.rfq),
+        "Revenue from New Product",
+        formatRupiahShort(src.newProduct),
         "Dalam periode",
       ],
       [

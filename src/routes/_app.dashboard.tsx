@@ -474,13 +474,15 @@ function DashboardPage() {
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
         <KpiCard
           label="Revenue Source YTD"
-          value={formatRupiahShort(src.rfq + src.existing + src.prototypePaid)}
+          value={formatRupiahShort(
+            src.newProduct + src.existing + src.prototypePaid,
+          )}
           right={<Boxes className="h-4 w-4 text-primary" />}
         >
           <div className="mt-2 space-y-1.5 text-xs">
             <SourceRow
-              label="RFQ / New Product"
-              value={src.rfq}
+              label="New Product"
+              value={src.newProduct}
               color="bg-primary"
             />
             <SourceRow

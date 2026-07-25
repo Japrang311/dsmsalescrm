@@ -256,11 +256,13 @@ beforeAll(async () => {
     commercialRows[key] = await insertId("commercial_documents", {
       client_id: clientOpen,
       owner_id: users.sales.id,
-      type: "RFQ",
+      type: "Quotation",
       source_flow: "RFQ / New Product",
       document_date: "2026-07-19",
-      rfq_number: `RFQ-TASK-4-${key}-${crypto.randomUUID()}`,
       stage,
+      ...(stage === "Closed Lost"
+        ? { lost_reason: "Tidak ada respons" }
+        : {}),
     });
   }
 

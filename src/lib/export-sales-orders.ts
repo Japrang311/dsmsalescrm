@@ -20,7 +20,7 @@ export type SalesOrdersExportSummary = {
   ppn: number;
   nonPpn: number;
   total: number;
-  rfq: number;
+  newProduct: number;
   existing: number;
   protoPaid: number;
   focCount: number;
@@ -167,7 +167,10 @@ export function exportSalesOrdersXlsx(
             summary.total ? summary.nonPpn / summary.total : 0,
           ),
         },
-        { metric: "RFQ / New Product", value: formatRupiahFull(summary.rfq) },
+        {
+          metric: "New Product",
+          value: formatRupiahFull(summary.newProduct),
+        },
         {
           metric: "Existing / Repeat Order",
           value: formatRupiahFull(summary.existing),

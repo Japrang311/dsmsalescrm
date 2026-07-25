@@ -153,11 +153,10 @@ function valuesForOwnerInsert(
       return {
         client_id: fixtureRows.client,
         owner_id: ownerId,
-        type: "RFQ",
+        type: "Quotation",
         source_flow: "RFQ / New Product",
         document_date: "2026-07-19",
-        rfq_number: `RFQ-TASK-2-${marker}`,
-        stage: "Client Request for Quotes",
+        stage: "Quotes Sent",
       };
     case "sales_orders":
       return {
@@ -199,7 +198,7 @@ function supportedUpdateFor(
     case "tasks":
       return { status: "Done" };
     case "commercial_documents":
-      return { stage: "Closed Lost" };
+      return { stage: "Negotiation" };
     case "sales_orders":
       return { tax_type: "Non-PPN" };
   }
@@ -294,11 +293,10 @@ beforeAll(async () => {
     const commercialItem = await insertFixture("commercial_documents", {
       client_id: client,
       owner_id: roleUsers.sales.id,
-      type: "RFQ",
+      type: "Quotation",
       source_flow: "RFQ / New Product",
       document_date: "2026-07-18",
-      rfq_number: `RFQ-TASK-2-${crypto.randomUUID()}`,
-      stage: "Client Request for Quotes",
+      stage: "Quotes Sent",
     });
     const task = await insertFixture("tasks", {
       client_id: client,
@@ -955,11 +953,10 @@ describe("active Super Admin supported business writes", () => {
       .insert({
         client_id: fixtureRows.client,
         owner_id: roleUsers.sales.id,
-        type: "RFQ",
+        type: "Quotation",
         source_flow: "RFQ / New Product",
         document_date: "2026-07-18",
-        rfq_number: `RFQ-SA-${crypto.randomUUID()}`,
-        stage: "Client Request for Quotes",
+        stage: "Quotes Sent",
       })
       .select("id")
       .single();

@@ -31,7 +31,7 @@ const regularPaid: SalesOrder = {
   ownerId: "owner-1",
   type: "Regular",
   taxType: "PPN",
-  source: "RFQ / New Product",
+  source: "New Product",
   value: 1_000_000,
   date: dateInCurrentMonth,
 };
@@ -73,7 +73,7 @@ const commercialItem = (
   clientId,
   ownerId: "owner-1",
   type,
-  sourceFlow: "RFQ / New Product",
+  sourceFlow: "New Product",
   stage: "Quotation Sent",
   description: id,
   estimatedValue,
@@ -94,8 +94,12 @@ describe("dashboard-selectors FOC exclusion", () => {
   });
 
   test("revenueBySource excludes FOC from every bucket", () => {
-    const { rfq, existing, prototypePaid: proto } = revenueBySource(orders);
-    expect(rfq).toBe(1_000_000);
+    const {
+      newProduct,
+      existing,
+      prototypePaid: proto,
+    } = revenueBySource(orders);
+    expect(newProduct).toBe(1_000_000);
     expect(existing).toBe(0);
     expect(proto).toBe(500_000);
   });
@@ -113,7 +117,7 @@ describe("clientCommercialMetrics", () => {
   test("uses Quotation value for client quotation pipeline", () => {
     const metrics = clientCommercialMetrics(
       [
-        commercialItem("rfq", "RFQ", 1_000_000),
+        commercialItem("direct", "Direct Order", 1_000_000),
         commercialItem("quotation", "Quotation", 2_500_000),
         commercialItem("other-client", "Quotation", 9_000_000, "client-2"),
       ],

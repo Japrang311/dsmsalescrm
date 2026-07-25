@@ -1,9 +1,5 @@
-// The seven exact weighted stages (PRD §7) — single source of truth for
-// both the stage names shown across Pipeline/RFQ/Quotation UI and the
-// forecast weights. Do not restore the obsolete "RFQ Received"/"Quotation
-// Sent"-style pipeline stages as a second, competing vocabulary.
+// Quotation stages and forecast weights.
 export const COMMERCIAL_STAGE_WEIGHTS = {
-  "Client Request for Quotes": 0.15,
   "Quotes Sent": 0.3,
   Negotiation: 0.55,
   "Hot Prospect": 0.75,

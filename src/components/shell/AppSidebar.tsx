@@ -8,7 +8,6 @@ import {
   Activity,
   BarChart3,
   Settings,
-  FileText,
   ReceiptText,
 } from "lucide-react";
 
@@ -46,7 +45,6 @@ const NAV_EXECUTIVE = [
 ] as const;
 
 const COMMERCIAL_ITEMS_NAV = [
-  { title: "RFQ", url: "/rfq", icon: FileText },
   { title: "Quotations", url: "/quotations", icon: ReceiptText },
 ] as const;
 

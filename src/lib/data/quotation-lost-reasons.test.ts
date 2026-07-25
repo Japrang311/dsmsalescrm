@@ -8,18 +8,10 @@ import {
 } from "./quotation-lost-reasons";
 
 describe("quotation lost reason rules", () => {
-  test("requires a category when RFQ or quotation moves to Closed Lost", () => {
+  test("requires a category when quotation moves to Closed Lost", () => {
     expect(
       validateQuotationLostReason({
         type: "Quotation",
-        stage: "Closed Lost",
-        lostReason: null,
-        lostReasonDetail: null,
-      }),
-    ).toBe("Pilih alasan closed lost.");
-    expect(
-      validateQuotationLostReason({
-        type: "RFQ",
         stage: "Closed Lost",
         lostReason: null,
         lostReasonDetail: null,
@@ -70,7 +62,7 @@ describe("quotation lost reason rules", () => {
       clientId: "client-1",
       ownerId: "owner-1",
       type,
-      sourceFlow: "RFQ / New Product",
+      sourceFlow: "New Product",
       stage,
       description: id,
       estimatedValue,
@@ -87,7 +79,13 @@ describe("quotation lost reason rules", () => {
           "Harga tidak kompetitif",
           10_000,
         ),
-        item("lost-2", "RFQ", "Closed Lost", "Harga tidak kompetitif", 20_000),
+        item(
+          "lost-2",
+          "Quotation",
+          "Closed Lost",
+          "Harga tidak kompetitif",
+          20_000,
+        ),
         item("open", "Quotation", "Negotiation", undefined, 50_000),
       ]),
     ).toEqual([

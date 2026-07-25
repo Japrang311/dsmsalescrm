@@ -66,7 +66,7 @@ type SalesOrderRow = {
   type: SoType;
   tax_type: TaxType | null;
   prototype_status: PrototypeStatus | null;
-  source: RevenueSource | "Prototype FOC";
+  source: RevenueSource | "Prototype FOC" | "RFQ / New Product";
   number_mode: SalesOrderDocument["numberMode"];
   backdate_reason: string | null;
   total_value: number | null;
@@ -124,7 +124,7 @@ function toSalesOrder(row: SalesOrderRow): SalesOrderDocument {
     type: row.type,
     taxType: row.tax_type ?? undefined,
     prototypeStatus: row.prototype_status ?? undefined,
-    source: row.source,
+    source: row.source === "RFQ / New Product" ? "New Product" : row.source,
     numberMode: row.number_mode,
     backdateReason: row.backdate_reason ?? undefined,
     totalValue: row.total_value,
@@ -225,7 +225,8 @@ export async function createSalesOrder(
     p_type: input.type,
     p_tax_type: input.taxType ?? null,
     p_prototype_status: input.prototypeStatus ?? null,
-    p_source: input.source,
+    p_source:
+      input.source === "New Product" ? "RFQ / New Product" : input.source,
     p_number_mode: input.numberMode ?? "Manual",
     p_manual_so_number: manualSoNumber || null,
     p_backdate_reason: backdateReason || null,

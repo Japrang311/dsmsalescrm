@@ -29,16 +29,9 @@ const paidLineItemsSchema = z
     });
   });
 
-export const rfqSchema = z.object({
-  documentDate: z.string().min(10, "Date wajib diisi"),
-  stage: z.enum(["Client Request for Quotes"]),
-  lineItems: paidLineItemsSchema,
-});
-
 export const quotationSchema = z.object({
   documentDate: z.string().min(10, "Date wajib diisi"),
   stage: z.enum([
-    "Client Request for Quotes",
     "Quotes Sent",
     "Negotiation",
     "Hot Prospect",
@@ -68,7 +61,7 @@ export function buildSalesOrderSchema(isHariffClient: boolean) {
       taxType: z.enum(["PPN", "Non-PPN"]).optional(),
       prototypeStatus: z.enum(["Paid", "FOC"]).optional(),
       source: z.enum([
-        "RFQ / New Product",
+        "New Product",
         "Existing / Repeat Order",
         "Prototype Paid",
         "Prototype FOC",
@@ -169,7 +162,6 @@ export function buildSalesOrderSchema(isHariffClient: boolean) {
     });
 }
 
-export type RfqValues = z.infer<typeof rfqSchema>;
 export type QuotationValues = z.infer<typeof quotationSchema>;
 export type PrototypeRequestValues = z.infer<typeof prototypeRequestSchema>;
 export type SalesOrderValues = z.infer<

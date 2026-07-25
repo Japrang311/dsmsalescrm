@@ -32,11 +32,10 @@ beforeAll(async () => {
     .insert({
       client_id: clientId,
       owner_id: fixtures.sales.id,
-      type: "RFQ",
+      type: "Quotation",
       source_flow: "RFQ / New Product",
       document_date: "2026-07-19",
-      rfq_number: `RFQ-FACADE-${crypto.randomUUID()}`,
-      stage: "Client Request for Quotes",
+      stage: "Quotes Sent",
     })
     .select("id")
     .single();

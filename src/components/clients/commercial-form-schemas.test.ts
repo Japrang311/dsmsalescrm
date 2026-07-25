@@ -3,7 +3,6 @@ import {
   buildSalesOrderSchema,
   prototypeRequestSchema,
   quotationSchema,
-  rfqSchema,
 } from "./commercial-form-schemas";
 
 const paidItem = {
@@ -15,33 +14,6 @@ const paidItem = {
 };
 
 describe("Phase 11 commercial form schemas", () => {
-  test("RFQ requires Date, Product, Qty, UOM, and paid price", () => {
-    expect(
-      rfqSchema.safeParse({
-        documentDate: "2026-07-19",
-        stage: "Client Request for Quotes",
-        lineItems: [paidItem],
-      }).success,
-    ).toBe(true);
-    expect(
-      rfqSchema.safeParse({
-        documentDate: "",
-        stage: "Client Request for Quotes",
-        lineItems: [{ ...paidItem, productName: "", uom: "" }],
-      }).success,
-    ).toBe(false);
-  });
-
-  test("RFQ intake rejects quotation-stage values", () => {
-    expect(
-      rfqSchema.safeParse({
-        documentDate: "2026-07-19",
-        stage: "Negotiation",
-        lineItems: [paidItem],
-      }).success,
-    ).toBe(false);
-  });
-
   test("Quotation keeps Description optional and requires weighted stage", () => {
     const parsed = quotationSchema.safeParse({
       documentDate: "2026-07-19",
@@ -53,7 +25,7 @@ describe("Phase 11 commercial form schemas", () => {
     expect(
       quotationSchema.safeParse({
         documentDate: "2026-07-19",
-        stage: "Quotation Sent",
+        stage: "Client Request for Quotes",
         lineItems: [paidItem],
       }).success,
     ).toBe(false);

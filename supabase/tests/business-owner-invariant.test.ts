@@ -146,11 +146,10 @@ describe("active business-owner database invariant", () => {
         {
           client_id: clientId,
           owner_id: owner,
-          type: "RFQ",
+          type: "Quotation",
           source_flow: "RFQ / New Product",
           document_date: "2026-07-19",
-          rfq_number: `RFQ-OWNER-INVARIANT-${marker}`,
-          stage: "RFQ Received",
+          stage: "Quotes Sent",
         },
       ],
       [

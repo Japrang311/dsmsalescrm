@@ -117,7 +117,6 @@ const METHOD_OPTIONS = [
 const PRIORITY_OPTIONS = ["all", "High", "Normal", "Low"] as const;
 const COMMERCIAL_OPTIONS = [
   "all",
-  "RFQ",
   "Quotation",
   "Direct Order",
   "Prototype",

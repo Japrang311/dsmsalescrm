@@ -49,10 +49,7 @@ import {
   listSalesTeamProfiles,
 } from "@/lib/data/clients";
 
-// RFQ and Quotations are the only remaining CommercialViews consumers
-// (Customer PO/Prototypes/Repeat Orders were removed 2026-07-20). RFQ intake
-// and quotation-stage work share the same source flow, so route-level filters
-// must combine document type and stage boundaries.
+// Quotation is the remaining CommercialViews consumer.
 export type CommercialViewFilter = {
   types?: CommercialItem["type"][];
   stages?: string[];
@@ -64,7 +61,7 @@ export type CommercialViewsProps = {
   icon: ReactNode;
   filter: CommercialViewFilter;
   stages: string[];
-  detailBasePath: string; // e.g. "/rfq"
+  detailBasePath: string; // e.g. "/quotations"
   headerAction?: ReactNode;
   emptyHint?: string;
 };

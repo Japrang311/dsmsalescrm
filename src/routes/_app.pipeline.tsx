@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import {
   GitBranch,
   Filter,
@@ -15,11 +15,10 @@ import { PipelineAnalytics } from "@/components/pipeline/PipelineAnalytics";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRole } from "@/context/role-context";
 import { NOW, type QuotationLostReason, type Role } from "@/lib/domain";
-import { listCommercialItems } from "@/lib/data/commercial-items";
 import {
-  isRfqReplacedByQuotation,
-  transitionCommercialItemStage,
-} from "@/lib/data/commercial-stage-transition";
+  listCommercialItems,
+  updateCommercialItem,
+} from "@/lib/data/commercial-items";
 import {
   listClients,
   listOwners,
@@ -100,7 +99,6 @@ function PipelinePage() {
 
 function PipelineBoard({ role }: { role: Role }) {
   const { authReady } = useRole();
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { data: items = [], isLoading: itemsLoading } = useQuery({
     queryKey: ["commercial-items", "all"],
@@ -173,7 +171,6 @@ function PipelineBoard({ role }: { role: Role }) {
 
   const filtered = useMemo(() => {
     return items.filter((it) => {
-      if (isRfqReplacedByQuotation(it, items)) return false;
       const client = clientById[it.clientId];
       if (!client) return false;
       if (owner !== "all" && it.ownerId !== owner) return false;
@@ -200,7 +197,7 @@ function PipelineBoard({ role }: { role: Role }) {
     for (const it of filtered) {
       const key = (STAGES as readonly string[]).includes(it.stage)
         ? (it.stage as Stage)
-        : "Client Request for Quotes";
+        : "Quotes Sent";
       g.get(key)!.push(it);
     }
     return g;
@@ -285,28 +282,23 @@ function PipelineBoard({ role }: { role: Role }) {
       // (see commercial-items.ts). "Next action" now lives on tasks, same
       // as nextByItem already reads it. Stage is the only thing patched
       // here; a changed date creates/logs a follow-up task instead.
-      const transition = await transitionCommercialItemStage(
-        item,
-        pendingMove.toStage,
-        {
-          lostReason: isLostReasonTracked(item.type, pendingMove.toStage)
-            ? reasonPatch.lostReason
-            : undefined,
-          lostReasonDetail: isLostReasonTracked(item.type, pendingMove.toStage)
-            ? reasonPatch.lostReasonDetail
-            : undefined,
-        },
-      );
-      const actorId = transition.transitionedToQuotation
-        ? null
-        : await getCurrentActorId();
+      const updatedItem = await updateCommercialItem(item.id, {
+        stage: pendingMove.toStage,
+        lostReason: isLostReasonTracked(item.type, pendingMove.toStage)
+          ? reasonPatch.lostReason
+          : undefined,
+        lostReasonDetail: isLostReasonTracked(item.type, pendingMove.toStage)
+          ? reasonPatch.lostReasonDetail
+          : undefined,
+      });
+      const actorId = await getCurrentActorId();
       if (actorId) {
         await logActivity({
           kind: "commercial_item_stage_change",
           ownerId: item.ownerId,
           actorId,
           clientId: item.clientId,
-          commercialDocumentId: transition.item.id,
+          commercialDocumentId: updatedItem.id,
           title: `${item.description} diperbarui`,
           detail: [
             `stage: ${pendingMove.fromStage} → ${pendingMove.toStage}`,
@@ -326,8 +318,8 @@ function PipelineBoard({ role }: { role: Role }) {
         await createTask({
           clientId: item.clientId,
           ownerId: item.ownerId,
-          commercialDocumentId: transition.item.id,
-          title: `Follow-up · ${transition.item.type} — ${pendingMove.clientName}`,
+          commercialDocumentId: updatedItem.id,
+          title: `Follow-up · ${updatedItem.type} — ${pendingMove.clientName}`,
           dueDate: nextDateInput,
           method: "Phone",
           priority: "Normal",
@@ -337,17 +329,6 @@ function PipelineBoard({ role }: { role: Role }) {
       }
       await queryClient.invalidateQueries({ queryKey: ["commercial-items"] });
       await queryClient.invalidateQueries({ queryKey: ["activity-log"] });
-      if (transition.transitionedToQuotation) {
-        toast.success("Quotation dibuat dari RFQ", {
-          description: "Lanjutkan pengisian data di module Quotation.",
-        });
-        setPendingMove(null);
-        await navigate({
-          to: "/quotations/$id",
-          params: { id: transition.item.id },
-        });
-        return;
-      }
       toast.success(`${pendingMove.clientName} → ${pendingMove.toStage}`, {
         description: nextDateInput
           ? `Next action ${formatDateShort(nextDateInput)}`

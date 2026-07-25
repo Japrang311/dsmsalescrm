@@ -20,7 +20,7 @@ const context: DashboardExportContext = {
       ownerId: "sales-1",
       type: "Regular",
       taxType: "PPN",
-      source: "RFQ / New Product",
+      source: "New Product",
       value: 125_000_000,
       date: "2026-07-10",
     },

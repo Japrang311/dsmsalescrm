@@ -26,7 +26,7 @@ type LostReasonState = {
 };
 
 export function isLostReasonTracked(type: CommercialType, stage: string) {
-  return (type === "RFQ" || type === "Quotation") && stage === "Closed Lost";
+  return type === "Quotation" && stage === "Closed Lost";
 }
 
 export function validateQuotationLostReason(

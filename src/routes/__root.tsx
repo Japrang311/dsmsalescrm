@@ -82,7 +82,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         {
           name: "description",
           content:
-            "Account-centric sales execution workspace for DSM: follow-ups, RFQ, quotations, sales orders, prototypes, and revenue tracking.",
+            "Account-centric sales execution workspace for DSM: follow-ups, quotations, sales orders, prototypes, and revenue tracking.",
         },
         {
           property: "og:title",

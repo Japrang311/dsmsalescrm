@@ -39,18 +39,18 @@ beforeAll(async () => {
       {
         client_id: clientId,
         owner_id: fixtures.sales.id,
-        type: "RFQ",
+        type: "Quotation",
         source_flow: "RFQ / New Product",
         document_date: "2026-07-24",
-        stage: "Client Request for Quotes",
+        stage: "Quotes Sent",
       },
       {
         client_id: clientId,
         owner_id: fixtures.manager.id,
-        type: "RFQ",
+        type: "Quotation",
         source_flow: "RFQ / New Product",
         document_date: "2026-07-24",
-        stage: "Client Request for Quotes",
+        stage: "Quotes Sent",
       },
     ])
     .select("id, owner_id");

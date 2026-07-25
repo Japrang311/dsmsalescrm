@@ -65,7 +65,7 @@ export const Route = createFileRoute("/_app/activity")({
       {
         name: "description",
         content:
-          "Timeline aktivitas terpadu: follow-up, perubahan status, pipeline, RFQ, quotation, dan sales order.",
+          "Timeline aktivitas terpadu: follow-up, perubahan status, pipeline, quotation, dan sales order.",
       },
     ],
   }),

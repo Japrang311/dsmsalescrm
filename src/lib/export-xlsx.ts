@@ -256,8 +256,8 @@ export function exportExecutiveReportXlsx(
       reference: "Tanpa pajak",
     },
     {
-      metric: "Revenue RFQ / New Product",
-      value: formatRupiahShort(metrics.revenueBySource.rfq),
+      metric: "Revenue New Product",
+      value: formatRupiahShort(metrics.revenueBySource.newProduct),
       reference: "Dalam periode",
     },
     {

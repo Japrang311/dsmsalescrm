@@ -20,11 +20,9 @@ import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
 import { Route as AppClientsRouteImport } from './routes/_app.clients'
 import { Route as AppActivityRouteImport } from './routes/_app.activity'
 import { Route as AppSalesOrdersIndexRouteImport } from './routes/_app.sales-orders.index'
-import { Route as AppRfqIndexRouteImport } from './routes/_app.rfq.index'
 import { Route as AppQuotationsIndexRouteImport } from './routes/_app.quotations.index'
 import { Route as AppClientsIndexRouteImport } from './routes/_app.clients.index'
 import { Route as AppSalesOrdersSoIdRouteImport } from './routes/_app.sales-orders.$soId'
-import { Route as AppRfqIdRouteImport } from './routes/_app.rfq.$id'
 import { Route as AppQuotationsIdRouteImport } from './routes/_app.quotations.$id'
 import { Route as AppClientsClientIdRouteImport } from './routes/_app.clients.$clientId'
 
@@ -82,11 +80,6 @@ const AppSalesOrdersIndexRoute = AppSalesOrdersIndexRouteImport.update({
   path: '/sales-orders/',
   getParentRoute: () => AppRoute,
 } as any)
-const AppRfqIndexRoute = AppRfqIndexRouteImport.update({
-  id: '/rfq/',
-  path: '/rfq/',
-  getParentRoute: () => AppRoute,
-} as any)
 const AppQuotationsIndexRoute = AppQuotationsIndexRouteImport.update({
   id: '/quotations/',
   path: '/quotations/',
@@ -100,11 +93,6 @@ const AppClientsIndexRoute = AppClientsIndexRouteImport.update({
 const AppSalesOrdersSoIdRoute = AppSalesOrdersSoIdRouteImport.update({
   id: '/sales-orders/$soId',
   path: '/sales-orders/$soId',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppRfqIdRoute = AppRfqIdRouteImport.update({
-  id: '/rfq/$id',
-  path: '/rfq/$id',
   getParentRoute: () => AppRoute,
 } as any)
 const AppQuotationsIdRoute = AppQuotationsIdRouteImport.update({
@@ -130,11 +118,9 @@ export interface FileRoutesByFullPath {
   '/tasks': typeof AppTasksRoute
   '/clients/$clientId': typeof AppClientsClientIdRoute
   '/quotations/$id': typeof AppQuotationsIdRoute
-  '/rfq/$id': typeof AppRfqIdRoute
   '/sales-orders/$soId': typeof AppSalesOrdersSoIdRoute
   '/clients/': typeof AppClientsIndexRoute
   '/quotations/': typeof AppQuotationsIndexRoute
-  '/rfq/': typeof AppRfqIndexRoute
   '/sales-orders/': typeof AppSalesOrdersIndexRoute
 }
 export interface FileRoutesByTo {
@@ -148,11 +134,9 @@ export interface FileRoutesByTo {
   '/tasks': typeof AppTasksRoute
   '/clients/$clientId': typeof AppClientsClientIdRoute
   '/quotations/$id': typeof AppQuotationsIdRoute
-  '/rfq/$id': typeof AppRfqIdRoute
   '/sales-orders/$soId': typeof AppSalesOrdersSoIdRoute
   '/clients': typeof AppClientsIndexRoute
   '/quotations': typeof AppQuotationsIndexRoute
-  '/rfq': typeof AppRfqIndexRoute
   '/sales-orders': typeof AppSalesOrdersIndexRoute
 }
 export interface FileRoutesById {
@@ -169,11 +153,9 @@ export interface FileRoutesById {
   '/_app/tasks': typeof AppTasksRoute
   '/_app/clients/$clientId': typeof AppClientsClientIdRoute
   '/_app/quotations/$id': typeof AppQuotationsIdRoute
-  '/_app/rfq/$id': typeof AppRfqIdRoute
   '/_app/sales-orders/$soId': typeof AppSalesOrdersSoIdRoute
   '/_app/clients/': typeof AppClientsIndexRoute
   '/_app/quotations/': typeof AppQuotationsIndexRoute
-  '/_app/rfq/': typeof AppRfqIndexRoute
   '/_app/sales-orders/': typeof AppSalesOrdersIndexRoute
 }
 export interface FileRouteTypes {
@@ -190,11 +172,9 @@ export interface FileRouteTypes {
     | '/tasks'
     | '/clients/$clientId'
     | '/quotations/$id'
-    | '/rfq/$id'
     | '/sales-orders/$soId'
     | '/clients/'
     | '/quotations/'
-    | '/rfq/'
     | '/sales-orders/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -208,11 +188,9 @@ export interface FileRouteTypes {
     | '/tasks'
     | '/clients/$clientId'
     | '/quotations/$id'
-    | '/rfq/$id'
     | '/sales-orders/$soId'
     | '/clients'
     | '/quotations'
-    | '/rfq'
     | '/sales-orders'
   id:
     | '__root__'
@@ -228,11 +206,9 @@ export interface FileRouteTypes {
     | '/_app/tasks'
     | '/_app/clients/$clientId'
     | '/_app/quotations/$id'
-    | '/_app/rfq/$id'
     | '/_app/sales-orders/$soId'
     | '/_app/clients/'
     | '/_app/quotations/'
-    | '/_app/rfq/'
     | '/_app/sales-orders/'
   fileRoutesById: FileRoutesById
 }
@@ -321,13 +297,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSalesOrdersIndexRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/rfq/': {
-      id: '/_app/rfq/'
-      path: '/rfq'
-      fullPath: '/rfq/'
-      preLoaderRoute: typeof AppRfqIndexRouteImport
-      parentRoute: typeof AppRoute
-    }
     '/_app/quotations/': {
       id: '/_app/quotations/'
       path: '/quotations'
@@ -347,13 +316,6 @@ declare module '@tanstack/react-router' {
       path: '/sales-orders/$soId'
       fullPath: '/sales-orders/$soId'
       preLoaderRoute: typeof AppSalesOrdersSoIdRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/rfq/$id': {
-      id: '/_app/rfq/$id'
-      path: '/rfq/$id'
-      fullPath: '/rfq/$id'
-      preLoaderRoute: typeof AppRfqIdRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/quotations/$id': {
@@ -396,10 +358,8 @@ interface AppRouteChildren {
   AppSettingsRoute: typeof AppSettingsRoute
   AppTasksRoute: typeof AppTasksRoute
   AppQuotationsIdRoute: typeof AppQuotationsIdRoute
-  AppRfqIdRoute: typeof AppRfqIdRoute
   AppSalesOrdersSoIdRoute: typeof AppSalesOrdersSoIdRoute
   AppQuotationsIndexRoute: typeof AppQuotationsIndexRoute
-  AppRfqIndexRoute: typeof AppRfqIndexRoute
   AppSalesOrdersIndexRoute: typeof AppSalesOrdersIndexRoute
 }
 
@@ -412,10 +372,8 @@ const AppRouteChildren: AppRouteChildren = {
   AppSettingsRoute: AppSettingsRoute,
   AppTasksRoute: AppTasksRoute,
   AppQuotationsIdRoute: AppQuotationsIdRoute,
-  AppRfqIdRoute: AppRfqIdRoute,
   AppSalesOrdersSoIdRoute: AppSalesOrdersSoIdRoute,
   AppQuotationsIndexRoute: AppQuotationsIndexRoute,
-  AppRfqIndexRoute: AppRfqIndexRoute,
   AppSalesOrdersIndexRoute: AppSalesOrdersIndexRoute,
 }
 

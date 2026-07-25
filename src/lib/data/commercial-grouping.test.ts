@@ -17,15 +17,13 @@ function document(
     clientId: "client",
     ownerId: "owner",
     type: "Quotation",
-    sourceFlow: "RFQ / New Product",
+    sourceFlow: "New Product",
     documentDate: "2026-07-18",
-    rfqNumber: null,
     quotationNumber: "DSM-26QUO-0404",
     quotationBaseNumber: "DSM-26QUO-0404",
     quotationRevision: 0,
     isCurrentRevision: true,
     supersedesDocumentId: null,
-    sourceRfqDocumentId: null,
     quotationExpiredDate: null,
     stage: "Quotes Sent",
     clientAddress: null,
@@ -72,9 +70,9 @@ describe("commercial grouped view models", () => {
       currentCommercialDocuments([
         document({ id: "base", isCurrentRevision: false }),
         document({ id: "revision", quotationRevision: 1 }),
-        document({ id: "rfq", type: "RFQ", isCurrentRevision: false }),
+        document({ id: "older", isCurrentRevision: false }),
       ]).map((entry) => entry.id),
-    ).toEqual(["revision", "rfq"]);
+    ).toEqual(["revision"]);
   });
 
   test("sorts items, sums totals, and calculates current forecast", () => {

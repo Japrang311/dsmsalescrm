@@ -56,7 +56,7 @@ import {
 } from "@/components/ui/dialog";
 import { useRole, ROLE_LABEL } from "@/context/role-context";
 import {
-  RFQ_STAGES,
+  QUOTATION_STAGES,
   REPEAT_STAGES,
   PROTOTYPE_STAGES,
 } from "@/lib/business-rules";
@@ -1440,8 +1440,8 @@ function OrgTab({ canEdit }: { canEdit: boolean }) {
           />
           <Separator />
           <ReferenceGroup
-            title="Pipeline: RFQ / New Product"
-            items={[...RFQ_STAGES]}
+            title="Pipeline: Quotation / New Product"
+            items={[...QUOTATION_STAGES]}
           />
           <ReferenceGroup
             title="Pipeline: Existing / Repeat Order"

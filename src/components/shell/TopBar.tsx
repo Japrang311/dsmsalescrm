@@ -39,24 +39,16 @@ import { useDashboardData } from "@/hooks/use-dashboard-data";
 import { AddClientDialog } from "@/components/clients/AddClientDialog";
 import { AddFollowUpDialog } from "@/components/clients/AddFollowUpDialog";
 import {
-  CreateRfqDialog,
   CreateQuotationDialog,
   CreateSalesOrderDialog,
   CreatePrototypeDialog,
 } from "@/components/clients/CreateRecordDialogs";
 
-type QuickCreateKind =
-  | "followup"
-  | "client"
-  | "rfq"
-  | "quotation"
-  | "so"
-  | "prototype";
+type QuickCreateKind = "followup" | "client" | "quotation" | "so" | "prototype";
 
 export const QUICK_CREATE_ITEMS = [
   { kind: "followup", label: "New Follow Up" },
   { kind: "client", label: "New Client" },
-  { kind: "rfq", label: "New RFQ" },
   { kind: "quotation", label: "New Quotation" },
   { kind: "so", label: "Record Sales Order" },
   { kind: "prototype", label: "New Prototype Request" },
@@ -67,8 +59,7 @@ export const QUICK_CREATE_ITEMS = [
 
 const MAX_RESULTS_PER_GROUP = 5;
 
-// Global search covers exactly what its placeholder promises — client, RFQ,
-// quotation, SO — matched client-side against data already fetched by
+// Global search covers client, quotation, and SO data already fetched by
 // useDashboardData() (shared React Query cache, no extra network round
 // trip). Uses a plain <Input> + PopoverAnchor (not PopoverTrigger) so the
 // dropdown opens as the user types rather than on click.
@@ -82,18 +73,6 @@ function GlobalSearch() {
   const matchedClients = q
     ? clients
         .filter((c) => c.name.toLowerCase().includes(q))
-        .slice(0, MAX_RESULTS_PER_GROUP)
-    : [];
-  const matchedRfq = q
-    ? items
-        .filter(
-          (i) =>
-            i.type === "RFQ" &&
-            (i.description.toLowerCase().includes(q) ||
-              (i.lineItems ?? []).some((line) =>
-                (line.productName ?? "").toLowerCase().includes(q),
-              )),
-        )
         .slice(0, MAX_RESULTS_PER_GROUP)
     : [];
   const matchedQuotation = q
@@ -112,7 +91,6 @@ function GlobalSearch() {
     : [];
   const hasResults =
     matchedClients.length > 0 ||
-    matchedRfq.length > 0 ||
     matchedQuotation.length > 0 ||
     matchedOrders.length > 0;
 
@@ -135,7 +113,7 @@ function GlobalSearch() {
             onKeyDown={(e) => {
               if (e.key === "Escape") setOpen(false);
             }}
-            placeholder="Cari client, RFQ, quotation, SO..."
+            placeholder="Cari client, quotation, SO..."
             className="h-9 pl-8 bg-surface-muted border-border"
           />
         </div>
@@ -167,22 +145,6 @@ function GlobalSearch() {
                     }}
                   >
                     {c.name}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            )}
-            {matchedRfq.length > 0 && (
-              <CommandGroup heading="RFQ">
-                {matchedRfq.map((i) => (
-                  <CommandItem
-                    key={i.id}
-                    value={`rfq-${i.id}`}
-                    onSelect={() => {
-                      closeSearch();
-                      void navigate({ to: "/rfq/$id", params: { id: i.id } });
-                    }}
-                  >
-                    {i.description}
                   </CommandItem>
                 ))}
               </CommandGroup>
@@ -366,10 +328,6 @@ export function TopBar() {
         />
         <AddClientDialog
           open={quickCreate === "client"}
-          onOpenChange={(o) => !o && setQuickCreate(null)}
-        />
-        <CreateRfqDialog
-          open={quickCreate === "rfq"}
           onOpenChange={(o) => !o && setQuickCreate(null)}
         />
         <CreateQuotationDialog

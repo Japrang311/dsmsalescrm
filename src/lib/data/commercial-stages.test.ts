@@ -4,7 +4,6 @@ import { COMMERCIAL_STAGE_WEIGHTS, forecastValue } from "./commercial-stages";
 describe("commercial stage weights", () => {
   test("covers every accepted weighted stage", () => {
     expect(COMMERCIAL_STAGE_WEIGHTS).toEqual({
-      "Client Request for Quotes": 0.15,
       "Quotes Sent": 0.3,
       Negotiation: 0.55,
       "Hot Prospect": 0.75,

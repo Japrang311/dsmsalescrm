@@ -9,6 +9,7 @@ import {
 
 let fixtures: RoleFixtureUsers;
 let itemIds: { own: string; other: string };
+let clientId: string;
 
 beforeAll(async () => {
   fixtures = await createRoleFixtureUsers();
@@ -19,17 +20,17 @@ beforeAll(async () => {
     .limit(1)
     .single();
   if (clientError) throw clientError;
+  clientId = anyClient.id;
 
   const { data: own, error: ownError } = await adminClient
     .from("commercial_documents")
     .insert({
       client_id: anyClient.id,
       owner_id: fixtures.sales.id,
-      type: "RFQ",
+      type: "Quotation",
       source_flow: "RFQ / New Product",
       document_date: "2026-07-17",
-      rfq_number: `RFQ-FIXTURE-OWN-${crypto.randomUUID()}`,
-      stage: "Client Request for Quotes",
+      stage: "Quotes Sent",
     })
     .select("id")
     .single();
@@ -40,11 +41,10 @@ beforeAll(async () => {
     .insert({
       client_id: anyClient.id,
       owner_id: "22222222-2222-2222-2222-222222222222",
-      type: "RFQ",
+      type: "Quotation",
       source_flow: "RFQ / New Product",
       document_date: "2026-07-17",
-      rfq_number: `RFQ-FIXTURE-OTHER-${crypto.randomUUID()}`,
-      stage: "Client Request for Quotes",
+      stage: "Quotes Sent",
     })
     .select("id")
     .single();
@@ -64,6 +64,24 @@ afterAll(async () => {
 });
 
 describe("commercial_documents RLS", () => {
+  test("authenticated users cannot create retired RFQ documents", async () => {
+    const client = await signInAs(fixtures.sales);
+    const { data, error } = await client
+      .from("commercial_documents")
+      .insert({
+        client_id: clientId,
+        owner_id: fixtures.sales.id,
+        type: "RFQ",
+        source_flow: "RFQ / New Product",
+        document_date: "2026-07-25",
+        stage: "Client Request for Quotes",
+      })
+      .select("id");
+
+    expect(data).toBeNull();
+    expect(error?.message).toContain("RFQ_RETIRED");
+  });
+
   test("sales role sees only commercial items they own", async () => {
     const client = await signInAs(fixtures.sales);
     const { data, error } = await client

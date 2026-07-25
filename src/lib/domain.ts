@@ -42,7 +42,6 @@ export type Client = {
 };
 
 export type CommercialType =
-  | "RFQ"
   | "Quotation"
   | "Direct Order"
   | "Prototype"
@@ -50,7 +49,7 @@ export type CommercialType =
   | "Sales Order";
 
 export type SourceFlow =
-  | "RFQ / New Product"
+  | "New Product"
   | "Existing / Repeat Order"
   | "Prototype";
 
@@ -58,8 +57,7 @@ export type SourceFlow =
 // src/lib/data/commercial-stages.ts's COMMERCIAL_STAGE_WEIGHTS, the actual
 // source of truth. Kept as a separate type alias here (not re-exported from
 // commercial-stages.ts) only because domain.ts has no data-layer imports.
-export type RfqStage =
-  | "Client Request for Quotes"
+export type QuotationStage =
   | "Quotes Sent"
   | "Negotiation"
   | "Hot Prospect"
@@ -104,11 +102,9 @@ export type CommercialItem = {
   projectName?: string;
   estimatedValue: number;
   updatedAt: string;
-  rfqNumber?: string;
   quotationNumber?: string;
   quotationBaseNumber?: string;
   quotationRevision?: number;
-  sourceRfqDocumentId?: string;
   quotationExpiredDate?: string;
   clientAddress?: string;
   note?: string;
@@ -142,7 +138,7 @@ export type SoType = "Regular" | "Prototype";
 export type TaxType = "PPN" | "Non-PPN";
 export type PrototypeStatus = "Paid" | "FOC";
 export type RevenueSource =
-  | "RFQ / New Product"
+  | "New Product"
   | "Existing / Repeat Order"
   | "Prototype Paid";
 

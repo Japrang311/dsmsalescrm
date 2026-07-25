@@ -134,7 +134,7 @@ function ReportsPage() {
   const totals = useMemo(() => {
     let ppn = 0;
     let nonPpn = 0;
-    let rfq = 0;
+    let newProduct = 0;
     let existing = 0;
     let protoPaid = 0;
     let protoFocCount = 0;
@@ -143,7 +143,7 @@ function ReportsPage() {
       const v = s.value ?? 0;
       if (s.taxType === "PPN") ppn += v;
       else if (s.taxType === "Non-PPN") nonPpn += v;
-      if (s.source === "RFQ / New Product") rfq += v;
+      if (s.source === "New Product") newProduct += v;
       else if (s.source === "Existing / Repeat Order") existing += v;
       else if (s.source === "Prototype Paid") protoPaid += v;
       if (s.type === "Prototype" && s.prototypeStatus === "FOC")
@@ -155,7 +155,7 @@ function ReportsPage() {
       revenue: ppn + nonPpn,
       ppn,
       nonPpn,
-      rfq,
+      newProduct,
       existing,
       protoPaid,
       protoFocCount,
@@ -233,7 +233,7 @@ function ReportsPage() {
 
   const sourceBreakdown = useMemo(
     () => [
-      { name: "RFQ / New Product", value: totals.rfq },
+      { name: "New Product", value: totals.newProduct },
       { name: "Existing / Repeat Order", value: totals.existing },
       { name: "Prototype Paid", value: totals.protoPaid },
     ],

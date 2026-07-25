@@ -121,11 +121,10 @@ describe("src/lib/data/tasks.ts", () => {
       .insert({
         client_id: anyClient!.id,
         owner_id: session.user.id,
-        type: "RFQ",
+        type: "Quotation",
         source_flow: "RFQ / New Product",
         document_date: "2026-07-18",
-        rfq_number: `RFQ-TASK-${crypto.randomUUID().slice(0, 8)}`,
-        stage: "Client Request for Quotes",
+        stage: "Quotes Sent",
       })
       .select("id")
       .single();

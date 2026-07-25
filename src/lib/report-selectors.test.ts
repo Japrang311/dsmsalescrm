@@ -58,7 +58,7 @@ describe("report selectors", () => {
       clientId: "client-1",
       ownerId: "owner-1",
       type: "Quotation",
-      sourceFlow: "RFQ / New Product",
+      sourceFlow: "New Product",
       stage: "Closed Lost",
       description: id,
       estimatedValue,

@@ -63,7 +63,6 @@ import { formatDateShort, formatRupiahShort, daysBetween } from "@/lib/format";
 import { StatusBadge } from "@/components/clients/StatusBadges";
 import { AddFollowUpDialog } from "@/components/clients/AddFollowUpDialog";
 import {
-  CreateRfqDialog,
   CreateQuotationDialog,
   CreateSalesOrderDialog,
   CreatePrototypeDialog,
@@ -141,8 +140,8 @@ function ClientProfilePage() {
     (t) =>
       t.status === "Today" || t.status === "Overdue" || t.status === "Upcoming",
   );
-  const clientRfqQuotations = clientCommercial.filter(
-    (i) => i.type === "RFQ" || i.type === "Quotation",
+  const clientQuotations = clientCommercial.filter(
+    (i) => i.type === "Quotation",
   );
 
   const [activeTab, setActiveTab] = useState("overview");
@@ -313,15 +312,6 @@ function ClientProfilePage() {
           trigger={
             <Button size="sm" variant="outline">
               <Calendar className="h-4 w-4" /> Create Task
-            </Button>
-          }
-        />
-        <CreateRfqDialog
-          {...sharedDialogProps}
-          onCreated={() => setActiveTab("quotations")}
-          trigger={
-            <Button size="sm" variant="outline">
-              <FileText className="h-4 w-4" /> Add RFQ
             </Button>
           }
         />
@@ -648,10 +638,10 @@ function ClientProfilePage() {
         <TabsContent value="quotations" className="mt-4">
           <Card>
             <CardContent className="p-4">
-              <SectionTitle icon={FileText} title="RFQ & Quotations" />
-              {clientRfqQuotations.length === 0 ? (
+              <SectionTitle icon={FileText} title="Quotations" />
+              {clientQuotations.length === 0 ? (
                 <p className="mt-3 rounded-md border border-dashed py-6 text-center text-xs text-muted-foreground">
-                  Belum ada RFQ atau Quotation untuk klien ini.
+                  Belum ada Quotation untuk klien ini.
                 </p>
               ) : (
                 <div className="mt-3 overflow-x-auto">
@@ -667,7 +657,7 @@ function ClientProfilePage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {clientRfqQuotations.map((ci) => {
+                      {clientQuotations.map((ci) => {
                         const items = ci.lineItems ?? [];
                         return (
                           <TableRow key={ci.id}>
@@ -680,9 +670,7 @@ function ClientProfilePage() {
                               </Badge>
                             </TableCell>
                             <TableCell className="font-medium">
-                              {ci.type === "RFQ"
-                                ? "RFQ intake"
-                                : (ci.quotationNumber ?? "—")}
+                              {ci.quotationNumber ?? "—"}
                             </TableCell>
                             <TableCell className="max-w-[200px] truncate">
                               {items.length === 0

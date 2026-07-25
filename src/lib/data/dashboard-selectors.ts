@@ -158,10 +158,10 @@ export function revenueBySource(orders: SalesOrder[]) {
   const yearOrders = orders.filter(
     (s) => new Date(s.date).getFullYear() === CURRENT_YEAR,
   );
-  const buckets = { rfq: 0, existing: 0, prototypePaid: 0 };
+  const buckets = { newProduct: 0, existing: 0, prototypePaid: 0 };
   for (const o of yearOrders) {
     const v = paidRevenue(o);
-    if (o.source === "RFQ / New Product") buckets.rfq += v;
+    if (o.source === "New Product") buckets.newProduct += v;
     else if (o.source === "Existing / Repeat Order") buckets.existing += v;
     else if (o.source === "Prototype Paid") buckets.prototypePaid += v;
   }
@@ -256,10 +256,10 @@ export function revenueByTaxInRange(orders: SalesOrder[], range: DateRange) {
 
 export function revenueBySourceInRange(orders: SalesOrder[], range: DateRange) {
   const inR = orders.filter((s) => inRange(s.date, range));
-  const buckets = { rfq: 0, existing: 0, prototypePaid: 0 };
+  const buckets = { newProduct: 0, existing: 0, prototypePaid: 0 };
   for (const o of inR) {
     const v = paidRevenue(o);
-    if (o.source === "RFQ / New Product") buckets.rfq += v;
+    if (o.source === "New Product") buckets.newProduct += v;
     else if (o.source === "Existing / Repeat Order") buckets.existing += v;
     else if (o.source === "Prototype Paid") buckets.prototypePaid += v;
   }
@@ -602,10 +602,9 @@ export function topCustomersYtd(
     .slice(0, limit);
 }
 
-// Funnel progression through the seven weighted stages (PRD §7), ending at
+// Funnel progression through the Quotation stages, ending at
 // Closed Won — Closed Lost is the "we lost" branch, not a funnel step.
 const FUNNEL_STAGES: CommercialStage[] = [
-  "Client Request for Quotes",
   "Quotes Sent",
   "Negotiation",
   "Hot Prospect",

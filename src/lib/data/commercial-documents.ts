@@ -33,13 +33,11 @@ export type CommercialDocumentWithItems = {
   type: CommercialType;
   sourceFlow: SourceFlow;
   documentDate: string;
-  rfqNumber: string | null;
   quotationNumber: string | null;
   quotationBaseNumber: string | null;
   quotationRevision: number;
   isCurrentRevision: boolean;
   supersedesDocumentId: string | null;
-  sourceRfqDocumentId: string | null;
   quotationExpiredDate: string | null;
   stage: string;
   clientAddress: string | null;
@@ -71,16 +69,14 @@ type CommercialDocumentRow = {
   id: string;
   client_id: string;
   owner_id: string;
-  type: CommercialType;
-  source_flow: SourceFlow;
+  type: CommercialType | "RFQ";
+  source_flow: SourceFlow | "RFQ / New Product";
   document_date: string;
-  rfq_number: string | null;
   quotation_number: string | null;
   quotation_base_number: string | null;
   quotation_revision: number;
   is_current_revision: boolean;
   supersedes_document_id: string | null;
-  source_rfq_document_id: string | null;
   quotation_expired_date: string | null;
   stage: string;
   client_address: string | null;
@@ -111,6 +107,9 @@ function toLineItem(row: LineItemRow): CommercialDocumentLineItem {
 }
 
 function toDocument(row: CommercialDocumentRow): CommercialDocumentWithItems {
+  if (row.type === "RFQ") {
+    throw new Error("RETIRED_RFQ_DOCUMENT");
+  }
   const items = (row.commercial_document_items ?? row.items ?? [])
     .map(toLineItem)
     .sort((a, b) => a.linePosition - b.linePosition);
@@ -119,15 +118,14 @@ function toDocument(row: CommercialDocumentRow): CommercialDocumentWithItems {
     clientId: row.client_id,
     ownerId: row.owner_id,
     type: row.type,
-    sourceFlow: row.source_flow,
+    sourceFlow:
+      row.source_flow === "RFQ / New Product" ? "New Product" : row.source_flow,
     documentDate: row.document_date,
-    rfqNumber: row.rfq_number,
     quotationNumber: row.quotation_number,
     quotationBaseNumber: row.quotation_base_number,
     quotationRevision: row.quotation_revision,
     isCurrentRevision: row.is_current_revision,
     supersedesDocumentId: row.supersedes_document_id,
-    sourceRfqDocumentId: row.source_rfq_document_id,
     quotationExpiredDate: row.quotation_expired_date,
     stage: row.stage,
     clientAddress: row.client_address,
@@ -153,7 +151,8 @@ export async function listCommercialDocuments(
 ): Promise<CommercialDocumentWithItems[]> {
   let query = supabase
     .from("commercial_documents")
-    .select("*, commercial_document_items(*)");
+    .select("*, commercial_document_items(*)")
+    .neq("type", "RFQ");
   query = options.deleted
     ? query.not("deleted_at", "is", null)
     : query.is("deleted_at", null);
@@ -169,7 +168,8 @@ export async function getCommercialDocument(
   let query = supabase
     .from("commercial_documents")
     .select("*, commercial_document_items(*)")
-    .eq("id", id);
+    .eq("id", id)
+    .neq("type", "RFQ");
   query = options.deleted
     ? query.not("deleted_at", "is", null)
     : query.is("deleted_at", null);
@@ -192,28 +192,6 @@ export async function restoreCommercialDocument(id: string): Promise<void> {
     p_deleted: false,
   });
   if (error) throw error;
-}
-
-export type CreateRfqInput = {
-  clientId: string;
-  rfqNumber?: string | null;
-  documentDate: string;
-  stage?: string;
-  items: LineItemInput[];
-};
-
-export async function createRfq(
-  input: CreateRfqInput,
-): Promise<CommercialDocumentWithItems> {
-  const { data, error } = await supabase.rpc("create_rfq", {
-    p_client_id: input.clientId,
-    p_rfq_number: input.rfqNumber ?? null,
-    p_document_date: input.documentDate,
-    p_stage: input.stage ?? "Client Request for Quotes",
-    p_items: input.items,
-  });
-  if (error) throw error;
-  return toDocument(data as CommercialDocumentRow);
 }
 
 export async function createPrototypeRequest(input: {
@@ -256,16 +234,6 @@ export async function createQuotation(
   return toDocument(data as CommercialDocumentRow);
 }
 
-export async function createQuotationFromRfq(
-  rfqDocumentId: string,
-): Promise<CommercialDocumentWithItems> {
-  const { data, error } = await supabase.rpc("create_quotation_from_rfq", {
-    p_rfq_document_id: rfqDocumentId,
-  });
-  if (error) throw error;
-  return toDocument(data as CommercialDocumentRow);
-}
-
 export type ReviseQuotationInput = {
   documentDate: string;
   clientAddress?: string;
@@ -291,7 +259,6 @@ export async function reviseQuotation(
 }
 
 export type CommercialDocumentPatch = Partial<{
-  rfqNumber: string | null;
   quotationNumber: string | null;
   quotationBaseNumber: string | null;
   documentDate: string;
@@ -310,8 +277,6 @@ export async function updateCommercialDocument(
   patch: CommercialDocumentPatch,
 ): Promise<CommercialDocumentWithItems> {
   const update: Record<string, unknown> = {};
-  if (patch.rfqNumber !== undefined)
-    update.rfq_number = patch.rfqNumber || null;
   if (patch.quotationNumber !== undefined)
     update.quotation_number = patch.quotationNumber || null;
   if (patch.quotationBaseNumber !== undefined)

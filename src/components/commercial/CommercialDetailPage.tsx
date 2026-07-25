@@ -52,7 +52,6 @@ import {
   listCommercialItems,
   updateCommercialItem,
   describeCommercialItemChanges,
-  convertRfqToQuotation,
 } from "@/lib/data/commercial-items";
 import {
   deleteCommercialDocument,
@@ -392,29 +391,12 @@ export function CommercialDetailPage({
     }
 
     try {
-      const convertingRfqToQuotation =
-        item.type === "RFQ" &&
-        item.stage !== "Quotes Sent" &&
-        stage === "Quotes Sent";
       for (const change of lineChanges) {
         await updateCommercialDocumentLineItem(change.line.id, {
           qty: change.qty,
           unitPrice: isFoc ? null : change.unitPrice,
           lineTotal: isFoc ? null : change.qty * change.unitPrice,
         });
-      }
-      if (convertingRfqToQuotation) {
-        const quotation = await convertRfqToQuotation(item.id);
-        await queryClient.invalidateQueries({ queryKey: ["commercial-items"] });
-        await queryClient.invalidateQueries({ queryKey: ["activity-log"] });
-        toast.success("Quotation dibuat dari RFQ", {
-          description: "Lanjutkan pengisian data di module Quotation.",
-        });
-        navigate({
-          to: "/quotations/$id",
-          params: { id: quotation.id },
-        });
-        return;
       }
       const headerChanged =
         (item.type === "Quotation" &&
@@ -511,7 +493,7 @@ export function CommercialDetailPage({
   }
 
   const deleteLabel = `${item.type} ${
-    item.quotationNumber ?? item.rfqNumber ?? item.projectName ?? item.id
+    item.quotationNumber ?? item.projectName ?? item.id
   }`;
 
   return (
@@ -550,7 +532,7 @@ export function CommercialDetailPage({
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {canEdit && (item.type === "RFQ" || item.type === "Quotation") && (
+          {canEdit && item.type === "Quotation" && (
             <SoftDeleteAction
               label={deleteLabel}
               onDelete={() => deleteItem(item.id)}
@@ -610,9 +592,7 @@ export function CommercialDetailPage({
                 icon={<User2 className="h-3.5 w-3.5" />}
                 label="Sales owner"
               >
-                {/* Read-only: the DB revokes UPDATE on owner_id for
-                    commercial_documents, so RFQ/Quotation ownership can't be
-                    reassigned here. */}
+                {/* Quotation ownership is read-only here. */}
                 <span className="text-sm">{owner?.name ?? "-"}</span>
               </InfoCell>
               <InfoCell

@@ -58,7 +58,6 @@ const SOURCES: ClientSource[] = [
   "Repeat",
 ];
 const COMMERCIAL_TYPE_FILTERS = [
-  "RFQ",
   "Quotation",
   "Direct Order",
   "Prototype",

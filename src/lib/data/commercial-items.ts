@@ -1,6 +1,5 @@
 import type { CommercialItem } from "@/lib/domain";
 import {
-  createQuotationFromRfq,
   listCommercialDocuments,
   updateCommercialDocument,
   type CommercialDocumentQuery,
@@ -23,11 +22,9 @@ export function toCommercialItem(
     projectName: firstItem?.productName ?? undefined,
     estimatedValue: document.totalValue,
     updatedAt: document.updatedAt,
-    rfqNumber: document.rfqNumber ?? undefined,
     quotationNumber: document.quotationNumber ?? undefined,
     quotationBaseNumber: document.quotationBaseNumber ?? undefined,
     quotationRevision: document.quotationRevision,
-    sourceRfqDocumentId: document.sourceRfqDocumentId ?? undefined,
     quotationExpiredDate: document.quotationExpiredDate ?? undefined,
     clientAddress: document.clientAddress ?? undefined,
     note: document.note ?? undefined,
@@ -94,7 +91,6 @@ export async function listCommercialItems(
 }
 
 export type CommercialItemPatch = Partial<{
-  rfqNumber: string | null;
   stage: string;
   ownerId: string;
   documentDate: string;
@@ -123,7 +119,6 @@ export async function updateCommercialItem(
   }
   return toCommercialItem(
     await updateCommercialDocument(id, {
-      rfqNumber: patch.rfqNumber,
       quotationNumber: patch.quotationNumber,
       quotationBaseNumber: patch.quotationBaseNumber,
       documentDate: patch.documentDate,
@@ -136,12 +131,6 @@ export async function updateCommercialItem(
       lostReasonDetail: patch.lostReasonDetail,
     }),
   );
-}
-
-export async function convertRfqToQuotation(
-  id: string,
-): Promise<CommercialItem> {
-  return toCommercialItem(await createQuotationFromRfq(id));
 }
 
 export async function createCommercialItem(_input: {
@@ -162,7 +151,6 @@ export async function createCommercialItemsBatch(_input: {
   type: CommercialItem["type"];
   sourceFlow: CommercialItem["sourceFlow"];
   stage: string;
-  rfqNumber?: string;
   quotationNumber?: string;
   lineItems: { description: string; qty: number; unitPrice: number }[];
 }): Promise<CommercialItem[]> {

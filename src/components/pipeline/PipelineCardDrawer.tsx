@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowRight,
@@ -41,8 +41,10 @@ import {
   type QuotationLostReason,
 } from "@/lib/domain";
 import { updateClientStatus } from "@/lib/data/clients";
-import { describeCommercialItemChanges } from "@/lib/data/commercial-items";
-import { transitionCommercialItemStage } from "@/lib/data/commercial-stage-transition";
+import {
+  describeCommercialItemChanges,
+  updateCommercialItem,
+} from "@/lib/data/commercial-items";
 import { listSalesOrders } from "@/lib/data/sales-orders";
 import { createTask } from "@/lib/data/tasks";
 import { COMMERCIAL_STAGES } from "@/lib/data/commercial-stages";
@@ -106,7 +108,6 @@ export function PipelineCardDrawer({
   currentNext,
 }: Props) {
   const { role, authReady } = useRole();
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   const { data: commercialHistory = [] } = useQuery({
@@ -168,13 +169,6 @@ export function PipelineCardDrawer({
 
   const linkedQuotations = useMemo(() => {
     if (!client || !item) return [];
-    if (item.type === "RFQ") {
-      return allItems.filter(
-        (candidate) =>
-          candidate.type === "Quotation" &&
-          candidate.sourceRfqDocumentId === item.id,
-      );
-    }
     return allItems.filter(
       (c) => c.clientId === client.id && c.type === "Quotation",
     );
@@ -243,14 +237,9 @@ export function PipelineCardDrawer({
     );
   }
 
-  const needsQuotation =
-    item.type === "RFQ" &&
-    stage === "Quotes Sent" &&
-    linkedQuotations.length === 0;
   const dirty =
     stage !== currentStage ||
     (nextDate || "") !== (currentNext ?? "") ||
-    needsQuotation ||
     (isLostReasonTracked(item.type, stage) &&
       ((lostReason || null) !== (item.lostReason ?? null) ||
         (lostReasonDetail.trim() || null) !== (item.lostReasonDetail ?? null)));
@@ -262,8 +251,7 @@ export function PipelineCardDrawer({
     lostReasonDetail,
   });
   const collectsLostReason = isLostReasonTracked(item.type, stage);
-  const supportsLostReasonFields =
-    item.type === "RFQ" || item.type === "Quotation";
+  const supportsLostReasonFields = item.type === "Quotation";
 
   function handleStageChange(nextStage: string) {
     if (!item) return;
@@ -315,19 +303,14 @@ export function PipelineCardDrawer({
     const cn = currentNext || undefined;
     if (nd !== cn) changes.push({ field: "nextActionDate", from: cn, to: nd });
 
-    if (changes.length === 0 && !needsQuotation) return;
+    if (changes.length === 0) return;
     try {
       // commercial_documents has no next_action_date column post-Phase-11
       // normalization — updateCommercialItem() rejects that field outright
       // (see commercial-items.ts). "Next action" now lives on tasks; a
-      // changed date creates a follow-up task instead, below. owner_id is
-      // also deliberately not sent — the DB revokes UPDATE on that column
-      // for commercial_documents (see harden_normalized_document_permissions
-      // migration), so owner reassignment isn't supported for RFQ/Quotation
-      // documents; sending it unconditionally previously made every save
-      // through this drawer fail with "permission denied for table
-      // commercial_documents", even when only the stage changed.
-      const transition = await transitionCommercialItemStage(item, stage, {
+      // changed date creates a follow-up task instead, below.
+      const updatedItem = await updateCommercialItem(item.id, {
+        stage,
         lostReason: supportsLostReasonFields
           ? reasonPatch.lostReason
           : undefined,
@@ -335,16 +318,14 @@ export function PipelineCardDrawer({
           ? reasonPatch.lostReasonDetail
           : undefined,
       });
-      const actorId = transition.transitionedToQuotation
-        ? null
-        : await getCurrentActorId();
+      const actorId = await getCurrentActorId();
       if (actorId) {
         await logActivity({
           kind: "commercial_item_stage_change",
           ownerId: currentOwnerId,
           actorId,
           clientId: item.clientId,
-          commercialDocumentId: transition.item.id,
+          commercialDocumentId: updatedItem.id,
           title: `${item.description} diperbarui`,
           detail: describeCommercialItemChanges(changes),
         });
@@ -353,8 +334,8 @@ export function PipelineCardDrawer({
         await createTask({
           clientId: item.clientId,
           ownerId: currentOwnerId,
-          commercialDocumentId: transition.item.id,
-          title: `Follow-up · ${transition.item.type} — ${client.name}`,
+          commercialDocumentId: updatedItem.id,
+          title: `Follow-up · ${updatedItem.type} — ${client.name}`,
           dueDate: nd,
           method: "Phone",
           priority: "Normal",
@@ -364,17 +345,6 @@ export function PipelineCardDrawer({
       }
       await queryClient.invalidateQueries({ queryKey: ["commercial-items"] });
       await queryClient.invalidateQueries({ queryKey: ["activity-log"] });
-      if (transition.transitionedToQuotation) {
-        toast.success("Quotation dibuat dari RFQ", {
-          description: "Lanjutkan pengisian data di module Quotation.",
-        });
-        onOpenChange(false);
-        await navigate({
-          to: "/quotations/$id",
-          params: { id: transition.item.id },
-        });
-        return;
-      }
       toast.success("Pipeline card diperbarui", {
         description: changes
           .map((c) => FIELD_LABEL[c.field] ?? c.field)
@@ -476,9 +446,7 @@ export function PipelineCardDrawer({
 
             <div className="flex flex-col gap-1">
               <Label className="text-[11px]">Owner</Label>
-              {/* Read-only: the DB revokes UPDATE on owner_id for
-                  commercial_documents, so RFQ/Quotation ownership can't be
-                  reassigned from this drawer. */}
+              {/* Quotation ownership is read-only in this drawer. */}
               <div className="flex h-8 items-center rounded-md border bg-muted px-2.5 text-xs text-muted-foreground">
                 {profilesById[currentOwnerId]?.name ?? "-"}
               </div>
@@ -546,7 +514,7 @@ export function PipelineCardDrawer({
               disabled={!canEdit || !dirty}
               onClick={() => void saveChanges()}
             >
-              {needsQuotation ? "Buat Quotation" : "Simpan perubahan"}
+              Simpan perubahan
             </Button>
           </div>
 
