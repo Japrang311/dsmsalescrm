@@ -208,7 +208,7 @@ function ClientProfilePage() {
             </div>
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="truncate text-lg font-semibold text-foreground">
+                <h1 className="text-lg font-semibold text-foreground">
                   {client.name}
                 </h1>
                 {canEditStatus && (

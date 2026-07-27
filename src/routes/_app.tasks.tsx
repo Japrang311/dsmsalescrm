@@ -909,7 +909,7 @@ function TasksInboxPage() {
             value={priority}
             onValueChange={(v) => setPriority(v as typeof priority)}
           >
-            <SelectTrigger className="h-9 w-full md:w-[140px]">
+            <SelectTrigger className="h-9 w-full md:w-[170px]">
               <SelectValue placeholder="Prioritas" />
             </SelectTrigger>
             <SelectContent>

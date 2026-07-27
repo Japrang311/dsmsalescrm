@@ -25,6 +25,12 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useQuery } from "@tanstack/react-query";
@@ -63,16 +69,11 @@ export const QUICK_CREATE_ITEMS = [
 
 const MAX_RESULTS_PER_GROUP = 5;
 
-// Global search covers client, quotation, and SO data already fetched by
-// useDashboardData() (shared React Query cache, no extra network round
-// trip). Uses a plain <Input> + PopoverAnchor (not PopoverTrigger) so the
-// dropdown opens as the user types rather than on click.
-function GlobalSearch() {
-  const navigate = useNavigate();
+// Shared by the desktop popover search and the mobile sheet search below —
+// both read from the same client/quotation/SO data already fetched by
+// useDashboardData() (shared React Query cache, no extra network round trip).
+function useGlobalSearchResults(query: string) {
   const { clients, items, orders } = useDashboardData();
-  const [query, setQuery] = useState("");
-  const [open, setOpen] = useState(false);
-
   const q = query.trim().toLowerCase();
   const matchedClients = q
     ? clients
@@ -97,6 +98,101 @@ function GlobalSearch() {
     matchedClients.length > 0 ||
     matchedQuotation.length > 0 ||
     matchedOrders.length > 0;
+
+  return { matchedClients, matchedQuotation, matchedOrders, hasResults };
+}
+
+function SearchResultsList({
+  query,
+  matchedClients,
+  matchedQuotation,
+  matchedOrders,
+  hasResults,
+  onNavigate,
+}: ReturnType<typeof useGlobalSearchResults> & {
+  query: string;
+  onNavigate: () => void;
+}) {
+  const navigate = useNavigate();
+
+  return (
+    <Command shouldFilter={false}>
+      <CommandList className="max-h-80">
+        {!hasResults && (
+          <CommandEmpty>
+            Tidak ada hasil untuk &ldquo;{query}&rdquo;.
+          </CommandEmpty>
+        )}
+        {matchedClients.length > 0 && (
+          <CommandGroup heading="Client">
+            {matchedClients.map((c) => (
+              <CommandItem
+                key={c.id}
+                value={`client-${c.id}`}
+                onSelect={() => {
+                  onNavigate();
+                  void navigate({
+                    to: "/clients/$clientId",
+                    params: { clientId: c.id },
+                  });
+                }}
+              >
+                {c.name}
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        )}
+        {matchedQuotation.length > 0 && (
+          <CommandGroup heading="Quotation">
+            {matchedQuotation.map((i) => (
+              <CommandItem
+                key={i.id}
+                value={`quotation-${i.id}`}
+                onSelect={() => {
+                  onNavigate();
+                  void navigate({
+                    to: "/quotations/$id",
+                    params: { id: i.id },
+                  });
+                }}
+              >
+                {i.quotationNumber}
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        )}
+        {matchedOrders.length > 0 && (
+          <CommandGroup heading="Sales Order">
+            {matchedOrders.map((o) => (
+              <CommandItem
+                key={o.id}
+                value={`so-${o.id}`}
+                onSelect={() => {
+                  onNavigate();
+                  void navigate({
+                    to: "/sales-orders/$soId",
+                    params: { soId: o.id },
+                  });
+                }}
+              >
+                {o.soNumber}
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        )}
+      </CommandList>
+    </Command>
+  );
+}
+
+// Desktop search: plain <Input> + PopoverAnchor (not PopoverTrigger) so the
+// dropdown opens as the user types rather than on click. Hidden below `md`
+// — see MobileSearch for the small-viewport equivalent.
+function GlobalSearch() {
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const results = useGlobalSearchResults(query);
+  const q = query.trim();
 
   function closeSearch() {
     setOpen(false);
@@ -127,74 +223,74 @@ function GlobalSearch() {
         className="w-(--radix-popover-anchor-width) p-0"
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
-        <Command shouldFilter={false}>
-          <CommandList className="max-h-80">
-            {!hasResults && (
-              <CommandEmpty>
-                Tidak ada hasil untuk &ldquo;{query}&rdquo;.
-              </CommandEmpty>
-            )}
-            {matchedClients.length > 0 && (
-              <CommandGroup heading="Client">
-                {matchedClients.map((c) => (
-                  <CommandItem
-                    key={c.id}
-                    value={`client-${c.id}`}
-                    onSelect={() => {
-                      closeSearch();
-                      void navigate({
-                        to: "/clients/$clientId",
-                        params: { clientId: c.id },
-                      });
-                    }}
-                  >
-                    {c.name}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            )}
-            {matchedQuotation.length > 0 && (
-              <CommandGroup heading="Quotation">
-                {matchedQuotation.map((i) => (
-                  <CommandItem
-                    key={i.id}
-                    value={`quotation-${i.id}`}
-                    onSelect={() => {
-                      closeSearch();
-                      void navigate({
-                        to: "/quotations/$id",
-                        params: { id: i.id },
-                      });
-                    }}
-                  >
-                    {i.quotationNumber}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            )}
-            {matchedOrders.length > 0 && (
-              <CommandGroup heading="Sales Order">
-                {matchedOrders.map((o) => (
-                  <CommandItem
-                    key={o.id}
-                    value={`so-${o.id}`}
-                    onSelect={() => {
-                      closeSearch();
-                      void navigate({
-                        to: "/sales-orders/$soId",
-                        params: { soId: o.id },
-                      });
-                    }}
-                  >
-                    {o.soNumber}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            )}
-          </CommandList>
-        </Command>
+        <SearchResultsList
+          query={query}
+          onNavigate={closeSearch}
+          {...results}
+        />
       </PopoverContent>
     </Popover>
+  );
+}
+
+// Mobile search: GlobalSearch's input is `hidden md:block`, so below `md`
+// there was previously no way to search at all. This opens the same
+// client/quotation/SO lookup in a full-width top sheet instead.
+function MobileSearch() {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const results = useGlobalSearchResults(query);
+
+  function closeSearch() {
+    setOpen(false);
+    setQuery("");
+  }
+
+  return (
+    <Sheet
+      open={open}
+      onOpenChange={(o) => {
+        setOpen(o);
+        if (!o) setQuery("");
+      }}
+    >
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-9 w-9 md:hidden"
+        aria-label="Cari"
+        onClick={() => setOpen(true)}
+      >
+        <Search className="h-4 w-4" />
+      </Button>
+      <SheetContent side="top" className="p-0">
+        <SheetHeader className="border-b border-border px-4 py-3 text-left">
+          <SheetTitle className="sr-only">
+            Cari client, quotation, SO
+          </SheetTitle>
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              autoFocus
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") closeSearch();
+              }}
+              placeholder="Cari client, quotation, SO..."
+              className="h-10 pl-8"
+            />
+          </div>
+        </SheetHeader>
+        {query.trim().length > 0 && (
+          <SearchResultsList
+            query={query}
+            onNavigate={closeSearch}
+            {...results}
+          />
+        )}
+      </SheetContent>
+    </Sheet>
   );
 }
 
@@ -318,6 +414,7 @@ export function TopBar() {
       <SidebarTrigger className="text-foreground" />
 
       {authReady && <GlobalSearch />}
+      {authReady && <MobileSearch />}
 
       <div className="ml-auto flex items-center gap-1.5 md:gap-2">
         {authReady && role !== "executive" && (

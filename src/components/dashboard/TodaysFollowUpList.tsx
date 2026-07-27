@@ -60,7 +60,7 @@ export function TodaysFollowUpList() {
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="truncate text-sm font-medium text-foreground">
-                          {client?.name ?? "-"}
+                          {client?.name ?? task.title}
                         </span>
                         {task.dueState === "Escalated" ? (
                           <Badge
@@ -93,12 +93,18 @@ export function TodaysFollowUpList() {
                           </Badge>
                         ) : null}
                       </div>
-                      <div className="mt-0.5 truncate text-xs text-muted-foreground">
-                        {task.title}
-                        {commercialItem
-                          ? ` · ${commercialItem.type} · ${commercialItem.stage}`
-                          : ""}
-                      </div>
+                      {client && (task.title || commercialItem) ? (
+                        <div className="mt-0.5 truncate text-xs text-muted-foreground">
+                          {task.title}
+                          {commercialItem
+                            ? ` · ${commercialItem.type} · ${commercialItem.stage}`
+                            : ""}
+                        </div>
+                      ) : !client && commercialItem ? (
+                        <div className="mt-0.5 truncate text-xs text-muted-foreground">
+                          {commercialItem.type} · {commercialItem.stage}
+                        </div>
+                      ) : null}
                     </div>
                   </div>
 

@@ -687,9 +687,10 @@ function ReportsPage() {
                   <div className="flex-1">
                     <div className="h-6 overflow-hidden rounded-md bg-muted/60">
                       <div
-                        className="flex h-full items-center justify-end pr-2 text-[10px] font-medium text-white"
+                        className="flex h-full items-center justify-end whitespace-nowrap pr-2 text-[10px] font-medium text-white"
                         style={{
                           width: `${Math.max(6, pct)}%`,
+                          minWidth: "4.5rem",
                           background: CHART_COLORS[i % CHART_COLORS.length],
                         }}
                       >

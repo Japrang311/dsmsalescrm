@@ -268,7 +268,7 @@ export function CommercialViews(props: CommercialViewsProps) {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Cari klien, project, no. dokumen…"
-            className="h-8 w-[240px] pl-7 text-xs"
+            className="h-8 w-[280px] pl-7 text-xs"
           />
         </div>
         {role !== "sales" && (
