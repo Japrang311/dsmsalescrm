@@ -25,6 +25,7 @@ import {
   listSalesTeamProfiles,
 } from "@/lib/data/clients";
 import { createTask, listTasks } from "@/lib/data/tasks";
+import { activeCommercialTasks } from "@/lib/data/task-relations";
 import { COMMERCIAL_STAGES } from "@/lib/data/commercial-stages";
 import { formatRupiahShort, formatDateShort, daysBetween } from "@/lib/format";
 import { StatusBadge } from "@/components/clients/StatusBadges";
@@ -160,8 +161,7 @@ function PipelineBoard({ role }: { role: Role }) {
         map.set(it.id, it.nextActionDate);
         continue;
       }
-      const related = tasks
-        .filter((t) => t.clientId === it.clientId && t.status !== "Done")
+      const related = activeCommercialTasks(tasks, it.id)
         .map((t) => t.dueDate)
         .sort();
       map.set(it.id, related[0]);
@@ -323,7 +323,7 @@ function PipelineBoard({ role }: { role: Role }) {
           dueDate: nextDateInput,
           method: "Phone",
           priority: "Normal",
-          status: "Upcoming",
+          category: "Follow-Up",
         });
         await queryClient.invalidateQueries({ queryKey: ["tasks"] });
       }

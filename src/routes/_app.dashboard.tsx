@@ -131,6 +131,7 @@ function DashboardPage() {
     salesTeam: dashboardSalesTeam(salesTeam),
     targetsByMember,
     companyTarget,
+    taskMetrics,
   };
 
   // Wraps export handlers: validates the range, shows a loading toast, and

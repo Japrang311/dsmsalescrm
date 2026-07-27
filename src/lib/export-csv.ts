@@ -1,5 +1,5 @@
 import {
-  dashboardExportFollowUps,
+  dashboardExportFollowUpRecords,
   dashboardExportMonthlyTrend,
   dashboardExportSalesPerformance,
   dashboardExportTopCustomers,
@@ -57,16 +57,25 @@ function assertRows<T>(rows: T[], label: string): T[] {
 
 // ---- Follow-ups (snapshot, role-scoped) ----
 export function exportFollowUpsCsv(context: DashboardExportContext): number {
-  const rows = assertRows(dashboardExportFollowUps(context), "follow-up");
+  const rows = assertRows(dashboardExportFollowUpRecords(context), "follow-up");
   const csv = toCsv([
-    ["Status", "Due Date", "Client", "Task", "Commercial Item", "Owner"],
+    [
+      "Workflow Status",
+      "Due State",
+      "Due Date",
+      "Client",
+      "Task",
+      "Commercial Item",
+      "Owner",
+    ],
     ...rows.map((r) => [
-      r.task.status,
-      r.task.dueDate ? iso(new Date(r.task.dueDate)) : "",
-      r.client.name,
-      r.task.title,
-      r.commercialItem?.description ?? "",
-      r.owner.name,
+      r.workflowStatus,
+      r.dueState,
+      r.dueDate ? iso(new Date(r.dueDate)) : "",
+      r.clientName,
+      r.taskTitle,
+      r.commercialItemDescription,
+      r.ownerName,
     ]),
   ]);
   download(`dsm-followups-${context.role}-${stamp(context.range)}.csv`, csv);

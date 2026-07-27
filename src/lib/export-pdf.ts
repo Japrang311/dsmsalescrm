@@ -2,7 +2,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
 import {
-  dashboardExportFollowUps,
+  dashboardExportFollowUpRecords,
   dashboardExportMetrics,
   dashboardExportMonthlyTrend,
   dashboardExportSalesPerformance,
@@ -139,12 +139,14 @@ function exportReportPdf(
       [
         "Open Tasks (snapshot)",
         String(tasks.open),
-        `${tasks.today} today · ${tasks.upcoming} upcoming`,
+        `${tasks.today} today · ${tasks.upcoming} upcoming · ${tasks.escalated} escalated`,
       ],
       [
         "Overdue Follow-Ups (snapshot)",
-        String(tasks.overdue),
-        tasks.overdue > 0 ? "Perlu tindak lanjut" : "Terkendali",
+        String(tasks.overdue + tasks.escalated),
+        tasks.overdue + tasks.escalated > 0
+          ? `${tasks.escalated} escalated · ${tasks.overdue} overdue`
+          : "Terkendali",
       ],
     ],
   });
@@ -177,10 +179,10 @@ function exportReportPdf(
   }
 
   // ---- Follow-ups snapshot ----
-  const fu = dashboardExportFollowUps(context);
+  const fu = dashboardExportFollowUpRecords(context);
   y = section(
     doc,
-    `Today & Overdue Follow-Ups (${fu.length}) · snapshot hari ini`,
+    `Today, Overdue & Escalated Follow-Ups (${fu.length}) · snapshot hari ini`,
     y,
   );
   if (fu.length === 0) {
@@ -201,17 +203,22 @@ function exportReportPdf(
       styles: { fontSize: 8.5, cellPadding: 5, overflow: "linebreak" },
       columnStyles: {
         0: { cellWidth: 55 },
-        1: { cellWidth: 110 },
-        2: { cellWidth: 150 },
-        4: { cellWidth: 70 },
+        1: { cellWidth: 55 },
+        2: { cellWidth: 100 },
+        3: { cellWidth: 140 },
+        4: { cellWidth: 110 },
+        5: { cellWidth: 60 },
       },
-      head: [["Status", "Client", "Task", "Commercial Item", "Owner"]],
+      head: [
+        ["Workflow", "Due State", "Client", "Task", "Commercial Item", "Owner"],
+      ],
       body: fu.map((r) => [
-        r.task.status,
-        r.client.name,
-        r.task.title,
-        r.commercialItem?.description ?? "—",
-        r.owner.name,
+        r.workflowStatus,
+        r.dueState,
+        r.clientName,
+        r.taskTitle,
+        r.commercialItemDescription || "-",
+        r.ownerName,
       ]),
     });
     y = getLastY(doc) + 20;

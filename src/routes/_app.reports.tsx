@@ -63,6 +63,7 @@ import {
   quotationFunnel,
   riskAlerts,
   sumTargetsThroughMonth,
+  taskCounts,
   targetForMonth,
   targetsFor,
 } from "@/lib/data/dashboard-selectors";
@@ -77,6 +78,7 @@ import {
   agingBucket,
   filterCommercialItems,
   filterSalesOrders,
+  reportSalesPerformance,
 } from "@/lib/report-selectors";
 import { exportExecutiveReportXlsx } from "@/lib/export-xlsx";
 import { exportExecutiveReportPdf } from "@/lib/export-pdf";
@@ -103,6 +105,7 @@ function ReportsPage() {
     targetsByMember,
     companyTarget,
     currentUserId,
+    taskMetrics,
     isLoading,
   } = useDashboardData();
   const displayTeam = dashboardSalesTeam(salesTeam);
@@ -292,35 +295,31 @@ function ReportsPage() {
       .slice(0, 5);
   }, [rows, clients]);
 
-  const salesPerf = useMemo(() => {
-    return displayTeam
-      .map((member) => {
-        const orders = rows.filter((s) => s.ownerId === member.id);
-        const revenue = orders.reduce((s, o) => s + (o.value ?? 0), 0);
-        const target = sumTargetsThroughMonth(
-          targetsFor(targetsByMember, member.id),
-        );
-        const openTasks = allTasks.filter(
-          (t) => t.ownerId === member.id && t.status !== "Done",
-        ).length;
-        const overdue = allTasks.filter(
-          (t) => t.ownerId === member.id && t.status === "Overdue",
-        ).length;
-        const activeClients = clientList.filter(
-          (c) => c.ownerId === member.id && c.status !== "Lost",
-        ).length;
-        return {
-          member,
-          revenue,
-          target,
-          pct: target > 0 ? revenue / target : 0,
-          openTasks,
-          overdue,
-          activeClients,
-        };
-      })
-      .sort((a, b) => b.revenue - a.revenue);
-  }, [rows, displayTeam, allTasks, clientList, targetsByMember]);
+  const includeTaskDetail = role !== "executive";
+  const salesPerf = useMemo(
+    () =>
+      reportSalesPerformance(
+        rows,
+        allTasks,
+        clientList,
+        displayTeam,
+        targetsByMember,
+        { includeTaskDetail },
+      ),
+    [
+      rows,
+      allTasks,
+      clientList,
+      displayTeam,
+      targetsByMember,
+      includeTaskDetail,
+    ],
+  );
+
+  const taskSummary = useMemo(
+    () => taskCounts(allTasks, role === "sales" ? undefined : taskMetrics),
+    [allTasks, role, taskMetrics],
+  );
 
   const compliance = useMemo(
     () => activityCompliance(clientList),
@@ -344,6 +343,7 @@ function ReportsPage() {
       salesTeam: displayTeam,
       targetsByMember,
       companyTarget,
+      taskMetrics,
     }),
     [
       role,
@@ -357,6 +357,7 @@ function ReportsPage() {
       displayTeam,
       targetsByMember,
       companyTarget,
+      taskMetrics,
     ],
   );
 
@@ -594,7 +595,7 @@ function ReportsPage() {
       </div>
 
       {/* Source breakdown + Forecast */}
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid gap-4 lg:grid-cols-4">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-semibold">
@@ -699,6 +700,42 @@ function ReportsPage() {
                 </div>
               );
             })}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+              <Target className="h-4 w-4 text-primary" /> Task Control
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-2 gap-2 text-xs">
+            <StatBlock
+              label="Open"
+              value={`${taskSummary.open}`}
+              tone="primary"
+            />
+            <StatBlock
+              label="Overdue"
+              value={`${taskSummary.overdue}`}
+              tone="amber"
+            />
+            <StatBlock
+              label="Escalated"
+              value={`${taskSummary.escalated}`}
+              tone="muted"
+            />
+            <StatBlock
+              label="Done / Cancelled"
+              value={`${taskSummary.done} / ${taskSummary.cancelled}`}
+              tone="emerald"
+            />
+            {role === "executive" ? (
+              <p className="col-span-2 text-[11px] text-muted-foreground">
+                Aggregate-only; detail Task rows follow Executive exception
+                boundary.
+              </p>
+            ) : null}
           </CardContent>
         </Card>
 
@@ -849,7 +886,17 @@ function ReportsPage() {
               </TableHeader>
               <TableBody>
                 {salesPerf.map(
-                  ({ member, revenue, target, pct, openTasks, overdue }) => (
+                  ({
+                    member,
+                    revenue,
+                    target,
+                    pct,
+                    openTasks,
+                    overdueTasks,
+                    escalatedTasks,
+                    completedTasks,
+                    cancelledTasks,
+                  }) => (
                     <TableRow key={member.id} className="text-xs">
                       <TableCell>
                         <div className="font-medium">{member.name}</div>
@@ -877,11 +924,28 @@ function ReportsPage() {
                         </div>
                       </TableCell>
                       <TableCell className="text-[10px]">
-                        <span className="font-medium">{openTasks}</span> open
-                        {overdue > 0 && (
-                          <span className="ml-1 text-red-600">
-                            · {overdue} overdue
+                        {openTasks === null ? (
+                          <span className="text-muted-foreground">
+                            Aggregate only
                           </span>
+                        ) : (
+                          <>
+                            <span className="font-medium">{openTasks}</span>{" "}
+                            open
+                            {overdueTasks ? (
+                              <span className="ml-1 text-amber-600">
+                                · {overdueTasks} overdue
+                              </span>
+                            ) : null}
+                            {escalatedTasks ? (
+                              <span className="ml-1 text-red-600">
+                                · {escalatedTasks} escalated
+                              </span>
+                            ) : null}
+                            <span className="ml-1 text-muted-foreground">
+                              · {completedTasks} done / {cancelledTasks} cancel
+                            </span>
+                          </>
                         )}
                       </TableCell>
                     </TableRow>

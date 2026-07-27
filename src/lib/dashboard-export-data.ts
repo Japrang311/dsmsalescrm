@@ -25,6 +25,7 @@ import {
   waitingPoValue,
   type SalesTeamMember,
 } from "@/lib/data/dashboard-selectors";
+import type { TaskControlLoopMetrics } from "@/lib/data/tasks";
 
 export type DashboardExportContext = {
   role: Role;
@@ -38,6 +39,7 @@ export type DashboardExportContext = {
   salesTeam: SalesTeamMember[];
   targetsByMember: TargetsByMember;
   companyTarget: MonthlyTarget[];
+  taskMetrics?: TaskControlLoopMetrics;
 };
 
 export function dashboardExportMonthlyTrend(context: DashboardExportContext) {
@@ -79,6 +81,20 @@ export function dashboardExportFollowUps(context: DashboardExportContext) {
   );
 }
 
+export function dashboardExportFollowUpRecords(
+  context: DashboardExportContext,
+) {
+  return dashboardExportFollowUps(context).map((row) => ({
+    workflowStatus: row.task.workflowStatus,
+    dueState: row.task.dueState ?? "",
+    dueDate: row.task.dueDate,
+    clientName: row.client.name,
+    taskTitle: row.task.title,
+    commercialItemDescription: row.commercialItem?.description ?? "",
+    ownerName: row.owner.name,
+  }));
+}
+
 export function dashboardExportTopCustomers(
   context: DashboardExportContext,
   limit = 5,
@@ -103,7 +119,10 @@ export function dashboardExportMetrics(context: DashboardExportContext) {
     revenueByTax: revenueByTaxInRange(context.orders, context.range),
     revenueBySource: revenueBySourceInRange(context.orders, context.range),
     prototype: prototypeSummaryInRange(context.orders, context.range),
-    tasks: taskCounts(context.tasks),
+    tasks: taskCounts(
+      context.tasks,
+      context.role === "sales" ? undefined : context.taskMetrics,
+    ),
     waitingPo: waitingPoValue(context.items),
     activeCommercial: activeCommercialCount(context.items),
     quotationFunnel: quotationFunnel(context.items),

@@ -65,7 +65,13 @@ export function useDashboardData() {
   // account, showing wrong data/identity for every other sales user.
   const currentUserId = useQuery({
     queryKey: ["current-user-id"],
-    queryFn: getCurrentActorId,
+    queryFn: async () => {
+      try {
+        return (await getCurrentActorId()) ?? null;
+      } catch {
+        return null;
+      }
+    },
     enabled: authReady,
   });
 
@@ -81,7 +87,7 @@ export function useDashboardData() {
     salesTeam: salesTeam.data ?? [],
     targetsByMember,
     companyTarget: companyMonthlyTarget(targetsByMember),
-    currentUserId: currentUserId.data,
+    currentUserId: currentUserId.data ?? undefined,
     isLoading:
       !authReady ||
       orders.isLoading ||

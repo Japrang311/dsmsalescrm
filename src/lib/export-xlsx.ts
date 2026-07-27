@@ -1,6 +1,6 @@
 import * as XLSX from "xlsx";
 import {
-  dashboardExportFollowUps,
+  dashboardExportFollowUpRecords,
   dashboardExportMetrics,
   dashboardExportMonthlyTrend,
   dashboardExportSalesPerformance,
@@ -103,18 +103,23 @@ function downloadWorkbook(wb: XLSX.WorkBook, filename: string) {
 
 // ---- Follow-ups ----
 export function exportFollowUpsXlsx(context: DashboardExportContext): number {
-  const source = assertRows(dashboardExportFollowUps(context), "follow-up");
+  const source = assertRows(
+    dashboardExportFollowUpRecords(context),
+    "follow-up",
+  );
   const rows = source.map((r) => ({
-    status: r.task.status,
-    due: r.task.dueDate ? new Date(r.task.dueDate) : "",
-    client: r.client.name,
-    task: r.task.title,
-    item: r.commercialItem?.description ?? "",
-    owner: r.owner.name,
+    workflowStatus: r.workflowStatus,
+    dueState: r.dueState,
+    due: r.dueDate ? new Date(r.dueDate) : "",
+    client: r.clientName,
+    task: r.taskTitle,
+    item: r.commercialItemDescription,
+    owner: r.ownerName,
   }));
   const ws = buildSheet(
     [
-      { header: "Status", key: "status", width: 14 },
+      { header: "Workflow Status", key: "workflowStatus", width: 18 },
+      { header: "Due State", key: "dueState", width: 14 },
       { header: "Due Date", key: "due", type: "date", width: 14 },
       { header: "Client", key: "client", width: 28 },
       { header: "Task", key: "task", width: 36 },
@@ -288,13 +293,15 @@ export function exportExecutiveReportXlsx(
     {
       metric: "Open Tasks",
       value: metrics.tasks.open,
-      reference: `${metrics.tasks.today} today · ${metrics.tasks.upcoming} upcoming`,
+      reference: `${metrics.tasks.today} today · ${metrics.tasks.upcoming} upcoming · ${metrics.tasks.escalated} escalated`,
     },
     {
       metric: "Overdue Follow-Ups",
-      value: metrics.tasks.overdue,
+      value: metrics.tasks.overdue + metrics.tasks.escalated,
       reference:
-        metrics.tasks.overdue > 0 ? "Perlu tindak lanjut" : "Terkendali",
+        metrics.tasks.overdue + metrics.tasks.escalated > 0
+          ? `${metrics.tasks.escalated} escalated · ${metrics.tasks.overdue} overdue`
+          : "Terkendali",
     },
   ];
   XLSX.utils.book_append_sheet(
@@ -374,19 +381,21 @@ export function exportExecutiveReportXlsx(
     "Top Customers",
   );
 
-  const followUpRows = dashboardExportFollowUps(context).map((r) => ({
-    status: r.task.status,
-    due: r.task.dueDate ? new Date(r.task.dueDate) : "",
-    client: r.client.name,
-    task: r.task.title,
-    item: r.commercialItem?.description ?? "",
-    owner: r.owner.name,
+  const followUpRows = dashboardExportFollowUpRecords(context).map((r) => ({
+    workflowStatus: r.workflowStatus,
+    dueState: r.dueState,
+    due: r.dueDate ? new Date(r.dueDate) : "",
+    client: r.clientName,
+    task: r.taskTitle,
+    item: r.commercialItemDescription,
+    owner: r.ownerName,
   }));
   XLSX.utils.book_append_sheet(
     wb,
     buildSheet(
       [
-        { header: "Status", key: "status", width: 14 },
+        { header: "Workflow Status", key: "workflowStatus", width: 18 },
+        { header: "Due State", key: "dueState", width: 14 },
         { header: "Due Date", key: "due", type: "date", width: 14 },
         { header: "Client", key: "client", width: 28 },
         { header: "Task", key: "task", width: 36 },

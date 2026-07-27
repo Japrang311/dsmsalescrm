@@ -1,6 +1,6 @@
 # Handoff — DSM Sales Web App V2
 
-Context dump for continuing this work in another tool (Codex). Written 2026-07-18; Phase 11/12 status refreshed 2026-07-19; Phase 11 import-review reconciliation session added 2026-07-19; post-import UX/bugfix session added 2026-07-20; second 2026-07-20 session (pipeline permissions/FK bugfixes) added 2026-07-20; Client Detail/Client List real-data wiring session added 2026-07-21; remote-migration-push + data-restoration session added 2026-07-21; browser-verification + spending_ytd fix + SO edit audit trail session added 2026-07-21; unused-code cleanup + client database (company info/contacts) feature session added 2026-07-22; contact position + Client Detail product/description fixes + commercial item product-name migration reconciliation added 2026-07-22; dynamic per-month sales target UI/calculation update added 2026-07-22; soft-delete implementation, remote Supabase apply, and main/live push closeout added 2026-07-24; RFQ retirement and documentation refresh added 2026-07-25; Sales Task Control Loop spec approval and Phase 1-2 implementation (Tasks 46-52) added 2026-07-27; unified progress timeline Task 53/8 and Manager Team Exceptions Task 54/9 added 2026-07-27; visual design audit Phase 1 (critical usability/responsiveness fixes) added 2026-07-27; Executive exception detail and aggregate-only Task metrics Task 55/10 added 2026-07-27; Dashboard/TopBar consumer migration Task 56/11 added 2026-07-27.
+Context dump for continuing this work in another tool (Codex). Written 2026-07-18; Phase 11/12 status refreshed 2026-07-19; Phase 11 import-review reconciliation session added 2026-07-19; post-import UX/bugfix session added 2026-07-20; second 2026-07-20 session (pipeline permissions/FK bugfixes) added 2026-07-20; Client Detail/Client List real-data wiring session added 2026-07-21; remote-migration-push + data-restoration session added 2026-07-21; browser-verification + spending_ytd fix + SO edit audit trail session added 2026-07-21; unused-code cleanup + client database (company info/contacts) feature session added 2026-07-22; contact position + Client Detail product/description fixes + commercial item product-name migration reconciliation added 2026-07-22; dynamic per-month sales target UI/calculation update added 2026-07-22; soft-delete implementation, remote Supabase apply, and main/live push closeout added 2026-07-24; RFQ retirement and documentation refresh added 2026-07-25; Sales Task Control Loop spec approval and Phase 1-2 implementation (Tasks 46-52) added 2026-07-27; unified progress timeline Task 53/8 and Manager Team Exceptions Task 54/9 added 2026-07-27; visual design audit Phase 1 (critical usability/responsiveness fixes) added 2026-07-27; Executive exception detail and aggregate-only Task metrics Task 55/10 added 2026-07-27; Dashboard/TopBar consumer migration Task 56/11 added 2026-07-27; Reports consumer migration Task 57/12 added 2026-07-27; export migration Task 58/13 added 2026-07-27; Pipeline/Client Detail/commercial follow-up migration Task 59/14 added 2026-07-27.
 
 ## HANDOFF TO CODEX — read this first (2026-07-27)
 
@@ -16,7 +16,7 @@ the four Task Control Loop migrations already present on the linked remote.
   (the approved spec — status header says "APPROVED oleh Product Owner —
   2026-07-27"), `docs/superpowers/plans/2026-07-27-sales-task-control-loop-implementation.md`
   (the task-by-task plan), `tasks/sales-task-control-loop-todo.md` (checklist),
-  and `.superpowers/sdd/sales-task-control-loop-task-{2,3,4,5,6,7,8,9,10,11}-report.md`
+  and `.superpowers/sdd/sales-task-control-loop-task-{2,3,4,5,6,7,8,9,10,11,12,13,14}-report.md`
   (one detailed completion report per task — read these before touching
   anything in this feature, they record several non-obvious decisions and
   three real bugs found only via browser testing).
@@ -111,10 +111,31 @@ the four Task Control Loop migrations already present on the linked remote.
   and Archived Tasks even when legacy `status` is stale. Executive remains
   read-only in the follow-up widget. See
   `.superpowers/sdd/sales-task-control-loop-task-11-report.md`.
-- **Not started**: Task 57/12 onward (Reports and remaining performance
-  calculations, export-specific migration, Pipeline/Client Detail/
-  account-lifecycle consumer migration, existing-data cutover, final release
-  gate).
+- **Task 57/12**: Reports and performance calculations migration done. New
+  `reportSalesPerformance()` keeps Manager-owned personal Tasks counted as
+  sales work by owner while separating open, overdue, escalated, done, and
+  cancelled definitions through `workflowStatus` + `dueState`. Executive
+  Reports no longer show per-member Task detail derived from restricted rows;
+  the Reports Task Control card uses aggregate metrics instead. See
+  `.superpowers/sdd/sales-task-control-loop-task-12-report.md`.
+- **Task 58/13**: Export migration done. CSV, XLSX, and PDF follow-up exports
+  now label `Workflow Status` and `Due State` separately, use the shared
+  authorized export snapshot, and avoid legacy Task `status` leakage.
+  Non-Sales export totals use aggregate Task metrics when available, so
+  Executive totals reconcile without relying on restricted Task detail. See
+  `.superpowers/sdd/sales-task-control-loop-task-13-report.md`.
+- **Task 59/14**: Pipeline, Client Detail, and commercial follow-up path
+  migration done. New `src/lib/data/task-relations.ts` centralizes
+  Client-related vs commercial-related Task filtering while preserving
+  standalone Tasks for the Tasks module. Pipeline next-action fallback and
+  Commercial Detail now use explicit commercial Task links, Client Detail uses
+  only Client-related Tasks, and UI call sites stopped passing legacy
+  `status: "Upcoming"` when creating commercial follow-up Tasks. Browser
+  screenshots of `/pipeline` and `/clients` rendered without RFQ being
+  reintroduced. See
+  `.superpowers/sdd/sales-task-control-loop-task-14-report.md`.
+- **Not started**: Task 60/15 onward (ownership transfer/account-lifecycle
+  consumer migration, existing-data cutover, final release gate).
 - Verification recorded through Task 9: full local suite **439 pass, 0 fail**
   (58 files), plus a focused 34-test suite across `business-calendar`,
   `task-exceptions`, `tasks`, `task-progress`, and `activity-log`;

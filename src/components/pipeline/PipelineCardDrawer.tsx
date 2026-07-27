@@ -339,7 +339,7 @@ export function PipelineCardDrawer({
           dueDate: nd,
           method: "Phone",
           priority: "Normal",
-          status: "Upcoming",
+          category: "Follow-Up",
         });
         await queryClient.invalidateQueries({ queryKey: ["tasks"] });
       }

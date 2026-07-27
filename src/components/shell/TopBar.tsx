@@ -296,7 +296,13 @@ export function TopBar() {
   // that specific seed account wasn't the one actually running.
   const { data: currentUserId } = useQuery({
     queryKey: ["current-user-id"],
-    queryFn: getCurrentActorId,
+    queryFn: async () => {
+      try {
+        return (await getCurrentActorId()) ?? null;
+      } catch {
+        return null;
+      }
+    },
     enabled: authReady && authSource === "dev",
   });
   const devUser = currentUserId ? owners[currentUserId] : undefined;

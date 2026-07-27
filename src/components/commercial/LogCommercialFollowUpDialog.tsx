@@ -174,7 +174,7 @@ export function LogCommercialFollowUpDialog({
           dueDate: v.nextFuDate,
           method: v.method,
           priority: "Normal",
-          status: "Upcoming",
+          category: "Follow-Up",
         });
         const actorId = await getCurrentActorId();
         if (actorId) {

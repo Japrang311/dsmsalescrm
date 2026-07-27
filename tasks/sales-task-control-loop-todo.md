@@ -129,9 +129,23 @@ Product direction: `docs/ideas/sales-task-control-loop.md`
       performance rows, risk alerts, exports that reuse dashboard selectors,
       and TopBar notifications now consume `workflowStatus` + `dueState`
       instead of interpreting the legacy `status` field.
-- [ ] Task 12: Migrate Reports and performance calculations
-- [ ] Task 13: Migrate exports
-- [ ] Task 14: Migrate Pipeline, Client Detail, and commercial follow-up paths
+- [x] Task 12: Migrate Reports and performance calculations — done
+      2026-07-27; see
+      `.superpowers/sdd/sales-task-control-loop-task-12-report.md`.
+      Reports now separate open, overdue, escalated, done, and cancelled
+      Task metrics using `workflowStatus` + `dueState`; Executive Reports
+      avoid per-member Task detail and use aggregate-only Task summary.
+- [x] Task 13: Migrate exports — done 2026-07-27; see
+      `.superpowers/sdd/sales-task-control-loop-task-13-report.md`.
+      CSV, XLSX, and PDF follow-up exports now label workflow status and
+      due state separately, and non-Sales export totals can reconcile
+      against aggregate Task metrics instead of restricted row detail.
+- [x] Task 14: Migrate Pipeline, Client Detail, and commercial follow-up paths
+      — done 2026-07-27; see
+      `.superpowers/sdd/sales-task-control-loop-task-14-report.md`.
+      Pipeline, Client Detail, and Commercial Detail now use workflow/due-state
+      Task relation helpers; commercial follow-up creation no longer writes
+      legacy due status from UI call sites.
 - [ ] Task 15: Migrate ownership transfer and account lifecycle consumers
 
 ### Checkpoint C — Consumer parity

@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
+  dashboardExportFollowUpRecords,
+  dashboardExportMetrics,
   dashboardExportMonthlyTrend,
   dashboardExportTopCustomers,
   type DashboardExportContext,
@@ -72,5 +74,82 @@ describe("dashboard export data", () => {
         revenue: 125_000_000,
       },
     ]);
+  });
+
+  test("exports follow-up workflow status and due state instead of legacy status", () => {
+    const [record] = dashboardExportFollowUpRecords({
+      ...context,
+      tasks: [
+        {
+          id: "task-1",
+          clientId: "client-1",
+          ownerId: "sales-1",
+          commercialItemId: "item-1",
+          title: "Follow up proposal",
+          dueDate: "2026-07-17",
+          method: "WhatsApp",
+          status: "Upcoming",
+          workflowStatus: "In Progress",
+          dueState: "Escalated",
+          calendarIncomplete: false,
+          category: "Follow-Up",
+          priority: "High",
+        },
+      ],
+      items: [
+        {
+          id: "item-1",
+          clientId: "client-1",
+          ownerId: "sales-1",
+          type: "Quotation",
+          sourceFlow: "New Product",
+          description: "DSM CRM rollout",
+          estimatedValue: 125_000_000,
+          stage: "Quotation Sent",
+          updatedAt: "2026-07-10",
+        },
+      ],
+    });
+
+    expect(record).toMatchObject({
+      workflowStatus: "In Progress",
+      dueState: "Escalated",
+      dueDate: "2026-07-17",
+      clientName: "PT Data Nyata",
+      taskTitle: "Follow up proposal",
+      commercialItemDescription: "DSM CRM rollout",
+      ownerName: "Aditya",
+    });
+    expect(record).not.toHaveProperty("status");
+  });
+
+  test("uses aggregate task metrics for non-sales export totals", () => {
+    const metrics = dashboardExportMetrics({
+      ...context,
+      role: "executive",
+      tasks: [],
+      taskMetrics: {
+        totalTasks: 13,
+        activeTasks: 9,
+        upcomingTasks: 2,
+        todayTasks: 1,
+        overdueTasks: 3,
+        escalatedTasks: 4,
+        doneTasks: 2,
+        cancelledTasks: 1,
+        archivedTasks: 1,
+        calendarIncompleteTasks: 0,
+      },
+    });
+
+    expect(metrics.tasks).toMatchObject({
+      open: 9,
+      upcoming: 2,
+      today: 1,
+      overdue: 3,
+      escalated: 4,
+      done: 2,
+      cancelled: 1,
+    });
   });
 });

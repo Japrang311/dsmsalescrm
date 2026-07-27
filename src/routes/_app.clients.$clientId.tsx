@@ -55,6 +55,10 @@ import { listSalesOrders } from "@/lib/data/sales-orders";
 import { listCommercialItems } from "@/lib/data/commercial-items";
 import { listTasks } from "@/lib/data/tasks";
 import {
+  activeClientTasks,
+  clientRelatedTasks,
+} from "@/lib/data/task-relations";
+import {
   clientRevenueMetrics,
   clientCommercialMetrics,
 } from "@/lib/data/dashboard-selectors";
@@ -135,11 +139,8 @@ function ClientProfilePage() {
   const clientCommercial = commercialItems.filter(
     (i) => i.clientId === clientId,
   );
-  const clientTasks = tasks.filter((t) => t.clientId === clientId);
-  const upcomingActions = clientTasks.filter(
-    (t) =>
-      t.status === "Today" || t.status === "Overdue" || t.status === "Upcoming",
-  );
+  const clientTasks = clientRelatedTasks(tasks, clientId);
+  const upcomingActions = activeClientTasks(tasks, clientId);
   const clientQuotations = clientCommercial.filter(
     (i) => i.type === "Quotation",
   );
@@ -501,7 +502,8 @@ function ClientProfilePage() {
                         key={t.id}
                         className="flex items-start gap-2 rounded-md border bg-muted/30 p-2.5 text-xs"
                       >
-                        {t.status === "Overdue" ? (
+                        {t.dueState === "Overdue" ||
+                        t.dueState === "Escalated" ? (
                           <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-rose-500" />
                         ) : (
                           <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
@@ -514,11 +516,14 @@ function ClientProfilePage() {
                         </div>
                         <Badge
                           variant={
-                            t.status === "Overdue" ? "destructive" : "secondary"
+                            t.dueState === "Overdue" ||
+                            t.dueState === "Escalated"
+                              ? "destructive"
+                              : "secondary"
                           }
                           className="shrink-0 text-[10px]"
                         >
-                          {t.status}
+                          {t.dueState ?? t.workflowStatus}
                         </Badge>
                       </li>
                     ))}
@@ -545,7 +550,8 @@ function ClientProfilePage() {
                         <TableHead>Title</TableHead>
                         <TableHead>Method</TableHead>
                         <TableHead>Due Date</TableHead>
-                        <TableHead>Status</TableHead>
+                        <TableHead>Workflow</TableHead>
+                        <TableHead>Due State</TableHead>
                         <TableHead>Priority</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -560,15 +566,20 @@ function ClientProfilePage() {
                           <TableCell>
                             <Badge
                               variant={
-                                t.status === "Overdue"
+                                t.workflowStatus === "Cancelled"
                                   ? "destructive"
-                                  : t.status === "Done"
+                                  : t.workflowStatus === "Done"
                                     ? "secondary"
                                     : "default"
                               }
                               className="text-[10px]"
                             >
-                              {t.status}
+                              {t.workflowStatus}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="text-[10px]">
+                              {t.dueState ?? "-"}
                             </Badge>
                           </TableCell>
                           <TableCell>

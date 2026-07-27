@@ -1,6 +1,14 @@
 import type { ReportFilters } from "@/components/reports/ReportFilterBar";
 import { NOW } from "@/lib/app-time";
-import type { CommercialItem, SalesOrder } from "@/lib/domain";
+import type { Client, CommercialItem, SalesOrder, Task } from "@/lib/domain";
+import {
+  hasTaskDueState,
+  isActiveTask,
+  type SalesTeamMember,
+  sumTargetsThroughMonth,
+  targetsFor,
+} from "@/lib/data/dashboard-selectors";
+import type { TargetsByMember } from "@/lib/data/targets";
 
 export { quotationLostReasonBreakdown } from "@/lib/data/quotation-lost-reasons";
 
@@ -67,4 +75,65 @@ export function agingBucket(dateStr: string): string {
   if (days <= 14) return "8-14 hari";
   if (days <= 30) return "15-30 hari";
   return "> 30 hari";
+}
+
+export type ReportSalesPerformanceRow = {
+  member: SalesTeamMember;
+  revenue: number;
+  target: number;
+  pct: number;
+  openTasks: number | null;
+  overdueTasks: number | null;
+  escalatedTasks: number | null;
+  completedTasks: number | null;
+  cancelledTasks: number | null;
+  activeClients: number;
+};
+
+export function reportSalesPerformance(
+  orders: SalesOrder[],
+  tasks: Task[],
+  clients: Client[],
+  salesTeam: SalesTeamMember[],
+  targetsByMember: TargetsByMember,
+  options: { includeTaskDetail?: boolean } = {},
+): ReportSalesPerformanceRow[] {
+  const includeTaskDetail = options.includeTaskDetail ?? true;
+
+  return salesTeam
+    .map((member) => {
+      const memberOrders = orders.filter((s) => s.ownerId === member.id);
+      const revenue = memberOrders.reduce((s, o) => s + (o.value ?? 0), 0);
+      const target = sumTargetsThroughMonth(
+        targetsFor(targetsByMember, member.id),
+      );
+      const memberTasks = tasks.filter((t) => t.ownerId === member.id);
+      const activeClients = clients.filter(
+        (c) => c.ownerId === member.id && c.status !== "Lost",
+      ).length;
+
+      return {
+        member,
+        revenue,
+        target,
+        pct: target > 0 ? revenue / target : 0,
+        openTasks: includeTaskDetail
+          ? memberTasks.filter(isActiveTask).length
+          : null,
+        overdueTasks: includeTaskDetail
+          ? memberTasks.filter((t) => hasTaskDueState(t, ["Overdue"])).length
+          : null,
+        escalatedTasks: includeTaskDetail
+          ? memberTasks.filter((t) => hasTaskDueState(t, ["Escalated"])).length
+          : null,
+        completedTasks: includeTaskDetail
+          ? memberTasks.filter((t) => t.workflowStatus === "Done").length
+          : null,
+        cancelledTasks: includeTaskDetail
+          ? memberTasks.filter((t) => t.workflowStatus === "Cancelled").length
+          : null,
+        activeClients,
+      };
+    })
+    .sort((a, b) => b.revenue - a.revenue);
 }

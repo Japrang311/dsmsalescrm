@@ -60,6 +60,7 @@ import {
 import { documentNumberExample } from "@/lib/data/document-numbering";
 import { listClients, listOwners } from "@/lib/data/clients";
 import { listTasks } from "@/lib/data/tasks";
+import { commercialRelatedTasks } from "@/lib/data/task-relations";
 import {
   getCurrentActorId,
   listCommercialItemHistory,
@@ -204,9 +205,7 @@ export function CommercialDetailPage({
   const client = clients[item.clientId];
   const owner = owners[item.ownerId];
   const stages = stagesForFlow(item.sourceFlow);
-  const relatedTasks = allTasks.filter(
-    (t) => t.commercialItemId === item.id || t.clientId === item.clientId,
-  );
+  const relatedTasks = commercialRelatedTasks(allTasks, item.id);
   // Sales Orders don't exist yet (Phase 5) — shown as an honest "not
   // available yet" placeholder below rather than mock SALES_ORDERS data.
   const canEdit = canManageSoftDeletedRecord(role, item.ownerId, currentUserId);
@@ -903,7 +902,8 @@ export function CommercialDetailPage({
                         >
                           {t.method}
                         </Badge>
-                        <span>{t.status}</span>
+                        <span>{t.workflowStatus}</span>
+                        <span>{t.dueState ?? "-"}</span>
                       </div>
                     </li>
                   ))}
