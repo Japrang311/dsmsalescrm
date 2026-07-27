@@ -86,6 +86,38 @@ type LineItemChange = {
   priceChanged: boolean;
 };
 
+// Some activity_log rows store `detail` as a raw JSON literal (e.g. the
+// revise_quotation/create_quotation DB functions) instead of prose. Render
+// those as a human sentence instead of dumping the JSON to the user.
+function formatHistoryDetail(
+  detail: string | null | undefined,
+  items: CommercialItem[],
+): string | null {
+  if (!detail) return null;
+  const trimmed = detail.trim();
+  if (!trimmed.startsWith("{")) return detail;
+  try {
+    const parsed = JSON.parse(trimmed) as Record<string, unknown>;
+    const parts: string[] = [];
+    if (typeof parsed.quotation_number === "string") {
+      parts.push(`Nomor: ${parsed.quotation_number}`);
+    }
+    if (typeof parsed.supersedes_document_id === "string") {
+      const previous = items.find(
+        (i) => i.id === parsed.supersedes_document_id,
+      );
+      parts.push(
+        previous?.quotationNumber
+          ? `Menggantikan: ${previous.quotationNumber}`
+          : "Menggantikan revisi sebelumnya",
+      );
+    }
+    return parts.length > 0 ? parts.join(" · ") : detail;
+  } catch {
+    return detail;
+  }
+}
+
 export function CommercialDetailPage({
   itemId,
   backHref,
@@ -209,6 +241,9 @@ export function CommercialDetailPage({
   // Sales Orders don't exist yet (Phase 5) — shown as an honest "not
   // available yet" placeholder below rather than mock SALES_ORDERS data.
   const canEdit = canManageSoftDeletedRecord(role, item.ownerId, currentUserId);
+  const isClosedStage =
+    item.stage === "Closed Won" || item.stage === "Closed Lost";
+  const canEditLineItems = canEdit && !isClosedStage;
   const aging = Math.max(0, daysBetween(new Date(item.updatedAt), NOW));
   const isFoc = item.prototypeStatus === "FOC";
   const quotationNumberGuide = documentNumberExample("QUO");
@@ -569,6 +604,9 @@ export function CommercialDetailPage({
       <div className="grid gap-4 md:grid-cols-3">
         <Card className="md:col-span-2">
           <CardContent className="grid gap-4 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-foreground/70">
+              Detail Klien
+            </p>
             <div className="grid gap-3 sm:grid-cols-2">
               <InfoCell
                 icon={<Building2 className="h-3.5 w-3.5" />}
@@ -723,9 +761,12 @@ export function CommercialDetailPage({
 
             <Separator />
 
+            <p className="text-xs font-semibold uppercase tracking-wide text-foreground/70">
+              Nilai &amp; Nomor Dokumen
+            </p>
             <div className="grid gap-3 sm:grid-cols-3">
               <InfoCell label="Total">
-                <span className="text-lg font-semibold tabular-nums">
+                <span className="text-2xl font-bold tabular-nums">
                   {isFoc ? "FOC · Rp0" : formatRupiahFull(item.estimatedValue)}
                 </span>
                 {!isFoc && item.estimatedValue >= 1_000_000 && (
@@ -784,10 +825,15 @@ export function CommercialDetailPage({
 
             <Separator />
 
+            {canEdit && isClosedStage && (
+              <p className="text-xs text-muted-foreground">
+                Item terkunci — quotation sudah berstatus {item.stage}.
+              </p>
+            )}
             <DocumentItemsTable
               items={item.lineItems ?? []}
               showMoney={!isFoc}
-              canEdit={canEdit}
+              canEdit={canEditLineItems}
               lineEdits={lineEdits}
               onLineEdit={(lineId, patch) =>
                 setLineEdits((current) => ({
@@ -942,7 +988,7 @@ export function CommercialDetailPage({
                       <div className="mt-1 flex items-start gap-1 text-[11px]">
                         <FileText className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground" />
                         <span className="text-muted-foreground">
-                          {h.detail ?? h.title}
+                          {formatHistoryDetail(h.detail, items) ?? h.title}
                         </span>
                       </div>
                     </li>
@@ -1013,7 +1059,7 @@ function DocumentItemsTable({
           </TableHeader>
           <TableBody>
             {items.map((line) => (
-              <TableRow key={line.id}>
+              <TableRow key={line.id} className="odd:bg-muted/20">
                 <TableCell className="font-medium">
                   {line.productName ?? "Nama Product belum diisi"}
                 </TableCell>
