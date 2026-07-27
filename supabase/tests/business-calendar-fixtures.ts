@@ -92,7 +92,8 @@ export const DUE_STATE_FIXTURES: DueStateFixture[] = [
     expected: { dueState: "Overdue", calendarIncomplete: false },
   },
   {
-    label: "single holiday: Escalated lands one day later than the no-holiday case",
+    label:
+      "single holiday: Escalated lands one day later than the no-holiday case",
     dueDate: "2026-01-05", // Monday
     workflowStatus: "Open",
     holidays: [ANCHOR_2026, "2026-01-06"], // Tue is cuti bersama
@@ -108,7 +109,8 @@ export const DUE_STATE_FIXTURES: DueStateFixture[] = [
     expected: { dueState: "Overdue", calendarIncomplete: false },
   },
   {
-    label: "two consecutive holidays: Escalated only after both business days after are business days",
+    label:
+      "two consecutive holidays: Escalated only after both business days after are business days",
     dueDate: "2026-01-05", // Monday
     workflowStatus: "Open",
     holidays: [ANCHOR_2026, "2026-01-06", "2026-01-07"], // Tue+Wed
@@ -172,7 +174,8 @@ export const DUE_STATE_FIXTURES: DueStateFixture[] = [
     expected: { dueState: "Overdue", calendarIncomplete: false },
   },
   {
-    label: "Waiting External is still an active workflow state (Escalated applies)",
+    label:
+      "Waiting External is still an active workflow state (Escalated applies)",
     dueDate: "2026-01-05", // Monday
     workflowStatus: "Waiting External",
     holidays: [ANCHOR_2026],

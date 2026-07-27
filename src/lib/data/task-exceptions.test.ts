@@ -20,14 +20,6 @@ function task(
     title: id,
     dueDate: "2026-07-20",
     method: "Phone",
-    status:
-      workflowStatus === "Done"
-        ? "Done"
-        : dueState === "Escalated" || dueState === "Overdue"
-          ? "Overdue"
-          : dueState === "Today"
-            ? "Today"
-            : "Upcoming",
     workflowStatus,
     dueState,
     calendarIncomplete: false,

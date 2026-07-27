@@ -143,22 +143,21 @@ describe("task timeline", () => {
       refresh_token: session.refresh_token,
     });
 
-    const { data: historicalFollowUp, error: followUpError } =
-      await adminClient
-        .from("follow_up_logs")
-        .insert({
-          task_id: taskId,
-          client_id: timelineClientId,
-          owner_id: fixtures.sales.id,
-          fu_date: "2026-07-27",
-          method: "Phone",
-          result: "Follow-up Later",
-          next_action: "Call again",
-          next_fu_date: "2026-07-28",
-          notes: "Historical follow-up note",
-        })
-        .select("id")
-        .single();
+    const { data: historicalFollowUp, error: followUpError } = await adminClient
+      .from("follow_up_logs")
+      .insert({
+        task_id: taskId,
+        client_id: timelineClientId,
+        owner_id: fixtures.sales.id,
+        fu_date: "2026-07-27",
+        method: "Phone",
+        result: "Follow-up Later",
+        next_action: "Call again",
+        next_fu_date: "2026-07-28",
+        notes: "Historical follow-up note",
+      })
+      .select("id")
+      .single();
     if (followUpError) throw followUpError;
     timelineFollowUpIds.push(historicalFollowUp.id);
 
@@ -188,21 +187,26 @@ describe("task timeline", () => {
 
     const timeline = await listTaskTimeline(taskId);
 
-    expect(timeline.some((entry) => entry.id === `follow-up-${historicalFollowUp.id}`)).toBe(
-      true,
-    );
-    expect(timeline.some((entry) => entry.id === `activity-${auditOnly.id}`)).toBe(
-      true,
-    );
+    expect(
+      timeline.some(
+        (entry) => entry.id === `follow-up-${historicalFollowUp.id}`,
+      ),
+    ).toBe(true);
+    expect(
+      timeline.some((entry) => entry.id === `activity-${auditOnly.id}`),
+    ).toBe(true);
     expect(
       timeline.filter((entry) => entry.id.includes(progress.followUpLogId)),
     ).toHaveLength(1);
     expect(
-      timeline.some((entry) => entry.id === `activity-${progress.activityLogId}`),
+      timeline.some(
+        (entry) => entry.id === `activity-${progress.activityLogId}`,
+      ),
     ).toBe(false);
     expect(
-      timeline.find((entry) => entry.id === `follow-up-${progress.followUpLogId}`)
-        ?.actorName,
+      timeline.find(
+        (entry) => entry.id === `follow-up-${progress.followUpLogId}`,
+      )?.actorName,
     ).toBe(SALES_FIXTURE_NAME);
 
     await supabase.auth.signOut();

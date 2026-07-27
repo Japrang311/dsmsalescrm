@@ -196,7 +196,7 @@ function supportedUpdateFor(
     case "clients":
       return { status: "Dormant" };
     case "tasks":
-      return { status: "Done" };
+      return { category: "Internal/Admin" };
     case "commercial_documents":
       return { stage: "Negotiation" };
     case "sales_orders":
@@ -935,7 +935,7 @@ describe("active Super Admin supported business writes", () => {
 
     const { data: updated, error: updateError } = await client
       .from("tasks")
-      .update({ status: "Done" })
+      .update({ title: "Super Admin corrected task title" })
       .eq("id", fixtureRows.task)
       .select("id, owner_id");
     expect(updateError).toBeNull();

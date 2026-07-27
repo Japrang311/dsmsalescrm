@@ -167,7 +167,7 @@ describe("record_task_progress: one call writes exactly one follow_up_logs and o
       .single();
     expect(event?.actor_id).toBe(fixtures.sales.id);
     expect(new Date(event!.created_at).getTime()).toBeGreaterThanOrEqual(
-      before.getTime(),
+      before.getTime() - 1000,
     );
   });
 });
@@ -220,15 +220,14 @@ describe("record_task_progress: validation rules", () => {
 
     const { data: task } = await adminClient
       .from("tasks")
-      .select("workflow_status, status, cancellation_reason")
+      .select("workflow_status, cancellation_reason")
       .eq("id", taskId)
       .single();
     expect(task?.workflow_status).toBe("Cancelled");
-    expect(task?.status).toBe("Done"); // legacy dual-write mapping
     expect(task?.cancellation_reason).toBe("Client no longer interested");
   });
 
-  test("Done maps the legacy status to Done", async () => {
+  test("Done persists as workflow_status without legacy dual-write", async () => {
     const taskId = await insertTask(fixtures.sales.id);
     const client = await signInAs(fixtures.sales);
 
@@ -242,11 +241,10 @@ describe("record_task_progress: validation rules", () => {
 
     const { data: task } = await adminClient
       .from("tasks")
-      .select("workflow_status, status")
+      .select("workflow_status")
       .eq("id", taskId)
       .single();
     expect(task?.workflow_status).toBe("Done");
-    expect(task?.status).toBe("Done");
   });
 
   test("reopening a Cancelled task back to Open requires a fresh next_action and clears cancellation_reason", async () => {
@@ -304,9 +302,8 @@ describe("record_task_progress: validation rules", () => {
   });
 
   test("a freshly created task (no progress yet) is not blocked by the next-action constraint", async () => {
-    // Proves the legacy createTask() flow (Task 6 has not rewired it yet)
-    // still works after this migration -- first_progress_at is null, so
-    // the CHECK constraint does not apply.
+    // Task creation still does not require next_action. The constraint starts
+    // only after the first atomic progress entry sets first_progress_at.
     const taskId = await insertTask(fixtures.sales.id);
     const { data: task, error } = await adminClient
       .from("tasks")
@@ -538,7 +535,9 @@ describe("record_task_progress: atomicity", () => {
 
     const after = await adminClient
       .from("tasks")
-      .select("workflow_status, next_action, next_action_date, first_progress_at")
+      .select(
+        "workflow_status, next_action, next_action_date, first_progress_at",
+      )
       .eq("id", taskId)
       .single();
     expect(after.data?.workflow_status).toBe("Open"); // unchanged

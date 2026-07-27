@@ -259,20 +259,24 @@ calendar, escalation, migration/backfill, RLS, and notification decisions.
 - [x] Task 52: Deliver Task creation and owner lifecycle — done
       2026-07-27; see
       `.superpowers/sdd/sales-task-control-loop-task-7-report.md`
-- [ ] Task 53: Deliver the unified progress timeline
-- [ ] Tasks 54-55: Deliver Manager and Executive control-loop boundaries
-- [ ] Tasks 56-60: Migrate Dashboard, Reports, exports, related surfaces, and
-      account-lifecycle consumers
-- [ ] Tasks 61-63: Reconcile existing data, verify locally, and pass the
-      separately approved release gate
+- [x] Task 53: Deliver the unified progress timeline — done 2026-07-27; see
+      `.superpowers/sdd/sales-task-control-loop-task-8-report.md`
+- [x] Tasks 54-55: Deliver Manager and Executive control-loop boundaries —
+      done 2026-07-27; see task 9-10 reports.
+- [x] Tasks 56-60: Migrate Dashboard, Reports, exports, related surfaces, and
+      account-lifecycle consumers — done 2026-07-27; see task 11-15 reports.
+- [x] Task 61: Reconcile existing data and retire the legacy status contract —
+      done locally 2026-07-27; see
+      `.superpowers/sdd/sales-task-control-loop-task-16-report.md`.
+- [ ] Tasks 62-63: Verify locally and pass the separately approved release gate
 
 ### Checkpoint 13: Sales Task Control Loop
 
-- [ ] Workflow status is separate from database-derived due state
-- [ ] Every active progress update is atomic and includes next action/date
-- [ ] Manager My Tasks and Team Exceptions are distinct
-- [ ] Executive detail and aggregate access are separated at the database
+- [x] Workflow status is separate from database-derived due state
+- [x] Every active progress update is atomic and includes next action/date
+- [x] Manager My Tasks and Team Exceptions are distinct
+- [x] Executive detail and aggregate access are separated at the database
       boundary
-- [ ] Holiday-aware escalation uses one Asia/Jakarta business calendar
-- [ ] Existing data migrates without fabricated business values
+- [x] Holiday-aware escalation uses one Asia/Jakarta business calendar
+- [x] Existing data migrates without fabricated business values
 - [ ] Remote mutation remains separately approved

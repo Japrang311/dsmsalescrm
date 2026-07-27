@@ -165,7 +165,6 @@ describe("dashboard-selectors task workflow and due-state contracts", () => {
     title: id,
     dueDate: "2026-07-27",
     method: "Phone",
-    status: "Upcoming",
     workflowStatus: "Open",
     dueState: "Upcoming",
     calendarIncomplete: false,
@@ -175,23 +174,19 @@ describe("dashboard-selectors task workflow and due-state contracts", () => {
     ...patch,
   });
 
-  test("taskCounts() buckets active tasks by dueState, not legacy status", () => {
+  test("taskCounts() buckets active tasks by dueState, not workflow status", () => {
     const counts = taskCounts([
-      task("stale-status", {
-        status: "Upcoming",
+      task("overdue-open", {
         dueState: "Overdue",
       }),
       task("escalated", {
-        status: "Overdue",
         dueState: "Escalated",
       }),
-      task("done-legacy-overdue", {
-        status: "Overdue",
+      task("done-terminal", {
         workflowStatus: "Done",
         dueState: null,
       }),
       task("archived-overdue", {
-        status: "Overdue",
         dueState: "Overdue",
         archived: true,
       }),

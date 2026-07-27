@@ -1,0 +1,25 @@
+{
+  "report": "sales-task-control-loop-migration",
+  "generatedAt": "2026-07-27T14:13:52.261Z",
+  "source": "private.task_control_loop_migration_audit",
+  "passed": true,
+  "counts": {
+    "taskCount": 0,
+    "deterministicCount": 0,
+    "reviewRequiredCount": 0,
+    "ownerMismatchCount": 0,
+    "standaloneTaskCount": 0,
+    "archiveMismatchCount": 0,
+    "timelineOrphanCount": 0
+  },
+  "distributions": {
+    "legacyStatus": {},
+    "workflowStatus": {},
+    "dueState": {}
+  },
+  "reviewRequiredTaskIds": [],
+  "unexplainedMismatches": {
+    "timeline_orphan_count": 0,
+    "review_required_task_ids": []
+  }
+}

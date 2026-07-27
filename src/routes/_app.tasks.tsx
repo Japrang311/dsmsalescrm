@@ -61,13 +61,14 @@ import {
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRole } from "@/context/role-context";
 import { NOW } from "@/lib/domain";
-import type { Role, Task, TaskStatus, CommercialItem } from "@/lib/domain";
+import type { Role, Task, CommercialItem } from "@/lib/domain";
 import {
   listTasks,
   updateTask,
   createTask,
   describeTaskChanges,
 } from "@/lib/data/tasks";
+import { recordTaskProgress } from "@/lib/data/task-progress";
 import {
   filterExecutiveTaskExceptions,
   filterManagerMyTasks,
@@ -159,7 +160,23 @@ function startOfDay(d: Date) {
 // into the "upcoming" view; "done" folds into "completed".
 type Bucket = "overdue" | "today" | "week" | "later" | "done";
 function bucketFor(task: Task): Bucket {
-  if (task.status === "Done") return "done";
+  if (
+    task.workflowStatus === "Done" ||
+    task.workflowStatus === "Cancelled" ||
+    task.dueState === null
+  ) {
+    return "done";
+  }
+  if (task.dueState === "Overdue" || task.dueState === "Escalated") {
+    return "overdue";
+  }
+  if (task.dueState === "Today") return "today";
+  if (task.dueState === "Upcoming") {
+    const today = startOfDay(NOW);
+    const due = startOfDay(new Date(task.dueDate));
+    const weekEnd = today + 7 * 86_400_000;
+    return due <= weekEnd ? "week" : "later";
+  }
   const today = startOfDay(NOW);
   const due = startOfDay(new Date(task.dueDate));
   if (due < today) return "overdue";
@@ -387,30 +404,18 @@ function TasksInboxPage() {
     await queryClient.invalidateQueries({ queryKey: ["activity-log"] });
   };
 
-  const setStatus = async (t: Task, status: TaskStatus, title: string) => {
-    try {
-      await updateTask(t.id, { status });
-      await logTaskEvent(t, title);
-      await invalidateTasks();
-    } catch (error) {
-      toast.error("Gagal mengubah status task", {
-        description: error instanceof Error ? error.message : "Unknown error",
-      });
-    }
-  };
-
   const handleDone = async (t: Task) => {
     try {
-      await updateTask(t.id, { status: "Done" });
-      await logTaskEvent(t, "Status → Done");
+      await recordTaskProgress({
+        taskId: t.id,
+        nextAction: null,
+        nextActionDate: null,
+        workflowStatusTarget: "Done",
+      });
       await invalidateTasks();
       const client = t.clientId ? clientsById[t.clientId] : undefined;
       toast.success(`Task diselesaikan — ${client?.name ?? "Klien"}`, {
         description: t.title,
-        action: {
-          label: "Undo",
-          onClick: () => void setStatus(t, "Today", "Status → Today (undo)"),
-        },
       });
     } catch (error) {
       toast.error("Gagal menyelesaikan task", {
@@ -423,12 +428,9 @@ function TasksInboxPage() {
     const next = new Date(t.dueDate);
     next.setDate(next.getDate() + 1);
     const iso = next.toISOString().slice(0, 10);
-    const nextStatus: TaskStatus =
-      startOfDay(next) === startOfDay(NOW) ? "Today" : "Upcoming";
     const prevDueDate = t.dueDate;
-    const prevStatus = t.status;
     try {
-      await updateTask(t.id, { dueDate: iso, status: nextStatus });
+      await updateTask(t.id, { dueDate: iso });
       await logTaskEvent(t, `Ditunda +1 hari → ${formatDateShort(iso)}`);
       await invalidateTasks();
       toast(`Ditunda ke ${formatDateShort(iso)}`, {
@@ -440,7 +442,6 @@ function TasksInboxPage() {
               try {
                 await updateTask(t.id, {
                   dueDate: prevDueDate,
-                  status: prevStatus,
                 });
                 await logTaskEvent(t, "Penundaan dibatalkan");
                 await invalidateTasks();
@@ -461,8 +462,10 @@ function TasksInboxPage() {
   };
 
   const handleUndo = (t: Task) => {
-    void setStatus(t, "Today", "Status → Today (undo)");
-    toast("Perubahan dibatalkan", { description: t.title });
+    setOpenTaskId(t.id);
+    toast("Buka detail untuk mengaktifkan ulang task", {
+      description: "Reopen wajib mengisi next action baru.",
+    });
   };
 
   const handleArchive = async (t: Task) => {
@@ -517,8 +520,6 @@ function TasksInboxPage() {
     const due = new Date(NOW);
     due.setDate(due.getDate() + (kind === "Quotation" ? 2 : 3));
     const iso = due.toISOString().slice(0, 10);
-    const nextStatus: TaskStatus =
-      startOfDay(due) === startOfDay(NOW) ? "Today" : "Upcoming";
     try {
       const childTask = await createTask({
         clientId: t.clientId,
@@ -529,7 +530,6 @@ function TasksInboxPage() {
         method: kind === "Quotation" ? "Email" : "Meeting",
         priority: "Normal",
         dueDate: iso,
-        status: nextStatus,
       });
       const actorId = await getCurrentActorId();
       if (actorId) {
@@ -607,31 +607,19 @@ function TasksInboxPage() {
   const bulkDone = async () => {
     const targets = selectedTasks.filter((t) => bucketFor(t) !== "done");
     if (targets.length === 0) return;
-    const snapshot = targets.map((t) => ({ id: t.id, status: t.status, t }));
     try {
       await Promise.all(
         targets.map(async (t) => {
-          await updateTask(t.id, { status: "Done" });
-          await logTaskEvent(t, "Status → Done (massal)");
+          await recordTaskProgress({
+            taskId: t.id,
+            nextAction: null,
+            nextActionDate: null,
+            workflowStatusTarget: "Done",
+          });
         }),
       );
       await invalidateTasks();
-      toast.success(`${targets.length} task ditandai Done`, {
-        action: {
-          label: "Undo",
-          onClick: () =>
-            void (async () => {
-              await Promise.all(
-                snapshot.map(({ id, status, t }) =>
-                  updateTask(id, { status }).then(() =>
-                    logTaskEvent(t, "Status dibatalkan (massal undo)"),
-                  ),
-                ),
-              );
-              await invalidateTasks();
-            })(),
-        },
-      });
+      toast.success(`${targets.length} task ditandai Done`);
     } catch (error) {
       toast.error("Gagal menandai task selesai", {
         description: error instanceof Error ? error.message : "Unknown error",
@@ -646,7 +634,6 @@ function TasksInboxPage() {
     const snapshot = targets.map((t) => ({
       id: t.id,
       dueDate: t.dueDate,
-      status: t.status,
       t,
     }));
     try {
@@ -655,9 +642,7 @@ function TasksInboxPage() {
           const next = new Date(t.dueDate);
           next.setDate(next.getDate() + 1);
           const iso = next.toISOString().slice(0, 10);
-          const nextStatus: TaskStatus =
-            startOfDay(next) === startOfDay(NOW) ? "Today" : "Upcoming";
-          await updateTask(t.id, { dueDate: iso, status: nextStatus });
+          await updateTask(t.id, { dueDate: iso });
           await logTaskEvent(
             t,
             `Ditunda +1 hari → ${formatDateShort(iso)} (massal)`,
@@ -671,8 +656,8 @@ function TasksInboxPage() {
           onClick: () =>
             void (async () => {
               await Promise.all(
-                snapshot.map(({ id, dueDate, status, t }) =>
-                  updateTask(id, { dueDate, status }).then(() =>
+                snapshot.map(({ id, dueDate, t }) =>
+                  updateTask(id, { dueDate }).then(() =>
                     logTaskEvent(t, "Penundaan dibatalkan (massal undo)"),
                   ),
                 ),
@@ -1561,10 +1546,18 @@ function CalendarView({
             const isSelected = iso === selectedISO;
             const dayTasks = tasksByDay.get(iso) ?? [];
             const overdue = dayTasks.some(
-              (t) => t.status !== "Done" && iso < todayISO,
+              (t) =>
+                t.workflowStatus !== "Done" &&
+                t.workflowStatus !== "Cancelled" &&
+                iso < todayISO,
             );
             const done =
-              dayTasks.length > 0 && dayTasks.every((t) => t.status === "Done");
+              dayTasks.length > 0 &&
+              dayTasks.every(
+                (t) =>
+                  t.workflowStatus === "Done" ||
+                  t.workflowStatus === "Cancelled",
+              );
             return (
               <button
                 key={iso}
@@ -1593,7 +1586,8 @@ function CalendarView({
                         key={t.id}
                         className={cn(
                           "truncate rounded px-1 py-0.5 text-[10px] leading-tight",
-                          t.status === "Done"
+                          t.workflowStatus === "Done" ||
+                            t.workflowStatus === "Cancelled"
                             ? "bg-success/10 text-success line-through"
                             : overdue
                               ? "bg-destructive/10 text-destructive"

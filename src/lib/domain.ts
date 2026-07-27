@@ -159,12 +159,6 @@ export type SalesOrder = {
 
 export type MonthlyTarget = { month: number; target: number };
 
-// Legacy due-state-shaped status, dual-read alongside workflowStatus/dueState
-// until Task 16/61 retires it (spec §6.1, §6.6). Every consumer still
-// reading `.status` directly is inventoried in
-// .superpowers/sdd/sales-task-control-loop-task-2-report.md.
-export type TaskStatus = "Today" | "Overdue" | "Upcoming" | "Done";
-
 // Workflow status the user chooses (Sales Task Control Loop spec §2.1) --
 // never derived from a date, unlike TaskDueState below.
 export type TaskWorkflowStatus =
@@ -209,7 +203,6 @@ export type Task = {
   title: string;
   dueDate: string;
   method: "Phone" | "Email" | "Visit" | "WhatsApp" | "Meeting";
-  status: TaskStatus;
   workflowStatus: TaskWorkflowStatus;
   dueState: TaskDueState;
   calendarIncomplete: boolean;

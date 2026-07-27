@@ -45,7 +45,9 @@ describe("public.compute_task_due_state fixture equivalence (DB side)", () => {
         if (error) throw error;
         const row = data![0];
         expect(row.due_state).toBe(fixture.expected.dueState);
-        expect(row.calendar_incomplete).toBe(fixture.expected.calendarIncomplete);
+        expect(row.calendar_incomplete).toBe(
+          fixture.expected.calendarIncomplete,
+        );
       } finally {
         if (fixture.holidays.length > 0) {
           await adminClient

@@ -1,0 +1,49 @@
+{
+  "runId": 1785162449127,
+  "steps": [
+    {
+      "step": "sales_create_task",
+      "title": "Task17 Browser Sales Retry 1785162449127"
+    },
+    {
+      "step": "sales_record_progress",
+      "title": "Task17 Browser Sales Retry 1785162449127"
+    },
+    {
+      "step": "sales_archive_task",
+      "title": "Task17 Browser Sales Retry 1785162449127"
+    },
+    {
+      "step": "sales_restore_task",
+      "title": "Task17 Browser Sales Retry 1785162449127"
+    },
+    {
+      "step": "manager_team_exception_before_holiday",
+      "visible": true
+    },
+    {
+      "step": "manager_team_exception_after_holiday",
+      "visible": false
+    },
+    {
+      "step": "executive_read_only",
+      "h1": "Executive Exceptions",
+      "createVisible": false
+    },
+    {
+      "step": "super_admin_correction",
+      "task": "Task17 Browser Sales Retry 1785162449127"
+    }
+  ],
+  "console": [],
+  "failedRequests": [],
+  "screenshots": [
+    "/Users/macbook/Library/CloudStorage/GoogleDrive-adhitya.wirambara@gmail.com/My Drive/Project/DSM SALES CRM/.superpowers/sdd/browser-evidence-task-17-final/01-sales-progress-drawer.png",
+    "/Users/macbook/Library/CloudStorage/GoogleDrive-adhitya.wirambara@gmail.com/My Drive/Project/DSM SALES CRM/.superpowers/sdd/browser-evidence-task-17-final/02-sales-archived-task.png",
+    "/Users/macbook/Library/CloudStorage/GoogleDrive-adhitya.wirambara@gmail.com/My Drive/Project/DSM SALES CRM/.superpowers/sdd/browser-evidence-task-17-final/03-manager-failure-page.png",
+    "/Users/macbook/Library/CloudStorage/GoogleDrive-adhitya.wirambara@gmail.com/My Drive/Project/DSM SALES CRM/.superpowers/sdd/browser-evidence-task-17-final/04-manager-team-exception-before-holiday.png",
+    "/Users/macbook/Library/CloudStorage/GoogleDrive-adhitya.wirambara@gmail.com/My Drive/Project/DSM SALES CRM/.superpowers/sdd/browser-evidence-task-17-final/05-manager-team-exception-after-holiday.png",
+    "/Users/macbook/Library/CloudStorage/GoogleDrive-adhitya.wirambara@gmail.com/My Drive/Project/DSM SALES CRM/.superpowers/sdd/browser-evidence-task-17-final/06-executive-exceptions-readonly.png",
+    "/Users/macbook/Library/CloudStorage/GoogleDrive-adhitya.wirambara@gmail.com/My Drive/Project/DSM SALES CRM/.superpowers/sdd/browser-evidence-task-17-final/07-super-admin-correction.png"
+  ]
+}

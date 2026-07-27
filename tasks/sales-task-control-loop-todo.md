@@ -165,14 +165,38 @@ Product direction: `docs/ideas/sales-task-control-loop.md`
 
 ## Phase 5 — Cutover, Verification, and Release
 
-- [ ] Task 16: Reconcile existing data and retire the legacy status contract
-- [ ] Task 17: Run complete local verification and reconcile documentation
-- [ ] Task 18: Release through an explicit remote gate
+- [x] Task 16: Reconcile existing data and retire the legacy status contract —
+      done 2026-07-27; see
+      `.superpowers/sdd/sales-task-control-loop-task-16-report.md`.
+      Local migration audit passed with zero unexplained mismatches, the
+      legacy `tasks.status` column and `task_status` enum are retired, and
+      active code/test consumers now use `workflowStatus` + `dueState`.
+- [x] Task 17: Run complete local verification and reconcile documentation —
+      done locally 2026-07-27; see
+      `.superpowers/sdd/sales-task-control-loop-task-17-report.md`. Clean
+      local reset, migration audit, full tests, typecheck, lint, build,
+      advisors, and browser UAT passed. `supabase db lint --local` still
+      reports existing baseline commercial-function findings, disclosed in the
+      Task 17 report.
+- [ ] Task 18: Release through an explicit remote gate — prepared as a NO-GO
+      release gate 2026-07-27; see
+      `.superpowers/sdd/sales-task-control-loop-task-18-release-gate.md`.
+      Read-only linked migration comparison found pending remote migrations
+      `20260727141303`, `20260727160000`, and `20260727160010`; dry-run did
+      not complete in this session; exact owner approval is still required
+      before any Git push, Supabase mutation, deployment, or production smoke
+      test.
 
 ### Checkpoint D — Complete
 
-- [ ] Existing Task migration has zero unexplained mismatches
-- [ ] Full tests, typecheck, lint, build, advisors, and browser UAT pass
-- [ ] Documentation reflects verified as-built behavior
-- [ ] Git, Supabase remote, deployment, and browser verification are reported
-      separately
+- [x] Existing Task migration has zero unexplained mismatches — verified by
+      `docs/reports/sales-task-control-loop-migration.json` after local reset
+      on 2026-07-27.
+- [x] Full tests, typecheck, lint, build, advisors, and browser UAT pass —
+      verified locally in Task 17. `supabase db lint --local` baseline findings
+      remain disclosed separately from the clean `db advisors` result.
+- [x] Documentation reflects verified as-built behavior — Task 17 report and
+      handoff updated 2026-07-27.
+- [x] Git, Supabase remote, deployment, and browser verification are reported
+      separately — no remote mutation, deployment, commit, or push occurred in
+      Task 17.

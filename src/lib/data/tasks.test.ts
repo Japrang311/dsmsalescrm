@@ -12,10 +12,10 @@ import {
 import {
   listTasks,
   getTaskControlLoopMetrics,
-  updateTaskStatus,
   updateTask,
   createTask,
 } from "./tasks";
+import { recordTaskProgress } from "./task-progress";
 import { supabase } from "@/lib/supabase";
 
 let fixtures: RoleFixtureUsers;
@@ -46,6 +46,8 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  await adminClient.from("activity_log").delete().eq("task_id", taskId);
+  await adminClient.from("follow_up_logs").delete().eq("task_id", taskId);
   await adminClient.from("tasks").delete().eq("id", taskId);
   await deleteRoleFixtureUsers(fixtures);
 });
@@ -125,7 +127,7 @@ describe("src/lib/data/tasks.ts", () => {
     await supabase.auth.signOut();
   });
 
-  test("updateTaskStatus() persists a real status change", async () => {
+  test("recordTaskProgress() persists a real workflow status change", async () => {
     const fixtureClient = await signInAs(fixtures.sales);
     const session = (await fixtureClient.auth.getSession()).data.session!;
     await supabase.auth.setSession({
@@ -133,15 +135,29 @@ describe("src/lib/data/tasks.ts", () => {
       refresh_token: session.refresh_token,
     });
 
-    const updated = await updateTaskStatus(taskId, "Done");
-    expect(updated.status).toBe("Done");
+    const updated = await recordTaskProgress({
+      taskId,
+      nextAction: null,
+      nextActionDate: null,
+      workflowStatusTarget: "Done",
+    });
+    expect(updated.workflowStatus).toBe("Done");
 
     const { data: fromDb } = await adminClient
       .from("tasks")
-      .select("status")
+      .select("workflow_status")
       .eq("id", taskId)
       .single();
-    expect(fromDb?.status).toBe("Done");
+    expect(fromDb?.workflow_status).toBe("Done");
+
+    await adminClient
+      .from("tasks")
+      .update({
+        workflow_status: "Open",
+        next_action: "Continue test fixture",
+        next_action_date: "2026-08-01",
+      })
+      .eq("id", taskId);
 
     await supabase.auth.signOut();
   });
@@ -190,20 +206,7 @@ describe("src/lib/data/tasks.ts", () => {
     await supabase.auth.signOut();
   });
 
-  // Characterization test (Sales Task Control Loop Task 2 / project-tracker
-  // Task 47) — locks in CURRENT legacy behavior before Task 3/4 introduce a
-  // derived due state. TaskStatus today is "Today" | "Overdue" | "Upcoming" |
-  // "Done" (src/lib/domain.ts) — one stored enum mixing workflow state (Done)
-  // with due-date proximity (Today/Overdue/Upcoming). createTask() always
-  // defaults status to "Upcoming" (src/lib/data/tasks.ts:110) regardless of
-  // dueDate, and nothing recomputes it later — a task created with a due
-  // date in the past stays "Upcoming" forever unless a human explicitly
-  // changes it (see src/routes/_app.tasks.tsx's bucketFor(), which computes
-  // its own client-side due bucket from dueDate and ignores stored status
-  // for that purpose). This is the exact gap Task 4's derived due-state
-  // algorithm replaces — do not "fix" this test when it starts failing
-  // post-Task-4; update it to assert the new derived behavior instead.
-  test("createTask() defaults status to Upcoming even when dueDate is already in the past (status is not date-derived)", async () => {
+  test("createTask() returns workflow status and derived due state without legacy status", async () => {
     const fixtureClient = await signInAs(fixtures.sales);
     const session = (await fixtureClient.auth.getSession()).data.session!;
     await supabase.auth.setSession({
@@ -228,14 +231,15 @@ describe("src/lib/data/tasks.ts", () => {
         priority: "Normal",
       });
       createdId = created.id;
-      expect(created.status).toBe("Upcoming");
+      expect(created.workflowStatus).toBe("Open");
+      expect(["Overdue", "Escalated"]).toContain(created.dueState ?? "");
 
       const { data: fromDb } = await adminClient
         .from("tasks")
-        .select("status")
+        .select("workflow_status")
         .eq("id", created.id)
         .single();
-      expect(fromDb?.status).toBe("Upcoming");
+      expect(fromDb?.workflow_status).toBe("Open");
     } finally {
       if (createdId) {
         await adminClient.from("tasks").delete().eq("id", createdId);

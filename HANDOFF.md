@@ -145,8 +145,50 @@ the four Task Control Loop migrations already present on the linked remote.
   update `public.commercial_documents`, not the retired `public.commercial_items`
   table. Checkpoint C is now locally complete. See
   `.superpowers/sdd/sales-task-control-loop-task-15-report.md`.
-- **Not started**: Task 61/16 onward (existing-data cutover, final release
-  gate).
+- **Task 61/16**: existing-data cutover and legacy Task status retirement done
+  locally. New migrations `20260727160000_backfill_task_control_loop.sql` and
+  `20260727160010_retire_legacy_task_status.sql` create a private
+  machine-readable audit row, replace `record_task_progress()` without the old
+  dual-write, then drop `public.tasks.status` and `public.task_status`. The
+  generated report is
+  `docs/reports/sales-task-control-loop-migration.json` plus the Markdown
+  companion; it passed with zero unexplained mismatches on the local seeded DB.
+  Active app/test code now uses `workflowStatus` + derived `dueState`; the
+  unused legacy `LogFollowUpDialog` component was removed. See
+  `.superpowers/sdd/sales-task-control-loop-task-16-report.md`.
+- **Task 62/17**: complete local verification and documentation reconciliation
+  done locally. See
+  `.superpowers/sdd/sales-task-control-loop-task-17-report.md`. Fresh local
+  reset, migration audit, full `bun test` (458 pass, 0 fail),
+  `bunx tsc --noEmit`, `bun run lint` (0 errors, 12 existing warnings),
+  `bun run build`, and `supabase db advisors --local` all pass. `bun run lint`
+  was stabilized by targeting source/config paths instead of scanning generated
+  artifacts from the repo root. One stale Phase 11 test fixture was fixed after
+  Task 16 removed `public.tasks.status`; Task Control Loop calendar functions
+  were hardened with an explicit empty `search_path`. `supabase db lint --local`
+  still exits 0 but reports existing baseline findings in commercial migration/
+  import functions and `reassign_client_owner`. Browser UAT evidence in
+  `.superpowers/sdd/browser-evidence-task-17-final/` covers Sales
+  create/progress/archive/restore, Manager Team Exceptions before and after a
+  local holiday correction, Executive read-only Exceptions, and Super Admin
+  correction through `/login`; summary recorded no console warnings/errors and
+  no failed requests. No remote mutation, deployment, commit, or push occurred.
+- **Task 63/18 prepared but NO-GO for execution**: release-gate dossier created
+  at `.superpowers/sdd/sales-task-control-loop-task-18-release-gate.md`.
+  Read-only linked migration comparison targets Supabase project
+  `qhtfixgbcpcitokeryxb` / `DSM Sales Web App V2`. Remote has Task Control
+  Loop migrations through `20260727150000` except local-only
+  `20260727141303_harden_task_calendar_function_search_path.sql`; remote is
+  also missing `20260727160000_backfill_task_control_loop.sql` and
+  `20260727160010_retire_legacy_task_status.sql`. `supabase db push --linked
+  --dry-run` did not emit a plan after about 90 seconds and was stopped
+  (`exit 130`), so do not treat dry-run as reviewed. Working tree is dirty and
+  there are no local commits ahead of `origin/main`; Git push/deploy is not
+  ready until a reviewed release commit exists. No remote mutation, deployment,
+  commit, push, or production browser check occurred. Exact owner approval is
+  still required before any execution.
+- **Not started for execution**: Task 63/18 remote apply/deploy/smoke-check
+  actions.
 - Verification recorded through Task 9: full local suite **439 pass, 0 fail**
   (58 files), plus a focused 34-test suite across `business-calendar`,
   `task-exceptions`, `tasks`, `task-progress`, and `activity-log`;

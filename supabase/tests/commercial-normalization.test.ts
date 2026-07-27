@@ -169,11 +169,11 @@ describe("Phase 11 legacy commercial normalization", () => {
       await db`
         insert into public.tasks (
           id, client_id, owner_id, commercial_item_id, title, due_date,
-          method, status, priority
+          method, workflow_status, priority
         ) values (
           ${taskId}, ${CLIENT_ID}, ${OWNER_ID}, ${commercialIds[0]},
           ${`Normalization task ${marker}`}, '2026-07-20', 'Email',
-          'Upcoming', 'Normal'
+          'Open', 'Normal'
         )
       `;
 

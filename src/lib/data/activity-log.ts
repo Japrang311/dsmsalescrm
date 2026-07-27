@@ -369,7 +369,8 @@ export async function listTaskTimeline(
   const entries: TaskTimelineEntry[] = followUps.map((row) => {
     const pairedActivity = activity.find(
       (candidate) =>
-        !pairedActivityIds.has(candidate.id) && sameProgressEvent(row, candidate),
+        !pairedActivityIds.has(candidate.id) &&
+        sameProgressEvent(row, candidate),
     );
     if (pairedActivity) pairedActivityIds.add(pairedActivity.id);
     const actor = actorsById.get(pairedActivity?.actor_id ?? row.owner_id);

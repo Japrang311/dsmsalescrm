@@ -43,7 +43,6 @@ function task(id: string, ownerId: string, patch: Partial<Task> = {}): Task {
     title: id,
     dueDate: "2026-07-27",
     method: "Phone",
-    status: "Upcoming",
     workflowStatus: "Open",
     dueState: "Upcoming",
     calendarIncomplete: false,
@@ -128,17 +127,14 @@ describe("report selectors", () => {
       ],
       [
         task("manager-personal-open", "manager-1", {
-          status: "Done",
           workflowStatus: "Open",
           dueState: "Escalated",
         }),
-        task("manager-done-stale-overdue", "manager-1", {
-          status: "Overdue",
+        task("manager-done", "manager-1", {
           workflowStatus: "Done",
           dueState: null,
         }),
         task("sales-overdue", "sales-1", {
-          status: "Upcoming",
           dueState: "Overdue",
         }),
         task("archived-escalated", "sales-1", {

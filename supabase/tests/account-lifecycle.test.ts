@@ -224,7 +224,6 @@ beforeAll(async () => {
     title: "Task 4 open task",
     due_date: "2026-07-19",
     method: "Email",
-    status: "Upcoming",
     workflow_status: "In Progress",
     archived: false,
   });
@@ -234,7 +233,6 @@ beforeAll(async () => {
     title: "Task 4 completed task",
     due_date: "2026-07-18",
     method: "Email",
-    status: "Done",
     workflow_status: "Done",
     archived: false,
   });
@@ -244,7 +242,6 @@ beforeAll(async () => {
     title: "Task 4 cancelled task",
     due_date: "2026-07-18",
     method: "Email",
-    status: "Upcoming",
     workflow_status: "Cancelled",
     cancellation_reason: "Task 15 transfer exclusion fixture",
     archived: false,
@@ -255,7 +252,6 @@ beforeAll(async () => {
     title: "Task 4 archived task",
     due_date: "2026-07-17",
     method: "Email",
-    status: "Upcoming",
     workflow_status: "Open",
     archived: true,
   });

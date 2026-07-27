@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/select";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import type { TaskCategory, TaskStatus } from "@/lib/domain";
+import type { TaskCategory } from "@/lib/domain";
 import { NOW } from "@/lib/domain";
 import type { Role } from "@/lib/domain";
 import { listClients, listSalesTeamProfiles } from "@/lib/data/clients";
@@ -67,17 +67,6 @@ const schema = z.object({
 });
 
 type FormValues = z.infer<typeof schema>;
-
-function startOfDay(d: Date) {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-}
-function statusFor(dueISO: string): TaskStatus {
-  const due = startOfDay(new Date(dueISO));
-  const today = startOfDay(NOW);
-  if (due < today) return "Overdue";
-  if (due === today) return "Today";
-  return "Upcoming";
-}
 
 export function CreateTaskDialog({
   role,
@@ -161,7 +150,6 @@ export function CreateTaskDialog({
         priority: v.priority,
         category: v.category,
         dueDate: v.dueDate,
-        status: statusFor(v.dueDate),
       });
       const actorId = await getCurrentActorId();
       if (actorId) {

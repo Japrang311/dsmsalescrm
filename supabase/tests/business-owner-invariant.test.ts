@@ -138,7 +138,6 @@ describe("active business-owner database invariant", () => {
           title: "Invalid owner task",
           due_date: "2026-07-19",
           method: "Email",
-          status: "Upcoming",
         },
       ],
       [

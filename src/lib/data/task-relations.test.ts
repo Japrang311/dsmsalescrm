@@ -14,7 +14,6 @@ const baseTask: Task = {
   title: "Base",
   dueDate: "2026-07-27",
   method: "Phone",
-  status: "Upcoming",
   workflowStatus: "Open",
   dueState: "Today",
   calendarIncomplete: false,

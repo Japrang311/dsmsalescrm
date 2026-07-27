@@ -88,7 +88,6 @@ describe("dashboard export data", () => {
           title: "Follow up proposal",
           dueDate: "2026-07-17",
           method: "WhatsApp",
-          status: "Upcoming",
           workflowStatus: "In Progress",
           dueState: "Escalated",
           calendarIncomplete: false,

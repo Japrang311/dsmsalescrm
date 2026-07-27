@@ -88,7 +88,7 @@ describe("tasks RLS", () => {
 
     const { data: updated, error: updateError } = await client
       .from("tasks")
-      .update({ status: "Done" })
+      .update({ title: "Executive should not update this task" })
       .eq("id", taskIds.other)
       .select("id");
     if (updateError) throw updateError;
@@ -101,14 +101,14 @@ describe("tasks RLS", () => {
     const client = await signInAs(fixtures.sales);
     const { data, error } = await client
       .from("tasks")
-      .update({ status: "Done" })
+      .update({ title: "Sales should not update another owner task" })
       .eq("id", taskIds.other)
       .select("id");
     if (error) throw error;
     expect(data).toHaveLength(0);
   });
 
-  test("no role can delete a task (status-based, not hard delete)", async () => {
+  test("no role can delete a task (archive/workflow-based, not hard delete)", async () => {
     const client = await signInAs(fixtures.manager);
     const { error, count } = await client
       .from("tasks")

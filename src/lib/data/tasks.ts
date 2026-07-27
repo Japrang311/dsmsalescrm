@@ -1,10 +1,5 @@
 import { supabase } from "@/lib/supabase";
-import type {
-  Task,
-  TaskStatus,
-  TaskWorkflowStatus,
-  TaskCategory,
-} from "@/lib/domain";
+import type { Task, TaskWorkflowStatus, TaskCategory } from "@/lib/domain";
 import {
   computeTaskDueState,
   listBusinessCalendarHolidays,
@@ -20,7 +15,6 @@ type TaskRow = {
   title: string;
   due_date: string;
   method: Task["method"];
-  status: TaskStatus;
   workflow_status: TaskWorkflowStatus;
   category: TaskCategory;
   next_action: string | null;
@@ -77,7 +71,6 @@ function toTask(
     title: row.title,
     dueDate: row.due_date,
     method: row.method,
-    status: row.status,
     workflowStatus: row.workflow_status,
     dueState,
     calendarIncomplete,
@@ -124,18 +117,10 @@ export async function getTaskControlLoopMetrics(): Promise<TaskControlLoopMetric
   };
 }
 
-export async function updateTaskStatus(
-  id: string,
-  status: TaskStatus,
-): Promise<Task> {
-  return updateTask(id, { status });
-}
-
 export type TaskPatch = Partial<{
   title: string;
   dueDate: string;
   method: Task["method"];
-  status: TaskStatus;
   category: TaskCategory;
   priority: Task["priority"];
   ownerId: string;
@@ -154,7 +139,6 @@ export async function updateTask(id: string, patch: TaskPatch): Promise<Task> {
   if (patch.title !== undefined) update.title = patch.title;
   if (patch.dueDate !== undefined) update.due_date = patch.dueDate;
   if (patch.method !== undefined) update.method = patch.method;
-  if (patch.status !== undefined) update.status = patch.status;
   if (patch.category !== undefined) update.category = patch.category;
   if (patch.priority !== undefined) update.priority = patch.priority;
   if (patch.ownerId !== undefined) update.owner_id = patch.ownerId;
@@ -185,7 +169,6 @@ export async function createTask(input: {
   dueDate: string;
   method: Task["method"];
   priority: Task["priority"];
-  status?: TaskStatus;
   category?: TaskCategory;
 }): Promise<Task> {
   const [{ data, error }, holidays] = await Promise.all([
@@ -200,7 +183,6 @@ export async function createTask(input: {
         due_date: input.dueDate,
         method: input.method,
         priority: input.priority,
-        status: input.status ?? "Upcoming",
         ...(input.category !== undefined ? { category: input.category } : {}),
       })
       .select("*")
