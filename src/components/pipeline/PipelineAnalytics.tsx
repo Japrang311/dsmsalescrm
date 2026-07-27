@@ -144,7 +144,13 @@ export function PipelineAnalytics({
           label="Win rate"
           value={`${totals.winRate.toFixed(1)}%`}
           sub={`${totals.wonCount} won · ${totals.lostCount} lost`}
-          tone={totals.winRate >= 50 ? "success" : "warning"}
+          tone={
+            totals.wonCount + totals.lostCount === 0
+              ? "default"
+              : totals.winRate >= 50
+                ? "success"
+                : "warning"
+          }
         />
       </div>
 

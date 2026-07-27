@@ -10,6 +10,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { Info } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CURRENT_MONTH } from "@/lib/domain";
@@ -287,6 +288,12 @@ export function MonthlyAchievementVsTargetChart({ role }: { role: Role }) {
           })}
           ).
         </p>
+        {data.length > 0 && !data.some((d) => d.revenue > 0) && (
+          <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+            <Info className="h-3 w-3" /> Belum ada capaian tercatat pada rentang
+            ini.
+          </p>
+        )}
       </CardHeader>
       <CardContent className={chartCardContent}>
         <div className="w-full" style={{ height: cfg.height }}>
@@ -491,6 +498,12 @@ export function TargetAllSalesChart() {
           Perbandingan capaian setiap sales terhadap target akumulatif hingga
           bulan berjalan.
         </p>
+        {data.length > 0 && !data.some((d) => d.achievement > 0) && (
+          <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+            <Info className="h-3 w-3" /> Belum ada capaian tercatat pada rentang
+            ini.
+          </p>
+        )}
       </CardHeader>
       <CardContent className={chartCardContent}>
         <div className="w-full" style={{ height: mobileHeight }}>

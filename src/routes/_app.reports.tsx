@@ -501,6 +501,13 @@ function ReportsPage() {
             <p className="text-[11px] text-muted-foreground">
               Akumulasi bulanan (kumulatif) untuk tahun {CURRENT_YEAR}.
             </p>
+            {cumulativeTrend.length > 0 &&
+              !cumulativeTrend.some((d) => d.achievement > 0) && (
+                <p className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground">
+                  <Info className="h-3 w-3" /> Belum ada capaian tercatat pada
+                  rentang ini.
+                </p>
+              )}
           </CardHeader>
           <CardContent className="h-[280px] px-2 pb-3">
             {cumulativeTrend.length === 0 ? (
@@ -552,6 +559,13 @@ function ReportsPage() {
             <p className="text-[11px] text-muted-foreground">
               Perbandingan revenue per bulan terhadap target bulanan.
             </p>
+            {monthlyTrend.length > 0 &&
+              !monthlyTrend.some((d) => d.revenue > 0) && (
+                <p className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground">
+                  <Info className="h-3 w-3" /> Belum ada capaian tercatat pada
+                  rentang ini.
+                </p>
+              )}
           </CardHeader>
           <CardContent className="h-[280px] px-2 pb-3">
             {monthlyTrend.length === 0 ? (

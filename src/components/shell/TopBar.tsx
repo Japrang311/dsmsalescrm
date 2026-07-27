@@ -259,6 +259,7 @@ function MobileSearch() {
         size="icon"
         className="h-9 w-9 md:hidden"
         aria-label="Cari"
+        title="Cari"
         onClick={() => setOpen(true)}
       >
         <Search className="h-4 w-4" />
@@ -425,6 +426,7 @@ export function TopBar() {
                   size="sm"
                   className="h-9 gap-1.5"
                   aria-label="Quick Create"
+                  title="Quick Create"
                 >
                   <Plus className="h-4 w-4" />
                   <span className="hidden sm:inline">Quick Create</span>

@@ -5,6 +5,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Eye,
+  Info,
   MoreHorizontal,
   Package,
   PhoneCall,
@@ -139,7 +140,15 @@ export function ClientsTable({
                 active={sortKey === "active"}
                 align="right"
               />
-              <th className={cn("font-medium", cellPad)}>Risk</th>
+              <th
+                className={cn("font-medium", cellPad)}
+                title="Indikator risiko klien — belum dihitung untuk klien hasil import/legacy."
+              >
+                <span className="inline-flex items-center gap-1">
+                  Risk
+                  <Info className="h-3 w-3 text-muted-foreground/60" />
+                </span>
+              </th>
               <th className={cn("w-10", cellPad)} />
             </tr>
           </thead>
