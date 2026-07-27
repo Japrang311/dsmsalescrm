@@ -1,6 +1,6 @@
 # Handoff — DSM Sales Web App V2
 
-Context dump for continuing this work in another tool (Codex). Written 2026-07-18; Phase 11/12 status refreshed 2026-07-19; Phase 11 import-review reconciliation session added 2026-07-19; post-import UX/bugfix session added 2026-07-20; second 2026-07-20 session (pipeline permissions/FK bugfixes) added 2026-07-20; Client Detail/Client List real-data wiring session added 2026-07-21; remote-migration-push + data-restoration session added 2026-07-21; browser-verification + spending_ytd fix + SO edit audit trail session added 2026-07-21; unused-code cleanup + client database (company info/contacts) feature session added 2026-07-22; contact position + Client Detail product/description fixes + commercial item product-name migration reconciliation added 2026-07-22; dynamic per-month sales target UI/calculation update added 2026-07-22; soft-delete implementation, remote Supabase apply, and main/live push closeout added 2026-07-24; RFQ retirement and documentation refresh added 2026-07-25; Sales Task Control Loop spec approval and Phase 1-2 implementation (Tasks 46-52) added 2026-07-27; unified progress timeline Task 53/8 and Manager Team Exceptions Task 54/9 added 2026-07-27.
+Context dump for continuing this work in another tool (Codex). Written 2026-07-18; Phase 11/12 status refreshed 2026-07-19; Phase 11 import-review reconciliation session added 2026-07-19; post-import UX/bugfix session added 2026-07-20; second 2026-07-20 session (pipeline permissions/FK bugfixes) added 2026-07-20; Client Detail/Client List real-data wiring session added 2026-07-21; remote-migration-push + data-restoration session added 2026-07-21; browser-verification + spending_ytd fix + SO edit audit trail session added 2026-07-21; unused-code cleanup + client database (company info/contacts) feature session added 2026-07-22; contact position + Client Detail product/description fixes + commercial item product-name migration reconciliation added 2026-07-22; dynamic per-month sales target UI/calculation update added 2026-07-22; soft-delete implementation, remote Supabase apply, and main/live push closeout added 2026-07-24; RFQ retirement and documentation refresh added 2026-07-25; Sales Task Control Loop spec approval and Phase 1-2 implementation (Tasks 46-52) added 2026-07-27; unified progress timeline Task 53/8 and Manager Team Exceptions Task 54/9 added 2026-07-27; visual design audit Phase 1 (critical usability/responsiveness fixes) added 2026-07-27.
 
 ## HANDOFF TO CODEX — read this first (2026-07-27)
 
@@ -116,6 +116,71 @@ has not been touched.
   task in turn (Tasks 1-9 were granted/continued locally in order) — the same
   pattern should hold for Task 55/10 onward: don't assume continuation is
   pre-approved just because Tasks 1-9 were.
+
+### Visual design audit, Phase 1 — critical usability/responsiveness fixes (2026-07-27, committed as `b10fb151` + a same-day follow-up commit)
+
+- A `/design-audit`-style pass walked all 10 routes (desktop 1440px and
+  mobile ~390px, logged in as `adhitya@local.dsm.test`/Sales Manager) and
+  produced a phased findings list. Only Phase 1 (critical) was approved and
+  implemented; Phase 2 (spacing/typography/color/consistency) and Phase 3
+  (empty/loading states, dark mode, micro-polish) are documented but not
+  built — see the full findings list earlier in this same session's chat
+  transcript if resuming this work, since it isn't duplicated here.
+- **`TaskDetailDrawer.tsx`**: the "Detail Task" and "Catat Progress"
+  sections save independently by design (Detail via `updateTask()`,
+  Progress via the atomic `recordTaskProgress()` RPC — see Task 50/51
+  above; this is intentional, not a bug, so it was *not* merged into one
+  form). Each section is now wrapped in its own bordered card, and shows
+  an inline "Ada perubahan belum disimpan" (amber, `text-warning` token)
+  indicator scoped to whichever section actually has unsaved edits, so a
+  user editing both sections can't silently lose one half by clicking only
+  one Simpan button.
+- **`_app.settings.tsx`** (Target tab): monthly target inputs were
+  rendering as `84px` columns, clipping real 9-digit raw-Rupiah values
+  (e.g. `750000000`) by a character. Widened to `140px` (table
+  `min-w-[1560px]` → `min-w-[2100px]`). Also added a `relative` wrapper +
+  right-edge fade-gradient overlay (`pointer-events-none`, `to-card`) so
+  the table visibly hints there's more to scroll to horizontally, instead
+  of just cutting off with no affordance.
+- **`_app.pipeline.tsx`**: same right-edge fade-gradient treatment added
+  to the Commercial Pipeline kanban board (`to-background`), which has 6
+  stage columns and regularly overflows the viewport on both desktop and
+  mobile. Note: the board's *mobile* behavior itself was re-verified live
+  via `window.innerWidth`/`getBoundingClientRect()` and found to already
+  be a correctly-functioning horizontal-scroll flex row (fixed 280px
+  columns) — an earlier read of it as a broken 2-column grid was a
+  viewport-measurement artifact (the devtools resize call silently didn't
+  apply on a freshly-opened tab; `emulate({viewport: ...})` was the
+  reliable way to force a true mobile width). No board-layout change was
+  needed beyond the fade.
+- **`_app.clients.$clientId.tsx`**: the six-tab `TabsList` used
+  `flex-wrap` without overriding the base `TabsList` component's fixed
+  `h-9`, so on mobile the wrapped second row of tabs visually overlapped
+  the KPI cards rendered immediately below instead of pushing them down.
+  Changed to a horizontally-scrolling single row (`overflow-x-auto`,
+  `shrink-0` per trigger) instead of wrapping.
+- **`shell/TopBar.tsx`**: the Quick Create button's visible label
+  (`<span className="hidden sm:inline">Quick Create</span>`) is hidden
+  below the `sm` breakpoint with no `aria-label` fallback, so on mobile it
+  was an icon-only button with an empty accessible name (confirmed via
+  the a11y tree, not just visually). Added `aria-label="Quick Create"` to
+  the button. Note this was originally misdiagnosed as a Search-button
+  labeling issue; direct DOM inspection (`button.ariaLabel`/`textContent`
+  per header button) showed the real culprit was Quick Create, and that
+  global search has no mobile entry point at all — `GlobalSearch`'s whole
+  wrapper is `hidden md:block`, not collapsed-with-a-trigger. That's a
+  bigger interaction-design gap (needs a real mobile search surface, not
+  a style fix) and was deliberately left unaddressed pending an explicit
+  decision, per the audit's scope-discipline rule (flag functional gaps,
+  don't silently build new UI for them).
+- Verification: `bunx tsc --noEmit` clean; `bunx eslint` on the five
+  touched files clean (one pre-existing, unrelated
+  `react-hooks/exhaustive-deps` warning in `TaskDetailDrawer.tsx`); all
+  fixes re-screenshotted live in-browser after `prettier --write`
+  reformatted the touched files (mechanical only, no visual change). Full
+  `bun run lint` was not used for the same reason noted in the Task 55/10
+  entry above (multi-minute hang with no output on this repo) —
+  file-scoped `eslint` was used as the effective gate instead.
 
 ## HANDOFF TO CODEX — read this first (2026-07-25)
 
