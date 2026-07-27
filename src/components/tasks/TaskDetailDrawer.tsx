@@ -145,7 +145,9 @@ export function TaskDetailDrawer({
     // any other workflowStatus so a fresh cancellation isn't pre-filled
     // with unrelated old text.
     setCancellationReason(
-      task.workflowStatus === "Cancelled" ? (task.cancellationReason ?? "") : "",
+      task.workflowStatus === "Cancelled"
+        ? (task.cancellationReason ?? "")
+        : "",
     );
     setProgressNote("");
   }, [task?.id, open]);

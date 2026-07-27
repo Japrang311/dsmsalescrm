@@ -304,7 +304,7 @@ export function TopBar() {
       <div className="ml-auto flex items-center gap-1.5 md:gap-2">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button size="sm" className="h-9 gap-1.5">
+            <Button size="sm" className="h-9 gap-1.5" aria-label="Quick Create">
               <Plus className="h-4 w-4" />
               <span className="hidden sm:inline">Quick Create</span>
             </Button>

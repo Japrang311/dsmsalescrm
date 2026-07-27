@@ -1163,50 +1163,52 @@ function TargetsTab({
               viewports, and overflow-x-auto alone gives no visible hint
               that there's more to scroll to on the right. */}
           <div className="relative">
-          <div className="overflow-x-auto rounded-md border border-border">
-            <Table className="min-w-[1560px]">
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[180px]">Sales</TableHead>
-                  {TARGET_MONTHS.map(({ month, label }) => (
-                    <TableHead key={month} className="w-[104px] text-right">
-                      {label}
-                    </TableHead>
-                  ))}
-                  <TableHead className="w-[130px] text-right">Total</TableHead>
-                  <TableHead className="w-[96px] text-right">Aksi</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {team.length === 0 && (
+            <div className="overflow-x-auto rounded-md border border-border">
+              <Table className="min-w-[2100px]">
+                <TableHeader>
                   <TableRow>
-                    <TableCell
-                      colSpan={15}
-                      className="py-8 text-center text-sm text-muted-foreground"
-                    >
-                      Belum ada sales.
-                    </TableCell>
+                    <TableHead className="w-[180px]">Sales</TableHead>
+                    {TARGET_MONTHS.map(({ month, label }) => (
+                      <TableHead key={month} className="w-[140px] text-right">
+                        {label}
+                      </TableHead>
+                    ))}
+                    <TableHead className="w-[130px] text-right">
+                      Total
+                    </TableHead>
+                    <TableHead className="w-[96px] text-right">Aksi</TableHead>
                   </TableRow>
-                )}
-                {team.map((m) => {
-                  const values = targetValuesForMember(targetsByMember, m.id);
-                  return (
-                    <TargetRow
-                      key={`${m.id}:${values.join(",")}`}
-                      member={m}
-                      values={values}
-                      canEdit={canEdit}
-                      onSaved={onSaved}
-                    />
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-y-0 right-0 w-10 rounded-r-md bg-gradient-to-l from-card to-transparent"
-          />
+                </TableHeader>
+                <TableBody>
+                  {team.length === 0 && (
+                    <TableRow>
+                      <TableCell
+                        colSpan={15}
+                        className="py-8 text-center text-sm text-muted-foreground"
+                      >
+                        Belum ada sales.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {team.map((m) => {
+                    const values = targetValuesForMember(targetsByMember, m.id);
+                    return (
+                      <TargetRow
+                        key={`${m.id}:${values.join(",")}`}
+                        member={m}
+                        values={values}
+                        canEdit={canEdit}
+                        onSaved={onSaved}
+                      />
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-y-0 right-0 w-10 rounded-r-md bg-gradient-to-l from-card to-transparent"
+            />
           </div>
         </CardContent>
       </Card>

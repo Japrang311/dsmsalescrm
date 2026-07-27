@@ -452,157 +452,157 @@ function PipelineBoard({ role }: { role: Role }) {
       <div className="relative">
         <div className="flex gap-3 overflow-x-auto pb-3">
           {STAGES.map((stage) => {
-          const col = grouped.get(stage) ?? [];
-          const sum = col.reduce((s, it) => s + it.estimatedValue, 0);
-          const isDropTarget = dragOverStage === stage && draggingId !== null;
-          return (
-            <div
-              key={stage}
-              onDragOver={(e) => {
-                if (!canDrag || !draggingId) return;
-                e.preventDefault();
-                e.dataTransfer.dropEffect = "move";
-                if (dragOverStage !== stage) setDragOverStage(stage);
-              }}
-              onDragLeave={(e) => {
-                if (e.currentTarget.contains(e.relatedTarget as Node)) return;
-                if (dragOverStage === stage) setDragOverStage(null);
-              }}
-              onDrop={(e) => {
-                if (!canDrag) return;
-                e.preventDefault();
-                handleDrop(stage);
-              }}
-              className={cn(
-                "flex w-[280px] shrink-0 flex-col rounded-lg border bg-muted/30 transition-colors",
-                isDropTarget &&
-                  "border-primary bg-primary-soft/60 ring-2 ring-primary/30",
-              )}
-            >
-              <div className="flex items-center justify-between border-b bg-card px-3 py-2 rounded-t-lg">
-                <div className="min-w-0">
-                  <p className="truncate text-xs font-semibold uppercase tracking-wide text-foreground">
-                    {stage}
-                  </p>
-                  <p className="text-[11px] text-muted-foreground tabular-nums">
-                    {col.length} · {formatRupiahShort(sum)}
-                  </p>
-                </div>
-                <span
-                  className={cn(
-                    "flex h-6 min-w-6 items-center justify-center rounded-full px-1.5 text-[11px] font-medium tabular-nums",
-                    stage === "Closed Lost"
-                      ? "bg-zinc-200 text-zinc-700"
-                      : "bg-primary-soft text-primary",
-                  )}
-                >
-                  {col.length}
-                </span>
-              </div>
-
-              <div className="flex flex-col gap-2 p-2 min-h-[80px]">
-                {col.length === 0 ? (
-                  <div
+            const col = grouped.get(stage) ?? [];
+            const sum = col.reduce((s, it) => s + it.estimatedValue, 0);
+            const isDropTarget = dragOverStage === stage && draggingId !== null;
+            return (
+              <div
+                key={stage}
+                onDragOver={(e) => {
+                  if (!canDrag || !draggingId) return;
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = "move";
+                  if (dragOverStage !== stage) setDragOverStage(stage);
+                }}
+                onDragLeave={(e) => {
+                  if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+                  if (dragOverStage === stage) setDragOverStage(null);
+                }}
+                onDrop={(e) => {
+                  if (!canDrag) return;
+                  e.preventDefault();
+                  handleDrop(stage);
+                }}
+                className={cn(
+                  "flex w-[280px] shrink-0 flex-col rounded-lg border bg-muted/30 transition-colors",
+                  isDropTarget &&
+                    "border-primary bg-primary-soft/60 ring-2 ring-primary/30",
+                )}
+              >
+                <div className="flex items-center justify-between border-b bg-card px-3 py-2 rounded-t-lg">
+                  <div className="min-w-0">
+                    <p className="truncate text-xs font-semibold uppercase tracking-wide text-foreground">
+                      {stage}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground tabular-nums">
+                      {col.length} · {formatRupiahShort(sum)}
+                    </p>
+                  </div>
+                  <span
                     className={cn(
-                      "rounded-md border border-dashed py-6 text-center text-[11px] text-muted-foreground",
-                      isDropTarget && "border-primary text-primary",
+                      "flex h-6 min-w-6 items-center justify-center rounded-full px-1.5 text-[11px] font-medium tabular-nums",
+                      stage === "Closed Lost"
+                        ? "bg-zinc-200 text-zinc-700"
+                        : "bg-primary-soft text-primary",
                     )}
                   >
-                    {isDropTarget ? "Lepas di sini" : "Kosong"}
-                  </div>
-                ) : (
-                  col.map((it) => {
-                    const client = clientById[it.clientId];
-                    const ownerName = ownerById[it.ownerId]?.name ?? "-";
-                    const next = nextByItem.get(it.id);
-                    const nextDays = next ? daysBetween(NOW, next) : null;
-                    const overdue = nextDays !== null && nextDays < 0;
-                    const today = nextDays === 0;
-                    const isDragging = draggingId === it.id;
-                    const canMoveThis = canMoveItem(it);
-                    return (
-                      <div
-                        key={it.id}
-                        draggable={canMoveThis}
-                        onDragStart={(e) => {
-                          if (!canMoveThis) return;
-                          setDraggingId(it.id);
-                          e.dataTransfer.effectAllowed = "move";
-                          e.dataTransfer.setData("text/plain", it.id);
-                        }}
-                        onDragEnd={() => {
-                          setDraggingId(null);
-                          setDragOverStage(null);
-                        }}
-                        onClick={() => setDrawerItemId(it.id)}
-                        role="button"
-                        tabIndex={0}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            e.preventDefault();
-                            setDrawerItemId(it.id);
-                          }
-                        }}
-                        className={cn(
-                          "group relative flex flex-col gap-1.5 rounded-md border bg-card p-2.5 pl-6 shadow-sm transition-all hover:border-primary/50 hover:shadow-md",
-                          canMoveThis && "cursor-grab active:cursor-grabbing",
-                          !canMoveThis && "cursor-pointer",
-                          isDragging && "opacity-40",
-                        )}
-                      >
-                        {canMoveThis && (
-                          <GripVertical className="pointer-events-none absolute left-1 top-2.5 h-3.5 w-3.5 text-muted-foreground/50 group-hover:text-muted-foreground" />
-                        )}
-                        <div className="flex items-start justify-between gap-2">
-                          <p className="min-w-0 truncate text-[13px] font-medium text-foreground group-hover:text-primary">
-                            {client?.name ?? "-"}
-                          </p>
-                          <Badge
-                            variant="outline"
-                            className="shrink-0 px-1.5 py-0 text-[10px] font-normal"
-                          >
-                            {it.type}
-                          </Badge>
-                        </div>
-                        <p className="line-clamp-2 text-[11px] text-muted-foreground">
-                          {it.description}
-                        </p>
-                        <div className="flex items-center justify-between pt-0.5">
-                          <span className="text-[12px] font-semibold tabular-nums text-foreground">
-                            {formatRupiahShort(it.estimatedValue)}
-                          </span>
-                          {client && <StatusBadge status={client.status} />}
-                        </div>
-                        <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                          <span className="truncate">{ownerName}</span>
-                          {next ? (
-                            <span
-                              className={cn(
-                                "tabular-nums",
-                                overdue && "text-rose-600 font-medium",
-                                today && "text-amber-700 font-medium",
-                              )}
-                            >
-                              {overdue
-                                ? `overdue ${Math.abs(nextDays!)}h`
-                                : today
-                                  ? "hari ini"
-                                  : formatDateShort(next)}
-                            </span>
-                          ) : (
-                            <span className="text-muted-foreground/70">
-                              no next action
-                            </span>
+                    {col.length}
+                  </span>
+                </div>
+
+                <div className="flex flex-col gap-2 p-2 min-h-[80px]">
+                  {col.length === 0 ? (
+                    <div
+                      className={cn(
+                        "rounded-md border border-dashed py-6 text-center text-[11px] text-muted-foreground",
+                        isDropTarget && "border-primary text-primary",
+                      )}
+                    >
+                      {isDropTarget ? "Lepas di sini" : "Kosong"}
+                    </div>
+                  ) : (
+                    col.map((it) => {
+                      const client = clientById[it.clientId];
+                      const ownerName = ownerById[it.ownerId]?.name ?? "-";
+                      const next = nextByItem.get(it.id);
+                      const nextDays = next ? daysBetween(NOW, next) : null;
+                      const overdue = nextDays !== null && nextDays < 0;
+                      const today = nextDays === 0;
+                      const isDragging = draggingId === it.id;
+                      const canMoveThis = canMoveItem(it);
+                      return (
+                        <div
+                          key={it.id}
+                          draggable={canMoveThis}
+                          onDragStart={(e) => {
+                            if (!canMoveThis) return;
+                            setDraggingId(it.id);
+                            e.dataTransfer.effectAllowed = "move";
+                            e.dataTransfer.setData("text/plain", it.id);
+                          }}
+                          onDragEnd={() => {
+                            setDraggingId(null);
+                            setDragOverStage(null);
+                          }}
+                          onClick={() => setDrawerItemId(it.id)}
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              setDrawerItemId(it.id);
+                            }
+                          }}
+                          className={cn(
+                            "group relative flex flex-col gap-1.5 rounded-md border bg-card p-2.5 pl-6 shadow-sm transition-all hover:border-primary/50 hover:shadow-md",
+                            canMoveThis && "cursor-grab active:cursor-grabbing",
+                            !canMoveThis && "cursor-pointer",
+                            isDragging && "opacity-40",
                           )}
+                        >
+                          {canMoveThis && (
+                            <GripVertical className="pointer-events-none absolute left-1 top-2.5 h-3.5 w-3.5 text-muted-foreground/50 group-hover:text-muted-foreground" />
+                          )}
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="min-w-0 truncate text-[13px] font-medium text-foreground group-hover:text-primary">
+                              {client?.name ?? "-"}
+                            </p>
+                            <Badge
+                              variant="outline"
+                              className="shrink-0 px-1.5 py-0 text-[10px] font-normal"
+                            >
+                              {it.type}
+                            </Badge>
+                          </div>
+                          <p className="line-clamp-2 text-[11px] text-muted-foreground">
+                            {it.description}
+                          </p>
+                          <div className="flex items-center justify-between pt-0.5">
+                            <span className="text-[12px] font-semibold tabular-nums text-foreground">
+                              {formatRupiahShort(it.estimatedValue)}
+                            </span>
+                            {client && <StatusBadge status={client.status} />}
+                          </div>
+                          <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                            <span className="truncate">{ownerName}</span>
+                            {next ? (
+                              <span
+                                className={cn(
+                                  "tabular-nums",
+                                  overdue && "text-rose-600 font-medium",
+                                  today && "text-amber-700 font-medium",
+                                )}
+                              >
+                                {overdue
+                                  ? `overdue ${Math.abs(nextDays!)}h`
+                                  : today
+                                    ? "hari ini"
+                                    : formatDateShort(next)}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground/70">
+                                no next action
+                              </span>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })
-                )}
+                      );
+                    })
+                  )}
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
         </div>
         <div
           aria-hidden="true"
