@@ -170,58 +170,63 @@ export function CreateQuotationDialog(props: SharedProps) {
       {(props.trigger || !controlled) && (
         <DialogTrigger asChild>{props.trigger}</DialogTrigger>
       )}
-      <DialogContent className="max-h-[90vh] max-w-xl overflow-y-auto">
+      <DialogContent className="flex max-h-[90vh] max-w-xl flex-col overflow-hidden">
         <DialogHeader>
           <DialogTitle>Buat Quotation</DialogTitle>
           <DialogDescription>{clientName ?? "Pilih klien"}</DialogDescription>
         </DialogHeader>
-        <form onSubmit={onSubmit} className="grid gap-3">
-          {needsPicker && (
-            <ClientPickerField
-              clients={clients}
-              value={pickedId}
-              onChange={setPickedId}
-            />
-          )}
-          <div className="rounded-md border bg-muted/40 p-3">
-            <Label>Nomor Quotation</Label>
-            <p className="text-sm text-muted-foreground">
-              Dibuat otomatis oleh sistem setelah disimpan. Panduan format:{" "}
-              {quotationNumberGuide}.
-            </p>
-          </div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <form
+          onSubmit={onSubmit}
+          className="flex flex-1 flex-col gap-3 overflow-hidden"
+        >
+          <div className="grid gap-3 overflow-y-auto pr-1">
+            {needsPicker && (
+              <ClientPickerField
+                clients={clients}
+                value={pickedId}
+                onChange={setPickedId}
+              />
+            )}
+            <div className="rounded-md border bg-muted/40 p-3">
+              <Label>Nomor Quotation</Label>
+              <p className="text-sm text-muted-foreground">
+                Dibuat otomatis oleh sistem setelah disimpan. Panduan format:{" "}
+                {quotationNumberGuide}.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <FieldText
+                label="Date"
+                type="date"
+                reg={form.register("documentDate")}
+                error={msg(form.formState.errors, "documentDate")}
+              />
+              <FieldSelect
+                label="Stage"
+                value={form.watch("stage")}
+                onChange={(v) =>
+                  form.setValue("stage", v as QuotationValues["stage"], {
+                    shouldDirty: true,
+                  })
+                }
+                options={[...WEIGHTED_STAGES]}
+              />
+            </div>
             <FieldText
-              label="Date"
-              type="date"
-              reg={form.register("documentDate")}
-              error={msg(form.formState.errors, "documentDate")}
+              label="Note"
+              reg={form.register("note")}
+              error={msg(form.formState.errors, "note")}
             />
-            <FieldSelect
-              label="Stage"
-              value={form.watch("stage")}
-              onChange={(v) =>
-                form.setValue("stage", v as QuotationValues["stage"], {
-                  shouldDirty: true,
-                })
-              }
-              options={[...WEIGHTED_STAGES]}
+            <LineItemsSection
+              fields={fields}
+              append={() => append(emptyLineItem)}
+              remove={remove}
+              register={form.register}
+              lineItems={lineItems}
+              errorMessage={form.formState.errors.lineItems?.message as string}
+              showMoney
             />
           </div>
-          <FieldText
-            label="Note"
-            reg={form.register("note")}
-            error={msg(form.formState.errors, "note")}
-          />
-          <LineItemsSection
-            fields={fields}
-            append={() => append(emptyLineItem)}
-            remove={remove}
-            register={form.register}
-            lineItems={lineItems}
-            errorMessage={form.formState.errors.lineItems?.message as string}
-            showMoney
-          />
           <Footer
             onCancel={() => setOpen(false)}
             submitting={form.formState.isSubmitting}
@@ -297,36 +302,41 @@ export function ReviseQuotationDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent className="max-h-[90vh] max-w-xl overflow-y-auto">
+      <DialogContent className="flex max-h-[90vh] max-w-xl flex-col overflow-hidden">
         <DialogHeader>
           <DialogTitle>Buat Revisi Quotation</DialogTitle>
           <DialogDescription>
             {document.quotationNumber} akan dipertahankan sebagai riwayat.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={onSubmit} className="grid gap-3">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <FieldText
-              label="Date"
-              type="date"
-              reg={form.register("documentDate")}
-              error={msg(form.formState.errors, "documentDate")}
-            />
-            <FieldText
-              label="Note"
-              reg={form.register("note")}
-              error={msg(form.formState.errors, "note")}
+        <form
+          onSubmit={onSubmit}
+          className="flex flex-1 flex-col gap-3 overflow-hidden"
+        >
+          <div className="grid gap-3 overflow-y-auto pr-1">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <FieldText
+                label="Date"
+                type="date"
+                reg={form.register("documentDate")}
+                error={msg(form.formState.errors, "documentDate")}
+              />
+              <FieldText
+                label="Note"
+                reg={form.register("note")}
+                error={msg(form.formState.errors, "note")}
+              />
+            </div>
+            <LineItemsSection
+              fields={fields}
+              append={() => append(emptyLineItem)}
+              remove={remove}
+              register={form.register}
+              lineItems={lineItems}
+              errorMessage={form.formState.errors.lineItems?.message as string}
+              showMoney
             />
           </div>
-          <LineItemsSection
-            fields={fields}
-            append={() => append(emptyLineItem)}
-            remove={remove}
-            register={form.register}
-            lineItems={lineItems}
-            errorMessage={form.formState.errors.lineItems?.message as string}
-            showMoney
-          />
           <Footer
             onCancel={() => setOpen(false)}
             submitting={form.formState.isSubmitting}
@@ -451,180 +461,188 @@ export function CreateSalesOrderDialog(props: SharedProps) {
       {(props.trigger || !controlled) && (
         <DialogTrigger asChild>{props.trigger}</DialogTrigger>
       )}
-      <DialogContent className="max-h-[90vh] max-w-xl overflow-y-auto">
+      <DialogContent className="flex max-h-[90vh] max-w-xl flex-col overflow-hidden">
         <DialogHeader>
           <DialogTitle>Record Sales Order</DialogTitle>
           <DialogDescription>{clientName ?? "Pilih klien"}</DialogDescription>
         </DialogHeader>
-        <form onSubmit={onSubmit} className="grid gap-3">
-          {needsPicker && (
-            <ClientPickerField
-              clients={clients}
-              value={pickedId}
-              onChange={setPickedId}
-            />
-          )}
-          <div className="rounded-md border bg-muted/40 p-3">
-            <Label>Nomor SO</Label>
-            <p className="text-sm text-muted-foreground">
-              {form.watch("numberMode") === "Hariff Backdate"
-                ? `Gunakan nomor resmi historis di bawah. Format ${soNumberGuide} hanya panduan umum.`
-                : `Isi nomor secara manual. Panduan format: ${soNumberGuide}.`}
-            </p>
-          </div>
-          <FieldText
-            label="Nomor SO"
-            placeholder={soNumberGuide}
-            description="Panduan format tidak diisi otomatis; masukkan nomor SO resmi."
-            reg={form.register("manualSoNumber")}
-            error={msg(form.formState.errors, "manualSoNumber")}
-          />
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <FieldText
-              label="Nomor PO Customer"
-              reg={form.register("customerPoNumber")}
-              error={msg(form.formState.errors, "customerPoNumber")}
-            />
-            <FieldSelect
-              label="Tipe SO"
-              value={type}
-              onChange={(v) => {
-                const next = v as SoValues["type"];
-                form.setValue("type", next, { shouldDirty: true });
-                if (next === "Regular") {
-                  form.setValue("prototypeStatus", undefined);
-                  form.setValue("taxType", "PPN");
-                  form.setValue("source", "Existing / Repeat Order");
-                } else {
-                  form.setValue("prototypeStatus", "Paid");
-                  form.setValue("taxType", "PPN");
-                  form.setValue("source", "Prototype Paid");
-                }
-              }}
-              options={["Regular", "Prototype"]}
-            />
-          </div>
-          {isHariffClient && (
-            <FieldSelect
-              label="Mode Penomoran SO"
-              value={form.watch("numberMode")}
-              onChange={(value) => {
-                const mode = value as SoValues["numberMode"];
-                form.setValue("numberMode", mode, { shouldDirty: true });
-                if (mode === "Manual") {
-                  form.setValue("backdateReason", "");
-                }
-              }}
-              options={["Manual", "Hariff Backdate"]}
-              error={msg(form.formState.errors, "numberMode")}
-            />
-          )}
-          {isHariffClient && form.watch("numberMode") === "Hariff Backdate" && (
-            <div>
-              <FieldText
-                label="Alasan Backdate"
-                reg={form.register("backdateReason")}
-                error={msg(form.formState.errors, "backdateReason")}
+        <form
+          onSubmit={onSubmit}
+          className="flex flex-1 flex-col gap-3 overflow-hidden"
+        >
+          <div className="grid gap-3 overflow-y-auto pr-1">
+            {needsPicker && (
+              <ClientPickerField
+                clients={clients}
+                value={pickedId}
+                onChange={setPickedId}
               />
+            )}
+            <div className="rounded-md border bg-muted/40 p-3">
+              <Label>Nomor SO</Label>
+              <p className="text-sm text-muted-foreground">
+                {form.watch("numberMode") === "Hariff Backdate"
+                  ? `Gunakan nomor resmi historis di bawah. Format ${soNumberGuide} hanya panduan umum.`
+                  : `Isi nomor secara manual. Panduan format: ${soNumberGuide}.`}
+              </p>
             </div>
-          )}
-          <div className="grid grid-cols-2 gap-3">
-            {type === "Prototype" && (
+            <FieldText
+              label="Nomor SO"
+              placeholder={soNumberGuide}
+              description="Panduan format tidak diisi otomatis; masukkan nomor SO resmi."
+              reg={form.register("manualSoNumber")}
+              error={msg(form.formState.errors, "manualSoNumber")}
+            />
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <FieldText
+                label="Nomor PO Customer"
+                reg={form.register("customerPoNumber")}
+                error={msg(form.formState.errors, "customerPoNumber")}
+              />
               <FieldSelect
-                label="Status prototype"
-                value={form.watch("prototypeStatus") ?? "Paid"}
+                label="Tipe SO"
+                value={type}
                 onChange={(v) => {
-                  const status = v as PrototypeStatus;
-                  form.setValue("prototypeStatus", status, {
-                    shouldDirty: true,
-                  });
-                  if (status === "FOC") {
-                    form.setValue("source", "Prototype FOC");
-                    form.setValue("taxType", undefined);
-                    form.setValue(
-                      "lineItems",
-                      form.getValues("lineItems").map((item) => ({
-                        ...item,
-                        unitPrice: undefined,
-                      })),
-                      { shouldDirty: true },
-                    );
-                  } else {
-                    form.setValue("source", "Prototype Paid");
+                  const next = v as SoValues["type"];
+                  form.setValue("type", next, { shouldDirty: true });
+                  if (next === "Regular") {
+                    form.setValue("prototypeStatus", undefined);
                     form.setValue("taxType", "PPN");
-                    form.setValue(
-                      "lineItems",
-                      form.getValues("lineItems").map((item) => ({
-                        ...item,
-                        unitPrice: item.unitPrice ?? 0,
-                      })),
-                      { shouldDirty: true },
-                    );
+                    form.setValue("source", "Existing / Repeat Order");
+                  } else {
+                    form.setValue("prototypeStatus", "Paid");
+                    form.setValue("taxType", "PPN");
+                    form.setValue("source", "Prototype Paid");
                   }
                 }}
-                options={["Paid", "FOC"]}
-                error={msg(form.formState.errors, "prototypeStatus")}
+                options={["Regular", "Prototype"]}
+              />
+            </div>
+            {isHariffClient && (
+              <FieldSelect
+                label="Mode Penomoran SO"
+                value={form.watch("numberMode")}
+                onChange={(value) => {
+                  const mode = value as SoValues["numberMode"];
+                  form.setValue("numberMode", mode, { shouldDirty: true });
+                  if (mode === "Manual") {
+                    form.setValue("backdateReason", "");
+                  }
+                }}
+                options={["Manual", "Hariff Backdate"]}
+                error={msg(form.formState.errors, "numberMode")}
               />
             )}
-            {showTax && (
-              <FieldSelect
-                label="Pajak"
-                value={form.watch("taxType") ?? "PPN"}
-                onChange={(v) =>
-                  form.setValue("taxType", v as TaxType, { shouldDirty: true })
-                }
-                options={["PPN", "Non-PPN"]}
-                error={msg(form.formState.errors, "taxType")}
-              />
-            )}
-            {type === "Regular" ? (
-              <FieldSelect
-                label="Sumber revenue"
-                value={form.watch("source")}
-                onChange={(v) =>
-                  form.setValue("source", v as SoValues["source"], {
-                    shouldDirty: true,
-                  })
-                }
-                options={regularSources}
-                error={msg(form.formState.errors, "source")}
-              />
-            ) : (
-              <div>
-                <Label>Sumber revenue</Label>
-                <Input value={prototypeSource} disabled readOnly />
-                <p className="mt-1 text-[11px] text-muted-foreground">
-                  {proto === "FOC"
-                    ? "Tidak berkontribusi ke revenue"
-                    : "Masuk revenue Prototype Paid"}
+            {isHariffClient &&
+              form.watch("numberMode") === "Hariff Backdate" && (
+                <div>
+                  <FieldText
+                    label="Alasan Backdate"
+                    reg={form.register("backdateReason")}
+                    error={msg(form.formState.errors, "backdateReason")}
+                  />
+                </div>
+              )}
+            <div className="grid grid-cols-2 gap-3">
+              {type === "Prototype" && (
+                <FieldSelect
+                  label="Status prototype"
+                  value={form.watch("prototypeStatus") ?? "Paid"}
+                  onChange={(v) => {
+                    const status = v as PrototypeStatus;
+                    form.setValue("prototypeStatus", status, {
+                      shouldDirty: true,
+                    });
+                    if (status === "FOC") {
+                      form.setValue("source", "Prototype FOC");
+                      form.setValue("taxType", undefined);
+                      form.setValue(
+                        "lineItems",
+                        form.getValues("lineItems").map((item) => ({
+                          ...item,
+                          unitPrice: undefined,
+                        })),
+                        { shouldDirty: true },
+                      );
+                    } else {
+                      form.setValue("source", "Prototype Paid");
+                      form.setValue("taxType", "PPN");
+                      form.setValue(
+                        "lineItems",
+                        form.getValues("lineItems").map((item) => ({
+                          ...item,
+                          unitPrice: item.unitPrice ?? 0,
+                        })),
+                        { shouldDirty: true },
+                      );
+                    }
+                  }}
+                  options={["Paid", "FOC"]}
+                  error={msg(form.formState.errors, "prototypeStatus")}
+                />
+              )}
+              {showTax && (
+                <FieldSelect
+                  label="Pajak"
+                  value={form.watch("taxType") ?? "PPN"}
+                  onChange={(v) =>
+                    form.setValue("taxType", v as TaxType, {
+                      shouldDirty: true,
+                    })
+                  }
+                  options={["PPN", "Non-PPN"]}
+                  error={msg(form.formState.errors, "taxType")}
+                />
+              )}
+              {type === "Regular" ? (
+                <FieldSelect
+                  label="Sumber revenue"
+                  value={form.watch("source")}
+                  onChange={(v) =>
+                    form.setValue("source", v as SoValues["source"], {
+                      shouldDirty: true,
+                    })
+                  }
+                  options={regularSources}
+                  error={msg(form.formState.errors, "source")}
+                />
+              ) : (
+                <div>
+                  <Label>Sumber revenue</Label>
+                  <Input value={prototypeSource} disabled readOnly />
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    {proto === "FOC"
+                      ? "Tidak berkontribusi ke revenue"
+                      : "Masuk revenue Prototype Paid"}
+                  </p>
+                </div>
+              )}
+            </div>
+            <div>
+              <Label>Date</Label>
+              <Input type="date" {...form.register("date")} />
+              {msg(form.formState.errors, "date") && (
+                <p className="mt-1 text-xs text-destructive">
+                  {msg(form.formState.errors, "date")}
                 </p>
-              </div>
-            )}
-          </div>
-          <div>
-            <Label>Date</Label>
-            <Input type="date" {...form.register("date")} />
-            {msg(form.formState.errors, "date") && (
-              <p className="mt-1 text-xs text-destructive">
-                {msg(form.formState.errors, "date")}
+              )}
+            </div>
+            {isFoc && (
+              <p className="text-[11px] text-muted-foreground">
+                Prototype FOC tetap menyimpan Product, Description, Qty, dan
+                UOM; Unit Price dan Total dikosongkan.
               </p>
             )}
+            <LineItemsSection
+              fields={fields}
+              append={() => append(emptySoLineItem)}
+              remove={remove}
+              register={form.register}
+              lineItems={lineItems}
+              errorMessage={form.formState.errors.lineItems?.message as string}
+              showMoney={!isFoc}
+            />
           </div>
-          {isFoc && (
-            <p className="text-[11px] text-muted-foreground">
-              Prototype FOC tetap menyimpan Product, Description, Qty, dan UOM;
-              Unit Price dan Total dikosongkan.
-            </p>
-          )}
-          <LineItemsSection
-            fields={fields}
-            append={() => append(emptySoLineItem)}
-            remove={remove}
-            register={form.register}
-            lineItems={lineItems}
-            errorMessage={form.formState.errors.lineItems?.message as string}
-            showMoney={!isFoc}
-          />
           <Footer
             onCancel={() => setOpen(false)}
             submitting={form.formState.isSubmitting}
@@ -699,34 +717,39 @@ export function CreatePrototypeDialog(props: SharedProps) {
       {(props.trigger || !controlled) && (
         <DialogTrigger asChild>{props.trigger}</DialogTrigger>
       )}
-      <DialogContent className="max-h-[90vh] max-w-xl overflow-y-auto">
+      <DialogContent className="flex max-h-[90vh] max-w-xl flex-col overflow-hidden">
         <DialogHeader>
           <DialogTitle>Prototype Request</DialogTitle>
           <DialogDescription>{clientName ?? "Pilih klien"}</DialogDescription>
         </DialogHeader>
-        <form onSubmit={onSubmit} className="grid gap-3">
-          {needsPicker && (
-            <ClientPickerField
-              clients={clients}
-              value={pickedId}
-              onChange={setPickedId}
+        <form
+          onSubmit={onSubmit}
+          className="flex flex-1 flex-col gap-3 overflow-hidden"
+        >
+          <div className="grid gap-3 overflow-y-auto pr-1">
+            {needsPicker && (
+              <ClientPickerField
+                clients={clients}
+                value={pickedId}
+                onChange={setPickedId}
+              />
+            )}
+            <FieldText
+              label="Date"
+              type="date"
+              reg={form.register("documentDate")}
+              error={msg(form.formState.errors, "documentDate")}
             />
-          )}
-          <FieldText
-            label="Date"
-            type="date"
-            reg={form.register("documentDate")}
-            error={msg(form.formState.errors, "documentDate")}
-          />
-          <LineItemsSection
-            fields={fields}
-            append={() => append(emptyLineItem)}
-            remove={remove}
-            register={form.register}
-            lineItems={lineItems}
-            errorMessage={form.formState.errors.lineItems?.message as string}
-            showMoney
-          />
+            <LineItemsSection
+              fields={fields}
+              append={() => append(emptyLineItem)}
+              remove={remove}
+              register={form.register}
+              lineItems={lineItems}
+              errorMessage={form.formState.errors.lineItems?.message as string}
+              showMoney
+            />
+          </div>
           <Footer
             onCancel={() => setOpen(false)}
             submitting={form.formState.isSubmitting}
@@ -769,7 +792,7 @@ function Footer({
   disabled?: boolean;
 }) {
   return (
-    <DialogFooter>
+    <DialogFooter className="border-t pt-3">
       <Button type="button" variant="ghost" onClick={onCancel}>
         Batal
       </Button>
