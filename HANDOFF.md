@@ -1,20 +1,21 @@
 # Handoff — DSM Sales Web App V2
 
-Context dump for continuing this work in another tool (Codex). Written 2026-07-18; Phase 11/12 status refreshed 2026-07-19; Phase 11 import-review reconciliation session added 2026-07-19; post-import UX/bugfix session added 2026-07-20; second 2026-07-20 session (pipeline permissions/FK bugfixes) added 2026-07-20; Client Detail/Client List real-data wiring session added 2026-07-21; remote-migration-push + data-restoration session added 2026-07-21; browser-verification + spending_ytd fix + SO edit audit trail session added 2026-07-21; unused-code cleanup + client database (company info/contacts) feature session added 2026-07-22; contact position + Client Detail product/description fixes + commercial item product-name migration reconciliation added 2026-07-22; dynamic per-month sales target UI/calculation update added 2026-07-22; soft-delete implementation, remote Supabase apply, and main/live push closeout added 2026-07-24; RFQ retirement and documentation refresh added 2026-07-25; Sales Task Control Loop spec approval and Phase 1-2 implementation (Tasks 46-52) added 2026-07-27.
+Context dump for continuing this work in another tool (Codex). Written 2026-07-18; Phase 11/12 status refreshed 2026-07-19; Phase 11 import-review reconciliation session added 2026-07-19; post-import UX/bugfix session added 2026-07-20; second 2026-07-20 session (pipeline permissions/FK bugfixes) added 2026-07-20; Client Detail/Client List real-data wiring session added 2026-07-21; remote-migration-push + data-restoration session added 2026-07-21; browser-verification + spending_ytd fix + SO edit audit trail session added 2026-07-21; unused-code cleanup + client database (company info/contacts) feature session added 2026-07-22; contact position + Client Detail product/description fixes + commercial item product-name migration reconciliation added 2026-07-22; dynamic per-month sales target UI/calculation update added 2026-07-22; soft-delete implementation, remote Supabase apply, and main/live push closeout added 2026-07-24; RFQ retirement and documentation refresh added 2026-07-25; Sales Task Control Loop spec approval and Phase 1-2 implementation (Tasks 46-52) added 2026-07-27; unified progress timeline Task 53/8 and Manager Team Exceptions Task 54/9 added 2026-07-27.
 
 ## HANDOFF TO CODEX — read this first (2026-07-27)
 
 Sales Task Control Loop: technical spec approved by the Product Owner, then
-implementation-plan Tasks 1-7 (project-tracker Tasks 46-52) delivered and
-locally verified in one continuous session. **Not yet committed as of this
-paragraph being written — see the commit this paragraph ships with for the
-actual commit hash.** Remote Supabase has not been touched.
+implementation-plan Tasks 1-9 (project-tracker Tasks 46-54) delivered and
+locally verified. **Tasks 1-7 were already committed locally at `ce160a1`;
+Tasks 8-9 are not committed as of this paragraph being written — see the commit
+this paragraph ships with for the actual Task 8/9 commit hash.** Remote Supabase
+has not been touched.
 
 - Source of truth: `docs/superpowers/specs/2026-07-27-sales-task-control-loop-design.md`
   (the approved spec — status header says "APPROVED oleh Product Owner —
   2026-07-27"), `docs/superpowers/plans/2026-07-27-sales-task-control-loop-implementation.md`
   (the task-by-task plan), `tasks/sales-task-control-loop-todo.md` (checklist),
-  and `.superpowers/sdd/sales-task-control-loop-task-{2,3,4,5,6,7}-report.md`
+  and `.superpowers/sdd/sales-task-control-loop-task-{2,3,4,5,6,7,8,9}-report.md`
   (one detailed completion report per task — read these before touching
   anything in this feature, they record several non-obvious decisions and
   three real bugs found only via browser testing).
@@ -67,16 +68,37 @@ actual commit hash.** Remote Supabase has not been touched.
   activity kind (so the Drawer's "Riwayat" silently showed nothing),
   and stale local form state after a successful save. All three are
   detailed in the Task 7 report.
-- **Not started**: Task 53/8 onward (unified timeline as its own
-  read contract, Manager Team Exceptions, Executive Exceptions, Dashboard/
-  Reports/export consumer migration, existing-data cutover, final release
-  gate). Task 8's own scope may be partially narrowed by what Task 7
-  already delivered (the Drawer's Progress section + Riwayat already give
-  a working combined view) — read the Task 7 report's "deliberately not
-  touched" notes before scoping Task 8.
-- Verification recorded: full local suite **435 pass, 0 fail** (57 files),
+- **Task 53/8**: unified progress timeline done. `src/lib/data/activity-log.ts`
+  now exposes `listTaskTimeline(taskId)`; it renders `follow_up_logs` as the
+  canonical progress entries, uses paired `activity_log.task_progress` rows
+  only to recover actor/title, suppresses that duplicate audit row, and keeps
+  historical follow-ups plus audit-only Task rows visible. `TaskDetailDrawer`
+  reads `["task-timeline", taskId]`, and the active Tasks-page "Log follow-up"
+  shortcut now opens the atomic drawer instead of the old non-transactional
+  `LogFollowUpDialog`. Browser verification created one local QA Task,
+  confirmed the timeline survived refresh, saw no console errors, then cleaned
+  the exact local fixture (1 task, 1 follow-up, 2 activity rows).
+- **Task 54/9**: Manager Tasks split done. New
+  `src/lib/data/task-exceptions.ts` provides role-aware selectors for
+  Manager-owned Tasks and Sales-owned active Escalated exceptions. The Tasks
+  page shows Manager-only mode toggles: "My Tasks" (Manager-owned) and
+  "Team Exceptions" (Sales-owned Escalated active rows only). Team Exceptions
+  auto-focuses Overdue, keeps the Task owner visible as the Sales owner, opens
+  the same Task Detail Drawer/timeline context, and deliberately hides the bulk
+  "Ubah owner" action in that mode so escalation does not imply ownership
+  transfer. Browser verification used exact local QA fixtures, then removed
+  all three fixture Tasks and confirmed `remaining=0`.
+- **Not started**: Task 55/10 onward (Executive Exceptions,
+  Dashboard/Reports/export consumer migration, existing-data cutover, final
+  release gate).
+- Verification recorded through Task 9: full local suite **439 pass, 0 fail**
+  (58 files), plus a focused 34-test suite across `business-calendar`,
+  `task-exceptions`, `tasks`, `task-progress`, and `activity-log`;
+  `bunx tsc --noEmit` clean; `bun run build` passed; browser Manager
+  verification passed with no console errors. Earlier
+  Task 7 full-suite stability was
   run twice from a fresh `bunx supabase db reset` for stability, not a
-  lucky pass; `bunx tsc --noEmit` clean throughout. `bun run lint`
+  lucky pass; Task 8 full suite was run once after implementation. `bun run lint`
   (ESLint) did **not** complete in the session that ran it (24+ then 47+
   minutes with no output, killed both times) — `tsc` and
   `supabase db lint --local` were used as the effective lint-shaped gates
@@ -91,9 +113,9 @@ actual commit hash.** Remote Supabase has not been touched.
   `execute_sql` against any remote project without fresh explicit
   approval naming the exact target. This session's own STOP RULE required
   new explicit authorization before starting each implementation-plan
-  task in turn (all seven were granted one at a time) — the same pattern
-  should hold for Task 53/8 onward: don't assume continuation is
-  pre-approved just because Tasks 1-7 were.
+  task in turn (Tasks 1-9 were granted/continued locally in order) — the same
+  pattern should hold for Task 55/10 onward: don't assume continuation is
+  pre-approved just because Tasks 1-9 were.
 
 ## HANDOFF TO CODEX — read this first (2026-07-25)
 

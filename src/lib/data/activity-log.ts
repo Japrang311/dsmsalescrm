@@ -8,6 +8,7 @@ export type ActivityKind =
   | "client_details_change"
   | "task_created"
   | "task_status_change"
+  | "task_progress"
   | "commercial_item_created"
   | "commercial_item_stage_change"
   | "sales_order_created"
@@ -32,6 +33,7 @@ export const ACTIVITY_KIND_LABELS: Record<ActivityKind, string> = {
   client_details_change: "Perubahan Info Klien",
   task_created: "Task Baru",
   task_status_change: "Perubahan Status Task",
+  task_progress: "Progress Task",
   commercial_item_created: "Commercial Baru",
   commercial_item_stage_change: "Perubahan Tahap Commercial",
   sales_order_created: "Sales Order Baru",
@@ -281,40 +283,128 @@ export type TaskHistoryEntry = {
   at: string;
 };
 
-// Powers the "Riwayat" panel on TaskDetailDrawer.tsx. Same shape/reasoning
-// as listCommercialItemHistory: plain title/detail text, no structured
-// per-field parsing.
-export async function listTaskHistory(
+export type TaskTimelineEntry = TaskHistoryEntry & {
+  source: "follow_up" | "activity";
+};
+
+type TaskActivityTimelineRow = {
+  id: string;
+  kind: ActivityKind;
+  owner_id: string;
+  actor_id: string;
+  title: string;
+  detail: string | null;
+  created_at: string;
+};
+
+type TaskFollowUpTimelineRow = {
+  id: string;
+  owner_id: string;
+  fu_date: string;
+  method: string;
+  result: string;
+  next_action: string | null;
+  next_fu_date: string | null;
+  notes: string | null;
+  created_at: string;
+};
+
+function timelineDetail(row: TaskFollowUpTimelineRow): string | undefined {
+  const parts = [
+    row.notes,
+    row.next_action ? `Next: ${row.next_action}` : undefined,
+    row.next_fu_date ? `Tanggal next action: ${row.next_fu_date}` : undefined,
+  ].filter(Boolean);
+  return parts.length > 0 ? parts.join("\n") : undefined;
+}
+
+function sameProgressEvent(
+  followUp: TaskFollowUpTimelineRow,
+  activity: TaskActivityTimelineRow,
+) {
+  return (
+    activity.kind === "task_progress" &&
+    activity.created_at === followUp.created_at &&
+    (activity.detail ?? null) === (followUp.notes ?? null)
+  );
+}
+
+// Unified Task timeline contract for TaskDetailDrawer.tsx. Progress rows are
+// represented by follow_up_logs, with the paired task_progress audit row used
+// only to recover the real actor/title. That suppresses the duplicate created
+// by record_task_progress() while keeping older follow_up_logs and audit-only
+// activity_log rows visible.
+export async function listTaskTimeline(
   taskId: string,
-): Promise<TaskHistoryEntry[]> {
+): Promise<TaskTimelineEntry[]> {
   const [
-    { data: logs, error: logsError },
+    { data: activityRows, error: activityError },
+    { data: followUpRows, error: followUpError },
     { data: profiles, error: profilesError },
   ] = await Promise.all([
     supabase
       .from("activity_log")
-      .select("id, actor_id, title, detail, created_at")
+      .select("id, kind, owner_id, actor_id, title, detail, created_at")
       .eq("task_id", taskId)
       .in("kind", ["task_created", "task_status_change", "task_progress"])
       .order("created_at", { ascending: false }),
+    supabase
+      .from("follow_up_logs")
+      .select(
+        "id, owner_id, fu_date, method, result, next_action, next_fu_date, notes, created_at",
+      )
+      .eq("task_id", taskId)
+      .order("created_at", { ascending: false }),
     supabase.from("profiles").select("id, name, role"),
   ]);
-  if (logsError) throw logsError;
+  if (activityError) throw activityError;
+  if (followUpError) throw followUpError;
   if (profilesError) throw profilesError;
 
   const actorsById = new Map((profiles ?? []).map((p) => [p.id, p]));
+  const activity = (activityRows ?? []) as TaskActivityTimelineRow[];
+  const followUps = (followUpRows ?? []) as TaskFollowUpTimelineRow[];
+  const pairedActivityIds = new Set<string>();
 
-  return (logs ?? []).map((row) => {
-    const actor = actorsById.get(row.actor_id);
+  const entries: TaskTimelineEntry[] = followUps.map((row) => {
+    const pairedActivity = activity.find(
+      (candidate) =>
+        !pairedActivityIds.has(candidate.id) && sameProgressEvent(row, candidate),
+    );
+    if (pairedActivity) pairedActivityIds.add(pairedActivity.id);
+    const actor = actorsById.get(pairedActivity?.actor_id ?? row.owner_id);
     return {
-      id: row.id,
+      id: `follow-up-${row.id}`,
+      source: "follow_up",
+      actorName: actor?.name ?? "—",
+      actorRole: (actor?.role as Role) ?? "sales",
+      title: pairedActivity?.title ?? `${row.method} · ${row.result}`,
+      detail: timelineDetail(row),
+      at: row.created_at,
+    };
+  });
+
+  for (const row of activity) {
+    if (pairedActivityIds.has(row.id)) continue;
+    const actor = actorsById.get(row.actor_id);
+    entries.push({
+      id: `activity-${row.id}`,
+      source: "activity",
       actorName: actor?.name ?? "—",
       actorRole: (actor?.role as Role) ?? "sales",
       title: row.title,
       detail: row.detail ?? undefined,
       at: row.created_at,
-    };
-  });
+    });
+  }
+
+  return entries.sort((a, b) => (a.at < b.at ? 1 : -1));
+}
+
+export async function listTaskHistory(
+  taskId: string,
+): Promise<TaskHistoryEntry[]> {
+  return listTaskTimeline(taskId);
 }
 
 export type CommercialItemHistoryEntry = {

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   Phone,
@@ -61,13 +61,17 @@ import {
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRole } from "@/context/role-context";
 import { NOW } from "@/lib/domain";
-import type { Task, TaskStatus, CommercialItem } from "@/lib/domain";
+import type { Role, Task, TaskStatus, CommercialItem } from "@/lib/domain";
 import {
   listTasks,
   updateTask,
   createTask,
   describeTaskChanges,
 } from "@/lib/data/tasks";
+import {
+  filterManagerMyTasks,
+  filterManagerTeamExceptions,
+} from "@/lib/data/task-exceptions";
 import {
   listClients,
   listOwners,
@@ -82,7 +86,6 @@ import { getCurrentActorId, logActivity } from "@/lib/data/activity-log";
 import { formatDateShort, formatRupiahShort } from "@/lib/format";
 import { TaskDetailDrawer } from "@/components/tasks/TaskDetailDrawer";
 import { CreateTaskDialog } from "@/components/tasks/CreateTaskDialog";
-import { LogFollowUpDialog } from "@/components/tasks/LogFollowUpDialog";
 
 export const Route = createFileRoute("/_app/tasks")({
   head: () => ({
@@ -126,6 +129,7 @@ const COMMERCIAL_OPTIONS = [
 ] as const;
 
 type ViewKey = "today" | "upcoming" | "overdue" | "completed" | "archived";
+type ManagerTaskMode = "my-tasks" | "team-exceptions";
 
 const VIEW_META: Record<
   ViewKey,
@@ -181,7 +185,10 @@ function agingDays(task: Task) {
 }
 
 type ClientLookup = Record<string, { id: string; name: string }>;
-type ProfileLookup = Record<string, { name: string; initials: string }>;
+type ProfileLookup = Record<
+  string,
+  { name: string; initials: string; role?: Role }
+>;
 type CommercialLookup = Record<string, CommercialItem>;
 
 function TasksInboxPage() {
@@ -191,6 +198,11 @@ function TasksInboxPage() {
   const { data: tasks = [], isLoading: tasksLoading } = useQuery({
     queryKey: ["tasks", "all"],
     queryFn: listTasks,
+    enabled: authReady,
+  });
+  const { data: currentActorId } = useQuery({
+    queryKey: ["profiles", "current-actor-id"],
+    queryFn: getCurrentActorId,
     enabled: authReady,
   });
   const { data: clientList = [] } = useQuery({
@@ -234,12 +246,13 @@ function TasksInboxPage() {
   const [commercialType, setCommercialType] =
     useState<(typeof COMMERCIAL_OPTIONS)[number]>("all");
   const [activeView, setActiveView] = useState<ViewKey>("today");
+  const [managerTaskMode, setManagerTaskMode] =
+    useState<ManagerTaskMode>("my-tasks");
   const [view, setView] = useState<"agenda" | "calendar">("agenda");
   const [calendarMonth, setCalendarMonth] = useState<Date>(
     () => new Date(NOW.getFullYear(), NOW.getMonth(), 1),
   );
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
-  const [logFuTaskId, setLogFuTaskId] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
 
   const toggleSelected = (id: string) => {
@@ -262,11 +275,26 @@ function TasksInboxPage() {
   };
   const clearSelection = () => setSelected(new Set());
 
+  useEffect(() => {
+    setSelected(new Set());
+    if (role === "manager" && managerTaskMode === "team-exceptions") {
+      setActiveView("overdue");
+    }
+  }, [role, managerTaskMode]);
+
+  const scopedTasks = useMemo(() => {
+    if (role !== "manager") return tasks;
+    if (managerTaskMode === "team-exceptions") {
+      return filterManagerTeamExceptions(tasks, profilesById);
+    }
+    return filterManagerMyTasks(tasks, currentActorId);
+  }, [role, managerTaskMode, tasks, profilesById, currentActorId]);
+
   // Filtered by common criteria (excluding view). Applied before view split so
   // per-view counts always reflect current filters.
   const commonFiltered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return tasks.filter((t) => {
+    return scopedTasks.filter((t) => {
       if (ownerId !== "all" && t.ownerId !== ownerId) return false;
       if (method !== "all" && t.method !== method) return false;
       if (priority !== "all" && t.priority !== priority) return false;
@@ -288,7 +316,7 @@ function TasksInboxPage() {
       return true;
     });
   }, [
-    tasks,
+    scopedTasks,
     ownerId,
     method,
     priority,
@@ -564,12 +592,12 @@ function TasksInboxPage() {
 
   // -------------------------- Bulk actions --------------------------
   const selectedIdList = useMemo(
-    () => tasks.filter((t) => selected.has(t.id)).map((t) => t.id),
-    [tasks, selected],
+    () => scopedTasks.filter((t) => selected.has(t.id)).map((t) => t.id),
+    [scopedTasks, selected],
   );
   const selectedTasks = useMemo(
-    () => tasks.filter((t) => selected.has(t.id)),
-    [tasks, selected],
+    () => scopedTasks.filter((t) => selected.has(t.id)),
+    [scopedTasks, selected],
   );
 
   const bulkDone = async () => {
@@ -703,6 +731,16 @@ function TasksInboxPage() {
   const openTask = openTaskId
     ? (tasks.find((t) => t.id === openTaskId) ?? null)
     : null;
+  const isManagerTeamExceptions =
+    role === "manager" && managerTaskMode === "team-exceptions";
+  const pageTitle =
+    role === "manager"
+      ? managerTaskMode === "team-exceptions"
+        ? "Team Exceptions"
+        : "My Tasks"
+      : role === "sales"
+        ? "My Tasks"
+        : "Team Tasks (read-only)";
 
   if (!authReady || tasksLoading) {
     return (
@@ -717,17 +755,43 @@ function TasksInboxPage() {
       <header className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex flex-col gap-1">
           <h1 className="text-xl font-semibold tracking-tight text-foreground">
-            {role === "manager"
-              ? "Team Tasks"
-              : role === "sales"
-                ? "My Tasks"
-                : "Team Tasks (read-only)"}
+            {pageTitle}
           </h1>
           <p className="text-sm text-muted-foreground">
-            Task &amp; follow-up terhubung ke klien serta commercial item aktif.
+            {isManagerTeamExceptions
+              ? "Sales-owned task yang sudah melewati threshold eskalasi."
+              : "Task & follow-up terhubung ke klien serta commercial item aktif."}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 self-start">
+          {role === "manager" && (
+            <ToggleGroup
+              type="single"
+              value={managerTaskMode}
+              onValueChange={(v) => {
+                if (v === "my-tasks" || v === "team-exceptions") {
+                  setManagerTaskMode(v);
+                }
+              }}
+              className="rounded-md border bg-card p-0.5"
+            >
+              <ToggleGroupItem
+                value="my-tasks"
+                className="h-8 gap-1.5 px-2.5 text-xs"
+              >
+                <Inbox className="h-3.5 w-3.5" /> My Tasks
+              </ToggleGroupItem>
+              <ToggleGroupItem
+                value="team-exceptions"
+                className="h-8 gap-1.5 px-2.5 text-xs data-[state=on]:bg-destructive/10 data-[state=on]:text-destructive"
+              >
+                <AlertTriangle className="h-3.5 w-3.5" /> Team Exceptions
+                <span className="num rounded bg-muted px-1 text-[10px]">
+                  {filterManagerTeamExceptions(tasks, profilesById).length}
+                </span>
+              </ToggleGroupItem>
+            </ToggleGroup>
+          )}
           <ToggleGroup
             type="single"
             value={view}
@@ -939,7 +1003,7 @@ function TasksInboxPage() {
                           onUnarchive={handleUnarchive}
                           onCreateChildTask={handleCreateChildTask}
                           onMoveWaitingPO={handleMoveWaitingPO}
-                          onLogFollowUp={(t) => setLogFuTaskId(t.id)}
+                          onLogFollowUp={handleOpen}
                           selected={selected.has(task.id)}
                           onToggleSelect={canEdit ? toggleSelected : undefined}
                           clientsById={clientsById}
@@ -993,7 +1057,7 @@ function TasksInboxPage() {
           onUnarchive={handleUnarchive}
           onCreateChildTask={handleCreateChildTask}
           onMoveWaitingPO={handleMoveWaitingPO}
-          onLogFollowUp={(t) => setLogFuTaskId(t.id)}
+          onLogFollowUp={handleOpen}
           canEdit={canEdit}
           selected={selected}
           onToggleSelect={toggleSelected}
@@ -1007,20 +1071,6 @@ function TasksInboxPage() {
         open={openTaskId !== null}
         onOpenChange={(o) => !o && setOpenTaskId(null)}
       />
-
-      {(() => {
-        const logTask = logFuTaskId
-          ? tasks.find((t) => t.id === logFuTaskId)
-          : null;
-        if (!logTask) return null;
-        return (
-          <LogFollowUpDialog
-            task={logTask}
-            open={true}
-            onOpenChange={(o) => !o && setLogFuTaskId(null)}
-          />
-        );
-      })()}
 
       {selectedIdList.length > 0 && (
         <div className="pointer-events-none sticky bottom-4 z-30 flex justify-center">
@@ -1045,34 +1095,38 @@ function TasksInboxPage() {
             >
               <Clock className="mr-1 h-4 w-4" /> Snooze +1
             </Button>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button size="sm" variant="outline" className="h-8">
-                  <UserCog className="mr-1 h-4 w-4" /> Ubah owner
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent align="end" className="w-56 p-1">
-                <div className="px-2 py-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
-                  Pindahkan ke
-                </div>
-                <div className="flex flex-col">
-                  {salesTeam.map((m) => (
-                    <button
-                      key={m.id}
-                      type="button"
-                      onClick={() => void bulkChangeOwner(m.id)}
-                      className="flex items-center justify-between rounded-md px-2 py-1.5 text-sm text-foreground hover:bg-accent"
-                    >
-                      <span>{m.name}</span>
-                      <span className="text-[11px] text-muted-foreground">
-                        {m.initials}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </PopoverContent>
-            </Popover>
-            <div className="mx-1 h-4 w-px bg-border" />
+            {!isManagerTeamExceptions && (
+              <>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button size="sm" variant="outline" className="h-8">
+                      <UserCog className="mr-1 h-4 w-4" /> Ubah owner
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent align="end" className="w-56 p-1">
+                    <div className="px-2 py-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
+                      Pindahkan ke
+                    </div>
+                    <div className="flex flex-col">
+                      {salesTeam.map((m) => (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => void bulkChangeOwner(m.id)}
+                          className="flex items-center justify-between rounded-md px-2 py-1.5 text-sm text-foreground hover:bg-accent"
+                        >
+                          <span>{m.name}</span>
+                          <span className="text-[11px] text-muted-foreground">
+                            {m.initials}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+                <div className="mx-1 h-4 w-px bg-border" />
+              </>
+            )}
             <Button
               size="sm"
               variant="ghost"

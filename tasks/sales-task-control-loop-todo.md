@@ -77,7 +77,13 @@ Product direction: `docs/ideas/sales-task-control-loop.md`
       client_id crashing activity_log inserts, a missing `task_progress`
       kind hiding all new history entries, and stale local form state
       after a save.
-- [ ] Task 8: Deliver the unified progress timeline
+- [x] Task 8: Deliver the unified progress timeline — done
+      2026-07-27; see
+      `.superpowers/sdd/sales-task-control-loop-task-8-report.md`.
+      The active Tasks-page "Log follow-up" shortcut now opens the
+      atomic Task Detail progress drawer; `listTaskTimeline()` merges
+      historical `follow_up_logs` with audit-only `activity_log` rows
+      while suppressing the paired `task_progress` duplicate.
 
 ### Checkpoint B1
 
@@ -92,12 +98,19 @@ Product direction: `docs/ideas/sales-task-control-loop.md`
 
 ## Phase 3 — Manager and Executive Control Loop
 
-- [ ] Task 9: Separate Manager My Tasks from Team Exceptions
+- [x] Task 9: Separate Manager My Tasks from Team Exceptions — done
+      2026-07-27; see
+      `.superpowers/sdd/sales-task-control-loop-task-9-report.md`.
+      Manager mode now separates Manager-owned Tasks from Sales-owned
+      escalated active exceptions without transferring ownership.
 - [ ] Task 10: Enforce Executive exception detail and aggregate-only reporting
 
 ### Checkpoint B — Core control loop
 
-- [ ] Manager sees only qualifying Sales exceptions
+- [x] Manager sees only qualifying Sales exceptions — verified in browser
+      2026-07-27 with local QA fixtures: Manager My Tasks showed only the
+      Manager-owned Task, Team Exceptions showed only the Sales-owned
+      Escalated Task, and the pre-threshold Sales Task stayed hidden.
 - [ ] Executive sees only qualifying Manager exception details
 - [ ] Executive company aggregates remain available without row-detail leakage
 - [ ] Super Admin correction remains supported without ownership
@@ -129,4 +142,3 @@ Product direction: `docs/ideas/sales-task-control-loop.md`
 - [ ] Documentation reflects verified as-built behavior
 - [ ] Git, Supabase remote, deployment, and browser verification are reported
       separately
-

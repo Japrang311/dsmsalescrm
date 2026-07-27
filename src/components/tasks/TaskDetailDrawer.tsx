@@ -39,7 +39,7 @@ import { updateTask } from "@/lib/data/tasks";
 import { recordTaskProgress } from "@/lib/data/task-progress";
 import {
   getCurrentActorId,
-  listTaskHistory,
+  listTaskTimeline,
   logActivity,
 } from "@/lib/data/activity-log";
 import { formatDateShort, formatRupiahShort } from "@/lib/format";
@@ -81,8 +81,8 @@ export function TaskDetailDrawer({
   const queryClient = useQueryClient();
 
   const { data: history = [] } = useQuery({
-    queryKey: ["activity-log", "task", task?.id],
-    queryFn: () => listTaskHistory(task!.id),
+    queryKey: ["task-timeline", task?.id],
+    queryFn: () => listTaskTimeline(task!.id),
     enabled: authReady && !!task,
   });
 
@@ -177,7 +177,7 @@ export function TaskDetailDrawer({
   const invalidate = async () => {
     await queryClient.invalidateQueries({ queryKey: ["tasks"] });
     await queryClient.invalidateQueries({
-      queryKey: ["activity-log", "task", task.id],
+      queryKey: ["task-timeline", task.id],
     });
     await queryClient.invalidateQueries({ queryKey: ["activity-log"] });
   };
