@@ -78,11 +78,13 @@ describe("follow_up_logs RLS", () => {
     expect(ids).toContain(logIds.other);
   });
 
-  test("executive role sees every follow-up log but cannot write", async () => {
+  test("executive role cannot read general follow-up rows and cannot write", async () => {
     const client = await signInAs(fixtures.executive);
     const { data, error } = await client.from("follow_up_logs").select("id");
     if (error) throw error;
-    expect(data!.length).toBeGreaterThanOrEqual(2);
+    const ids = data!.map((row) => row.id);
+    expect(ids).not.toContain(logIds.own);
+    expect(ids).not.toContain(logIds.other);
 
     const { data: anyClient } = await adminClient
       .from("clients")

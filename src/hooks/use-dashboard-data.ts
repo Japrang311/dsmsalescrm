@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useRole } from "@/context/role-context";
 import { listSalesOrders } from "@/lib/data/sales-orders";
-import { listTasks } from "@/lib/data/tasks";
+import { getTaskControlLoopMetrics, listTasks } from "@/lib/data/tasks";
 import { listCommercialItems } from "@/lib/data/commercial-items";
 import {
   listClients,
@@ -17,7 +17,7 @@ import { getCurrentActorId } from "@/lib/data/activity-log";
 // page, Tasks page, etc.), so React Query serves these from cache instead
 // of firing duplicate network requests.
 export function useDashboardData() {
-  const { authReady } = useRole();
+  const { authReady, role } = useRole();
 
   const orders = useQuery({
     queryKey: ["sales-orders", "all"],
@@ -28,6 +28,11 @@ export function useDashboardData() {
     queryKey: ["tasks", "all"],
     queryFn: listTasks,
     enabled: authReady,
+  });
+  const taskMetrics = useQuery({
+    queryKey: ["tasks", "control-loop-metrics"],
+    queryFn: getTaskControlLoopMetrics,
+    enabled: authReady && role !== "sales",
   });
   const items = useQuery({
     queryKey: ["commercial-items", "all"],
@@ -69,6 +74,7 @@ export function useDashboardData() {
   return {
     orders: orders.data ?? [],
     tasks: tasks.data ?? [],
+    taskMetrics: taskMetrics.data,
     items: items.data ?? [],
     clients: clients.data ?? [],
     ownersById: owners.data ?? {},
@@ -80,6 +86,7 @@ export function useDashboardData() {
       !authReady ||
       orders.isLoading ||
       tasks.isLoading ||
+      (role !== "sales" && taskMetrics.isLoading) ||
       items.isLoading ||
       clients.isLoading ||
       owners.isLoading ||

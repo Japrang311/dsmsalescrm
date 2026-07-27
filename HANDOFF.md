@@ -1,21 +1,22 @@
 # Handoff — DSM Sales Web App V2
 
-Context dump for continuing this work in another tool (Codex). Written 2026-07-18; Phase 11/12 status refreshed 2026-07-19; Phase 11 import-review reconciliation session added 2026-07-19; post-import UX/bugfix session added 2026-07-20; second 2026-07-20 session (pipeline permissions/FK bugfixes) added 2026-07-20; Client Detail/Client List real-data wiring session added 2026-07-21; remote-migration-push + data-restoration session added 2026-07-21; browser-verification + spending_ytd fix + SO edit audit trail session added 2026-07-21; unused-code cleanup + client database (company info/contacts) feature session added 2026-07-22; contact position + Client Detail product/description fixes + commercial item product-name migration reconciliation added 2026-07-22; dynamic per-month sales target UI/calculation update added 2026-07-22; soft-delete implementation, remote Supabase apply, and main/live push closeout added 2026-07-24; RFQ retirement and documentation refresh added 2026-07-25; Sales Task Control Loop spec approval and Phase 1-2 implementation (Tasks 46-52) added 2026-07-27; unified progress timeline Task 53/8 and Manager Team Exceptions Task 54/9 added 2026-07-27; visual design audit Phase 1 (critical usability/responsiveness fixes) added 2026-07-27.
+Context dump for continuing this work in another tool (Codex). Written 2026-07-18; Phase 11/12 status refreshed 2026-07-19; Phase 11 import-review reconciliation session added 2026-07-19; post-import UX/bugfix session added 2026-07-20; second 2026-07-20 session (pipeline permissions/FK bugfixes) added 2026-07-20; Client Detail/Client List real-data wiring session added 2026-07-21; remote-migration-push + data-restoration session added 2026-07-21; browser-verification + spending_ytd fix + SO edit audit trail session added 2026-07-21; unused-code cleanup + client database (company info/contacts) feature session added 2026-07-22; contact position + Client Detail product/description fixes + commercial item product-name migration reconciliation added 2026-07-22; dynamic per-month sales target UI/calculation update added 2026-07-22; soft-delete implementation, remote Supabase apply, and main/live push closeout added 2026-07-24; RFQ retirement and documentation refresh added 2026-07-25; Sales Task Control Loop spec approval and Phase 1-2 implementation (Tasks 46-52) added 2026-07-27; unified progress timeline Task 53/8 and Manager Team Exceptions Task 54/9 added 2026-07-27; visual design audit Phase 1 (critical usability/responsiveness fixes) added 2026-07-27; Executive exception detail and aggregate-only Task metrics Task 55/10 added 2026-07-27; Dashboard/TopBar consumer migration Task 56/11 added 2026-07-27.
 
 ## HANDOFF TO CODEX — read this first (2026-07-27)
 
 Sales Task Control Loop: technical spec approved by the Product Owner, then
 implementation-plan Tasks 1-9 (project-tracker Tasks 46-54) delivered and
-locally verified. **Tasks 1-7 were already committed locally at `ce160a1`;
-Tasks 8-9 are not committed as of this paragraph being written — see the commit
-this paragraph ships with for the actual Task 8/9 commit hash.** Remote Supabase
-has not been touched.
+locally verified. **Tasks 1-7 were committed at `ce160a1`; Tasks 8-9 were
+committed at `6ad22eb` and are already in `origin/main` as of the 2026-07-27
+reconciliation below.** Remote Supabase migration state must be checked live
+before acting; this paragraph was corrected after a later reconciliation found
+the four Task Control Loop migrations already present on the linked remote.
 
 - Source of truth: `docs/superpowers/specs/2026-07-27-sales-task-control-loop-design.md`
   (the approved spec — status header says "APPROVED oleh Product Owner —
   2026-07-27"), `docs/superpowers/plans/2026-07-27-sales-task-control-loop-implementation.md`
   (the task-by-task plan), `tasks/sales-task-control-loop-todo.md` (checklist),
-  and `.superpowers/sdd/sales-task-control-loop-task-{2,3,4,5,6,7,8,9}-report.md`
+  and `.superpowers/sdd/sales-task-control-loop-task-{2,3,4,5,6,7,8,9,10,11}-report.md`
   (one detailed completion report per task — read these before touching
   anything in this feature, they record several non-obvious decisions and
   three real bugs found only via browser testing).
@@ -88,9 +89,32 @@ has not been touched.
   "Ubah owner" action in that mode so escalation does not imply ownership
   transfer. Browser verification used exact local QA fixtures, then removed
   all three fixture Tasks and confirmed `remaining=0`.
-- **Not started**: Task 55/10 onward (Executive Exceptions,
-  Dashboard/Reports/export consumer migration, existing-data cutover, final
-  release gate).
+- **Task 55/10**: Executive exception detail and aggregate-only reporting done.
+  New local migration
+  `20260727150000_restrict_task_exception_visibility.sql` narrows Executive
+  row-detail RLS to active, non-archived, Manager-owned Tasks whose derived
+  due state is `Escalated`; applies the same boundary to Task-linked
+  `follow_up_logs` and `activity_log`; and adds
+  `public.task_control_loop_metrics()` for aggregate-only company metrics
+  (Manager/Executive/Super Admin only, `PUBLIC` execute revoked). UI now labels
+  Executive `/tasks` as `Executive Exceptions`, hides Quick Create and write
+  controls, and gates TopBar data widgets until `authReady` to avoid pre-auth
+  401 noise. See
+  `.superpowers/sdd/sales-task-control-loop-task-10-report.md`.
+- **Task 56/11**: Dashboard and TopBar consumer migration done. Dashboard
+  operational selectors now count active Tasks by `workflowStatus` and due
+  buckets by derived `dueState`; `Escalated` is counted separately and combined
+  with `Overdue` only for the attention KPI. Manager/Executive/Super Admin
+  Dashboard KPI counts use `public.task_control_loop_metrics()` so Executive
+  company aggregates do not depend on row-detail visibility. TopBar
+  notifications and the Follow-Up Prioritas widget exclude Done, Cancelled,
+  and Archived Tasks even when legacy `status` is stale. Executive remains
+  read-only in the follow-up widget. See
+  `.superpowers/sdd/sales-task-control-loop-task-11-report.md`.
+- **Not started**: Task 57/12 onward (Reports and remaining performance
+  calculations, export-specific migration, Pipeline/Client Detail/
+  account-lifecycle consumer migration, existing-data cutover, final release
+  gate).
 - Verification recorded through Task 9: full local suite **439 pass, 0 fail**
   (58 files), plus a focused 34-test suite across `business-calendar`,
   `task-exceptions`, `tasks`, `task-progress`, and `activity-log`;
@@ -104,18 +128,41 @@ has not been touched.
   `supabase db lint --local` were used as the effective lint-shaped gates
   instead; worth investigating separately why ESLint is this slow on this
   repo.
-- Git/Supabase state: four new local migrations
+- Git/Supabase state as reconciled on 2026-07-27: four Task Control Loop
+  migrations
   (`20260727120000_add_task_control_loop_foundation.sql`,
   `20260727130000_add_business_calendar.sql`,
   `20260727140000_extend_task_progress_schema.sql`,
-  `20260727141000_add_atomic_task_progress.sql`) exist and were applied
-  **locally only**. Do not run `supabase db push`/`apply_migration`/
-  `execute_sql` against any remote project without fresh explicit
-  approval naming the exact target. This session's own STOP RULE required
+  `20260727141000_add_atomic_task_progress.sql`) exist locally and were also
+  listed on the linked remote by `bunx supabase migration list --linked`
+  during the reconciliation pass. Do not run `supabase db push`/
+  `apply_migration`/`execute_sql` against any remote project without fresh
+  explicit approval naming the exact target; read-only migration-list checks
+  are acceptable for reconciliation. This session's own STOP RULE required
   new explicit authorization before starting each implementation-plan
   task in turn (Tasks 1-9 were granted/continued locally in order) — the same
   pattern should hold for Task 55/10 onward: don't assume continuation is
   pre-approved just because Tasks 1-9 were.
+
+### 2026-07-27 reconciliation checkpoint
+
+- `git status --short --branch` shows `main...origin/main [ahead 3]`.
+  The three local commits ahead of `origin/main` are `b10fb15` (design audit
+  Phase 1 layout polish), `32f9d50` (mobile Quick Create accessibility label),
+  and `17c3fee` (this handoff/design-audit documentation line).
+- `origin/main` points at `6ad22eb feat: complete task progress timeline and
+  manager exceptions`, so Task 53/8 and Task 54/9 are already pushed to Git.
+- `bunx supabase migration list --linked` lists the four Task Control Loop
+  migrations through `20260727141000` on both local and remote. This corrects
+  the older "remote Supabase has not been touched" and "locally only" wording.
+- Task 55/10 later added
+  `20260727150000_restrict_task_exception_visibility.sql` locally only. It has
+  been applied to the local database via `bunx supabase db reset`, but it has
+  **not** been pushed/applied to remote Supabase and requires a fresh explicit
+  remote gate before any remote mutation.
+- No source-file working-tree diff was present before this reconciliation edit.
+  The only new pending change from this checkpoint is this `HANDOFF.md`
+  correction unless later work adds more.
 
 ### Visual design audit, Phase 1 — critical usability/responsiveness fixes (2026-07-27, committed as `b10fb151` + a same-day follow-up commit)
 

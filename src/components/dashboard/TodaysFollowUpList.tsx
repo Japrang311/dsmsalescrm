@@ -6,6 +6,7 @@ import { Phone, Mail, MessageSquare, MapPin, Users } from "lucide-react";
 import { todaysFollowUps } from "@/lib/data/dashboard-selectors";
 import { useDashboardData } from "@/hooks/use-dashboard-data";
 import { formatDateShort, formatRupiahShort } from "@/lib/format";
+import { useRole } from "@/context/role-context";
 
 const METHOD_ICON = {
   Phone,
@@ -18,8 +19,10 @@ const METHOD_ICON = {
 // RLS already scopes `tasks` to what the logged-in user can see — no role
 // prop needed here anymore (unlike the old mock version).
 export function TodaysFollowUpList() {
+  const { role } = useRole();
   const { tasks, clients, items, ownersById } = useDashboardData();
   const rows = todaysFollowUps(tasks, clients, items, ownersById).slice(0, 8);
+  const canCompleteTasks = role !== "executive";
 
   return (
     <Card className="border-border shadow-none">
@@ -59,7 +62,14 @@ export function TodaysFollowUpList() {
                         <span className="truncate text-sm font-medium text-foreground">
                           {client?.name ?? "-"}
                         </span>
-                        {task.status === "Overdue" ? (
+                        {task.dueState === "Escalated" ? (
+                          <Badge
+                            variant="outline"
+                            className="border-destructive/40 bg-destructive/10 text-[10px] font-medium text-destructive"
+                          >
+                            Escalated
+                          </Badge>
+                        ) : task.dueState === "Overdue" ? (
                           <Badge
                             variant="outline"
                             className="border-destructive/40 bg-destructive/10 text-[10px] font-medium text-destructive"
@@ -106,9 +116,11 @@ export function TodaysFollowUpList() {
                         {owner?.initials ?? "-"}
                       </div>
                     </div>
-                    <Button size="sm" variant="secondary" className="h-8">
-                      Mark Done
-                    </Button>
+                    {canCompleteTasks ? (
+                      <Button size="sm" variant="secondary" className="h-8">
+                        Mark Done
+                      </Button>
+                    ) : null}
                   </div>
                 </div>
               );

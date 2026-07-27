@@ -106,6 +106,7 @@ function DashboardPage() {
     targetsByMember,
     companyTarget,
     currentUserId,
+    taskMetrics,
     isLoading,
   } = useDashboardData();
   const monthName = new Date(2026, CURRENT_MONTH - 1, 1).toLocaleDateString(
@@ -207,7 +208,11 @@ function DashboardPage() {
   const tax = revenueByTax(orders);
   const src = revenueBySource(orders);
   const proto = prototypeSummary(orders);
-  const tasks = taskCounts(allTasks);
+  const tasks = taskCounts(
+    allTasks,
+    role === "sales" ? undefined : taskMetrics,
+  );
+  const overdueAttention = tasks.overdue + tasks.escalated;
   const waitingPo = waitingPoValue(items);
   const activeCi = activeCommercialCount(items);
 
@@ -556,20 +561,20 @@ function DashboardPage() {
 
         <KpiCard
           label="Overdue Follow-Ups"
-          value={tasks.overdue}
-          tone={tasks.overdue > 0 ? "destructive" : "default"}
+          value={overdueAttention}
+          tone={overdueAttention > 0 ? "destructive" : "default"}
           right={
             <AlertTriangle
               className={
-                tasks.overdue > 0
+                overdueAttention > 0
                   ? "h-4 w-4 text-destructive"
                   : "h-4 w-4 text-muted-foreground"
               }
             />
           }
           sub={
-            tasks.overdue > 0
-              ? "Perlu segera dijadwalkan ulang"
+            overdueAttention > 0
+              ? `${tasks.escalated} escalated · ${tasks.overdue} overdue`
               : "Semua terkendali"
           }
         />

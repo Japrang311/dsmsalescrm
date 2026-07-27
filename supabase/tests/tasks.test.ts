@@ -78,16 +78,18 @@ describe("tasks RLS", () => {
     expect(ids).toContain(taskIds.other);
   });
 
-  test("executive role sees every task but cannot write", async () => {
+  test("executive role sees only qualifying Manager exception task detail and cannot write", async () => {
     const client = await signInAs(fixtures.executive);
     const { data, error } = await client.from("tasks").select("id");
     if (error) throw error;
-    expect(data!.length).toBeGreaterThanOrEqual(2);
+    const ids = data!.map((row) => row.id);
+    expect(ids).not.toContain(taskIds.own);
+    expect(ids).toContain(taskIds.other);
 
     const { data: updated, error: updateError } = await client
       .from("tasks")
       .update({ status: "Done" })
-      .eq("id", taskIds.own)
+      .eq("id", taskIds.other)
       .select("id");
     if (updateError) throw updateError;
     // No UPDATE policy exists for executive at all, so RLS silently

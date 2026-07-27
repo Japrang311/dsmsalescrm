@@ -103,7 +103,12 @@ Product direction: `docs/ideas/sales-task-control-loop.md`
       `.superpowers/sdd/sales-task-control-loop-task-9-report.md`.
       Manager mode now separates Manager-owned Tasks from Sales-owned
       escalated active exceptions without transferring ownership.
-- [ ] Task 10: Enforce Executive exception detail and aggregate-only reporting
+- [x] Task 10: Enforce Executive exception detail and aggregate-only
+      reporting — done 2026-07-27; see
+      `.superpowers/sdd/sales-task-control-loop-task-10-report.md`.
+      Executive row-detail access is now limited at RLS level to active
+      Manager-owned Escalated Task exceptions; company-wide Task metrics
+      are exposed through an aggregate-only RPC.
 
 ### Checkpoint B — Core control loop
 
@@ -111,13 +116,19 @@ Product direction: `docs/ideas/sales-task-control-loop.md`
       2026-07-27 with local QA fixtures: Manager My Tasks showed only the
       Manager-owned Task, Team Exceptions showed only the Sales-owned
       Escalated Task, and the pre-threshold Sales Task stayed hidden.
-- [ ] Executive sees only qualifying Manager exception details
-- [ ] Executive company aggregates remain available without row-detail leakage
-- [ ] Super Admin correction remains supported without ownership
+- [x] Executive sees only qualifying Manager exception details
+- [x] Executive company aggregates remain available without row-detail leakage
+- [x] Super Admin correction remains supported without ownership
 
 ## Phase 4 — Consumer Migration
 
-- [ ] Task 11: Migrate Dashboard and TopBar consumers
+- [x] Task 11: Migrate Dashboard and TopBar consumers — done
+      2026-07-27; see
+      `.superpowers/sdd/sales-task-control-loop-task-11-report.md`.
+      Dashboard selectors, KPI counters, follow-up widgets, sales
+      performance rows, risk alerts, exports that reuse dashboard selectors,
+      and TopBar notifications now consume `workflowStatus` + `dueState`
+      instead of interpreting the legacy `status` field.
 - [ ] Task 12: Migrate Reports and performance calculations
 - [ ] Task 13: Migrate exports
 - [ ] Task 14: Migrate Pipeline, Client Detail, and commercial follow-up paths

@@ -9,7 +9,13 @@ import {
   signInAs,
   type RoleFixtureUsers,
 } from "../../../supabase/tests/helpers";
-import { listTasks, updateTaskStatus, updateTask, createTask } from "./tasks";
+import {
+  listTasks,
+  getTaskControlLoopMetrics,
+  updateTaskStatus,
+  updateTask,
+  createTask,
+} from "./tasks";
 import { supabase } from "@/lib/supabase";
 
 let fixtures: RoleFixtureUsers;
@@ -81,6 +87,40 @@ describe("src/lib/data/tasks.ts", () => {
     // real test run date -- an active, never-progressed Task is Overdue.
     expect(["Overdue", "Escalated"]).toContain(fixture?.dueState ?? "");
     expect(typeof fixture?.calendarIncomplete).toBe("boolean");
+
+    await supabase.auth.signOut();
+  });
+
+  test("getTaskControlLoopMetrics() maps aggregate Task counts for manager dashboards", async () => {
+    const fixtureClient = await signInAs(fixtures.manager);
+    const session = (await fixtureClient.auth.getSession()).data.session!;
+    await supabase.auth.setSession({
+      access_token: session.access_token,
+      refresh_token: session.refresh_token,
+    });
+
+    const metrics = await getTaskControlLoopMetrics();
+    expect(metrics.totalTasks).toBeGreaterThan(0);
+    expect(metrics.activeTasks).toBeGreaterThanOrEqual(0);
+    expect(metrics.todayTasks).toBeGreaterThanOrEqual(0);
+    expect(
+      metrics.overdueTasks + metrics.escalatedTasks,
+    ).toBeGreaterThanOrEqual(0);
+
+    await supabase.auth.signOut();
+  });
+
+  test("getTaskControlLoopMetrics() is not available to Sales", async () => {
+    const fixtureClient = await signInAs(fixtures.sales);
+    const session = (await fixtureClient.auth.getSession()).data.session!;
+    await supabase.auth.setSession({
+      access_token: session.access_token,
+      refresh_token: session.refresh_token,
+    });
+
+    await expect(getTaskControlLoopMetrics()).rejects.toThrow(
+      "task_control_loop_metrics is not available",
+    );
 
     await supabase.auth.signOut();
   });

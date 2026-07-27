@@ -30,6 +30,32 @@ type TaskRow = {
   archived: boolean;
 };
 
+type TaskControlLoopMetricsRow = {
+  total_tasks: number;
+  active_tasks: number;
+  upcoming_tasks: number;
+  today_tasks: number;
+  overdue_tasks: number;
+  escalated_tasks: number;
+  done_tasks: number;
+  cancelled_tasks: number;
+  archived_tasks: number;
+  calendar_incomplete_tasks: number;
+};
+
+export type TaskControlLoopMetrics = {
+  totalTasks: number;
+  activeTasks: number;
+  upcomingTasks: number;
+  todayTasks: number;
+  overdueTasks: number;
+  escalatedTasks: number;
+  doneTasks: number;
+  cancelledTasks: number;
+  archivedTasks: number;
+  calendarIncompleteTasks: number;
+};
+
 function toTask(
   row: TaskRow,
   holidays: ReadonlySet<string>,
@@ -77,6 +103,25 @@ export async function listTasks(): Promise<Task[]> {
   if (error) throw error;
   const asOf = todayInJakarta();
   return (data ?? []).map((row) => toTask(row, holidays, asOf));
+}
+
+export async function getTaskControlLoopMetrics(): Promise<TaskControlLoopMetrics> {
+  const { data, error } = await supabase.rpc("task_control_loop_metrics");
+  if (error) throw error;
+
+  const [row] = (data ?? []) as TaskControlLoopMetricsRow[];
+  return {
+    totalTasks: row?.total_tasks ?? 0,
+    activeTasks: row?.active_tasks ?? 0,
+    upcomingTasks: row?.upcoming_tasks ?? 0,
+    todayTasks: row?.today_tasks ?? 0,
+    overdueTasks: row?.overdue_tasks ?? 0,
+    escalatedTasks: row?.escalated_tasks ?? 0,
+    doneTasks: row?.done_tasks ?? 0,
+    cancelledTasks: row?.cancelled_tasks ?? 0,
+    archivedTasks: row?.archived_tasks ?? 0,
+    calendarIncompleteTasks: row?.calendar_incomplete_tasks ?? 0,
+  };
 }
 
 export async function updateTaskStatus(

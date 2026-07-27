@@ -3,7 +3,14 @@
 // correctly exclude Prototype FOC via `so.value ?? 0`, since FOC rows are
 // guaranteed null-value by a DB check constraint), just parameterized on
 // real fetched arrays instead of reading mock module-level arrays.
-import type { SalesOrder, Task, CommercialItem, Client } from "@/lib/domain";
+import type {
+  SalesOrder,
+  Task,
+  CommercialItem,
+  Client,
+  TaskDueState,
+  TaskWorkflowStatus,
+} from "@/lib/domain";
 import {
   CURRENT_MONTH,
   CURRENT_YEAR,
@@ -15,6 +22,7 @@ import {
   forecastValue,
   type CommercialStage,
 } from "@/lib/data/commercial-stages";
+import type { TaskControlLoopMetrics } from "@/lib/data/tasks";
 
 function paidRevenue(so: SalesOrder): number {
   return so.value ?? 0;
@@ -108,6 +116,37 @@ export function dashboardSalesTeam(
 function inRange(dateStr: string, range: DateRange): boolean {
   const d = new Date(dateStr).getTime();
   return d >= range.from.getTime() && d <= range.to.getTime();
+}
+
+const ACTIVE_TASK_WORKFLOW_STATUSES = new Set<TaskWorkflowStatus>([
+  "Open",
+  "In Progress",
+  "Waiting External",
+]);
+
+export function isActiveTask(task: Task): boolean {
+  return (
+    !task.archived && ACTIVE_TASK_WORKFLOW_STATUSES.has(task.workflowStatus)
+  );
+}
+
+export function hasTaskDueState(
+  task: Task,
+  dueStates: readonly Exclude<TaskDueState, null>[],
+): boolean {
+  if (!isActiveTask(task) || task.dueState === null) return false;
+  return dueStates.includes(task.dueState);
+}
+
+export function isTaskOverdueLike(task: Task): boolean {
+  return hasTaskDueState(task, ["Overdue", "Escalated"]);
+}
+
+function dueStateSortRank(dueState: TaskDueState): number {
+  if (dueState === "Escalated") return 0;
+  if (dueState === "Overdue") return 1;
+  if (dueState === "Today") return 2;
+  return 3;
 }
 
 // ---------------------------------------------------------------------------
@@ -392,10 +431,10 @@ export function salesPerformanceInRange(
       const revenue = memberOrders.reduce((s, o) => s + paidRevenue(o), 0);
       const target = sumMonthlyProrated(targetsFor(byMember, member.id), range);
       const overdue = tasks.filter(
-        (t) => t.ownerId === member.id && t.status === "Overdue",
+        (t) => t.ownerId === member.id && isTaskOverdueLike(t),
       ).length;
       const openTasks = tasks.filter(
-        (t) => t.ownerId === member.id && t.status !== "Done",
+        (t) => t.ownerId === member.id && isActiveTask(t),
       ).length;
       return {
         member,
@@ -441,12 +480,29 @@ export function sumMonthlyProrated(
 // Operational counters
 // ---------------------------------------------------------------------------
 
-export function taskCounts(tasks: Task[]) {
+export function taskCounts(tasks: Task[], metrics?: TaskControlLoopMetrics) {
+  if (metrics) {
+    return {
+      today: metrics.todayTasks,
+      overdue: metrics.overdueTasks,
+      escalated: metrics.escalatedTasks,
+      upcoming: metrics.upcomingTasks,
+      open: metrics.activeTasks,
+      done: metrics.doneTasks,
+      cancelled: metrics.cancelledTasks,
+      archived: metrics.archivedTasks,
+    };
+  }
+
   return {
-    today: tasks.filter((x) => x.status === "Today").length,
-    overdue: tasks.filter((x) => x.status === "Overdue").length,
-    upcoming: tasks.filter((x) => x.status === "Upcoming").length,
-    open: tasks.filter((x) => x.status !== "Done").length,
+    today: tasks.filter((x) => hasTaskDueState(x, ["Today"])).length,
+    overdue: tasks.filter((x) => hasTaskDueState(x, ["Overdue"])).length,
+    escalated: tasks.filter((x) => hasTaskDueState(x, ["Escalated"])).length,
+    upcoming: tasks.filter((x) => hasTaskDueState(x, ["Upcoming"])).length,
+    open: tasks.filter(isActiveTask).length,
+    done: tasks.filter((x) => x.workflowStatus === "Done").length,
+    cancelled: tasks.filter((x) => x.workflowStatus === "Cancelled").length,
+    archived: tasks.filter((x) => x.archived).length,
   };
 }
 
@@ -470,7 +526,7 @@ export function todaysFollowUps(
   ownersById: Record<string, { name: string; initials: string }>,
 ) {
   return tasks
-    .filter((t) => t.status === "Today" || t.status === "Overdue")
+    .filter((t) => hasTaskDueState(t, ["Today", "Overdue", "Escalated"]))
     .map((t) => {
       const client = clients.find((c) => c.id === t.clientId);
       const ci = t.commercialItemId
@@ -479,11 +535,12 @@ export function todaysFollowUps(
       const owner = ownersById[t.ownerId];
       return { task: t, client, commercialItem: ci, owner };
     })
-    .sort(
-      (a, b) =>
-        (a.task.status === "Overdue" ? -1 : 1) -
-        (b.task.status === "Overdue" ? -1 : 1),
-    );
+    .sort((a, b) => {
+      const byState =
+        dueStateSortRank(a.task.dueState) - dueStateSortRank(b.task.dueState);
+      if (byState !== 0) return byState;
+      return a.task.dueDate.localeCompare(b.task.dueDate);
+    });
 }
 
 // ---------------------------------------------------------------------------
@@ -507,10 +564,10 @@ export function salesPerformance(
       const revenue = memberOrders.reduce((s, o) => s + paidRevenue(o), 0);
       const target = sumTargetsThroughMonth(targetsFor(byMember, member.id));
       const overdue = tasks.filter(
-        (t) => t.ownerId === member.id && t.status === "Overdue",
+        (t) => t.ownerId === member.id && isTaskOverdueLike(t),
       ).length;
       const openTasks = tasks.filter(
-        (t) => t.ownerId === member.id && t.status !== "Done",
+        (t) => t.ownerId === member.id && isActiveTask(t),
       ).length;
       const activeClients = clients.filter(
         (c) => c.ownerId === member.id && c.status !== "Lost",
@@ -653,7 +710,7 @@ export function riskAlerts(
     title: string;
     detail: string;
   }> = [];
-  const overdue = tasks.filter((t) => t.status === "Overdue");
+  const overdue = tasks.filter(isTaskOverdueLike);
   if (overdue.length > 0) {
     alerts.push({
       id: "r1",

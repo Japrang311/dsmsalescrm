@@ -157,55 +157,93 @@ describe("dashboard-selectors dynamic monthly targets", () => {
   });
 });
 
-// Characterization tests (Sales Task Control Loop Task 2 / project-tracker
-// Task 47) — lock in that these operational selectors trust the stored
-// Task.status string literally and never look at dueDate to decide
-// Today/Overdue/Upcoming. This is the pre-Task-4 baseline: once Task 4 adds
-// a database-derived due state, these selectors are expected to consume the
-// derived value and these fixtures (past due date, status still "Upcoming")
-// should then report the task as overdue instead. Update, don't delete,
-// these tests when that migration lands.
-describe("dashboard-selectors task status is read as-is, not derived from dueDate", () => {
-  const overdueByDateButUpcomingStatus: Task = {
-    id: "task-stale-status",
+describe("dashboard-selectors task workflow and due-state contracts", () => {
+  const task = (id: string, patch: Partial<Task> = {}): Task => ({
+    id,
     clientId: "client-1",
     ownerId: "owner-1",
-    title: "Due last year, status never recomputed",
-    dueDate: "2020-01-01",
+    title: id,
+    dueDate: "2026-07-27",
     method: "Phone",
     status: "Upcoming",
     workflowStatus: "Open",
-    dueState: "Overdue",
+    dueState: "Upcoming",
     calendarIncomplete: false,
     category: "Other",
     priority: "Normal",
-  };
-
-  const genuinelyOverdue: Task = {
-    ...overdueByDateButUpcomingStatus,
-    id: "task-real-overdue",
-    status: "Overdue",
-  };
-
-  test("taskCounts() buckets purely by the stored status field", () => {
-    const counts = taskCounts([overdueByDateButUpcomingStatus, genuinelyOverdue]);
-    // The 2020-01-01 task is years overdue by the calendar, but taskCounts()
-    // has no date logic at all — it counts it as "upcoming" because that's
-    // what status literally says.
-    expect(counts.upcoming).toBe(1);
-    expect(counts.overdue).toBe(1);
-    expect(counts.today).toBe(0);
+    archived: false,
+    ...patch,
   });
 
-  test("todaysFollowUps() excludes a calendar-overdue task whose stored status is still Upcoming", () => {
+  test("taskCounts() buckets active tasks by dueState, not legacy status", () => {
+    const counts = taskCounts([
+      task("stale-status", {
+        status: "Upcoming",
+        dueState: "Overdue",
+      }),
+      task("escalated", {
+        status: "Overdue",
+        dueState: "Escalated",
+      }),
+      task("done-legacy-overdue", {
+        status: "Overdue",
+        workflowStatus: "Done",
+        dueState: null,
+      }),
+      task("archived-overdue", {
+        status: "Overdue",
+        dueState: "Overdue",
+        archived: true,
+      }),
+    ]);
+
+    expect(counts.open).toBe(2);
+    expect(counts.upcoming).toBe(0);
+    expect(counts.overdue).toBe(1);
+    expect(counts.escalated).toBe(1);
+    expect(counts.done).toBe(1);
+    expect(counts.archived).toBe(1);
+  });
+
+  test("taskCounts() can use aggregate metrics instead of visible detail rows", () => {
+    const counts = taskCounts([], {
+      totalTasks: 20,
+      activeTasks: 7,
+      upcomingTasks: 2,
+      todayTasks: 1,
+      overdueTasks: 3,
+      escalatedTasks: 1,
+      doneTasks: 10,
+      cancelledTasks: 2,
+      archivedTasks: 1,
+      calendarIncompleteTasks: 0,
+    });
+
+    expect(counts.open).toBe(7);
+    expect(counts.today).toBe(1);
+    expect(counts.overdue).toBe(3);
+    expect(counts.escalated).toBe(1);
+  });
+
+  test("todaysFollowUps() includes active Today, Overdue, and Escalated tasks only", () => {
     const result = todaysFollowUps(
-      [overdueByDateButUpcomingStatus, genuinelyOverdue],
+      [
+        task("today", { dueState: "Today" }),
+        task("overdue", { dueState: "Overdue" }),
+        task("escalated", { dueState: "Escalated" }),
+        task("upcoming", { dueState: "Upcoming" }),
+        task("done", { workflowStatus: "Done", dueState: null }),
+        task("archived", { dueState: "Escalated", archived: true }),
+      ],
       [],
       [],
       {},
     );
-    const ids = result.map((r) => r.task.id);
-    expect(ids).not.toContain(overdueByDateButUpcomingStatus.id);
-    expect(ids).toContain(genuinelyOverdue.id);
+
+    expect(result.map((r) => r.task.id)).toEqual([
+      "escalated",
+      "overdue",
+      "today",
+    ]);
   });
 });

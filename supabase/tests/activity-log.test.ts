@@ -77,11 +77,13 @@ describe("activity_log RLS", () => {
     expect(ids).toContain(logIds.other);
   });
 
-  test("executive role sees every activity entry but cannot insert", async () => {
+  test("executive role cannot read general activity entries and cannot insert", async () => {
     const client = await signInAs(fixtures.executive);
     const { data, error } = await client.from("activity_log").select("id");
     if (error) throw error;
-    expect(data!.length).toBeGreaterThanOrEqual(2);
+    const ids = data!.map((row) => row.id);
+    expect(ids).not.toContain(logIds.own);
+    expect(ids).not.toContain(logIds.other);
 
     const { error: insertError } = await client.from("activity_log").insert({
       kind: "client_status_change",

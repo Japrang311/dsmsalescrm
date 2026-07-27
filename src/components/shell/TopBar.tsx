@@ -36,6 +36,10 @@ import type { Role } from "@/lib/domain";
 import { listOwners } from "@/lib/data/clients";
 import { getCurrentActorId } from "@/lib/data/activity-log";
 import { useDashboardData } from "@/hooks/use-dashboard-data";
+import {
+  hasTaskDueState,
+  isTaskOverdueLike,
+} from "@/lib/data/dashboard-selectors";
 import { AddClientDialog } from "@/components/clients/AddClientDialog";
 import { AddFollowUpDialog } from "@/components/clients/AddFollowUpDialog";
 import {
@@ -201,10 +205,14 @@ function NotificationsMenu() {
   const navigate = useNavigate();
   const { tasks, clients } = useDashboardData();
   const alerts = tasks
-    .filter((t) => t.status === "Overdue" || t.status === "Today")
-    .sort((a, b) =>
-      a.status === b.status ? 0 : a.status === "Overdue" ? -1 : 1,
-    );
+    .filter((t) => isTaskOverdueLike(t) || hasTaskDueState(t, ["Today"]))
+    .sort((a, b) => {
+      const rank = (state: typeof a.dueState) =>
+        state === "Escalated" ? 0 : state === "Overdue" ? 1 : 2;
+      const byState = rank(a.dueState) - rank(b.dueState);
+      if (byState !== 0) return byState;
+      return a.dueDate.localeCompare(b.dueDate);
+    });
   const clientName = (id: string) =>
     clients.find((c) => c.id === id)?.name ?? "—";
 
@@ -249,12 +257,16 @@ function NotificationsMenu() {
                 <Badge
                   variant="outline"
                   className={
-                    t.status === "Overdue"
+                    isTaskOverdueLike(t)
                       ? "border-destructive/40 bg-destructive/10 text-destructive"
                       : "border-warning/40 bg-warning/10 text-warning"
                   }
                 >
-                  {t.status === "Overdue" ? "Overdue" : "Hari ini"}
+                  {t.dueState === "Escalated"
+                    ? "Escalated"
+                    : t.dueState === "Overdue"
+                      ? "Overdue"
+                      : "Hari ini"}
                 </Badge>
               </span>
               <span className="text-xs text-muted-foreground">
@@ -275,7 +287,7 @@ export function TopBar() {
   const { data: owners = {} } = useQuery({
     queryKey: ["profiles", "owners"],
     queryFn: listOwners,
-    enabled: authSource === "dev",
+    enabled: authReady && authSource === "dev",
   });
   // Looked up by the real signed-in user's id, not guessed by role — the
   // dev switcher signs into a specific seed account per role (see
@@ -299,52 +311,60 @@ export function TopBar() {
     <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-border bg-background/95 px-3 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:px-4">
       <SidebarTrigger className="text-foreground" />
 
-      <GlobalSearch />
+      {authReady && <GlobalSearch />}
 
       <div className="ml-auto flex items-center gap-1.5 md:gap-2">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button size="sm" className="h-9 gap-1.5" aria-label="Quick Create">
-              <Plus className="h-4 w-4" />
-              <span className="hidden sm:inline">Quick Create</span>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuLabel>Quick Create</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            {QUICK_CREATE_ITEMS.map((item) => (
-              <DropdownMenuItem
-                key={item.kind}
-                onSelect={() => setQuickCreate(item.kind)}
-              >
-                {item.label}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {authReady && role !== "executive" && (
+          <>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  size="sm"
+                  className="h-9 gap-1.5"
+                  aria-label="Quick Create"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span className="hidden sm:inline">Quick Create</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Quick Create</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {QUICK_CREATE_ITEMS.map((item) => (
+                  <DropdownMenuItem
+                    key={item.kind}
+                    onSelect={() => setQuickCreate(item.kind)}
+                  >
+                    {item.label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
 
-        <AddFollowUpDialog
-          open={quickCreate === "followup"}
-          onOpenChange={(o) => !o && setQuickCreate(null)}
-        />
-        <AddClientDialog
-          open={quickCreate === "client"}
-          onOpenChange={(o) => !o && setQuickCreate(null)}
-        />
-        <CreateQuotationDialog
-          open={quickCreate === "quotation"}
-          onOpenChange={(o) => !o && setQuickCreate(null)}
-        />
-        <CreateSalesOrderDialog
-          open={quickCreate === "so"}
-          onOpenChange={(o) => !o && setQuickCreate(null)}
-        />
-        <CreatePrototypeDialog
-          open={quickCreate === "prototype"}
-          onOpenChange={(o) => !o && setQuickCreate(null)}
-        />
+            <AddFollowUpDialog
+              open={quickCreate === "followup"}
+              onOpenChange={(o) => !o && setQuickCreate(null)}
+            />
+            <AddClientDialog
+              open={quickCreate === "client"}
+              onOpenChange={(o) => !o && setQuickCreate(null)}
+            />
+            <CreateQuotationDialog
+              open={quickCreate === "quotation"}
+              onOpenChange={(o) => !o && setQuickCreate(null)}
+            />
+            <CreateSalesOrderDialog
+              open={quickCreate === "so"}
+              onOpenChange={(o) => !o && setQuickCreate(null)}
+            />
+            <CreatePrototypeDialog
+              open={quickCreate === "prototype"}
+              onOpenChange={(o) => !o && setQuickCreate(null)}
+            />
+          </>
+        )}
 
-        <NotificationsMenu />
+        {authReady && <NotificationsMenu />}
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

@@ -69,6 +69,7 @@ import {
   describeTaskChanges,
 } from "@/lib/data/tasks";
 import {
+  filterExecutiveTaskExceptions,
   filterManagerMyTasks,
   filterManagerTeamExceptions,
 } from "@/lib/data/task-exceptions";
@@ -283,6 +284,9 @@ function TasksInboxPage() {
   }, [role, managerTaskMode]);
 
   const scopedTasks = useMemo(() => {
+    if (role === "executive") {
+      return filterExecutiveTaskExceptions(tasks, profilesById);
+    }
     if (role !== "manager") return tasks;
     if (managerTaskMode === "team-exceptions") {
       return filterManagerTeamExceptions(tasks, profilesById);
@@ -738,9 +742,11 @@ function TasksInboxPage() {
       ? managerTaskMode === "team-exceptions"
         ? "Team Exceptions"
         : "My Tasks"
-      : role === "sales"
-        ? "My Tasks"
-        : "Team Tasks (read-only)";
+      : role === "executive"
+        ? "Executive Exceptions"
+        : role === "sales"
+          ? "My Tasks"
+          : "Team Tasks (read-only)";
 
   if (!authReady || tasksLoading) {
     return (
@@ -760,7 +766,9 @@ function TasksInboxPage() {
           <p className="text-sm text-muted-foreground">
             {isManagerTeamExceptions
               ? "Sales-owned task yang sudah melewati threshold eskalasi."
-              : "Task & follow-up terhubung ke klien serta commercial item aktif."}
+              : role === "executive"
+                ? "Manager-owned task yang sudah tereskalasi. Detail bersifat read-only."
+                : "Task & follow-up terhubung ke klien serta commercial item aktif."}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 self-start">
