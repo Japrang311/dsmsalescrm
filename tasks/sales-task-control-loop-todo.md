@@ -146,13 +146,22 @@ Product direction: `docs/ideas/sales-task-control-loop.md`
       Pipeline, Client Detail, and Commercial Detail now use workflow/due-state
       Task relation helpers; commercial follow-up creation no longer writes
       legacy due status from UI call sites.
-- [ ] Task 15: Migrate ownership transfer and account lifecycle consumers
+- [x] Task 15: Migrate ownership transfer and account lifecycle consumers —
+      done 2026-07-27; see
+      `.superpowers/sdd/sales-task-control-loop-task-15-report.md`.
+      Ownership transfer and Team roster counts now use active
+      `workflowStatus` + `archived` semantics; Done, Cancelled, and archived
+      Tasks keep historical attribution.
 
 ### Checkpoint C — Consumer parity
 
-- [ ] No active consumer treats Today/Upcoming/Overdue as workflow status
-- [ ] Dashboard, Reports, and exports reconcile for every role
-- [ ] Pipeline and Client Detail work without restoring RFQ
+- [x] No active consumer treats Today/Upcoming/Overdue as workflow status —
+      active-code scan clean 2026-07-27; remaining `status <> 'Done'`
+      matches are in superseded historical migrations only.
+- [x] Dashboard, Reports, and exports reconcile for every role — verified
+      across Tasks 11-13 focused selector/export/report tests.
+- [x] Pipeline and Client Detail work without restoring RFQ — verified in Task
+      14 static scan plus Playwright screenshots of `/pipeline` and `/clients`.
 
 ## Phase 5 — Cutover, Verification, and Release
 

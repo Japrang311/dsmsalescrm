@@ -34,6 +34,7 @@ type CreatedRows = {
   clientLost: string;
   taskOpen: string;
   taskDone: string;
+  taskCancelled: string;
   taskArchived: string;
   commercialOpen: string;
   commercialClosedWon: string;
@@ -224,6 +225,7 @@ beforeAll(async () => {
     due_date: "2026-07-19",
     method: "Email",
     status: "Upcoming",
+    workflow_status: "In Progress",
     archived: false,
   });
   const taskDone = await insertId("tasks", {
@@ -233,6 +235,18 @@ beforeAll(async () => {
     due_date: "2026-07-18",
     method: "Email",
     status: "Done",
+    workflow_status: "Done",
+    archived: false,
+  });
+  const taskCancelled = await insertId("tasks", {
+    client_id: clientOpen,
+    owner_id: users.sales.id,
+    title: "Task 4 cancelled task",
+    due_date: "2026-07-18",
+    method: "Email",
+    status: "Upcoming",
+    workflow_status: "Cancelled",
+    cancellation_reason: "Task 15 transfer exclusion fixture",
     archived: false,
   });
   const taskArchived = await insertId("tasks", {
@@ -242,6 +256,7 @@ beforeAll(async () => {
     due_date: "2026-07-17",
     method: "Email",
     status: "Upcoming",
+    workflow_status: "Open",
     archived: true,
   });
 
@@ -260,9 +275,7 @@ beforeAll(async () => {
       source_flow: "RFQ / New Product",
       document_date: "2026-07-19",
       stage,
-      ...(stage === "Closed Lost"
-        ? { lost_reason: "Tidak ada respons" }
-        : {}),
+      ...(stage === "Closed Lost" ? { lost_reason: "Tidak ada respons" } : {}),
     });
   }
 
@@ -332,6 +345,7 @@ beforeAll(async () => {
     clientLost,
     taskOpen,
     taskDone,
+    taskCancelled,
     taskArchived,
     commercialOpen: commercialRows.commercialOpen,
     commercialClosedWon: commercialRows.commercialClosedWon,
@@ -374,7 +388,15 @@ afterAll(async () => {
       ],
       ["follow_up_logs", [created.followUp]],
       ["sales_orders", [created.salesOrder]],
-      ["tasks", [created.taskOpen, created.taskDone, created.taskArchived]],
+      [
+        "tasks",
+        [
+          created.taskOpen,
+          created.taskDone,
+          created.taskCancelled,
+          created.taskArchived,
+        ],
+      ],
       [
         "commercial_documents",
         [
@@ -447,7 +469,7 @@ describe("account lifecycle database primitives", () => {
     expect(error).toBeNull();
     expect(data as ReferenceCounts).toEqual({
       clients: 2,
-      tasks: 3,
+      tasks: 4,
       commercial_items: 5,
       sales_orders: 1,
       follow_up_logs: 1,
@@ -456,8 +478,8 @@ describe("account lifecycle database primitives", () => {
       activity_log_actor: 1,
       activity_log_target: 1,
       profile_status_changes: 1,
-      total_blocking: 16,
-      total_all: 17,
+      total_blocking: 17,
+      total_all: 18,
     });
   });
 
@@ -571,6 +593,9 @@ describe("account lifecycle database primitives", () => {
       expect(await ownerId("clients", created.clientLost)).toBe(users.sales.id);
       expect(await ownerId("tasks", created.taskOpen)).toBe(users.manager.id);
       expect(await ownerId("tasks", created.taskDone)).toBe(users.sales.id);
+      expect(await ownerId("tasks", created.taskCancelled)).toBe(
+        users.sales.id,
+      );
       expect(await ownerId("tasks", created.taskArchived)).toBe(users.sales.id);
       expect(
         await ownerId("commercial_documents", created.commercialOpen),
@@ -1109,7 +1134,7 @@ describe("account lifecycle database primitives", () => {
         },
       );
       expect(referencedError?.message).toContain("ACCOUNT_HAS_REFERENCES");
-      expect(referencedError?.details).toContain('"total_blocking": 16');
+      expect(referencedError?.details).toContain('"total_blocking": 17');
 
       const { data, error } = await adminClient.rpc(
         "admin_delete_eligible_account",

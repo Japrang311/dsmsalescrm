@@ -66,6 +66,11 @@ const ADMIN_ACTIVITY_KINDS = [
 ] as const;
 
 const TEAM_SUMMARY_BATCH_SIZE = 8;
+const ACTIVE_TRANSFER_WORKFLOW_STATUSES = [
+  "Open",
+  "In Progress",
+  "Waiting External",
+] as const;
 
 function throwQueryError(error: unknown): void {
   if (error) throw error;
@@ -111,7 +116,7 @@ async function mapInBatches<T, R>(
 
 // Privileged RLS readers receive every profile row, including inactive
 // accounts. Ownership totals mirror the server transfer scope: non-Lost
-// clients, open/unarchived tasks, and non-terminal commercial items.
+// clients, workflow-active/unarchived tasks, and non-terminal commercial items.
 export async function listTeamMembers(): Promise<TeamMember[]> {
   const profilesResult = await supabase
     .from("profiles")
@@ -133,7 +138,7 @@ export async function listTeamMembers(): Promise<TeamMember[]> {
           .from("tasks")
           .select("id", { count: "exact", head: true })
           .eq("owner_id", row.id)
-          .neq("status", "Done")
+          .in("workflow_status", [...ACTIVE_TRANSFER_WORKFLOW_STATUSES])
           .eq("archived", false),
         countActiveCommercialItems(row.id),
         supabase

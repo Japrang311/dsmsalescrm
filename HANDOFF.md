@@ -1,6 +1,6 @@
 # Handoff — DSM Sales Web App V2
 
-Context dump for continuing this work in another tool (Codex). Written 2026-07-18; Phase 11/12 status refreshed 2026-07-19; Phase 11 import-review reconciliation session added 2026-07-19; post-import UX/bugfix session added 2026-07-20; second 2026-07-20 session (pipeline permissions/FK bugfixes) added 2026-07-20; Client Detail/Client List real-data wiring session added 2026-07-21; remote-migration-push + data-restoration session added 2026-07-21; browser-verification + spending_ytd fix + SO edit audit trail session added 2026-07-21; unused-code cleanup + client database (company info/contacts) feature session added 2026-07-22; contact position + Client Detail product/description fixes + commercial item product-name migration reconciliation added 2026-07-22; dynamic per-month sales target UI/calculation update added 2026-07-22; soft-delete implementation, remote Supabase apply, and main/live push closeout added 2026-07-24; RFQ retirement and documentation refresh added 2026-07-25; Sales Task Control Loop spec approval and Phase 1-2 implementation (Tasks 46-52) added 2026-07-27; unified progress timeline Task 53/8 and Manager Team Exceptions Task 54/9 added 2026-07-27; visual design audit Phase 1 (critical usability/responsiveness fixes) added 2026-07-27; Executive exception detail and aggregate-only Task metrics Task 55/10 added 2026-07-27; Dashboard/TopBar consumer migration Task 56/11 added 2026-07-27; Reports consumer migration Task 57/12 added 2026-07-27; export migration Task 58/13 added 2026-07-27; Pipeline/Client Detail/commercial follow-up migration Task 59/14 added 2026-07-27.
+Context dump for continuing this work in another tool (Codex). Written 2026-07-18; Phase 11/12 status refreshed 2026-07-19; Phase 11 import-review reconciliation session added 2026-07-19; post-import UX/bugfix session added 2026-07-20; second 2026-07-20 session (pipeline permissions/FK bugfixes) added 2026-07-20; Client Detail/Client List real-data wiring session added 2026-07-21; remote-migration-push + data-restoration session added 2026-07-21; browser-verification + spending_ytd fix + SO edit audit trail session added 2026-07-21; unused-code cleanup + client database (company info/contacts) feature session added 2026-07-22; contact position + Client Detail product/description fixes + commercial item product-name migration reconciliation added 2026-07-22; dynamic per-month sales target UI/calculation update added 2026-07-22; soft-delete implementation, remote Supabase apply, and main/live push closeout added 2026-07-24; RFQ retirement and documentation refresh added 2026-07-25; Sales Task Control Loop spec approval and Phase 1-2 implementation (Tasks 46-52) added 2026-07-27; unified progress timeline Task 53/8 and Manager Team Exceptions Task 54/9 added 2026-07-27; visual design audit Phase 1 (critical usability/responsiveness fixes) added 2026-07-27; Executive exception detail and aggregate-only Task metrics Task 55/10 added 2026-07-27; Dashboard/TopBar consumer migration Task 56/11 added 2026-07-27; Reports consumer migration Task 57/12 added 2026-07-27; export migration Task 58/13 added 2026-07-27; Pipeline/Client Detail/commercial follow-up migration Task 59/14 added 2026-07-27; ownership/account lifecycle migration Task 60/15 added 2026-07-27.
 
 ## HANDOFF TO CODEX — read this first (2026-07-27)
 
@@ -16,7 +16,7 @@ the four Task Control Loop migrations already present on the linked remote.
   (the approved spec — status header says "APPROVED oleh Product Owner —
   2026-07-27"), `docs/superpowers/plans/2026-07-27-sales-task-control-loop-implementation.md`
   (the task-by-task plan), `tasks/sales-task-control-loop-todo.md` (checklist),
-  and `.superpowers/sdd/sales-task-control-loop-task-{2,3,4,5,6,7,8,9,10,11,12,13,14}-report.md`
+  and `.superpowers/sdd/sales-task-control-loop-task-{2,3,4,5,6,7,8,9,10,11,12,13,14,15}-report.md`
   (one detailed completion report per task — read these before touching
   anything in this feature, they record several non-obvious decisions and
   three real bugs found only via browser testing).
@@ -134,8 +134,19 @@ the four Task Control Loop migrations already present on the linked remote.
   screenshots of `/pipeline` and `/clients` rendered without RFQ being
   reintroduced. See
   `.superpowers/sdd/sales-task-control-loop-task-14-report.md`.
-- **Not started**: Task 60/15 onward (ownership transfer/account-lifecycle
-  consumer migration, existing-data cutover, final release gate).
+- **Task 60/15**: Ownership transfer and account lifecycle consumer migration
+  done locally. New migration
+  `20260727130930_update_task_account_lifecycle.sql` replaces account
+  lifecycle transfer scope with `workflow_status in ('Open','In Progress',
+  'Waiting External')` plus `archived = false`, while Done, Cancelled, and
+  archived Tasks preserve historical owner attribution. Team roster active
+  counts now use the same workflow-active Task predicate. During verification,
+  a copied historical bug was caught and fixed: the transfer function must
+  update `public.commercial_documents`, not the retired `public.commercial_items`
+  table. Checkpoint C is now locally complete. See
+  `.superpowers/sdd/sales-task-control-loop-task-15-report.md`.
+- **Not started**: Task 61/16 onward (existing-data cutover, final release
+  gate).
 - Verification recorded through Task 9: full local suite **439 pass, 0 fail**
   (58 files), plus a focused 34-test suite across `business-calendar`,
   `task-exceptions`, `tasks`, `task-progress`, and `activity-log`;

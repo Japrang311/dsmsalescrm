@@ -382,7 +382,13 @@ describe("privileged Team roster mapping", () => {
     ).toContainEqual({ method: "neq", args: ["status", "Lost"] });
     expect(fromCalls.find((entry) => entry.table === "tasks")?.filters).toEqual(
       expect.arrayContaining([
-        { method: "neq", args: ["status", "Done"] },
+        {
+          method: "in",
+          args: [
+            "workflow_status",
+            ["Open", "In Progress", "Waiting External"],
+          ],
+        },
         { method: "eq", args: ["archived", false] },
       ]),
     );
