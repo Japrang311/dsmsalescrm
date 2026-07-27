@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 import {
   Select,
   SelectContent,
@@ -169,7 +170,7 @@ export function CreateQuotationDialog(props: SharedProps) {
       {(props.trigger || !controlled) && (
         <DialogTrigger asChild>{props.trigger}</DialogTrigger>
       )}
-      <DialogContent className="max-w-xl">
+      <DialogContent className="max-h-[90vh] max-w-xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Buat Quotation</DialogTitle>
           <DialogDescription>{clientName ?? "Pilih klien"}</DialogDescription>
@@ -450,7 +451,7 @@ export function CreateSalesOrderDialog(props: SharedProps) {
       {(props.trigger || !controlled) && (
         <DialogTrigger asChild>{props.trigger}</DialogTrigger>
       )}
-      <DialogContent className="max-w-xl">
+      <DialogContent className="max-h-[90vh] max-w-xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Record Sales Order</DialogTitle>
           <DialogDescription>{clientName ?? "Pilih klien"}</DialogDescription>
@@ -698,7 +699,7 @@ export function CreatePrototypeDialog(props: SharedProps) {
       {(props.trigger || !controlled) && (
         <DialogTrigger asChild>{props.trigger}</DialogTrigger>
       )}
-      <DialogContent>
+      <DialogContent className="max-h-[90vh] max-w-xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Prototype Request</DialogTitle>
           <DialogDescription>{clientName ?? "Pilih klien"}</DialogDescription>
@@ -854,60 +855,73 @@ function LineItemsSection<
           return (
             <div
               key={field.id}
-              className="grid grid-cols-[1fr_auto] items-start gap-2 rounded-md border p-2"
+              className="grid grid-cols-[1fr_auto] items-start gap-2 rounded-md border p-3"
             >
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-6">
-                <Input
-                  aria-label={`Nama Product item ${index + 1}`}
-                  placeholder="Nama Product"
-                  {...register(
-                    `lineItems.${index}.productName` as Path<TFieldValues>,
+              <div className="grid gap-2">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <Input
+                    aria-label={`Nama Product item ${index + 1}`}
+                    placeholder="Nama Product"
+                    {...register(
+                      `lineItems.${index}.productName` as Path<TFieldValues>,
+                    )}
+                  />
+                  <Input
+                    aria-label={`Description item ${index + 1}`}
+                    placeholder="Description / Deskripsi Project"
+                    {...register(
+                      `lineItems.${index}.description` as Path<TFieldValues>,
+                    )}
+                  />
+                </div>
+                <div
+                  className={cn(
+                    "grid grid-cols-2 gap-2",
+                    showMoney && "sm:grid-cols-4",
                   )}
-                />
-                <Input
-                  aria-label={`Description item ${index + 1}`}
-                  placeholder="Description / Deskripsi Project"
-                  {...register(
-                    `lineItems.${index}.description` as Path<TFieldValues>,
-                  )}
-                />
-                <Input
-                  aria-label={`Qty item ${index + 1}`}
-                  type="number"
-                  min={0}
-                  placeholder="Qty"
-                  {...register(`lineItems.${index}.qty` as Path<TFieldValues>)}
-                />
-                <select
-                  aria-label={`UOM item ${index + 1}`}
-                  className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-                  {...register(`lineItems.${index}.uom` as Path<TFieldValues>)}
                 >
-                  {["Unit", "Pcs", "Set", "Lot"].map((uom) => (
-                    <option key={uom} value={uom}>
-                      {uom}
-                    </option>
-                  ))}
-                </select>
-                {showMoney && (
-                  <>
-                    <Input
-                      aria-label={`Unit Price item ${index + 1}`}
-                      type="number"
-                      min={0}
-                      placeholder="Unit Price"
-                      {...register(
-                        `lineItems.${index}.unitPrice` as Path<TFieldValues>,
-                      )}
-                    />
-                    <Input
-                      aria-label={`Total item ${index + 1}`}
-                      disabled
-                      readOnly
-                      value={rowTotal.toLocaleString("id-ID")}
-                    />
-                  </>
-                )}
+                  <Input
+                    aria-label={`Qty item ${index + 1}`}
+                    type="number"
+                    min={0}
+                    placeholder="Qty"
+                    {...register(
+                      `lineItems.${index}.qty` as Path<TFieldValues>,
+                    )}
+                  />
+                  <select
+                    aria-label={`UOM item ${index + 1}`}
+                    className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+                    {...register(
+                      `lineItems.${index}.uom` as Path<TFieldValues>,
+                    )}
+                  >
+                    {["Unit", "Pcs", "Set", "Lot"].map((uom) => (
+                      <option key={uom} value={uom}>
+                        {uom}
+                      </option>
+                    ))}
+                  </select>
+                  {showMoney && (
+                    <>
+                      <Input
+                        aria-label={`Unit Price item ${index + 1}`}
+                        type="number"
+                        min={0}
+                        placeholder="Unit Price"
+                        {...register(
+                          `lineItems.${index}.unitPrice` as Path<TFieldValues>,
+                        )}
+                      />
+                      <Input
+                        aria-label={`Total item ${index + 1}`}
+                        disabled
+                        readOnly
+                        value={rowTotal.toLocaleString("id-ID")}
+                      />
+                    </>
+                  )}
+                </div>
               </div>
               <Button
                 type="button"
