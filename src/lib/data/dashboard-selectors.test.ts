@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test";
-import type { CommercialItem, SalesOrder } from "@/lib/domain";
+import type { CommercialItem, SalesOrder, Task } from "@/lib/domain";
 import {
   clientCommercialMetrics,
   companyMonthlyTarget,
@@ -11,6 +11,8 @@ import {
   revenueByTax,
   revenueBySource,
   prototypeSummary,
+  taskCounts,
+  todaysFollowUps,
 } from "./dashboard-selectors";
 
 // Proves PRD §7/§15's revenue-inclusion rule at the app/data-layer level: a
@@ -152,5 +154,58 @@ describe("dashboard-selectors dynamic monthly targets", () => {
       ytdTargetValue("sales", "sales-1", targetsByMember, companyTarget, 3),
     ).toBe(4_000);
     expect(sumTargetsThroughMonth(targetsByMember["sales-2"], 3)).toBe(30_000);
+  });
+});
+
+// Characterization tests (Sales Task Control Loop Task 2 / project-tracker
+// Task 47) — lock in that these operational selectors trust the stored
+// Task.status string literally and never look at dueDate to decide
+// Today/Overdue/Upcoming. This is the pre-Task-4 baseline: once Task 4 adds
+// a database-derived due state, these selectors are expected to consume the
+// derived value and these fixtures (past due date, status still "Upcoming")
+// should then report the task as overdue instead. Update, don't delete,
+// these tests when that migration lands.
+describe("dashboard-selectors task status is read as-is, not derived from dueDate", () => {
+  const overdueByDateButUpcomingStatus: Task = {
+    id: "task-stale-status",
+    clientId: "client-1",
+    ownerId: "owner-1",
+    title: "Due last year, status never recomputed",
+    dueDate: "2020-01-01",
+    method: "Phone",
+    status: "Upcoming",
+    workflowStatus: "Open",
+    dueState: "Overdue",
+    calendarIncomplete: false,
+    category: "Other",
+    priority: "Normal",
+  };
+
+  const genuinelyOverdue: Task = {
+    ...overdueByDateButUpcomingStatus,
+    id: "task-real-overdue",
+    status: "Overdue",
+  };
+
+  test("taskCounts() buckets purely by the stored status field", () => {
+    const counts = taskCounts([overdueByDateButUpcomingStatus, genuinelyOverdue]);
+    // The 2020-01-01 task is years overdue by the calendar, but taskCounts()
+    // has no date logic at all — it counts it as "upcoming" because that's
+    // what status literally says.
+    expect(counts.upcoming).toBe(1);
+    expect(counts.overdue).toBe(1);
+    expect(counts.today).toBe(0);
+  });
+
+  test("todaysFollowUps() excludes a calendar-overdue task whose stored status is still Upcoming", () => {
+    const result = todaysFollowUps(
+      [overdueByDateButUpcomingStatus, genuinelyOverdue],
+      [],
+      [],
+      {},
+    );
+    const ids = result.map((r) => r.task.id);
+    expect(ids).not.toContain(overdueByDateButUpcomingStatus.id);
+    expect(ids).toContain(genuinelyOverdue.id);
   });
 });

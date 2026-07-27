@@ -942,6 +942,23 @@ describe("active Super Admin supported business writes", () => {
     expect(updated).toEqual([
       { id: fixtureRows.task, owner_id: roleUsers.sales.id },
     ]);
+
+    // Sales Task Control Loop Task 3 / project-tracker Task 48 — Super
+    // Admin correction rights (ADR-002) extend to the new workflow
+    // columns, same as every other non-owner Task field.
+    const { data: correctedCategory, error: categoryError } = await client
+      .from("tasks")
+      .update({ category: "Internal/Admin" })
+      .eq("id", fixtureRows.task)
+      .select("id, owner_id, category");
+    expect(categoryError).toBeNull();
+    expect(correctedCategory).toEqual([
+      {
+        id: fixtureRows.task,
+        owner_id: roleUsers.sales.id,
+        category: "Internal/Admin",
+      },
+    ]);
   });
 
   test("can insert and update a commercial document without changing its owner", async () => {

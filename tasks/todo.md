@@ -1685,3 +1685,46 @@ Implementation order: complete Phase 12's schema/RLS foundation before Phase 11 
 **Files touched:** none in repo (data-only operation; stray review-log JSONLs deleted)
 
 **Estimated scope:** Data operation
+
+---
+
+## Phase 13: Sales Task Control Loop
+
+**Status:** Proposed — technical specification approval is the first gate.
+
+Detailed plan:
+`docs/superpowers/plans/2026-07-27-sales-task-control-loop-implementation.md`
+
+Detailed checklist: `tasks/sales-task-control-loop-todo.md`
+
+- [x] Task 46: Approve the technical specification — approved by Product
+      Owner 2026-07-27; see
+      `docs/superpowers/specs/2026-07-27-sales-task-control-loop-design.md`
+- [x] Task 47: Lock legacy behavior with characterization tests — done
+      2026-07-27; see
+      `.superpowers/sdd/sales-task-control-loop-task-2-report.md`
+- [x] Task 48: Add a backward-compatible Task schema and RLS contract —
+      done 2026-07-27; see
+      `.superpowers/sdd/sales-task-control-loop-task-3-report.md`
+- [x] Task 49: Centralize holiday calendar and derived due state — done
+      2026-07-27; see
+      `.superpowers/sdd/sales-task-control-loop-task-4-report.md`
+- [x] Task 50: Make progress updates atomic and expose one timeline
+      contract — done 2026-07-27; see
+      `.superpowers/sdd/sales-task-control-loop-task-5-report.md`
+- [x] Task 51: Migrate domain types and Task adapters — done 2026-07-27;
+      see `.superpowers/sdd/sales-task-control-loop-task-6-report.md`
+- [x] Task 52: Deliver Task creation and owner lifecycle — done
+      2026-07-27; see
+      `.superpowers/sdd/sales-task-control-loop-task-7-report.md`
+- [ ] Task 53: Deliver the unified progress timeline
+- [ ] Task 54: Separate Manager My Tasks from Team Exceptions
+- [ ] Task 55: Enforce Executive exception detail and aggregate-only reporting
+- [ ] Task 56: Migrate Dashboard and TopBar consumers
+- [ ] Task 57: Migrate Reports and performance calculations
+- [ ] Task 58: Migrate exports
+- [ ] Task 59: Migrate Pipeline, Client Detail, and commercial follow-up paths
+- [ ] Task 60: Migrate ownership transfer and account lifecycle consumers
+- [ ] Task 61: Reconcile existing data and retire the legacy status contract
+- [ ] Task 62: Run complete local verification and reconcile documentation
+- [ ] Task 63: Release through an explicit remote gate

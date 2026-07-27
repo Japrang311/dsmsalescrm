@@ -1,9 +1,19 @@
 import { supabase } from "@/lib/supabase";
-import type { Task, TaskStatus } from "@/lib/domain";
+import type {
+  Task,
+  TaskStatus,
+  TaskWorkflowStatus,
+  TaskCategory,
+} from "@/lib/domain";
+import {
+  computeTaskDueState,
+  listBusinessCalendarHolidays,
+  todayInJakarta,
+} from "@/lib/data/business-calendar";
 
 type TaskRow = {
   id: string;
-  client_id: string;
+  client_id: string | null;
   owner_id: string;
   commercial_item_id: string | null;
   commercial_document_id: string | null;
@@ -11,14 +21,29 @@ type TaskRow = {
   due_date: string;
   method: Task["method"];
   status: TaskStatus;
+  workflow_status: TaskWorkflowStatus;
+  category: TaskCategory;
+  next_action: string | null;
+  next_action_date: string | null;
+  cancellation_reason: string | null;
   priority: Task["priority"];
   archived: boolean;
 };
 
-function toTask(row: TaskRow): Task {
+function toTask(
+  row: TaskRow,
+  holidays: ReadonlySet<string>,
+  asOf: string,
+): Task {
+  const { dueState, calendarIncomplete } = computeTaskDueState(
+    row.due_date,
+    row.workflow_status,
+    holidays,
+    asOf,
+  );
   return {
     id: row.id,
-    clientId: row.client_id,
+    clientId: row.client_id ?? undefined,
     ownerId: row.owner_id,
     commercialItemId:
       row.commercial_document_id ?? row.commercial_item_id ?? undefined,
@@ -27,17 +52,31 @@ function toTask(row: TaskRow): Task {
     dueDate: row.due_date,
     method: row.method,
     status: row.status,
+    workflowStatus: row.workflow_status,
+    dueState,
+    calendarIncomplete,
+    category: row.category,
+    nextAction: row.next_action ?? undefined,
+    nextActionDate: row.next_action_date ?? undefined,
+    cancellationReason: row.cancellation_reason ?? undefined,
     priority: row.priority,
     archived: row.archived,
   };
 }
 
 // No role/userId parameter, same reasoning as listClients(): RLS already
-// scopes the rows to whatever the logged-in user can see.
+// scopes the rows to whatever the logged-in user can see. dueState is
+// computed here with the same TypeScript mirror Task 4 proved identical
+// to the database function (business-calendar.test.ts), fed by one
+// holiday-table fetch shared across every row -- not N+1 RPC calls.
 export async function listTasks(): Promise<Task[]> {
-  const { data, error } = await supabase.from("tasks").select("*");
+  const [{ data, error }, holidays] = await Promise.all([
+    supabase.from("tasks").select("*"),
+    listBusinessCalendarHolidays(),
+  ]);
   if (error) throw error;
-  return (data ?? []).map(toTask);
+  const asOf = todayInJakarta();
+  return (data ?? []).map((row) => toTask(row, holidays, asOf));
 }
 
 export async function updateTaskStatus(
@@ -52,29 +91,36 @@ export type TaskPatch = Partial<{
   dueDate: string;
   method: Task["method"];
   status: TaskStatus;
+  category: TaskCategory;
   priority: Task["priority"];
   ownerId: string;
   archived: boolean;
 }>;
 
+// workflowStatus, nextAction, nextActionDate, and cancellationReason are
+// deliberately not patchable here (Task 6 acceptance criterion: "direct
+// multi-write progress code is no longer exported for UI use") -- those
+// go exclusively through recordTaskProgress() in
+// src/lib/data/task-progress.ts, the one atomic RPC. category is a plain
+// correction field (same tier as title/priority), not a progress field,
+// so it stays here.
 export async function updateTask(id: string, patch: TaskPatch): Promise<Task> {
   const update: Record<string, unknown> = {};
   if (patch.title !== undefined) update.title = patch.title;
   if (patch.dueDate !== undefined) update.due_date = patch.dueDate;
   if (patch.method !== undefined) update.method = patch.method;
   if (patch.status !== undefined) update.status = patch.status;
+  if (patch.category !== undefined) update.category = patch.category;
   if (patch.priority !== undefined) update.priority = patch.priority;
   if (patch.ownerId !== undefined) update.owner_id = patch.ownerId;
   if (patch.archived !== undefined) update.archived = patch.archived;
 
-  const { data, error } = await supabase
-    .from("tasks")
-    .update(update)
-    .eq("id", id)
-    .select("*")
-    .single();
+  const [{ data, error }, holidays] = await Promise.all([
+    supabase.from("tasks").update(update).eq("id", id).select("*").single(),
+    listBusinessCalendarHolidays(),
+  ]);
   if (error) throw error;
-  return toTask(data);
+  return toTask(data, holidays, todayInJakarta());
 }
 
 export function describeTaskChanges(
@@ -86,7 +132,7 @@ export function describeTaskChanges(
 }
 
 export async function createTask(input: {
-  clientId: string;
+  clientId?: string;
   ownerId: string;
   commercialItemId?: string;
   commercialDocumentId?: string;
@@ -95,22 +141,27 @@ export async function createTask(input: {
   method: Task["method"];
   priority: Task["priority"];
   status?: TaskStatus;
+  category?: TaskCategory;
 }): Promise<Task> {
-  const { data, error } = await supabase
-    .from("tasks")
-    .insert({
-      client_id: input.clientId,
-      owner_id: input.ownerId,
-      commercial_item_id: input.commercialItemId,
-      commercial_document_id: input.commercialDocumentId,
-      title: input.title,
-      due_date: input.dueDate,
-      method: input.method,
-      priority: input.priority,
-      status: input.status ?? "Upcoming",
-    })
-    .select("*")
-    .single();
+  const [{ data, error }, holidays] = await Promise.all([
+    supabase
+      .from("tasks")
+      .insert({
+        client_id: input.clientId ?? null,
+        owner_id: input.ownerId,
+        commercial_item_id: input.commercialItemId,
+        commercial_document_id: input.commercialDocumentId,
+        title: input.title,
+        due_date: input.dueDate,
+        method: input.method,
+        priority: input.priority,
+        status: input.status ?? "Upcoming",
+        ...(input.category !== undefined ? { category: input.category } : {}),
+      })
+      .select("*")
+      .single(),
+    listBusinessCalendarHolidays(),
+  ]);
   if (error) throw error;
-  return toTask(data);
+  return toTask(data, holidays, todayInJakarta());
 }

@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/select";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import type { TaskStatus } from "@/lib/domain";
+import type { TaskCategory, TaskStatus } from "@/lib/domain";
 import { NOW } from "@/lib/domain";
 import type { Role } from "@/lib/domain";
 import { listClients, listSalesTeamProfiles } from "@/lib/data/clients";
@@ -38,9 +38,22 @@ import { useRole } from "@/context/role-context";
 
 const METHODS = ["Phone", "Email", "WhatsApp", "Visit", "Meeting"] as const;
 const PRIORITIES = ["High", "Normal", "Low"] as const;
+// Same 7 values as public.task_category (spec §2.1) -- Task not yet
+// classified defaults to "Other", same "not yet known" meaning as its use
+// elsewhere (spec §6.3).
+const CATEGORIES: TaskCategory[] = [
+  "Project/Opportunity Planning",
+  "Client Meeting/Visit",
+  "Follow-Up",
+  "Quotation",
+  "Sales Order",
+  "Internal/Admin",
+  "Other",
+];
 
 const schema = z.object({
-  clientId: z.string().min(1, { message: "Pilih klien" }),
+  // Optional (spec §2.1, Task 7/52): a Task may omit Client entirely.
+  clientId: z.string().optional(),
   title: z
     .string()
     .trim()
@@ -48,6 +61,7 @@ const schema = z.object({
     .max(120, { message: "Judul maks 120 karakter" }),
   method: z.enum(METHODS),
   priority: z.enum(PRIORITIES),
+  category: z.enum(CATEGORIES as [TaskCategory, ...TaskCategory[]]),
   dueDate: z.string().min(4, { message: "Tanggal wajib diisi" }),
   ownerId: z.string().min(1, { message: "Owner wajib dipilih" }),
 });
@@ -121,6 +135,7 @@ export function CreateTaskDialog({
       title: "",
       method: "Phone",
       priority: "Normal",
+      category: "Other",
       dueDate: NOW.toISOString().slice(0, 10),
       ownerId: defaultOwner,
     },
@@ -139,11 +154,12 @@ export function CreateTaskDialog({
   const onSubmit = handleSubmit(async (v) => {
     try {
       const task = await createTask({
-        clientId: v.clientId,
+        clientId: v.clientId || undefined,
         ownerId: v.ownerId,
         title: v.title,
         method: v.method,
         priority: v.priority,
+        category: v.category,
         dueDate: v.dueDate,
         status: statusFor(v.dueDate),
       });
@@ -153,7 +169,7 @@ export function CreateTaskDialog({
           kind: "task_created",
           ownerId: v.ownerId,
           actorId,
-          clientId: v.clientId,
+          clientId: v.clientId || undefined,
           taskId: task.id,
           title: "Task dibuat dari inbox",
           detail: `${v.title} · due ${v.dueDate}`,
@@ -184,6 +200,7 @@ export function CreateTaskDialog({
       title: "",
       method: "Phone",
       priority: "Normal",
+      category: "Other",
       dueDate: NOW.toISOString().slice(0, 10),
       ownerId: defaultOwner,
     });
@@ -210,7 +227,7 @@ export function CreateTaskDialog({
           <div>
             <ClientPickerField
               clients={clients}
-              value={watch("clientId")}
+              value={watch("clientId") ?? ""}
               onChange={(v) =>
                 setValue("clientId", v, {
                   shouldDirty: true,
@@ -218,6 +235,9 @@ export function CreateTaskDialog({
                 })
               }
             />
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Opsional — Task boleh dibuat tanpa klien.
+            </p>
             {errors.clientId && (
               <p className="mt-1 text-xs text-destructive">
                 {errors.clientId.message}
@@ -227,7 +247,7 @@ export function CreateTaskDialog({
               <p className="mt-1 text-[11px] text-muted-foreground">
                 <Link
                   to="/clients/$clientId"
-                  params={{ clientId: watch("clientId") }}
+                  params={{ clientId: watch("clientId")! }}
                   className="hover:text-primary hover:underline"
                 >
                   Lihat profil klien →
@@ -248,6 +268,29 @@ export function CreateTaskDialog({
                 {errors.title.message}
               </p>
             )}
+          </div>
+
+          <div>
+            <Label>Kategori</Label>
+            <Select
+              value={watch("category")}
+              onValueChange={(v) =>
+                setValue("category", v as FormValues["category"], {
+                  shouldDirty: true,
+                })
+              }
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {CATEGORIES.map((c) => (
+                  <SelectItem key={c} value={c}>
+                    {c}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="grid grid-cols-2 gap-3">

@@ -295,7 +295,7 @@ export async function listTaskHistory(
       .from("activity_log")
       .select("id, actor_id, title, detail, created_at")
       .eq("task_id", taskId)
-      .in("kind", ["task_created", "task_status_change"])
+      .in("kind", ["task_created", "task_status_change", "task_progress"])
       .order("created_at", { ascending: false }),
     supabase.from("profiles").select("id, name, role"),
   ]);

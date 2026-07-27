@@ -236,12 +236,13 @@ function NotificationsMenu() {
             <DropdownMenuItem
               key={t.id}
               className="flex flex-col items-start gap-0.5 whitespace-normal py-2"
-              onSelect={() =>
+              onSelect={() => {
+                if (!t.clientId) return;
                 void navigate({
                   to: "/clients/$clientId",
                   params: { clientId: t.clientId },
-                })
-              }
+                });
+              }}
             >
               <span className="flex w-full items-center justify-between gap-2">
                 <span className="text-sm font-medium">{t.title}</span>
@@ -257,7 +258,7 @@ function NotificationsMenu() {
                 </Badge>
               </span>
               <span className="text-xs text-muted-foreground">
-                {clientName(t.clientId)}
+                {t.clientId ? clientName(t.clientId) : "Tanpa klien"}
               </span>
             </DropdownMenuItem>
           ))

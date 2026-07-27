@@ -159,11 +159,50 @@ export type SalesOrder = {
 
 export type MonthlyTarget = { month: number; target: number };
 
+// Legacy due-state-shaped status, dual-read alongside workflowStatus/dueState
+// until Task 16/61 retires it (spec §6.1, §6.6). Every consumer still
+// reading `.status` directly is inventoried in
+// .superpowers/sdd/sales-task-control-loop-task-2-report.md.
 export type TaskStatus = "Today" | "Overdue" | "Upcoming" | "Done";
+
+// Workflow status the user chooses (Sales Task Control Loop spec §2.1) --
+// never derived from a date, unlike TaskDueState below.
+export type TaskWorkflowStatus =
+  | "Open"
+  | "In Progress"
+  | "Waiting External"
+  | "Done"
+  | "Cancelled";
+
+// Derived, not stored (spec §2.2): computed by
+// public.compute_task_due_state / src/lib/data/business-calendar.ts's
+// computeTaskDueState() for the same due_date/workflowStatus, never
+// written directly. null for Done/Cancelled Tasks, which have no active
+// due state.
+export type TaskDueState =
+  | "Upcoming"
+  | "Today"
+  | "Overdue"
+  | "Escalated"
+  | null;
+
+export type TaskCategory =
+  | "Project/Opportunity Planning"
+  | "Client Meeting/Visit"
+  | "Follow-Up"
+  | "Quotation"
+  | "Sales Order"
+  | "Internal/Admin"
+  | "Other";
 
 export type Task = {
   id: string;
-  clientId: string;
+  // Optional end-to-end (spec §2.1, Task 7/52) -- a Task may now omit
+  // Client. Task 6/51 deliberately kept this required to avoid breaking
+  // tsc in files outside its own scope; Task 7/52 is where "may omit
+  // Client" is an actual acceptance criterion, so the ripple (TopBar.tsx,
+  // LogFollowUpDialog.tsx, _app.tasks.tsx) is fixed here instead.
+  clientId?: string;
   ownerId: string;
   commercialItemId?: string;
   commercialDocumentId?: string;
@@ -171,6 +210,13 @@ export type Task = {
   dueDate: string;
   method: "Phone" | "Email" | "Visit" | "WhatsApp" | "Meeting";
   status: TaskStatus;
+  workflowStatus: TaskWorkflowStatus;
+  dueState: TaskDueState;
+  calendarIncomplete: boolean;
+  category: TaskCategory;
+  nextAction?: string;
+  nextActionDate?: string;
+  cancellationReason?: string;
   priority: "High" | "Normal" | "Low";
   archived?: boolean;
 };

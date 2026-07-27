@@ -147,4 +147,26 @@ describe("follow_up_logs RLS", () => {
       .single();
     expect(stillThere?.id).toBe(logIds.own);
   });
+
+  // Sales Task Control Loop Task 3 (implementation-plan) / project-tracker
+  // Task 48 — client_id became nullable end-to-end (spec §2.1, §3.1) so a
+  // follow-up can be logged against a Task that has no Client.
+  test("client_id is nullable on new follow-up logs", async () => {
+    const client = await signInAs(fixtures.sales);
+    const { data, error } = await client
+      .from("follow_up_logs")
+      .insert({
+        client_id: null,
+        owner_id: fixtures.sales.id,
+        fu_date: "2026-07-17",
+        method: "Phone",
+        result: "Interested",
+        notes: "Fixture follow-up without a Client",
+      })
+      .select("id, client_id")
+      .single();
+    if (error) throw error;
+    expect(data.client_id).toBeNull();
+    await adminClient.from("follow_up_logs").delete().eq("id", data.id);
+  });
 });

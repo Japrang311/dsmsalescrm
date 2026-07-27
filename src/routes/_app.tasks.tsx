@@ -281,7 +281,7 @@ function TasksInboxPage() {
         }
       }
       if (q) {
-        const client = clientsById[t.clientId];
+        const client = t.clientId ? clientsById[t.clientId] : undefined;
         const hay = `${t.title} ${client?.name ?? ""}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
@@ -372,7 +372,7 @@ function TasksInboxPage() {
       await updateTask(t.id, { status: "Done" });
       await logTaskEvent(t, "Status → Done");
       await invalidateTasks();
-      const client = clientsById[t.clientId];
+      const client = t.clientId ? clientsById[t.clientId] : undefined;
       toast.success(`Task diselesaikan — ${client?.name ?? "Klien"}`, {
         description: t.title,
         action: {
@@ -481,7 +481,7 @@ function TasksInboxPage() {
     t: Task,
     kind: "Quotation" | "Prototype",
   ) => {
-    const client = clientsById[t.clientId];
+    const client = t.clientId ? clientsById[t.clientId] : undefined;
     const due = new Date(NOW);
     due.setDate(due.getDate() + (kind === "Quotation" ? 2 : 3));
     const iso = due.toISOString().slice(0, 10);
@@ -1126,7 +1126,7 @@ function TaskRow({
   profilesById: ProfileLookup;
   commercialItemsById: CommercialLookup;
 }) {
-  const client = clientsById[task.clientId];
+  const client = task.clientId ? clientsById[task.clientId] : undefined;
   const commercial = task.commercialItemId
     ? commercialItemsById[task.commercialItemId]
     : undefined;

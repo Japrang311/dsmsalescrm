@@ -225,3 +225,54 @@ Source of truth: `docs/decisions/ADR-002-super-admin-authorization-and-account-l
 - The live Sheet headers and observed 2026 maxima have been inspected, but Task 33 must recalculate maxima at actual import time because the Sheet can change.
 - Local implementation is authorized by this plan; any linked/remote migration remains a separate explicit approval with the exact Supabase target confirmed first.
 - Phase 12's role/status/RLS foundation should land before Phase 11 creates new commercial tables, so those tables receive four-role policies from their first local migration.
+
+### Phase 13: Sales Task Control Loop _(proposed 2026-07-27; not authorized for implementation)_
+
+Source of truth:
+
+- `docs/ideas/sales-task-control-loop.md`
+- `docs/ideas/sales-task-control-loop-claude-handoff.md`
+- `docs/superpowers/plans/2026-07-27-sales-task-control-loop-implementation.md`
+- `tasks/sales-task-control-loop-todo.md`
+
+This phase evolves the existing Task feature; it does not create a parallel Task
+module or a third Notes store. The first task is a technical-specification gate.
+Implementation may start only after the owner approves the schema, timeline,
+calendar, escalation, migration/backfill, RLS, and notification decisions.
+
+- [x] Task 46: Approve the Sales Task Control Loop technical specification —
+      approved by Product Owner 2026-07-27
+- [x] Task 47: Lock legacy behavior with characterization tests — done
+      2026-07-27; see
+      `.superpowers/sdd/sales-task-control-loop-task-2-report.md`
+- [x] Task 48: Add a backward-compatible Task schema and RLS contract —
+      done 2026-07-27; see
+      `.superpowers/sdd/sales-task-control-loop-task-3-report.md`
+- [x] Task 49: Centralize holiday calendar and derived due state — done
+      2026-07-27; see
+      `.superpowers/sdd/sales-task-control-loop-task-4-report.md`
+- [x] Task 50: Make progress updates atomic and expose one timeline
+      contract — done 2026-07-27; see
+      `.superpowers/sdd/sales-task-control-loop-task-5-report.md`
+- [x] Task 51: Migrate domain types and Task adapters — done 2026-07-27;
+      see `.superpowers/sdd/sales-task-control-loop-task-6-report.md`
+- [x] Task 52: Deliver Task creation and owner lifecycle — done
+      2026-07-27; see
+      `.superpowers/sdd/sales-task-control-loop-task-7-report.md`
+- [ ] Task 53: Deliver the unified progress timeline
+- [ ] Tasks 54-55: Deliver Manager and Executive control-loop boundaries
+- [ ] Tasks 56-60: Migrate Dashboard, Reports, exports, related surfaces, and
+      account-lifecycle consumers
+- [ ] Tasks 61-63: Reconcile existing data, verify locally, and pass the
+      separately approved release gate
+
+### Checkpoint 13: Sales Task Control Loop
+
+- [ ] Workflow status is separate from database-derived due state
+- [ ] Every active progress update is atomic and includes next action/date
+- [ ] Manager My Tasks and Team Exceptions are distinct
+- [ ] Executive detail and aggregate access are separated at the database
+      boundary
+- [ ] Holiday-aware escalation uses one Asia/Jakarta business calendar
+- [ ] Existing data migrates without fabricated business values
+- [ ] Remote mutation remains separately approved

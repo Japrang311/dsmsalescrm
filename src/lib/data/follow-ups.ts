@@ -10,12 +10,16 @@ export type FollowUpResult =
   | "Waiting PO"
   | "PO Confirmed"
   | "Not Interested"
-  | "Follow-up Later";
+  | "Follow-up Later"
+  // Neutral value for non-commercial Task categories (Internal/Admin,
+  // Project/Opportunity Planning, etc.) that don't fit the quotation
+  // funnel above -- default result for record_task_progress() (spec §3.1).
+  | "Progress Update";
 
 export type FollowUpLog = {
   id: string;
   taskId?: string;
-  clientId: string;
+  clientId?: string; // optional end-to-end (spec §2.1, §3.1) -- Task 7/52
   commercialItemId?: string;
   commercialDocumentId?: string;
   ownerId: string;
@@ -33,7 +37,7 @@ export type FollowUpLog = {
 type FollowUpLogRow = {
   id: string;
   task_id: string | null;
-  client_id: string;
+  client_id: string | null;
   commercial_item_id: string | null;
   commercial_document_id: string | null;
   owner_id: string;
@@ -52,7 +56,7 @@ function toFollowUpLog(row: FollowUpLogRow): FollowUpLog {
   return {
     id: row.id,
     taskId: row.task_id ?? undefined,
-    clientId: row.client_id,
+    clientId: row.client_id ?? undefined,
     commercialItemId:
       row.commercial_document_id ?? row.commercial_item_id ?? undefined,
     commercialDocumentId: row.commercial_document_id ?? undefined,
@@ -71,7 +75,7 @@ function toFollowUpLog(row: FollowUpLogRow): FollowUpLog {
 
 export async function logFollowUp(input: {
   taskId?: string;
-  clientId: string;
+  clientId?: string;
   commercialItemId?: string;
   commercialDocumentId?: string;
   ownerId: string;

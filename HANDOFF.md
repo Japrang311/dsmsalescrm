@@ -1,6 +1,99 @@
 # Handoff — DSM Sales Web App V2
 
-Context dump for continuing this work in another tool (Codex). Written 2026-07-18; Phase 11/12 status refreshed 2026-07-19; Phase 11 import-review reconciliation session added 2026-07-19; post-import UX/bugfix session added 2026-07-20; second 2026-07-20 session (pipeline permissions/FK bugfixes) added 2026-07-20; Client Detail/Client List real-data wiring session added 2026-07-21; remote-migration-push + data-restoration session added 2026-07-21; browser-verification + spending_ytd fix + SO edit audit trail session added 2026-07-21; unused-code cleanup + client database (company info/contacts) feature session added 2026-07-22; contact position + Client Detail product/description fixes + commercial item product-name migration reconciliation added 2026-07-22; dynamic per-month sales target UI/calculation update added 2026-07-22; soft-delete implementation, remote Supabase apply, and main/live push closeout added 2026-07-24; RFQ retirement and documentation refresh added 2026-07-25.
+Context dump for continuing this work in another tool (Codex). Written 2026-07-18; Phase 11/12 status refreshed 2026-07-19; Phase 11 import-review reconciliation session added 2026-07-19; post-import UX/bugfix session added 2026-07-20; second 2026-07-20 session (pipeline permissions/FK bugfixes) added 2026-07-20; Client Detail/Client List real-data wiring session added 2026-07-21; remote-migration-push + data-restoration session added 2026-07-21; browser-verification + spending_ytd fix + SO edit audit trail session added 2026-07-21; unused-code cleanup + client database (company info/contacts) feature session added 2026-07-22; contact position + Client Detail product/description fixes + commercial item product-name migration reconciliation added 2026-07-22; dynamic per-month sales target UI/calculation update added 2026-07-22; soft-delete implementation, remote Supabase apply, and main/live push closeout added 2026-07-24; RFQ retirement and documentation refresh added 2026-07-25; Sales Task Control Loop spec approval and Phase 1-2 implementation (Tasks 46-52) added 2026-07-27.
+
+## HANDOFF TO CODEX — read this first (2026-07-27)
+
+Sales Task Control Loop: technical spec approved by the Product Owner, then
+implementation-plan Tasks 1-7 (project-tracker Tasks 46-52) delivered and
+locally verified in one continuous session. **Not yet committed as of this
+paragraph being written — see the commit this paragraph ships with for the
+actual commit hash.** Remote Supabase has not been touched.
+
+- Source of truth: `docs/superpowers/specs/2026-07-27-sales-task-control-loop-design.md`
+  (the approved spec — status header says "APPROVED oleh Product Owner —
+  2026-07-27"), `docs/superpowers/plans/2026-07-27-sales-task-control-loop-implementation.md`
+  (the task-by-task plan), `tasks/sales-task-control-loop-todo.md` (checklist),
+  and `.superpowers/sdd/sales-task-control-loop-task-{2,3,4,5,6,7}-report.md`
+  (one detailed completion report per task — read these before touching
+  anything in this feature, they record several non-obvious decisions and
+  three real bugs found only via browser testing).
+- **Task 46/1** (spec) and **Task 47/2** (characterization tests) done.
+  Task 47 also found and fixed a real pre-existing bug: `.env.local`'s
+  `VITE_SUPABASE_URL` pointed at a remote Supabase project instead of local,
+  silently breaking every `src/lib/data/*.test.ts` test. Now points local;
+  confirmed fixed (full suite passed after).
+- **Task 48/3**: new columns on `tasks` (`workflow_status`, `category`,
+  `next_action`, `next_action_date`, `cancellation_reason`), `client_id`
+  nullable on `tasks` and `follow_up_logs`. Legacy `status` column
+  untouched (dual-read until Task 16/61). The next-action-required CHECK
+  constraint was deliberately **not** added here — confirmed with the
+  Product Owner it would break the live `createTask()` flow immediately.
+- **Task 49/4**: `public.business_calendar_holidays` table (empty —
+  real holiday data is a deliberately separate, later manual-entry action,
+  not fabricated here) plus `compute_task_due_state()` (DB function) and
+  its TypeScript mirror `src/lib/data/business-calendar.ts`, proven
+  byte-identical against 18 shared fixtures (weekends, consecutive
+  holidays, leap day, year-end, calendar-incomplete fallback).
+- **Task 50/5**: `public.record_task_progress()` — the one atomic RPC
+  (insert `follow_up_logs`, update `tasks`, insert `activity_log`, all or
+  nothing; verified with a forced-failure test proving real rollback).
+  This is also where the next-action constraint from Task 48 was safely
+  added, gated by a new `tasks.first_progress_at` column so it only
+  applies once a Task has actually been progressed through the RPC.
+- **Task 51/6**: TypeScript domain/adapter migration.
+  `src/lib/domain.ts`'s `Task` type gained `workflowStatus`/`dueState`/
+  `category`/`nextAction`/`nextActionDate`/`cancellationReason` (legacy
+  `status` kept, dual-read). New `src/lib/data/task-progress.ts` wraps the
+  RPC; `updateTask()` deliberately cannot touch workflow/progress fields
+  anymore (only the RPC can). Found and fixed a real `bun:test` bug: two
+  test files sharing the literal basename `task-progress.test.ts` in
+  different directories corrupted each other's `supabase.auth` state under
+  a full-suite run (not `--isolate`); fixed by renaming one to
+  `task-progress-adapter.test.ts`.
+- **Task 52/7**: first UI-facing task. `CreateTaskDialog.tsx` — Client now
+  optional, Category picker added. `TaskDetailDrawer.tsx` — split into
+  "Detail Task" (plain fields via `updateTask()`) and a new "Catat
+  Progress" section (workflow status, next action/date, cancellation
+  reason, note — all via the RPC; this also absorbed the old standalone
+  "Tambah catatan" box, which used to write straight to `activity_log`
+  only). Manually browser-verified end-to-end as both real seeded
+  accounts (`nur@local.dsm.test` Sales, `adhitya@local.dsm.test` Manager)
+  — create without a Client, progress through every workflow state,
+  cancel with reason, reopen with a fresh next action, quick-complete,
+  archive. This found and fixed **three real bugs unit tests missed**:
+  an empty-string `client_id` crashing an `activity_log` insert on
+  Task creation, `listTaskHistory()` excluding the new `task_progress`
+  activity kind (so the Drawer's "Riwayat" silently showed nothing),
+  and stale local form state after a successful save. All three are
+  detailed in the Task 7 report.
+- **Not started**: Task 53/8 onward (unified timeline as its own
+  read contract, Manager Team Exceptions, Executive Exceptions, Dashboard/
+  Reports/export consumer migration, existing-data cutover, final release
+  gate). Task 8's own scope may be partially narrowed by what Task 7
+  already delivered (the Drawer's Progress section + Riwayat already give
+  a working combined view) — read the Task 7 report's "deliberately not
+  touched" notes before scoping Task 8.
+- Verification recorded: full local suite **435 pass, 0 fail** (57 files),
+  run twice from a fresh `bunx supabase db reset` for stability, not a
+  lucky pass; `bunx tsc --noEmit` clean throughout. `bun run lint`
+  (ESLint) did **not** complete in the session that ran it (24+ then 47+
+  minutes with no output, killed both times) — `tsc` and
+  `supabase db lint --local` were used as the effective lint-shaped gates
+  instead; worth investigating separately why ESLint is this slow on this
+  repo.
+- Git/Supabase state: four new local migrations
+  (`20260727120000_add_task_control_loop_foundation.sql`,
+  `20260727130000_add_business_calendar.sql`,
+  `20260727140000_extend_task_progress_schema.sql`,
+  `20260727141000_add_atomic_task_progress.sql`) exist and were applied
+  **locally only**. Do not run `supabase db push`/`apply_migration`/
+  `execute_sql` against any remote project without fresh explicit
+  approval naming the exact target. This session's own STOP RULE required
+  new explicit authorization before starting each implementation-plan
+  task in turn (all seven were granted one at a time) — the same pattern
+  should hold for Task 53/8 onward: don't assume continuation is
+  pre-approved just because Tasks 1-7 were.
 
 ## HANDOFF TO CODEX — read this first (2026-07-25)
 
