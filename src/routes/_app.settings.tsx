@@ -1159,13 +1159,17 @@ function TargetsTab({
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {/* relative wrapper + edge fade: 12 month columns don't fit most
+              viewports, and overflow-x-auto alone gives no visible hint
+              that there's more to scroll to on the right. */}
+          <div className="relative">
           <div className="overflow-x-auto rounded-md border border-border">
-            <Table className="min-w-[1320px]">
+            <Table className="min-w-[1560px]">
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[180px]">Sales</TableHead>
                   {TARGET_MONTHS.map(({ month, label }) => (
-                    <TableHead key={month} className="w-[84px] text-right">
+                    <TableHead key={month} className="w-[104px] text-right">
                       {label}
                     </TableHead>
                   ))}
@@ -1198,6 +1202,11 @@ function TargetsTab({
                 })}
               </TableBody>
             </Table>
+          </div>
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-y-0 right-0 w-10 rounded-r-md bg-gradient-to-l from-card to-transparent"
+          />
           </div>
         </CardContent>
       </Card>

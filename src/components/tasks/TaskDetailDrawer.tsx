@@ -372,8 +372,11 @@ export function TaskDetailDrawer({
         </SheetHeader>
 
         <div className="flex-1 overflow-y-auto p-4">
-          {/* Editable fields */}
-          <section className="space-y-3">
+          {/* Editable fields -- bordered as its own card since this section
+              saves independently from Catat Progress below (see comment on
+              the state above); the border keeps the two "Simpan" actions
+              from reading as one form. */}
+          <section className="space-y-3 rounded-lg border border-border bg-card p-3">
             <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               <Pencil className="h-3.5 w-3.5" /> Detail task
             </div>
@@ -466,23 +469,32 @@ export function TaskDetailDrawer({
               </span>
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-1">
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-8"
-                onClick={() => onOpenChange(false)}
-              >
-                Tutup
-              </Button>
-              <Button
-                size="sm"
-                className="h-8"
-                onClick={() => void commitSave()}
-                disabled={!detailDirty}
-              >
-                <Save className="mr-1 h-4 w-4" /> Simpan
-              </Button>
+            <div className="flex items-center justify-between gap-2 pt-1">
+              {detailDirty ? (
+                <span className="text-[11px] font-medium text-warning">
+                  Ada perubahan belum disimpan
+                </span>
+              ) : (
+                <span />
+              )}
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-8"
+                  onClick={() => onOpenChange(false)}
+                >
+                  Tutup
+                </Button>
+                <Button
+                  size="sm"
+                  className="h-8"
+                  onClick={() => void commitSave()}
+                  disabled={!detailDirty}
+                >
+                  <Save className="mr-1 h-4 w-4" /> Simpan
+                </Button>
+              </div>
             </div>
           </section>
 
@@ -492,8 +504,9 @@ export function TaskDetailDrawer({
               nextAction, nextActionDate, or cancellationReason (spec §3.3,
               Task 6/51 acceptance criterion). Reopening a Done/Cancelled
               Task also goes through here, since it requires a fresh next
-              action (spec §2.4a). */}
-          <section className="space-y-3">
+              action (spec §2.4a). Bordered as its own card -- see comment
+              on the Detail task section above. */}
+          <section className="space-y-3 rounded-lg border border-border bg-card p-3">
             <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               <Undo2 className="h-3.5 w-3.5" /> Catat progress
             </div>
@@ -576,7 +589,14 @@ export function TaskDetailDrawer({
               />
             </div>
 
-            <div className="flex justify-end">
+            <div className="flex items-center justify-between gap-2">
+              {progressDirty && !savingProgress ? (
+                <span className="text-[11px] font-medium text-warning">
+                  Ada perubahan belum disimpan
+                </span>
+              ) : (
+                <span />
+              )}
               <Button
                 size="sm"
                 variant="secondary"

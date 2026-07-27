@@ -346,13 +346,25 @@ function ClientProfilePage() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="flex w-full flex-wrap justify-start gap-1 bg-muted/60 p-1">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="tasks">Follow-Up &amp; Tasks</TabsTrigger>
-          <TabsTrigger value="commercial">Commercial Items</TabsTrigger>
-          <TabsTrigger value="quotations">Quotations</TabsTrigger>
-          <TabsTrigger value="orders">Sales Orders</TabsTrigger>
-          <TabsTrigger value="revenue">Revenue History</TabsTrigger>
+        <TabsList className="flex w-full max-w-full justify-start gap-1 overflow-x-auto bg-muted/60 p-1">
+          <TabsTrigger value="overview" className="shrink-0">
+            Overview
+          </TabsTrigger>
+          <TabsTrigger value="tasks" className="shrink-0">
+            Follow-Up &amp; Tasks
+          </TabsTrigger>
+          <TabsTrigger value="commercial" className="shrink-0">
+            Commercial Items
+          </TabsTrigger>
+          <TabsTrigger value="quotations" className="shrink-0">
+            Quotations
+          </TabsTrigger>
+          <TabsTrigger value="orders" className="shrink-0">
+            Sales Orders
+          </TabsTrigger>
+          <TabsTrigger value="revenue" className="shrink-0">
+            Revenue History
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="mt-4 space-y-4">

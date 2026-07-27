@@ -446,9 +446,12 @@ function PipelineBoard({ role }: { role: Role }) {
         ownerById={ownerById}
       />
 
-      {/* Board */}
-      <div className="flex gap-3 overflow-x-auto pb-3">
-        {STAGES.map((stage) => {
+      {/* Board -- more stage columns than fit most viewports; the edge
+          fade hints at the horizontal scroll so it doesn't look like the
+          board simply ends at "Commit". */}
+      <div className="relative">
+        <div className="flex gap-3 overflow-x-auto pb-3">
+          {STAGES.map((stage) => {
           const col = grouped.get(stage) ?? [];
           const sum = col.reduce((s, it) => s + it.estimatedValue, 0);
           const isDropTarget = dragOverStage === stage && draggingId !== null;
@@ -600,6 +603,11 @@ function PipelineBoard({ role }: { role: Role }) {
             </div>
           );
         })}
+        </div>
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-background to-transparent"
+        />
       </div>
 
       <Dialog
