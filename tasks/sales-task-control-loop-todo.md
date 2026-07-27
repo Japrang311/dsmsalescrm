@@ -178,14 +178,17 @@ Product direction: `docs/ideas/sales-task-control-loop.md`
       advisors, and browser UAT passed. `supabase db lint --local` still
       reports existing baseline commercial-function findings, disclosed in the
       Task 17 report.
-- [ ] Task 18: Release through an explicit remote gate — prepared as a NO-GO
-      release gate 2026-07-27; see
+- [x] Task 18: Release through an explicit remote gate — executed after exact
+      owner approval on 2026-07-27; see
       `.superpowers/sdd/sales-task-control-loop-task-18-release-gate.md`.
-      Read-only linked migration comparison found pending remote migrations
-      `20260727141303`, `20260727160000`, and `20260727160010`; dry-run did
-      not complete in this session; exact owner approval is still required
-      before any Git push, Supabase mutation, deployment, or production smoke
-      test.
+      Commit `b33efe3` was pushed to `origin/main`, linked Supabase migrations
+      `20260727141303`, `20260727160000`, and `20260727160010` were confirmed
+      synced to `qhtfixgbcpcitokeryxb`, and Vercel production deployment
+      `dpl_ATtYyZxxZEp4cLR1jHVwSs1rZaE5` is Ready at
+      `https://dsmsalescrm.vercel.app`. SQL/RLS and HTTP smoke checks passed;
+      authenticated browser smoke was not run because no production
+      password/session was available, and remote Supabase advisors did not
+      complete in this session.
 
 ### Checkpoint D — Complete
 
@@ -198,5 +201,6 @@ Product direction: `docs/ideas/sales-task-control-loop.md`
 - [x] Documentation reflects verified as-built behavior — Task 17 report and
       handoff updated 2026-07-27.
 - [x] Git, Supabase remote, deployment, and browser verification are reported
-      separately — no remote mutation, deployment, commit, or push occurred in
-      Task 17.
+      separately — Task 18 records Git push, Supabase remote migration sync,
+      Vercel production deploy, SQL/RLS smoke, HTTP smoke, and the unverified
+      authenticated browser/advisors boundaries separately.

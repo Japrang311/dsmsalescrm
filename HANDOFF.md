@@ -173,22 +173,28 @@ the four Task Control Loop migrations already present on the linked remote.
   local holiday correction, Executive read-only Exceptions, and Super Admin
   correction through `/login`; summary recorded no console warnings/errors and
   no failed requests. No remote mutation, deployment, commit, or push occurred.
-- **Task 63/18 prepared but NO-GO for execution**: release-gate dossier created
-  at `.superpowers/sdd/sales-task-control-loop-task-18-release-gate.md`.
-  Read-only linked migration comparison targets Supabase project
-  `qhtfixgbcpcitokeryxb` / `DSM Sales Web App V2`. Remote has Task Control
-  Loop migrations through `20260727150000` except local-only
-  `20260727141303_harden_task_calendar_function_search_path.sql`; remote is
-  also missing `20260727160000_backfill_task_control_loop.sql` and
-  `20260727160010_retire_legacy_task_status.sql`. `supabase db push --linked
-  --dry-run` did not emit a plan after about 90 seconds and was stopped
-  (`exit 130`), so do not treat dry-run as reviewed. Working tree is dirty and
-  there are no local commits ahead of `origin/main`; Git push/deploy is not
-  ready until a reviewed release commit exists. No remote mutation, deployment,
-  commit, push, or production browser check occurred. Exact owner approval is
-  still required before any execution.
-- **Not started for execution**: Task 63/18 remote apply/deploy/smoke-check
-  actions.
+- **Task 63/18 executed after exact owner approval**: release-gate dossier
+  updated at
+  `.superpowers/sdd/sales-task-control-loop-task-18-release-gate.md`.
+  Commit `b33efe3` (`feat: complete sales task control loop release gate`) was
+  pushed to `origin/main` (`30fdb12..b33efe3`). Linked Supabase project
+  `qhtfixgbcpcitokeryxb` / `DSM Sales Web App V2` was synced for
+  `20260727141303_harden_task_calendar_function_search_path.sql`,
+  `20260727160000_backfill_task_control_loop.sql`, and
+  `20260727160010_retire_legacy_task_status.sql`; post-apply migration list
+  confirmed all three have matching local/remote versions. Vercel production
+  deployment `dpl_ATtYyZxxZEp4cLR1jHVwSs1rZaE5` is Ready at
+  `https://dsmsalescrm.vercel.app` with deployment URL
+  `https://dsmsalescrm-eo807jrdz-hiulaukgalak.vercel.app`. SQL/RLS smoke
+  passed: production has 24 tasks, retired `public.task_status` resolves null,
+  due-state helper returns `Today` with `calendar_incomplete = true`, Sales RLS
+  sees 10 owned tasks, Manager sees 24, Executive sees 0 direct task rows but
+  aggregate metrics return 24 total tasks, and Super Admin sees 24. HTTP smoke
+  passed for `/`, `/login`, and `/tasks`. Authenticated production browser
+  smoke was not run because no production password/session was available; no
+  production Auth users were created or mutated for test access. Remote
+  `supabase db advisors --linked` did not complete after login-role
+  initialization and was stopped, so remote advisors are not verified.
 - Verification recorded through Task 9: full local suite **439 pass, 0 fail**
   (58 files), plus a focused 34-test suite across `business-calendar`,
   `task-exceptions`, `tasks`, `task-progress`, and `activity-log`;

@@ -6,10 +6,44 @@ Task: Release through an explicit remote gate
 
 ## Gate Status
 
-NO-GO for execution until the owner gives exact-target approval.
+EXECUTED after exact-target owner approval.
 
-This file prepares the remote gate only. It does not authorize or record any
-remote Supabase mutation, Git push, deployment, or production browser test.
+Approval received on 2026-07-27:
+
+`Saya approve Task 18 execution: push Git ke origin/main, apply Supabase migrations to qhtfixgbcpcitokeryxb (DSM Sales Web App V2), deploy the app, then run post-deploy smoke checks.`
+
+This file now records the release execution results and the verification
+boundary.
+
+## Execution Results
+
+- Git:
+  - Committed release set as `b33efe3`
+    (`feat: complete sales task control loop release gate`).
+  - Pushed `main` to `origin/main`:
+    `30fdb12..b33efe3  main -> main`.
+- Supabase remote:
+  - Target: `qhtfixgbcpcitokeryxb` / `DSM Sales Web App V2`.
+  - Synced pending migrations:
+    - `20260727141303_harden_task_calendar_function_search_path.sql`
+    - `20260727160000_backfill_task_control_loop.sql`
+    - `20260727160010_retire_legacy_task_status.sql`
+  - Post-apply `supabase migration list --linked` confirmed all three have
+    matching local and remote versions.
+- Deployment:
+  - Vercel production deployment: `dpl_ATtYyZxxZEp4cLR1jHVwSs1rZaE5`.
+  - Production alias: `https://dsmsalescrm.vercel.app`.
+  - Deployment URL:
+    `https://dsmsalescrm-eo807jrdz-hiulaukgalak.vercel.app`.
+  - `vercel inspect` reported `Ready`.
+- Post-deploy smoke:
+  - SQL/RLS smoke checks passed via linked Supabase SQL role simulation.
+  - HTTP SSR smoke checks passed for `/`, `/login`, and `/tasks`.
+  - Authenticated browser smoke was not run because no production password or
+    reusable production session was available; no production Auth users were
+    created or mutated for test access.
+  - `supabase db advisors --linked` did not complete in this session and was
+    stopped with Ctrl-C, so remote advisors are not claimed as verified.
 
 ## Exact Target Discovered
 
@@ -33,38 +67,33 @@ remote Supabase mutation, Git push, deployment, or production browser test.
     with Ctrl-C (`exit 130`). Treat this dry-run as unavailable in this
     session, not as a successful release proof.
 
-## Pending Supabase Migrations
+## Supabase Migration Outcome
 
-Remote already has local migrations through `20260727150000` except for one
-local-only advisor-hardening migration inserted at timestamp `20260727141303`.
+Before execution, remote already had local migrations through `20260727150000`
+except for one local-only advisor-hardening migration inserted at timestamp
+`20260727141303`.
 
-Pending on linked remote:
+These migrations were pending before execution and confirmed synced after
+execution:
 
 - `20260727141303_harden_task_calendar_function_search_path.sql`
 - `20260727160000_backfill_task_control_loop.sql`
 - `20260727160010_retire_legacy_task_status.sql`
 
-Release risk:
+Ordering note:
 
 - The linked remote already has `20260727150000_restrict_task_exception_visibility.sql`,
-  but does not have `20260727141303_harden_task_calendar_function_search_path.sql`.
-  That means one pending migration has a timestamp older than the current
-  remote head. Do not run `supabase db push --linked` until the owner reviews
-  this ordering risk and the CLI dry-run can be captured or an explicit
-  alternative migration application strategy is approved.
+  but initially did not have
+  `20260727141303_harden_task_calendar_function_search_path.sql`. The CLI
+  required `--include-all` handling for this timestamp ordering case.
 
 ## Git State
 
-Release execution is not ready because the working tree is dirty and the
-release changes are not committed.
+Release commit and push completed.
 
-- `git log origin/main..HEAD` returned no local commits ahead of `origin/main`.
-- `git diff --stat` shows Task 16-17 source, test, migration, report, and
-  evidence changes still pending locally.
-
-Before any Git push, create a reviewed commit containing the intended release
-set and verify that unrelated working-tree changes are either included
-deliberately or kept out deliberately.
+- Release commit: `b33efe3`.
+- Push target: `origin/main`.
+- Push result: `30fdb12..b33efe3  main -> main`.
 
 ## Backup And Recovery Approach
 
@@ -94,29 +123,32 @@ Recovery path:
 
 ## Post-Deploy Smoke Checks
 
-Run after an explicitly approved remote migration/deployment:
+Executed after the approved remote migration/deployment:
 
 - `supabase migration list --linked`
-  - verify remote has the exact applied migration set.
+  - verified remote has the exact applied migration set for the three pending
+    migrations.
 - SQL smoke checks:
-  - `select to_regclass('public.tasks') as tasks_table;`
-  - `select to_regclass('public.task_status') as retired_task_status_enum;`
-  - `select count(*) from public.tasks;`
-  - `select * from public.compute_task_due_state(current_date, 'Open'::public.task_workflow_status) limit 1;`
-  - `select * from public.task_control_loop_metrics() limit 1;`
-- Authenticated browser smoke checks:
-  - Sales: `/tasks` create/progress path still works.
-  - Manager: My Tasks and Team Exceptions still separate ownership correctly.
-  - Executive: `/tasks` remains read-only and titled `Executive Exceptions`.
-  - Super Admin: correction path still records progress without ownership
-    reassignment.
-  - Calendar boundary: holiday correction changes Team Exceptions membership.
-
-## Approval Required Before Execution
-
-Use an exact approval sentence like:
-
-`Saya approve Task 18 execution: push Git ke origin/main, apply Supabase migrations to qhtfixgbcpcitokeryxb (DSM Sales Web App V2), deploy the app, then run post-deploy smoke checks.`
-
-Without that level of exact target/action approval, Task 18 must remain a
-prepared NO-GO gate.
+  - `public.tasks` exists.
+  - `public.task_status` is retired (`to_regtype(...)` returned null).
+  - Production task count: `24`.
+  - `public.compute_task_due_state(current_date, 'Open'::public.task_workflow_status)`
+    returned `Today` with `calendar_incomplete = true`.
+  - `public.task_control_loop_metrics` exists and executive aggregate metrics
+    returned production totals.
+  - RLS simulation:
+    - Sales user saw 10 owned tasks.
+    - Manager user saw 24 tasks.
+    - Executive user saw 0 direct task rows but aggregate metrics returned 24
+      total tasks.
+    - Super Admin user saw 24 tasks.
+- HTTP smoke checks:
+  - `https://dsmsalescrm.vercel.app` returned `307` to `/dashboard`.
+  - `/login` rendered the production login app shell.
+  - `/tasks` rendered the production SSR app shell with Task page title and
+    deployed Task assets.
+- Not verified:
+  - Authenticated production browser smoke checks, because no production
+    password/session was available.
+  - Remote Supabase advisors, because `supabase db advisors --linked` hung
+    after login-role initialization and was stopped.
