@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -317,15 +318,15 @@ export function CommercialViews(props: CommercialViewsProps) {
       </div>
 
       {filtered.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center gap-2 py-16 text-center">
-            <p className="text-sm font-medium">Tidak ada data</p>
-            <p className="text-xs text-muted-foreground max-w-sm">
-              {props.emptyHint ??
-                "Coba ubah filter atau reset pencarian untuk melihat item lainnya."}
-            </p>
-          </CardContent>
-        </Card>
+        <EmptyState
+          className="py-16"
+          icon={Search}
+          title="Tidak ada data"
+          description={
+            props.emptyHint ??
+            "Coba ubah filter atau reset pencarian untuk melihat item lainnya."
+          }
+        />
       ) : deletedMode || view === "table" ? (
         <Card>
           <CardContent className="p-0">

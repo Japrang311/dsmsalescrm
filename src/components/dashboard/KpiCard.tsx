@@ -38,7 +38,10 @@ export function KpiCard({
           {value}
         </div>
         {sub ? (
-          <div className="text-xs text-muted-foreground">{sub}</div>
+          // min-h reserves space for 2 lines of text-xs so a sibling card
+          // whose `sub` wraps (e.g. a long Variance value) doesn't grow
+          // taller than cards in the same row whose `sub` fits on one line.
+          <div className="min-h-8 text-xs text-muted-foreground">{sub}</div>
         ) : null}
         {children}
       </CardContent>
@@ -61,7 +64,7 @@ export function KpiProgress({
         ? "bg-warning"
         : "bg-primary";
   return (
-    <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+    <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-border/60">
       <div
         className={cn("h-full rounded-full transition-all", bg)}
         style={{ width: `${clamped * 100}%` }}

@@ -1,4 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Phone, Mail, MessageSquare, MapPin, Users } from "lucide-react";
@@ -41,9 +42,10 @@ export function TodaysFollowUpList() {
       </CardHeader>
       <CardContent className="p-0">
         {rows.length === 0 ? (
-          <div className="px-4 py-10 text-center text-sm text-muted-foreground">
-            Tidak ada follow-up prioritas hari ini.
-          </div>
+          <EmptyState
+            className="m-4 py-10"
+            description="Tidak ada follow-up prioritas hari ini."
+          />
         ) : (
           <div className="divide-y divide-border">
             {rows.map(({ task, client, commercialItem, owner }) => {

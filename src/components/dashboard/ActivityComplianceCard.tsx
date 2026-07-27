@@ -50,7 +50,7 @@ export function ActivityComplianceCard() {
             {formatPercent(compliance)}
           </span>
         </div>
-        <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+        <div className="h-1.5 w-full overflow-hidden rounded-full bg-border/60">
           <div
             className={cn(
               "h-full rounded-full",

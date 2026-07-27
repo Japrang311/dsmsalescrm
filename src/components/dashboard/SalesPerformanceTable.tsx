@@ -94,7 +94,7 @@ export function SalesPerformanceTable() {
                       >
                         {formatPercent(pct)}
                       </span>
-                      <div className="h-1.5 w-24 overflow-hidden rounded-full bg-muted">
+                      <div className="h-1.5 w-24 overflow-hidden rounded-full bg-border/60">
                         <div
                           className={cn(
                             "h-full rounded-full",

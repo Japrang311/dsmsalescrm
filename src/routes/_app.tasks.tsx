@@ -33,6 +33,7 @@ import { cn } from "@/lib/utils";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1012,17 +1013,12 @@ function TasksInboxPage() {
           )}
 
           {filtered.length === 0 && (
-            <Card className="border-border shadow-none">
-              <CardContent className="flex flex-col items-center gap-2 py-12 text-center">
-                <Inbox className="h-8 w-8 text-muted-foreground" />
-                <p className="text-sm font-medium text-foreground">
-                  Inbox kosong
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Tidak ada task yang cocok dengan filter saat ini.
-                </p>
-              </CardContent>
-            </Card>
+            <EmptyState
+              className="py-12"
+              icon={Inbox}
+              title="Inbox kosong"
+              description="Tidak ada task yang cocok dengan filter saat ini."
+            />
           )}
         </div>
       ) : (
@@ -1633,9 +1629,7 @@ function CalendarView({
             </span>
           </div>
           {selectedTasks.length === 0 ? (
-            <p className="py-6 text-center text-xs text-muted-foreground">
-              Tidak ada task pada tanggal ini.
-            </p>
+            <EmptyState description="Tidak ada task pada tanggal ini." />
           ) : (
             <ul className="divide-y divide-border">
               {selectedTasks.map((t) => (

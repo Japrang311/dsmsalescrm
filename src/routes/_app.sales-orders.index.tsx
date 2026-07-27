@@ -8,9 +8,11 @@ import {
   FileSpreadsheet,
   FileText,
   RotateCcw,
+  Search,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -329,12 +331,11 @@ function SalesOrdersRevenuePage() {
       )}
 
       {rows.length === 0 ? (
-        <Card>
-          <CardContent className="py-14 text-center text-sm text-muted-foreground">
-            Tidak ada SO pada rentang & filter ini. Longgarkan filter atau pilih
-            periode lain.
-          </CardContent>
-        </Card>
+        <EmptyState
+          className="py-14"
+          icon={Search}
+          description="Tidak ada SO pada rentang & filter ini. Longgarkan filter atau pilih periode lain."
+        />
       ) : (
         <Card>
           <CardContent className="p-0">

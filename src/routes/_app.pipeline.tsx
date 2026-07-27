@@ -606,7 +606,7 @@ function PipelineBoard({ role }: { role: Role }) {
         </div>
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-background to-transparent"
+          className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-border-strong/40 to-transparent"
         />
       </div>
 

@@ -31,6 +31,7 @@ import {
   YAxis,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -41,7 +42,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -811,9 +811,10 @@ function ReportsPage() {
           </CardHeader>
           <CardContent className="p-0">
             {topCustomers.length === 0 ? (
-              <p className="p-4 text-center text-xs text-muted-foreground">
-                Belum ada revenue pada scope ini.
-              </p>
+              <EmptyState
+                className="m-4"
+                description="Belum ada revenue pada scope ini."
+              />
             ) : (
               <Table>
                 <TableHeader>
@@ -1152,9 +1153,10 @@ function StatBlock({
 
 function ChartEmpty() {
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-2 text-xs text-muted-foreground">
-      <Skeleton className="h-24 w-full max-w-xs" />
-      <span>Belum ada data pada rentang & filter ini.</span>
-    </div>
+    <EmptyState
+      className="h-full"
+      icon={BarChart3}
+      description="Belum ada data pada rentang & filter ini."
+    />
   );
 }

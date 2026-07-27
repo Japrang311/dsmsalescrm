@@ -3,6 +3,7 @@ import { TrendingUp, Target, Percent, Wallet } from "lucide-react";
 import { formatRupiahShort } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { COMMERCIAL_STAGES } from "@/lib/data/commercial-stages";
+import { EmptyState } from "@/components/ui/empty-state";
 
 type Item = {
   id: string;
@@ -178,7 +179,7 @@ export function PipelineAnalytics({
                         {s.count} · {formatRupiahShort(s.value)}
                       </p>
                     </div>
-                    <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                    <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-border/60">
                       <div
                         className={cn(
                           "h-full rounded-full transition-all",
@@ -215,9 +216,7 @@ export function PipelineAnalytics({
               </span>
             </div>
             {byOwner.length === 0 ? (
-              <p className="py-4 text-center text-[12px] text-muted-foreground">
-                Belum ada data owner.
-              </p>
+              <EmptyState description="Belum ada data owner." />
             ) : (
               <div className="flex flex-col gap-1.5">
                 {byOwner.map((o) => (
@@ -234,7 +233,7 @@ export function PipelineAnalytics({
                           {formatRupiahShort(o.total)}
                         </p>
                       </div>
-                      <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                      <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-border/60">
                         <div
                           className="h-full rounded-full bg-primary transition-all"
                           style={{

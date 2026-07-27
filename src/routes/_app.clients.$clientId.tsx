@@ -21,6 +21,7 @@ import {
 import { toast } from "sonner";
 
 import { Card, CardContent } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
@@ -455,9 +456,10 @@ function ClientProfilePage() {
               <CardContent className="p-4">
                 <SectionTitle icon={Clock} title="Follow-up Timeline" />
                 {followUps.length === 0 ? (
-                  <p className="mt-3 rounded-md border border-dashed py-6 text-center text-xs text-muted-foreground">
-                    Belum ada follow-up tercatat.
-                  </p>
+                  <EmptyState
+                    className="mt-3"
+                    description="Belum ada follow-up tercatat."
+                  />
                 ) : (
                   <ul className="mt-3 flex flex-col gap-2">
                     {followUps.map((fu) => (
@@ -492,9 +494,10 @@ function ClientProfilePage() {
               <CardContent className="p-4">
                 <SectionTitle icon={Calendar} title="Upcoming Actions" />
                 {upcomingActions.length === 0 ? (
-                  <p className="mt-3 rounded-md border border-dashed py-6 text-center text-xs text-muted-foreground">
-                    Tidak ada action mendatang.
-                  </p>
+                  <EmptyState
+                    className="mt-3"
+                    description="Tidak ada action mendatang."
+                  />
                 ) : (
                   <ul className="mt-3 flex flex-col gap-2">
                     {upcomingActions.slice(0, 5).map((t) => (
@@ -539,9 +542,10 @@ function ClientProfilePage() {
             <CardContent className="p-4">
               <SectionTitle icon={Calendar} title="Semua Tasks" />
               {clientTasks.length === 0 ? (
-                <p className="mt-3 rounded-md border border-dashed py-6 text-center text-xs text-muted-foreground">
-                  Belum ada task untuk klien ini.
-                </p>
+                <EmptyState
+                  className="mt-3"
+                  description="Belum ada task untuk klien ini."
+                />
               ) : (
                 <div className="mt-3 overflow-x-auto">
                   <Table>
@@ -609,9 +613,10 @@ function ClientProfilePage() {
             <CardContent className="p-4">
               <SectionTitle icon={Package} title="Commercial Items" />
               {clientCommercial.length === 0 ? (
-                <p className="mt-3 rounded-md border border-dashed py-6 text-center text-xs text-muted-foreground">
-                  Belum ada commercial item untuk klien ini.
-                </p>
+                <EmptyState
+                  className="mt-3"
+                  description="Belum ada commercial item untuk klien ini."
+                />
               ) : (
                 <div className="mt-3 overflow-x-auto">
                   <Table>
@@ -663,9 +668,10 @@ function ClientProfilePage() {
             <CardContent className="p-4">
               <SectionTitle icon={FileText} title="Quotations" />
               {clientQuotations.length === 0 ? (
-                <p className="mt-3 rounded-md border border-dashed py-6 text-center text-xs text-muted-foreground">
-                  Belum ada Quotation untuk klien ini.
-                </p>
+                <EmptyState
+                  className="mt-3"
+                  description="Belum ada Quotation untuk klien ini."
+                />
               ) : (
                 <div className="mt-3 overflow-x-auto">
                   <Table>
@@ -731,9 +737,10 @@ function ClientProfilePage() {
             <CardContent className="p-4">
               <SectionTitle icon={ReceiptText} title="Sales Orders" />
               {clientOrders.length === 0 ? (
-                <p className="mt-3 rounded-md border border-dashed py-6 text-center text-xs text-muted-foreground">
-                  Belum ada Sales Order untuk klien ini.
-                </p>
+                <EmptyState
+                  className="mt-3"
+                  description="Belum ada Sales Order untuk klien ini."
+                />
               ) : (
                 <div className="mt-3 overflow-x-auto">
                   <Table>
@@ -806,9 +813,10 @@ function ClientProfilePage() {
             <CardContent className="p-4">
               <SectionTitle icon={ReceiptText} title="Revenue History" />
               {clientOrders.length === 0 ? (
-                <p className="mt-3 rounded-md border border-dashed py-6 text-center text-xs text-muted-foreground">
-                  Belum ada revenue tercatat untuk klien ini.
-                </p>
+                <EmptyState
+                  className="mt-3"
+                  description="Belum ada revenue tercatat untuk klien ini."
+                />
               ) : (
                 <div className="mt-3 overflow-x-auto">
                   <Table>
@@ -1110,17 +1118,13 @@ function ClientInfoCard({
             <InfoRow label="Website" value={client.website} />
             <InfoRow label="Catatan" value={client.notes} />
             {!hasCompanyInfo && (
-              <p className="text-muted-foreground">
-                Belum ada info perusahaan.
-              </p>
+              <EmptyState description="Belum ada info perusahaan." />
             )}
           </div>
 
           <div className="grid gap-2">
             {filledContacts.length === 0 ? (
-              <p className="text-xs text-muted-foreground">
-                Belum ada kontak person.
-              </p>
+              <EmptyState description="Belum ada kontak person." />
             ) : (
               client.contacts.map((c, i) =>
                 c.name || c.position || c.email || c.phone || c.mobile ? (

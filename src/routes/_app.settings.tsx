@@ -1207,7 +1207,7 @@ function TargetsTab({
             </div>
             <div
               aria-hidden="true"
-              className="pointer-events-none absolute inset-y-0 right-0 w-10 rounded-r-md bg-gradient-to-l from-card to-transparent"
+              className="pointer-events-none absolute inset-y-0 right-0 w-10 rounded-r-md bg-gradient-to-l from-border-strong/40 to-transparent"
             />
           </div>
         </CardContent>
