@@ -228,13 +228,22 @@ const SALES_TEAM_INCLUDE_MANAGERS = new Set(["Adhitya Wirambara", "Leli Al"]);
 // (Settings' target assignment dropdown, dashboard and report "sales team"
 // collections) — Super Admin is not a Sales owner and must never appear
 // there (Phase 12 plan, Global Constraints).
+//
+// Deactivated (account_status = 'inactive') sales/manager profiles are
+// excluded here too, so a deactivated rep's name stops appearing in any
+// active-roster UI (dashboards, target charts, owner/assignee dropdowns,
+// filters). Their name still shows up on Sales Orders, Commercial Items,
+// and Client records already attributed to them, because those resolve
+// owner names via listOwners() below, which is intentionally unfiltered —
+// deactivation must not rewrite history. Per owner decision 2026-07-28.
 export async function listSalesTeamProfiles(): Promise<
   { id: string; name: string; initials: string; email: string }[]
 > {
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, name, initials, email, role")
-    .in("role", ["sales", "manager"]);
+    .select("id, name, initials, email, role, account_status")
+    .in("role", ["sales", "manager"])
+    .eq("account_status", "active");
   if (error) throw error;
   return (data ?? [])
     .filter(

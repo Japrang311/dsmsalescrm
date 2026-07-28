@@ -59,7 +59,6 @@ import { useRole, ROLE_LABEL } from "@/context/role-context";
 import { CURRENT_MONTH, CURRENT_YEAR, NOW } from "@/lib/domain";
 import {
   activityCompliance,
-  dashboardSalesTeam,
   quotationFunnel,
   riskAlerts,
   sumTargetsThroughMonth,
@@ -108,7 +107,6 @@ function ReportsPage() {
     taskMetrics,
     isLoading,
   } = useDashboardData();
-  const displayTeam = dashboardSalesTeam(salesTeam);
 
   const [filters, setFilters] = useState<ReportFilters>(() =>
     defaultReportFilters({ from: new Date(CURRENT_YEAR, 0, 1), to: NOW }),
@@ -302,18 +300,11 @@ function ReportsPage() {
         rows,
         allTasks,
         clientList,
-        displayTeam,
+        salesTeam,
         targetsByMember,
         { includeTaskDetail },
       ),
-    [
-      rows,
-      allTasks,
-      clientList,
-      displayTeam,
-      targetsByMember,
-      includeTaskDetail,
-    ],
+    [rows, allTasks, clientList, salesTeam, targetsByMember, includeTaskDetail],
   );
 
   const taskSummary = useMemo(
@@ -340,7 +331,7 @@ function ReportsPage() {
       items: commercial,
       clients: clientList,
       ownersById,
-      salesTeam: displayTeam,
+      salesTeam,
       targetsByMember,
       companyTarget,
       taskMetrics,
@@ -354,7 +345,7 @@ function ReportsPage() {
       commercial,
       clientList,
       ownersById,
-      displayTeam,
+      salesTeam,
       targetsByMember,
       companyTarget,
       taskMetrics,
@@ -451,7 +442,7 @@ function ReportsPage() {
         value={filters}
         onChange={patch}
         clients={clientList}
-        salesTeam={displayTeam}
+        salesTeam={salesTeam}
       />
 
       <div className="flex flex-wrap gap-1.5 text-[11px] text-muted-foreground">

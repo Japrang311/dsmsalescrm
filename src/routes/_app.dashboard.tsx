@@ -40,7 +40,6 @@ import { useRole, ROLE_LABEL } from "@/context/role-context";
 import { CURRENT_MONTH } from "@/lib/domain";
 import {
   activeCommercialCount,
-  dashboardSalesTeam,
   monthlyRevenue,
   monthlyTargetValue,
   prototypeSummary,
@@ -128,7 +127,7 @@ function DashboardPage() {
     items,
     clients,
     ownersById,
-    salesTeam: dashboardSalesTeam(salesTeam),
+    salesTeam,
     targetsByMember,
     companyTarget,
     taskMetrics,
@@ -382,9 +381,8 @@ function DashboardPage() {
           right={<Target className="h-4 w-4 text-primary" />}
           sub={
             <>
-              Target{" "}
-              <span className="num">{formatRupiahShort(yearlyTgt)}</span> ·
-              Variance{" "}
+              Target <span className="num">{formatRupiahShort(yearlyTgt)}</span>{" "}
+              · Variance{" "}
               <span
                 className={
                   ytd - yearlyTgt >= 0 ? "text-success" : "text-destructive"

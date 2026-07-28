@@ -96,23 +96,6 @@ export function ytdTargetValue(
 
 export type SalesTeamMember = { id: string; name: string; initials: string };
 
-// Executive dashboard "Sales Performance" composition. Adhitya Wirambara
-// and Leli Al personally run a sales book despite their profiles.role
-// being 'manager', so listSalesTeamProfiles() (clients.ts) already includes
-// them; Andri Sutomo (profiles.role 'sales') has no personal book of
-// business and is excluded here instead. Display-only for this
-// dashboard/export — does not change anyone's actual RLS role/permissions.
-// Per owner decision 2026-07-20.
-const DASHBOARD_SALES_EXCLUDE = new Set(["Andri Sutomo"]);
-
-export function dashboardSalesTeam(
-  salesTeam: SalesTeamMember[],
-): SalesTeamMember[] {
-  return salesTeam.filter(
-    (member) => !DASHBOARD_SALES_EXCLUDE.has(member.name),
-  );
-}
-
 function inRange(dateStr: string, range: DateRange): boolean {
   const d = new Date(dateStr).getTime();
   return d >= range.from.getTime() && d <= range.to.getTime();

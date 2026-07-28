@@ -9,10 +9,7 @@ import {
 } from "@/components/ui/table";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import {
-  salesPerformance,
-  dashboardSalesTeam,
-} from "@/lib/data/dashboard-selectors";
+import { salesPerformance } from "@/lib/data/dashboard-selectors";
 import { useDashboardData } from "@/hooks/use-dashboard-data";
 import { formatRupiahShort, formatPercent } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -20,12 +17,11 @@ import { cn } from "@/lib/utils";
 export function SalesPerformanceTable() {
   const { orders, tasks, clients, salesTeam, ownersById, targetsByMember } =
     useDashboardData();
-  const displayTeam = dashboardSalesTeam(salesTeam);
   const rows = salesPerformance(
     orders,
     tasks,
     clients,
-    displayTeam,
+    salesTeam,
     targetsByMember,
   );
 
@@ -36,7 +32,7 @@ export function SalesPerformanceTable() {
           Sales Performance vs Target YTD
         </CardTitle>
         <p className="text-xs text-muted-foreground">
-          {displayTeam.length} anggota tim sales aktif. FOC prototype tidak
+          {salesTeam.length} anggota tim sales aktif. FOC prototype tidak
           dihitung dalam revenue.
         </p>
       </CardHeader>
