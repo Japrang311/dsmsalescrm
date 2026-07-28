@@ -189,13 +189,14 @@ function DashboardPage() {
   }
 
   const ytd = ytdRevenue(orders);
-  const ytdTgt = ytdTargetValue(
+  const yearlyTgt = ytdTargetValue(
     role,
     currentUserId ?? "",
     targetsByMember,
     companyTarget,
+    12,
   );
-  const ytdPct = ytdTgt > 0 ? ytd / ytdTgt : 0;
+  const ytdPct = yearlyTgt > 0 ? ytd / yearlyTgt : 0;
 
   const monthRev = monthlyRevenue(orders);
   const monthTgt = monthlyTargetValue(
@@ -376,19 +377,20 @@ function DashboardPage() {
       {/* KPI row */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard
-          label="Achievement YTD vs Target YTD"
+          label="Achievement YTD vs Yearly Target"
           value={formatRupiahShort(ytd)}
           right={<Target className="h-4 w-4 text-primary" />}
           sub={
             <>
-              Target <span className="num">{formatRupiahShort(ytdTgt)}</span> ·
+              Target{" "}
+              <span className="num">{formatRupiahShort(yearlyTgt)}</span> ·
               Variance{" "}
               <span
                 className={
-                  ytd - ytdTgt >= 0 ? "text-success" : "text-destructive"
+                  ytd - yearlyTgt >= 0 ? "text-success" : "text-destructive"
                 }
               >
-                {formatRupiahShort(ytd - ytdTgt)}
+                {formatRupiahShort(ytd - yearlyTgt)}
               </span>
             </>
           }
