@@ -13,18 +13,33 @@ import {
 } from "./handler.ts";
 import { readBoundedRequestBody } from "./body-reader.ts";
 
-const CORS_HEADERS = {
+const BASE_CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
+  Vary: "Access-Control-Request-Headers",
 };
 
-function json(body: AdminResponse["body"] | ErrorBody, status: number) {
+function corsHeaders(request: Request) {
+  const requestedHeaders = request.headers.get(
+    "Access-Control-Request-Headers",
+  );
+  return {
+    ...BASE_CORS_HEADERS,
+    "Access-Control-Allow-Headers":
+      requestedHeaders?.trim() ||
+      "authorization, x-client-info, apikey, content-type",
+  };
+}
+
+function json(
+  request: Request,
+  body: AdminResponse["body"] | ErrorBody,
+  status: number,
+) {
   return new Response(JSON.stringify(body), {
     status,
     headers: {
-      ...CORS_HEADERS,
+      ...corsHeaders(request),
       "Content-Type": "application/json; charset=utf-8",
       "Cache-Control": "no-store",
     },
@@ -109,7 +124,7 @@ function createDependencies(): AdminDependencies {
 
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") {
-    return new Response("ok", { headers: CORS_HEADERS });
+    return new Response("ok", { headers: corsHeaders(request) });
   }
 
   try {
@@ -123,7 +138,7 @@ Deno.serve(async (request) => {
       },
       createDependencies(),
     );
-    return json(result.body, result.status);
+    return json(request, result.body, result.status);
   } catch (error) {
     const safe =
       error instanceof AdminHttpError
@@ -138,6 +153,6 @@ Deno.serve(async (request) => {
               code: "INTERNAL_ERROR",
             },
           };
-    return json(safe.body, safe.status);
+    return json(request, safe.body, safe.status);
   }
 });
