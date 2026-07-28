@@ -38,6 +38,13 @@ import { useRole } from "@/context/role-context";
 
 const METHODS = ["Phone", "Email", "WhatsApp", "Visit", "Meeting"] as const;
 const PRIORITIES = ["High", "Normal", "Low"] as const;
+// Default due date is tomorrow (local day), not today -- user can still edit it.
+const tomorrow = new Date(NOW.getFullYear(), NOW.getMonth(), NOW.getDate() + 1);
+const DEFAULT_DUE_DATE = [
+  tomorrow.getFullYear(),
+  String(tomorrow.getMonth() + 1).padStart(2, "0"),
+  String(tomorrow.getDate()).padStart(2, "0"),
+].join("-");
 // Same 7 values as public.task_category (spec §2.1) -- Task not yet
 // classified defaults to "Other", same "not yet known" meaning as its use
 // elsewhere (spec §6.3).
@@ -125,7 +132,7 @@ export function CreateTaskDialog({
       method: "Phone",
       priority: "Normal",
       category: "Other",
-      dueDate: NOW.toISOString().slice(0, 10),
+      dueDate: DEFAULT_DUE_DATE,
       ownerId: defaultOwner,
     },
   });
@@ -189,7 +196,7 @@ export function CreateTaskDialog({
       method: "Phone",
       priority: "Normal",
       category: "Other",
-      dueDate: NOW.toISOString().slice(0, 10),
+      dueDate: DEFAULT_DUE_DATE,
       ownerId: defaultOwner,
     });
     setOpen(false);

@@ -202,4 +202,38 @@ describe("normalized commercial document adapter", () => {
     expect(reopened.lostReasonDetail).toBeNull();
     await supabase.auth.signOut();
   });
+
+  test("allows correcting Quotation Number, Date, and Expired Date after creation", async () => {
+    const authClient = await signInAs(fixtures.sales);
+    const session = (await authClient.auth.getSession()).data.session!;
+    await supabase.auth.setSession({
+      access_token: session.access_token,
+      refresh_token: session.refresh_token,
+    });
+
+    const created = await createQuotation({
+      clientId,
+      documentDate: "2095-03-01",
+      items: [
+        {
+          productName: "Correction target",
+          qty: 1,
+          uom: "Unit",
+          unitPrice: 1000,
+        },
+      ],
+    });
+
+    const corrected = await updateCommercialDocument(created.id, {
+      quotationNumber: `${created.quotationNumber}-CORRECTED`,
+      documentDate: "2095-03-02",
+      quotationExpiredDate: "2095-04-01",
+    });
+    expect(corrected.quotationNumber).toBe(
+      `${created.quotationNumber}-CORRECTED`,
+    );
+    expect(corrected.documentDate).toBe("2095-03-02");
+    expect(corrected.quotationExpiredDate).toBe("2095-04-01");
+    await supabase.auth.signOut();
+  });
 });

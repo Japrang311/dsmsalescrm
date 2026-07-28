@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import {
   ArrowUpDown,
   ChevronLeft,
@@ -45,6 +45,7 @@ export function ClientsTable({
   pageSize: number;
   onPageChange: (n: number) => void;
 }) {
+  const navigate = useNavigate();
   const [sortKey, setSortKey] = useState<SortKey>("spending");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
@@ -156,16 +157,36 @@ export function ClientsTable({
             {pageRows.map((r) => {
               const nextDays = r.nextFu ? daysBetween(NOW, r.nextFu) : null;
               const overdue = nextDays !== null && nextDays < 0;
+              const detailHref = "/clients/$clientId" as const;
               return (
                 <tr
                   key={r.client.id}
-                  className="border-b transition-colors last:border-b-0 hover:bg-muted/30"
+                  className="cursor-pointer border-b outline-none transition-colors last:border-b-0 hover:bg-muted/30 focus-visible:bg-muted/30 focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-primary/50"
+                  role="link"
+                  tabIndex={0}
+                  aria-label={`Buka detail ${r.client.name}`}
+                  onClick={() =>
+                    navigate({
+                      to: detailHref,
+                      params: { clientId: r.client.id },
+                    })
+                  }
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      navigate({
+                        to: detailHref,
+                        params: { clientId: r.client.id },
+                      });
+                    }
+                  }}
                 >
                   <td className={cellPad}>
                     <Link
                       to="/clients/$clientId"
                       params={{ clientId: r.client.id }}
                       className="font-medium text-foreground hover:text-primary hover:underline"
+                      onClick={(e) => e.stopPropagation()}
                     >
                       {r.client.name}
                     </Link>
@@ -236,7 +257,7 @@ export function ClientsTable({
                   <td className={cellPad}>
                     <RiskDot risk={r.risk} />
                   </td>
-                  <td className={cellPad}>
+                  <td className={cellPad} onClick={(e) => e.stopPropagation()}>
                     <RowActions
                       clientId={r.client.id}
                       clientName={r.client.name}

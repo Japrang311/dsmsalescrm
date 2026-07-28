@@ -245,10 +245,12 @@ function ClientProfilePage() {
                     ? formatRupiahShort(revenue.totalRevenue)
                     : "Rp0"
                 }
+                onClick={() => setActiveTab("revenue")}
               />
               <MiniStat
                 label="Last FU"
                 value={client.lastFu ? formatDateShort(client.lastFu) : "—"}
+                onClick={() => setActiveTab("tasks")}
               />
               <MiniStat
                 label="Next FU"
@@ -258,6 +260,7 @@ function ClientProfilePage() {
                     ? "danger"
                     : "default"
                 }
+                onClick={() => setActiveTab("tasks")}
               />
             </div>
 
@@ -376,12 +379,14 @@ function ClientProfilePage() {
               value={formatRupiahShort(revenue.totalRevenue)}
               icon={ReceiptText}
               hint={`${CURRENT_YEAR}`}
+              onClick={() => setActiveTab("revenue")}
             />
             <MetricCard
               label="PPN"
               value={revenue.ppn > 0 ? formatRupiahShort(revenue.ppn) : "—"}
               icon={Layers}
               hint={revenue.ppn > 0 ? "PPN" : "Belum ada PPN"}
+              onClick={() => setActiveTab("revenue")}
             />
             <MetricCard
               label="Non-PPN"
@@ -390,6 +395,7 @@ function ClientProfilePage() {
               }
               icon={Layers}
               hint={revenue.nonPpn > 0 ? "Non-PPN" : "Belum ada Non-PPN"}
+              onClick={() => setActiveTab("revenue")}
             />
             <MetricCard
               label="Quotation Pipeline"
@@ -404,6 +410,7 @@ function ClientProfilePage() {
                   ? "Quotation aktif"
                   : "Belum ada Quotation"
               }
+              onClick={() => setActiveTab("quotations")}
             />
             <MetricCard
               label="Commit"
@@ -414,6 +421,7 @@ function ClientProfilePage() {
               }
               icon={Clock}
               hint={commercial.commit > 0 ? "Total Commit" : "Belum ada Commit"}
+              onClick={() => setActiveTab("commercial")}
             />
             <MetricCard
               label="Prototype Paid"
@@ -428,6 +436,7 @@ function ClientProfilePage() {
                   ? "Prototype berbayar"
                   : "Belum ada Prototype Paid"
               }
+              onClick={() => setActiveTab("orders")}
             />
             <MetricCard
               label="Prototype FOC"
@@ -442,6 +451,7 @@ function ClientProfilePage() {
                   ? "Prototype FOC"
                   : "Belum ada Prototype FOC"
               }
+              onClick={() => setActiveTab("orders")}
             />
           </div>
 
@@ -1006,13 +1016,33 @@ function MiniStat({
   label,
   value,
   tone,
+  onClick,
 }: {
   label: string;
   value: string;
   tone?: "default" | "danger";
+  onClick?: () => void;
 }) {
   return (
-    <div>
+    <div
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onClick={onClick}
+      onKeyDown={
+        onClick
+          ? (event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                onClick();
+              }
+            }
+          : undefined
+      }
+      className={cn(
+        onClick &&
+          "cursor-pointer rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+      )}
+    >
       <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
         {label}
       </p>
@@ -1033,14 +1063,34 @@ function MetricCard({
   value,
   icon: Icon,
   hint,
+  onClick,
 }: {
   label: string;
   value: string;
   icon: React.ComponentType<{ className?: string }>;
   hint?: string;
+  onClick?: () => void;
 }) {
   return (
-    <Card className="shadow-sm">
+    <Card
+      className={cn(
+        "shadow-sm",
+        onClick && "cursor-pointer transition-colors hover:bg-muted/50",
+      )}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onClick={onClick}
+      onKeyDown={
+        onClick
+          ? (event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                onClick();
+              }
+            }
+          : undefined
+      }
+    >
       <CardContent className="flex flex-col gap-1 p-3">
         <div className="flex items-center justify-between">
           <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
