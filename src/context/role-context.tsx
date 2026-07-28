@@ -36,20 +36,38 @@ const STORAGE_KEY = "dsm.role";
 
 // Dev/local-only convenience: picking a role here signs into the matching
 // seeded local Supabase account (see supabase/seed.sql) so RLS has a real
-// session to enforce against. This only works against the local stack —
-// these accounts don't exist on any real project, so once .env.local points
-// at a real project this becomes a harmless no-op (sign-in just fails) and
-// /login (with loadRealSession() below) takes over instead.
+// session to enforce against.
+// This is gated on import.meta.env.DEV, not on the assumption that the seed
+// accounts are absent upstream. That assumption does not hold: seed.sql is
+// tracked in git and config.toml has a [db.seed] section, so a reset against
+// a linked remote would create these accounts — at which point shipping the
+// passwords would hand any anonymous visitor a manager session.
 // Dev switcher role type: intentionally excludes "super_admin" — there is
 // no seed super_admin login, and real Super Admin authorization always
 // comes from a real /login session's profile, never this prototype switcher.
 type DevRole = Exclude<Role, "super_admin">;
 
-const ROLE_LOGIN: Record<DevRole, { email: string; password: string }> = {
-  sales: { email: "nur@local.dsm.test", password: "seed-local-only" },
-  manager: { email: "leli@local.dsm.test", password: "seed-local-only" },
-  executive: { email: "executive@local.dsm.test", password: "seed-local-only" },
-};
+// Compiled out of production builds entirely. Vite statically replaces
+// `import.meta.env.DEV` with `false`, so the minifier drops the dead branch
+// and these credentials never reach a shipped bundle. Previously they were
+// unconditional module constants, which meant working seed passwords were
+// served to every browser and any visitor without a session was silently
+// signed in as one of these accounts. `bun run build` is grepped for
+// "seed-local-only" / "local.dsm.test" to keep it that way.
+const ROLE_LOGIN: Record<DevRole, { email: string; password: string }> =
+  import.meta.env.DEV
+    ? {
+        sales: { email: "nur@local.dsm.test", password: "seed-local-only" },
+        manager: { email: "leli@local.dsm.test", password: "seed-local-only" },
+        executive: {
+          email: "executive@local.dsm.test",
+          password: "seed-local-only",
+        },
+      }
+    : ({} as Record<DevRole, { email: string; password: string }>);
+// Empty in production, where no seed session can exist. Kept (rather than
+// removed) so loadRealSession() behaves identically if a production build is
+// ever run against the local stack.
 const SEED_EMAILS = new Set(Object.values(ROLE_LOGIN).map((v) => v.email));
 
 // A session belongs to a real (non-seed) account when a user has signed in
@@ -68,7 +86,11 @@ async function loadRealSession() {
 }
 
 async function signInForRole(role: DevRole) {
-  const { email, password } = ROLE_LOGIN[role];
+  // Never attempt a seed sign-in outside development, even if something
+  // manages to call this — ROLE_LOGIN is empty there.
+  const entry = import.meta.env.DEV ? ROLE_LOGIN[role] : undefined;
+  if (!entry) return;
+  const { email, password } = entry;
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) {
     // Expected once this runs against a real project (no seed data there)
@@ -113,6 +135,24 @@ export function RoleProvider({ children }: { children: ReactNode }) {
         setAuthSource("real");
         setHydrated(true);
         setAuthReady(true);
+        return;
+      }
+
+      if (result?.kind === "error") {
+        // The profile lookup itself failed, so we know nothing about this
+        // account. Fail closed rather than falling through to the dev
+        // switcher, which would sign a real user out of their own session
+        // and into a seed account over a transient network/RLS blip.
+        setHydrated(true);
+        window.location.href = "/login";
+        return;
+      }
+
+      if (!import.meta.env.DEV) {
+        // Production has no seed accounts to fall back to: no session (or a
+        // session with no profile row) means the user must sign in.
+        setHydrated(true);
+        window.location.href = "/login";
         return;
       }
 

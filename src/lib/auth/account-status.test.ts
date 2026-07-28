@@ -108,7 +108,12 @@ describe("fetchAccountStatus", () => {
     expect(result).toEqual({ kind: "missing_profile" });
   });
 
-  test("a query error yields missing_profile (fail closed, never a default role)", async () => {
+  // Distinct from missing_profile on purpose: a failed query says nothing
+  // about the account. Collapsing the two let a transient network/RLS blip
+  // look like "no profile row yet", which role-context.tsx treated as a cue
+  // to fall back to the local dev switcher — signing a real user out of
+  // their own session and into a seed account.
+  test("a query error yields error, not missing_profile (never a default role)", async () => {
     const { client } = fakeProfileClient({
       data: null,
       error: { message: "boom" },
@@ -116,7 +121,8 @@ describe("fetchAccountStatus", () => {
 
     const result = await accountStatus.fetchAccountStatus("user-1", client);
 
-    expect(result).toEqual({ kind: "missing_profile" });
+    expect(result).toEqual({ kind: "error" });
+    expect("role" in result).toBe(false);
   });
 
   test("queries role, account_status, name, initials, email scoped to the user id", async () => {

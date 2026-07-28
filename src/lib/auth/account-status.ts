@@ -33,10 +33,15 @@ export type RealProfile = {
 // outcome (inactive, no profile row, query error) is a variant with no
 // role field at all, so a caller can't accidentally destructure and use
 // one for an account that shouldn't have access.
+// "error" and "missing_profile" are deliberately separate: a failed query
+// says nothing about whether the account is legitimate, so callers must not
+// treat a transient network/RLS failure as "this user has no profile yet"
+// and downgrade an established session because of it.
 export type AccountStatusResult =
   | { kind: "active"; role: Role; profile: RealProfile }
   | { kind: "inactive" }
-  | { kind: "missing_profile" };
+  | { kind: "missing_profile" }
+  | { kind: "error" };
 
 type ProfileStatusRow = {
   role: Role;
@@ -49,8 +54,8 @@ type ProfileStatusRow = {
 // Reads the signed-in user's role AND account_status together — this is
 // the check role-context.tsx's previous loadRealSession() was missing: it
 // used to read only `role` and hand it out regardless of account_status.
-// Any query error or missing row fails closed to "missing_profile", never
-// to a default role.
+// A missing row fails closed to "missing_profile" and a failed query to
+// "error" — never to a default role.
 // Cast, not a structural default-param check: TypeScript's structural
 // comparison of the real (deeply generic) SupabaseClient type against the
 // narrow ProfileQueryClient/AuthSignOutClient interfaces above blows up
@@ -69,7 +74,8 @@ export async function fetchAccountStatus(
     .eq("id", userId)
     .maybeSingle();
 
-  if (error || !data) return { kind: "missing_profile" };
+  if (error) return { kind: "error" };
+  if (!data) return { kind: "missing_profile" };
 
   const row = data as ProfileStatusRow;
   if (row.account_status === "inactive") return { kind: "inactive" };
