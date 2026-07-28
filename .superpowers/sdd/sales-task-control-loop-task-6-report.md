@@ -97,13 +97,13 @@ purely for style and re-testing again.
 ## Verification actually run
 
 - `bun run test src/lib/data/tasks.test.ts
-  src/lib/data/task-progress-adapter.test.ts` (Task 6's specified
+src/lib/data/task-progress-adapter.test.ts` (Task 6's specified
   command, adjusted for the renamed file) → **9 pass, 0 fail.**
 - `bunx tsc --noEmit` → clean (after fixing real errors: `clientId`
   widening broke 3 out-of-scope files, reverted; a nullable-string
   `toContain()` overload mismatch in a new test).
 - Full suite `bun run test`, run **twice** on a fresh `bunx supabase db
-  reset` to confirm stability, not a lucky pass → **433 pass, 0 fail
+reset` to confirm stability, not a lucky pass → **433 pass, 0 fail
   across 57 files**, both times.
 - `git diff --check` — clean.
 - `bun run lint` (ESLint, requested separately by the user) — **did not

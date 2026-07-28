@@ -34,6 +34,7 @@ optional (zod schema, form default, submit payload); added a Category
 **`src/components/tasks/TaskDetailDrawer.tsx`** — split into two
 independent sections matching the domain model's own split (spec
 §3.1-§3.2):
+
 - **Detail Task**: title/dueDate/method/priority/category, saved via
   `updateTask()` (plain correction fields, unchanged mechanism).
 - **Catat Progress** (new): a `workflowStatus` target selector: `Open`/

@@ -32,11 +32,13 @@
 ### Task 1: Add deletion metadata, grants, activity kinds, and database permission coverage
 
 **Files:**
+
 - Create: `supabase/migrations/20260724110000_add_commercial_soft_delete_activity_kinds.sql`
 - Create: `supabase/migrations/20260724110001_add_commercial_soft_delete_columns.sql`
 - Create: `supabase/tests/commercial-soft-delete-rls.test.ts`
 
 **Interfaces:**
+
 - Consumes: existing `commercial_documents_update` and `sales_orders_update` policies from `supabase/migrations/20260719041351_harden_normalized_document_permissions.sql`
 - Produces: `deleted_at timestamptz`, `deleted_by uuid`, and four `public.activity_kind` values available to all later tasks
 
@@ -164,12 +166,14 @@ git commit -m "feat: add commercial soft delete schema"
 ### Task 2: Implement active/deleted commercial-document queries and audited transitions
 
 **Files:**
+
 - Modify: `src/lib/data/commercial-documents.ts`
 - Modify: `src/lib/data/commercial-documents.test.ts`
 - Modify: `src/lib/data/commercial-items.ts`
 - Modify: `src/lib/data/activity-log.ts`
 
 **Interfaces:**
+
 - Consumes: Task 1 columns and activity kinds
 - Produces:
   - `listCommercialDocuments(options?: { deleted?: boolean }): Promise<CommercialDocumentWithItems[]>`
@@ -184,7 +188,9 @@ Import the four new interfaces and create a base Quotation plus a revision throu
 
 ```ts
 await deleteCommercialDocument(base.id);
-expect((await listCommercialDocuments()).some((row) => row.id === base.id)).toBe(false);
+expect(
+  (await listCommercialDocuments()).some((row) => row.id === base.id),
+).toBe(false);
 expect(
   (await listCommercialDocuments({ deleted: true })).some(
     (row) => row.id === base.id,
@@ -192,7 +198,9 @@ expect(
 ).toBe(true);
 
 await restoreCommercialDocument(base.id);
-expect((await listCommercialDocuments()).some((row) => row.id === base.id)).toBe(true);
+expect(
+  (await listCommercialDocuments()).some((row) => row.id === base.id),
+).toBe(true);
 expect(
   (await listCommercialDocuments({ deleted: true })).some(
     (row) => row.id === base.id,
@@ -243,10 +251,12 @@ Use one private query builder so normal reads cannot accidentally omit the filte
 ```ts
 type DeletedQuery = { deleted?: boolean };
 
-function withDeletionFilter<T extends {
-  is: (column: string, value: null) => T;
-  not: (column: string, operator: string, value: null) => T;
-}>(query: T, options: DeletedQuery): T {
+function withDeletionFilter<
+  T extends {
+    is: (column: string, value: null) => T;
+    not: (column: string, operator: string, value: null) => T;
+  },
+>(query: T, options: DeletedQuery): T {
   return options.deleted
     ? query.not("deleted_at", "is", null)
     : query.is("deleted_at", null);
@@ -343,10 +353,12 @@ git commit -m "feat: add audited commercial document soft delete"
 ### Task 3: Implement active/deleted Sales Order queries and audited transitions
 
 **Files:**
+
 - Modify: `src/lib/data/sales-orders.ts`
 - Modify: `src/lib/data/sales-orders.test.ts`
 
 **Interfaces:**
+
 - Consumes: Task 1 columns and Task 2 activity kinds/helpers
 - Produces:
   - `listSalesOrders(options?: { deleted?: boolean }): Promise<SalesOrderDocument[]>`
@@ -360,7 +372,9 @@ After creating a Sales Order, assert active/deleted visibility, restore, and the
 
 ```ts
 await deleteSalesOrder(created.id);
-expect((await listSalesOrders()).some((row) => row.id === created.id)).toBe(false);
+expect((await listSalesOrders()).some((row) => row.id === created.id)).toBe(
+  false,
+);
 expect(
   (await listSalesOrders({ deleted: true })).some(
     (row) => row.id === created.id,
@@ -368,7 +382,9 @@ expect(
 ).toBe(true);
 
 await restoreSalesOrder(created.id);
-expect((await listSalesOrders()).some((row) => row.id === created.id)).toBe(true);
+expect((await listSalesOrders()).some((row) => row.id === created.id)).toBe(
+  true,
+);
 ```
 
 Also assert `deleted_by` equals the authenticated Sales id after delete and both deletion columns are null after restore.
@@ -433,12 +449,14 @@ git commit -m "feat: add audited sales order soft delete"
 ### Task 4: Add role-safe delete controls to commercial and Sales Order detail pages
 
 **Files:**
+
 - Create: `src/components/commercial/SoftDeleteConfirmDialog.tsx`
 - Create: `src/components/commercial/SoftDeleteConfirmDialog.test.tsx`
 - Modify: `src/components/commercial/CommercialDetailPage.tsx`
 - Modify: `src/routes/_app.sales-orders.$soId.tsx`
 
 **Interfaces:**
+
 - Consumes: `deleteCommercialDocument(id)` and `deleteSalesOrder(id)` from Tasks 2–3
 - Produces: a shared confirmation dialog accepting `label`, `open`, `busy`, `error`, `onOpenChange`, and `onConfirm`
 
@@ -526,12 +544,14 @@ git commit -m "feat: add soft delete controls to document details"
 ### Task 5: Add deleted-list modes and restore actions
 
 **Files:**
+
 - Modify: `src/components/commercial/CommercialViews.tsx`
 - Modify: `src/routes/_app.sales-orders.index.tsx`
 - Create: `src/components/commercial/CommercialViews.test.tsx`
 - Create: `src/routes/_app.sales-orders.index.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `{ deleted: true }` list modes and restore functions from Tasks 2–3
 - Produces: role-gated “Show deleted” modes that never share cache keys with active lists
 
@@ -627,10 +647,12 @@ git commit -m "feat: add deleted document restore views"
 ### Task 6: Final regression and documentation reconciliation
 
 **Files:**
+
 - Modify: `HANDOFF.md`
 - Modify: `docs/superpowers/specs/2026-07-24-soft-delete-rfq-quotation-sales-order-design.md`
 
 **Interfaces:**
+
 - Consumes: verified commits and test evidence from Tasks 1–5
 - Produces: an accurate operational handoff that distinguishes local, pushed, and remote-applied state
 

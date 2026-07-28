@@ -26,7 +26,7 @@ New migration:
   visible fallback signal spec §5.5 requires instead of silently treating
   an unimported year as holiday-free or all-holiday.
 - `public.compute_task_due_state(due_date, workflow_status, as_of default
-  today in Asia/Jakarta)` — returns `(due_state, calendar_incomplete)`.
+today in Asia/Jakarta)` — returns `(due_state, calendar_incomplete)`.
   `due_state` is `Upcoming`/`Today`/`Overdue`/`Escalated`, or `null` for
   `Done`/`Cancelled` (spec §2.2). Escalation fires once 2 business days have
   fully elapsed since `due_date`, matching spec §5.2's worked example
@@ -93,7 +93,7 @@ and deleted per test, not a claim about the real production calendar.
   writing the full automated suite — all matched hand-derived expectations
   exactly.
 - `bun run test supabase/tests/business-calendar.test.ts
-  src/lib/data/business-calendar.test.ts` → **41 pass, 0 fail** (18 shared
+src/lib/data/business-calendar.test.ts` → **41 pass, 0 fail** (18 shared
   fixtures × 2 consumers + timezone + correction + RLS tests).
 - Full suite `bun run test` → **414 pass, 0 fail across 55 files.**
 - `bunx tsc --noEmit` → clean.

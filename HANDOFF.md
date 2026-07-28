@@ -138,7 +138,7 @@ the four Task Control Loop migrations already present on the linked remote.
   done locally. New migration
   `20260727130930_update_task_account_lifecycle.sql` replaces account
   lifecycle transfer scope with `workflow_status in ('Open','In Progress',
-  'Waiting External')` plus `archived = false`, while Done, Cancelled, and
+'Waiting External')` plus `archived = false`, while Done, Cancelled, and
   archived Tasks preserve historical owner attribution. Team roster active
   counts now use the same workflow-active Task predicate. During verification,
   a copied historical bug was caught and fixed: the transfer function must
@@ -231,7 +231,7 @@ the four Task Control Loop migrations already present on the linked remote.
   Phase 1 layout polish), `32f9d50` (mobile Quick Create accessibility label),
   and `17c3fee` (this handoff/design-audit documentation line).
 - `origin/main` points at `6ad22eb feat: complete task progress timeline and
-  manager exceptions`, so Task 53/8 and Task 54/9 are already pushed to Git.
+manager exceptions`, so Task 53/8 and Task 54/9 are already pushed to Git.
 - `bunx supabase migration list --linked` lists the four Task Control Loop
   migrations through `20260727141000` on both local and remote. This corrects
   the older "remote Supabase has not been touched" and "locally only" wording.
@@ -256,7 +256,7 @@ the four Task Control Loop migrations already present on the linked remote.
 - **`TaskDetailDrawer.tsx`**: the "Detail Task" and "Catat Progress"
   sections save independently by design (Detail via `updateTask()`,
   Progress via the atomic `recordTaskProgress()` RPC — see Task 50/51
-  above; this is intentional, not a bug, so it was *not* merged into one
+  above; this is intentional, not a bug, so it was _not_ merged into one
   form). Each section is now wrapped in its own bordered card, and shows
   an inline "Ada perubahan belum disimpan" (amber, `text-warning` token)
   indicator scoped to whichever section actually has unsaved edits, so a
@@ -272,7 +272,7 @@ the four Task Control Loop migrations already present on the linked remote.
 - **`_app.pipeline.tsx`**: same right-edge fade-gradient treatment added
   to the Commercial Pipeline kanban board (`to-background`), which has 6
   stage columns and regularly overflows the viewport on both desktop and
-  mobile. Note: the board's *mobile* behavior itself was re-verified live
+  mobile. Note: the board's _mobile_ behavior itself was re-verified live
   via `window.innerWidth`/`getBoundingClientRect()` and found to already
   be a correctly-functioning horizontal-scroll flex row (fixed 280px
   columns) — an earlier read of it as a broken 2-column grid was a
@@ -379,7 +379,7 @@ pushed, and remote-applied**.
   live site is reachable; it does not prove Vercel has completed every build
   step because dashboard deployment status was not available in this session.
 - **Supabase deployment state:** with explicit owner approval, `supabase db push
-  --linked` was applied to project `qhtfixgbcpcitokeryxb` (DSM Sales Web App
+--linked` was applied to project `qhtfixgbcpcitokeryxb` (DSM Sales Web App
   V2). Applied migrations:
   `20260724094444_fix_normalized_import_supersedes_column.sql`,
   `20260724094906_add_commercial_soft_delete_activity_kinds.sql`,
@@ -405,7 +405,7 @@ pushed, and remote-applied**.
 - Remote Supabase target is `qhtfixgbcpcitokeryxb` (DSM Sales Web App V2).
   Never run future remote schema/data mutations without fresh explicit owner
   approval for that exact target. On 2026-07-24, `supabase db push --linked
-  --dry-run` reported `Remote database is up to date` after the soft-delete
+--dry-run` reported `Remote database is up to date` after the soft-delete
   migrations were applied.
 - The user (Aditya) is not a programmer — explain things in plain terms, avoid silently making irreversible calls (schema changes, deleting data).
 

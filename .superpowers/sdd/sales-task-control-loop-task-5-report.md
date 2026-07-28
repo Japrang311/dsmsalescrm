@@ -13,6 +13,7 @@ Two migrations (split because Postgres cannot use a newly added enum value
 inside the transaction that added it):
 
 **`supabase/migrations/20260727140000_extend_task_progress_schema.sql`**
+
 - `follow_up_result` enum gains `'Progress Update'` — a neutral value for
   Task categories that aren't a commercial funnel (spec §3.1).
 - `activity_kind` enum gains `'task_progress'` — distinct from the legacy
@@ -27,9 +28,10 @@ inside the transaction that added it):
   properly this time" below — this is the mechanism that makes it safe.
 
 **`supabase/migrations/20260727141000_add_atomic_task_progress.sql`**
+
 - `public.record_task_progress(p_task_id, p_next_action,
-  p_next_action_date, p_note, p_workflow_status_target,
-  p_cancellation_reason, p_method, p_result, p_fu_date, p_corrects_id)` —
+p_next_action_date, p_note, p_workflow_status_target,
+p_cancellation_reason, p_method, p_result, p_fu_date, p_corrects_id)` —
   the one atomic RPC (spec §3.3). In a single transaction: locks and reads
   the Task (`FOR UPDATE`), validates next-action/cancellation-reason rules,
   inserts one `follow_up_logs` row, updates the Task (`workflow_status`,
@@ -46,7 +48,7 @@ inside the transaction that added it):
 
 Task 3's report said this constraint would land in Task 5. Writing the RPC
 surfaced a refinement worth recording: the RPC only guarantees compliance
-for *its own* writes — the legacy `createTask()`/`updateTask()` direct
+for _its own_ writes — the legacy `createTask()`/`updateTask()` direct
 paths are still live (Task 6 hasn't rewired them) and still never populate
 `next_action`, so a blanket constraint would have broken Task creation
 again, for the same reason as before.
@@ -105,7 +107,7 @@ never-recomputed guess Task 2 documented.
   10/55 is where that read boundary itself narrows).
 - **Atomicity**: a temporary trigger (created and dropped inside the test,
   via a direct `Bun.SQL` connection since no `psql`/`pg` client is
-  available and none was added as a dependency) forces the RPC's *last*
+  available and none was added as a dependency) forces the RPC's _last_
   write (the `activity_log` insert) to fail after the `follow_up_logs`
   insert and Task update would already have happened inside the same
   transaction. Verified: the Task is unchanged, `first_progress_at` stays

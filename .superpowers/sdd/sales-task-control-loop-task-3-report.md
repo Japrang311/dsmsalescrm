@@ -78,7 +78,7 @@ comment in the migration file itself so Task 5 doesn't miss it.
   see Manager-owned Escalated Task detail, not all rows) is explicitly
   Task 10/Task 55's job — it depends on the "Escalated" derived due state,
   which doesn't exist until Task 4/Task 49 builds the business-calendar
-  function. Task 3's own acceptance criteria only ask for RLS *tests*
+  function. Task 3's own acceptance criteria only ask for RLS _tests_
   proving the current boundary, not a new boundary; narrowing the policy
   now would be guessing at a due-state definition that hasn't been built
   yet. Left unchanged, consistent with spec §4.1's own "(Task 3/Task 10)"
@@ -96,12 +96,12 @@ comment in the migration file itself so Task 5 doesn't miss it.
 
 - `bunx supabase db reset` — clean, migration applied with no errors.
 - `bun run test supabase/tests/tasks.test.ts
-  supabase/tests/super-admin-rls.test.ts
-  supabase/tests/follow-up-logs.test.ts` → **49 pass, 0 fail** (Task 3's
+supabase/tests/super-admin-rls.test.ts
+supabase/tests/follow-up-logs.test.ts` → **49 pass, 0 fail** (Task 3's
   own required verification command, plus follow-up-logs for the
   client_id change).
 - `bun run test src/lib/data/tasks.test.ts src/lib/data/follow-ups.test.ts
-  supabase/tests/tasks.test.ts supabase/tests/follow-up-logs.test.ts` →
+supabase/tests/tasks.test.ts supabase/tests/follow-up-logs.test.ts` →
   16 pass, 0 fail — proves the **currently running app's Task-creation and
   follow-up-logging code paths are unbroken** by this migration (the exact
   regression the deferred next-action constraint was designed to avoid).

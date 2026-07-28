@@ -17,7 +17,7 @@ existed and was verified against a clean local reset.
 ### New characterization tests
 
 - `src/lib/data/tasks.test.ts` — `createTask() defaults status to Upcoming
-  even when dueDate is already in the past (status is not date-derived)`.
+even when dueDate is already in the past (status is not date-derived)`.
   Locks in that `TaskStatus` (`src/lib/domain.ts:162`,
   `"Today" | "Overdue" | "Upcoming" | "Done"`) is a single stored enum
   conflating workflow state (`Done`) with due-date proximity
@@ -27,7 +27,7 @@ existed and was verified against a clean local reset.
 - `src/lib/data/dashboard-selectors.test.ts` — two tests proving
   `taskCounts()` and `todaysFollowUps()` bucket purely by the stored
   `status` string and never look at `dueDate`. A task with `dueDate:
-  "2020-01-01"` and `status: "Upcoming"` is reported as upcoming, not
+"2020-01-01"` and `status: "Upcoming"` is reported as upcoming, not
   overdue, by both selectors today.
 
 Both files' existing tests were read first; no existing assertion was
@@ -37,11 +37,11 @@ changed, only new `test()`/`describe()` blocks were added.
 
 ### 1. Four-role RLS/data coverage — already exists, verified passing
 
-| Table | Sales | Manager | Executive | Super Admin | File |
-|---|---|---|---|---|---|
-| `tasks` | own-only SELECT, own-only UPDATE | all-rows SELECT/UPDATE | all-rows SELECT, no UPDATE | correction rights (no ownership) | `supabase/tests/tasks.test.ts`, `supabase/tests/super-admin-rls.test.ts` |
-| `follow_up_logs` | own-only SELECT/INSERT, append-only | all-rows SELECT/INSERT, append-only | all-rows SELECT, no INSERT | correction rights, append-only | `supabase/tests/follow-up-logs.test.ts`, `supabase/tests/super-admin-rls.test.ts` |
-| `activity_log` | own-only SELECT, own-owner INSERT | all-rows SELECT, any-owner INSERT | all-rows SELECT, no INSERT | administrative event kinds + reason enforcement | `supabase/tests/activity-log.test.ts` |
+| Table            | Sales                               | Manager                             | Executive                  | Super Admin                                     | File                                                                              |
+| ---------------- | ----------------------------------- | ----------------------------------- | -------------------------- | ----------------------------------------------- | --------------------------------------------------------------------------------- |
+| `tasks`          | own-only SELECT, own-only UPDATE    | all-rows SELECT/UPDATE              | all-rows SELECT, no UPDATE | correction rights (no ownership)                | `supabase/tests/tasks.test.ts`, `supabase/tests/super-admin-rls.test.ts`          |
+| `follow_up_logs` | own-only SELECT/INSERT, append-only | all-rows SELECT/INSERT, append-only | all-rows SELECT, no INSERT | correction rights, append-only                  | `supabase/tests/follow-up-logs.test.ts`, `supabase/tests/super-admin-rls.test.ts` |
+| `activity_log`   | own-only SELECT, own-owner INSERT   | all-rows SELECT, any-owner INSERT   | all-rows SELECT, no INSERT | administrative event kinds + reason enforcement | `supabase/tests/activity-log.test.ts`                                             |
 
 Confirmed (again, current-state audit already flagged this in the approved
 spec §1.8 as conflict C4): **Executive currently gets all-row SELECT on
@@ -64,17 +64,17 @@ Every one of these reads `task.status === "Today" | "Overdue" | "Upcoming"`
 directly. None of them look at `dueDate`. This is the exact set Task 4 must
 migrate to the new derived due-state contract.
 
-| Consumer | Location |
-|---|---|
-| `taskCounts()` | `src/lib/data/dashboard-selectors.ts:444-451` |
-| `todaysFollowUps()` | `src/lib/data/dashboard-selectors.ts:466-487` |
-| `salesPerformance()` (per-member overdue count) | `src/lib/data/dashboard-selectors.ts:395` |
-| `dashboardSalesTeam()` (per-member overdue count) | `src/lib/data/dashboard-selectors.ts:510` |
-| `riskAlerts()` | `src/lib/data/dashboard-selectors.ts:656` |
-| Reports overdue count | `src/routes/_app.reports.tsx:307` |
-| Client Detail task badges/sort | `src/routes/_app.clients.$clientId.tsx:141, 492, 505, 551-553` |
-| TopBar "Today/Overdue" widget | `src/components/shell/TopBar.tsx:204-256` |
-| Dashboard `TodaysFollowUpList` | `src/components/dashboard/TodaysFollowUpList.tsx:62` |
+| Consumer                                          | Location                                                       |
+| ------------------------------------------------- | -------------------------------------------------------------- |
+| `taskCounts()`                                    | `src/lib/data/dashboard-selectors.ts:444-451`                  |
+| `todaysFollowUps()`                               | `src/lib/data/dashboard-selectors.ts:466-487`                  |
+| `salesPerformance()` (per-member overdue count)   | `src/lib/data/dashboard-selectors.ts:395`                      |
+| `dashboardSalesTeam()` (per-member overdue count) | `src/lib/data/dashboard-selectors.ts:510`                      |
+| `riskAlerts()`                                    | `src/lib/data/dashboard-selectors.ts:656`                      |
+| Reports overdue count                             | `src/routes/_app.reports.tsx:307`                              |
+| Client Detail task badges/sort                    | `src/routes/_app.clients.$clientId.tsx:141, 492, 505, 551-553` |
+| TopBar "Today/Overdue" widget                     | `src/components/shell/TopBar.tsx:204-256`                      |
+| Dashboard `TodaysFollowUpList`                    | `src/components/dashboard/TodaysFollowUpList.tsx:62`           |
 
 Separately, `src/routes/_app.tasks.tsx` (the Tasks inbox itself) does **not**
 read stored `status` for bucketing — it computes its own client-side
@@ -118,7 +118,7 @@ submission, in this order:
    (line 219). Only if step 4 ran **and** an actor id was resolved.
 
 None of these are wrapped in a transaction or RPC. The whole sequence is
-guarded by one `try`/`catch` that only shows a toast on the *first* thrown
+guarded by one `try`/`catch` that only shows a toast on the _first_ thrown
 error — it does not roll back any write that already succeeded.
 
 Failure scenarios Task 5's atomicity test must first reproduce as a failing
@@ -193,12 +193,12 @@ editing `.env.local`).
 - `bun run test src/lib/data/dashboard-selectors.test.ts` → 8 pass, 0 fail
   (includes the 2 new characterization tests).
 - `bun run test supabase/tests/tasks.test.ts
-  supabase/tests/follow-up-logs.test.ts src/lib/data/tasks.test.ts
-  src/lib/data/dashboard-selectors.test.ts` → 18 pass, 5 fail (all 5
+supabase/tests/follow-up-logs.test.ts src/lib/data/tasks.test.ts
+src/lib/data/dashboard-selectors.test.ts` → 18 pass, 5 fail (all 5
   failures are the pre-existing `src/lib/data/tasks.test.ts` environment
   issue above, including 3 tests this session did not write).
 - `bun run test supabase/tests/super-admin-rls.test.ts
-  supabase/tests/activity-log.test.ts` → 46 pass, 0 fail.
+supabase/tests/activity-log.test.ts` → 46 pass, 0 fail.
 - `git diff --check` — clean.
 - No migration created or applied beyond the existing committed set. No
   `supabase db push` / `apply_migration` / `execute_sql` / remote mutation.

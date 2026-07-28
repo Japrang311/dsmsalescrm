@@ -73,7 +73,7 @@ Replace the mock data layer (`src/lib/mock/`) with a real Supabase backend, one 
 ### Checkpoint 4: Commercial Pipeline fully live
 
 - [x] Historical RFQ / Quotation / Prototype pipeline views read from Postgres
-  at the time; RFQ active surfaces were later retired by ADR-003.
+      at the time; RFQ active surfaces were later retired by ADR-003.
 - [x] `bun test` passes (commercial_items RLS test)
 
 ### Phase 5: Sales Orders & Revenue Vertical Slice

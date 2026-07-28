@@ -31,20 +31,20 @@
 **`public.tasks`** (`supabase/migrations/20260717232459_tasks.sql`,
 `20260718030000_tasks_archived.sql`):
 
-| Kolom | Tipe | Wajib | Catatan |
-|---|---|---|---|
-| `id` | uuid | ya | PK |
-| `client_id` | uuid → `clients.id` | **ya (`not null`)** | konflik langsung dengan "Client opsional" |
-| `owner_id` | uuid → `profiles.id` | ya | ditegakkan aktif Sales/Manager oleh trigger (§1.3) |
-| `commercial_item_id` | uuid | tidak | legacy, tanpa FK aktif (menunjuk snapshot historis beku) |
-| `commercial_document_id` | uuid | tidak | kolom aktif saat ini untuk relasi Quotation/SO (ditambahkan migrasi lanjutan, di luar 4 file wajib) |
-| `title` | text | ya | |
-| `due_date` | date | ya | |
-| `method` | enum `task_method` | ya | Phone/Email/Visit/WhatsApp/Meeting |
-| `status` | enum `task_status` | ya, default `'Upcoming'` | **`'Today', 'Overdue', 'Upcoming', 'Done'`** — mencampur workflow dan due state |
-| `priority` | enum `task_priority` | ya | High/Normal/Low |
-| `archived` | boolean | ya, default `false` | terpisah dari `status` (migrasi `20260718030000`) |
-| `created_at` | timestamptz | ya | |
+| Kolom                    | Tipe                 | Wajib                    | Catatan                                                                                             |
+| ------------------------ | -------------------- | ------------------------ | --------------------------------------------------------------------------------------------------- |
+| `id`                     | uuid                 | ya                       | PK                                                                                                  |
+| `client_id`              | uuid → `clients.id`  | **ya (`not null`)**      | konflik langsung dengan "Client opsional"                                                           |
+| `owner_id`               | uuid → `profiles.id` | ya                       | ditegakkan aktif Sales/Manager oleh trigger (§1.3)                                                  |
+| `commercial_item_id`     | uuid                 | tidak                    | legacy, tanpa FK aktif (menunjuk snapshot historis beku)                                            |
+| `commercial_document_id` | uuid                 | tidak                    | kolom aktif saat ini untuk relasi Quotation/SO (ditambahkan migrasi lanjutan, di luar 4 file wajib) |
+| `title`                  | text                 | ya                       |                                                                                                     |
+| `due_date`               | date                 | ya                       |                                                                                                     |
+| `method`                 | enum `task_method`   | ya                       | Phone/Email/Visit/WhatsApp/Meeting                                                                  |
+| `status`                 | enum `task_status`   | ya, default `'Upcoming'` | **`'Today', 'Overdue', 'Upcoming', 'Done'`** — mencampur workflow dan due state                     |
+| `priority`               | enum `task_priority` | ya                       | High/Normal/Low                                                                                     |
+| `archived`               | boolean              | ya, default `false`      | terpisah dari `status` (migrasi `20260718030000`)                                                   |
+| `created_at`             | timestamptz          | ya                       |                                                                                                     |
 
 Tidak ada kolom `category`, `next_action`, `next_action_date`,
 `cancellation_reason`, atau catatan progress terstruktur pada `tasks`.
@@ -181,25 +181,25 @@ otomatis setelah itu.
 
 ### 1.7 Daftar konsumen yang harus dimigrasikan (bukti file+baris)
 
-| Area | File | Bukti |
-|---|---|---|
-| Dashboard | `src/lib/data/dashboard-selectors.ts` | `taskCounts()`, `todaysFollowUps()`, `salesPerformance()`, `waitingPoValue()` baca `t.status` mentah |
-| Dashboard widget | `src/components/dashboard/TodaysFollowUpList.tsx` | baris 62, `task.status === "Overdue"` |
-| Reports | `src/routes/_app.reports.tsx` | baris 304–307 |
-| TopBar | `src/components/shell/TopBar.tsx` | baris 204–256, notifikasi Overdue/Today |
-| Pipeline | `src/routes/_app.pipeline.tsx` | baris 164 (`t.status !== "Done"`), baris 326 (`status:"Upcoming"` saat create Task dari pipeline) |
-| Pipeline drawer | `src/components/pipeline/PipelineCardDrawer.tsx` | baris 342 |
-| Client Detail | `src/routes/_app.clients.$clientId.tsx` | baris 141, 492, 505, 551–553 |
-| Commercial follow-up | `src/components/commercial/LogCommercialFollowUpDialog.tsx` | baris 177, 366 |
-| Export CSV | `src/lib/export-csv.ts` | baris 91, kolom "Overdue" |
-| Export XLSX | `src/lib/export-xlsx.ts` | baris 158, 350 |
-| Export PDF | `src/lib/export-pdf.ts` | baris 228, kolom agregat "Overdue" |
-| Ownership/account lifecycle | `src/lib/data/team.ts` | baris 131–136, `.neq("status","Done").eq("archived", false)` sebagai proksi Task aktif untuk eligibility koreksi/transfer |
-| Task UI utama | `src/routes/_app.tasks.tsx` | seluruh papan Today/Upcoming/Overdue, kalkulasi lokal `setDate()` |
-| Task Detail | `src/components/tasks/TaskDetailDrawer.tsx` | status select bebas, snooze lokal, note tanpa next-action |
-| Task Create | `src/components/tasks/CreateTaskDialog.tsx` | Client wajib, status dihitung sekali saat submit |
-| Follow-up dialog | `src/components/tasks/LogFollowUpDialog.tsx` | 2–4 write independen |
-| Tests | `supabase/tests/tasks.test.ts`, `follow-up-logs.test.ts`, `account-lifecycle.test.ts`, `business-owner-invariant.test.ts`, `super-admin-rls.test.ts` | masih menguji kontrak 3/4-role lama tanpa workflow/due-state terpisah |
+| Area                        | File                                                                                                                                                 | Bukti                                                                                                                     |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Dashboard                   | `src/lib/data/dashboard-selectors.ts`                                                                                                                | `taskCounts()`, `todaysFollowUps()`, `salesPerformance()`, `waitingPoValue()` baca `t.status` mentah                      |
+| Dashboard widget            | `src/components/dashboard/TodaysFollowUpList.tsx`                                                                                                    | baris 62, `task.status === "Overdue"`                                                                                     |
+| Reports                     | `src/routes/_app.reports.tsx`                                                                                                                        | baris 304–307                                                                                                             |
+| TopBar                      | `src/components/shell/TopBar.tsx`                                                                                                                    | baris 204–256, notifikasi Overdue/Today                                                                                   |
+| Pipeline                    | `src/routes/_app.pipeline.tsx`                                                                                                                       | baris 164 (`t.status !== "Done"`), baris 326 (`status:"Upcoming"` saat create Task dari pipeline)                         |
+| Pipeline drawer             | `src/components/pipeline/PipelineCardDrawer.tsx`                                                                                                     | baris 342                                                                                                                 |
+| Client Detail               | `src/routes/_app.clients.$clientId.tsx`                                                                                                              | baris 141, 492, 505, 551–553                                                                                              |
+| Commercial follow-up        | `src/components/commercial/LogCommercialFollowUpDialog.tsx`                                                                                          | baris 177, 366                                                                                                            |
+| Export CSV                  | `src/lib/export-csv.ts`                                                                                                                              | baris 91, kolom "Overdue"                                                                                                 |
+| Export XLSX                 | `src/lib/export-xlsx.ts`                                                                                                                             | baris 158, 350                                                                                                            |
+| Export PDF                  | `src/lib/export-pdf.ts`                                                                                                                              | baris 228, kolom agregat "Overdue"                                                                                        |
+| Ownership/account lifecycle | `src/lib/data/team.ts`                                                                                                                               | baris 131–136, `.neq("status","Done").eq("archived", false)` sebagai proksi Task aktif untuk eligibility koreksi/transfer |
+| Task UI utama               | `src/routes/_app.tasks.tsx`                                                                                                                          | seluruh papan Today/Upcoming/Overdue, kalkulasi lokal `setDate()`                                                         |
+| Task Detail                 | `src/components/tasks/TaskDetailDrawer.tsx`                                                                                                          | status select bebas, snooze lokal, note tanpa next-action                                                                 |
+| Task Create                 | `src/components/tasks/CreateTaskDialog.tsx`                                                                                                          | Client wajib, status dihitung sekali saat submit                                                                          |
+| Follow-up dialog            | `src/components/tasks/LogFollowUpDialog.tsx`                                                                                                         | 2–4 write independen                                                                                                      |
+| Tests                       | `supabase/tests/tasks.test.ts`, `follow-up-logs.test.ts`, `account-lifecycle.test.ts`, `business-owner-invariant.test.ts`, `super-admin-rls.test.ts` | masih menguji kontrak 3/4-role lama tanpa workflow/due-state terpisah                                                     |
 
 Graphify (`graphify query` atas TaskStatus/Dashboard/Reports/TopBar/Pipeline/
 Client Detail/export/account-lifecycle, budget 1200) mengonfirmasi kumpulan
@@ -212,17 +212,17 @@ baris — detail baris diverifikasi langsung dari source di atas).
 
 ### 1.8 Konflik eksplisit kode-existing vs one-pager
 
-| # | One-pager mensyaratkan | Kode saat ini | Dampak |
-|---|---|---|---|
-| C1 | Client opsional end-to-end | `tasks.client_id not null` (DB), `clientId: z.string().min(1)` (form) | Task tanpa Client tidak bisa dibuat sama sekali hari ini |
-| C2 | Workflow status terpisah dari due state | Satu enum `task_status` mencampur `Today/Overdue/Upcoming/Done` | KPI Overdue/Today keliru begitu status tidak lagi mengandung makna waktu |
-| C3 | Progress update atomik | `LogFollowUpDialog` = 2–4 write independen | Kegagalan parsial nyata sudah mungkin terjadi hari ini |
-| C4 | Executive hanya detail read-only untuk eskalasi Manager + agregat perusahaan | RLS `tasks_select` memberi Executive baca semua baris | Kebocoran row-detail company-wide ke Executive |
-| C5 | Tidak ada Notes store ketiga; satukan `activity_log`+`follow_up_logs` | `listTaskHistory()` hanya baca `activity_log`, tidak menyertakan `follow_up_logs` | Timeline per-Task hari ini tidak lengkap, meski secara arsitektur belum ada tabel ketiga |
-| C6 | Next action wajib untuk Task aktif | `next_action` di `follow_up_logs` nullable, tidak divalidasi; `tasks` tidak punya kolom next action sama sekali | Task bisa "diam" tanpa rencana lanjutan |
-| C7 | Kalender kerja terpusat | 8+ titik `setDate()` independen di UI | Escalation/snooze akan berbeda hasil antar layar |
-| C8 | Cancelled ≠ Archived | `task_status` tidak punya `Cancelled`; `archived` sudah terpisah dari `status` sejak `20260718030000` — bagian ini **sudah konsisten** dengan one-pager | Perlu ditambah `Cancelled` sebagai workflow value, `archived` tetap dipertahankan apa adanya |
-| C9 | Kategori terstruktur | Tidak ada kolom `category` | Tidak ada gap arsitektur besar — kolom baru murni aditif |
+| #   | One-pager mensyaratkan                                                       | Kode saat ini                                                                                                                                           | Dampak                                                                                       |
+| --- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| C1  | Client opsional end-to-end                                                   | `tasks.client_id not null` (DB), `clientId: z.string().min(1)` (form)                                                                                   | Task tanpa Client tidak bisa dibuat sama sekali hari ini                                     |
+| C2  | Workflow status terpisah dari due state                                      | Satu enum `task_status` mencampur `Today/Overdue/Upcoming/Done`                                                                                         | KPI Overdue/Today keliru begitu status tidak lagi mengandung makna waktu                     |
+| C3  | Progress update atomik                                                       | `LogFollowUpDialog` = 2–4 write independen                                                                                                              | Kegagalan parsial nyata sudah mungkin terjadi hari ini                                       |
+| C4  | Executive hanya detail read-only untuk eskalasi Manager + agregat perusahaan | RLS `tasks_select` memberi Executive baca semua baris                                                                                                   | Kebocoran row-detail company-wide ke Executive                                               |
+| C5  | Tidak ada Notes store ketiga; satukan `activity_log`+`follow_up_logs`        | `listTaskHistory()` hanya baca `activity_log`, tidak menyertakan `follow_up_logs`                                                                       | Timeline per-Task hari ini tidak lengkap, meski secara arsitektur belum ada tabel ketiga     |
+| C6  | Next action wajib untuk Task aktif                                           | `next_action` di `follow_up_logs` nullable, tidak divalidasi; `tasks` tidak punya kolom next action sama sekali                                         | Task bisa "diam" tanpa rencana lanjutan                                                      |
+| C7  | Kalender kerja terpusat                                                      | 8+ titik `setDate()` independen di UI                                                                                                                   | Escalation/snooze akan berbeda hasil antar layar                                             |
+| C8  | Cancelled ≠ Archived                                                         | `task_status` tidak punya `Cancelled`; `archived` sudah terpisah dari `status` sejak `20260718030000` — bagian ini **sudah konsisten** dengan one-pager | Perlu ditambah `Cancelled` sebagai workflow value, `archived` tetap dipertahankan apa adanya |
+| C9  | Kategori terstruktur                                                         | Tidak ada kolom `category`                                                                                                                              | Tidak ada gap arsitektur besar — kolom baru murni aditif                                     |
 
 ---
 
@@ -233,15 +233,15 @@ paralel.
 
 ### 2.1 Kolom baru (diusulkan, additive, dual-read dengan `status` lama sampai Task 16)
 
-| Kolom baru | Tipe | Wajib | Aturan |
-|---|---|---|---|
-| `workflow_status` | enum baru `task_workflow_status` (`Open`, `In Progress`, `Waiting External`, `Done`, `Cancelled`) | ya, default `'Open'` | Nilai yang **dipilih pengguna**; tidak pernah otomatis diturunkan dari tanggal |
-| `category` | enum baru `task_category` (`Project/Opportunity Planning`, `Client Meeting/Visit`, `Follow-Up`, `Quotation`, `Sales Order`, `Internal/Admin`, `Other`) | ya, default `'Other'` untuk baris baru; existing rows lihat §6 | Judul Task tetap bebas terpisah dari kategori |
-| `client_id` | uuid, **diubah menjadi nullable** | tidak | Perubahan schema, bukan hanya UI |
-| `next_action` | text | wajib kondisional (lihat §2.4) | Deskripsi bebas rencana lanjutan |
-| `next_action_date` | date | wajib kondisional (lihat §2.4) | Dipakai due-state engine sebagai tanggal acuan berikutnya |
-| `cancellation_reason` | text | wajib jika `workflow_status = 'Cancelled'` | |
-| `status` (lama) | tetap ada, tidak dihapus di spec ini | — | Dual-read sampai Task 16; ditulis lewat compatibility shim, dibaca sebagai fallback consumer lama |
+| Kolom baru            | Tipe                                                                                                                                                   | Wajib                                                          | Aturan                                                                                            |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `workflow_status`     | enum baru `task_workflow_status` (`Open`, `In Progress`, `Waiting External`, `Done`, `Cancelled`)                                                      | ya, default `'Open'`                                           | Nilai yang **dipilih pengguna**; tidak pernah otomatis diturunkan dari tanggal                    |
+| `category`            | enum baru `task_category` (`Project/Opportunity Planning`, `Client Meeting/Visit`, `Follow-Up`, `Quotation`, `Sales Order`, `Internal/Admin`, `Other`) | ya, default `'Other'` untuk baris baru; existing rows lihat §6 | Judul Task tetap bebas terpisah dari kategori                                                     |
+| `client_id`           | uuid, **diubah menjadi nullable**                                                                                                                      | tidak                                                          | Perubahan schema, bukan hanya UI                                                                  |
+| `next_action`         | text                                                                                                                                                   | wajib kondisional (lihat §2.4)                                 | Deskripsi bebas rencana lanjutan                                                                  |
+| `next_action_date`    | date                                                                                                                                                   | wajib kondisional (lihat §2.4)                                 | Dipakai due-state engine sebagai tanggal acuan berikutnya                                         |
+| `cancellation_reason` | text                                                                                                                                                   | wajib jika `workflow_status = 'Cancelled'`                     |                                                                                                   |
+| `status` (lama)       | tetap ada, tidak dihapus di spec ini                                                                                                                   | —                                                              | Dual-read sampai Task 16; ditulis lewat compatibility shim, dibaca sebagai fallback consumer lama |
 
 `due_date` yang sudah ada **tetap dipertahankan** sebagai tanggal jatuh tempo
 utama Task; `next_action_date` adalah tanggal rencana lanjutan yang bisa
@@ -316,7 +316,7 @@ timestamp — cukup sebagai jejak audit tanpa field alasan eksplisit.
 ### 3.1 Sumber canonical progress domain — **DIPUTUSKAN oleh Product Owner (2026-07-27)**
 
 **Keputusan: `follow_up_logs` adalah canonical progress record.**
-`activity_log` tetap audit trail immutable untuk *semua* jenis event
+`activity_log` tetap audit trail immutable untuk _semua_ jenis event
 termasuk workflow-status/owner/cancellation changes — bukan tempat
 penyimpanan utama isi progress.
 
@@ -329,7 +329,7 @@ Konsekuensi teknis dari keputusan ini yang wajib ditangani Task 3/Task 5:
   bergaya funnel quotation seperti `'Waiting PO'`, `'PO Confirmed'`) perlu
   diperluas dengan nilai netral (mis. `'Progress Update'`) agar masuk akal
   untuk kategori Task non-komersial (`Internal/Admin`, `Project/Opportunity
-  Planning`, dll.) — detail nilai baru dan penamaan final diputuskan di
+Planning`, dll.) — detail nilai baru dan penamaan final diputuskan di
   Task 3, bukan di sini.
 - `follow_up_logs.task_id` tetap nullable seperti sekarang, tapi RPC atomik
   (§3.3) yang baru mewajibkan `task_id` terisi untuk setiap panggilan yang
@@ -410,21 +410,21 @@ permission" dari SUPABASE SECURITY RULES).
 
 ## 4. Role/Action Matrix
 
-| Aksi | Sales | Manager (My Tasks) | Manager (Team Exceptions) | Executive | Super Admin |
-|---|---|---|---|---|---|
-| Create Task milik sendiri | ✅ | ✅ | — | ❌ | ❌ (tidak jadi owner) |
-| Edit/progress Task milik sendiri | ✅ | ✅ | — | ❌ | ❌ |
-| Lihat Task milik sendiri | ✅ | ✅ | — | ❌ | ✅ (koreksi company-wide, lihat catatan) |
-| Lihat Task Sales lain (non-eskalasi) | ❌ | ❌ | ❌ | ❌ | ✅ (koreksi company-wide) |
-| Lihat Task Sales yang Escalated | — | — | ✅ (read+context) | ❌ | ✅ |
-| Lihat detail Task Manager yang Escalated | ❌ | — | — | ✅ read-only | ✅ |
-| Lihat detail Task Manager non-eskalasi | ❌ | — | — | ❌ | ✅ |
-| Ambil alih ownership via eskalasi | ❌ (tidak berpindah) | ❌ | ❌ (tidak otomatis) | ❌ | ❌ |
-| Ubah owner Task (transfer eksplisit) | ❌ | ❌ | ❌ | ❌ | ✅ (aksi transfer eksplisit, tetap ke Sales/Manager aktif, sesuai ADR-002) |
-| Koreksi field non-owner (title/category/dll) company-wide | ❌ | ✅ (company-wide, existing) | — | ❌ | ✅ (ADR-002, preserve `owner_id`) |
-| Terima metrik agregat perusahaan | tidak relevan | tidak relevan | tidak relevan | ✅ (aggregate-only interface) | tidak relevan (bukan performance member) |
-| Masuk hitungan performance/target | ✅ | ✅ | ✅ | ❌ | ❌ (ADR-002: dikecualikan) |
-| Jadi penerima eskalasi | ❌ | ✅ (dari Sales) | — | ✅ (dari Manager, read-only) | ❌ |
+| Aksi                                                      | Sales                | Manager (My Tasks)          | Manager (Team Exceptions) | Executive                     | Super Admin                                                                |
+| --------------------------------------------------------- | -------------------- | --------------------------- | ------------------------- | ----------------------------- | -------------------------------------------------------------------------- |
+| Create Task milik sendiri                                 | ✅                   | ✅                          | —                         | ❌                            | ❌ (tidak jadi owner)                                                      |
+| Edit/progress Task milik sendiri                          | ✅                   | ✅                          | —                         | ❌                            | ❌                                                                         |
+| Lihat Task milik sendiri                                  | ✅                   | ✅                          | —                         | ❌                            | ✅ (koreksi company-wide, lihat catatan)                                   |
+| Lihat Task Sales lain (non-eskalasi)                      | ❌                   | ❌                          | ❌                        | ❌                            | ✅ (koreksi company-wide)                                                  |
+| Lihat Task Sales yang Escalated                           | —                    | —                           | ✅ (read+context)         | ❌                            | ✅                                                                         |
+| Lihat detail Task Manager yang Escalated                  | ❌                   | —                           | —                         | ✅ read-only                  | ✅                                                                         |
+| Lihat detail Task Manager non-eskalasi                    | ❌                   | —                           | —                         | ❌                            | ✅                                                                         |
+| Ambil alih ownership via eskalasi                         | ❌ (tidak berpindah) | ❌                          | ❌ (tidak otomatis)       | ❌                            | ❌                                                                         |
+| Ubah owner Task (transfer eksplisit)                      | ❌                   | ❌                          | ❌                        | ❌                            | ✅ (aksi transfer eksplisit, tetap ke Sales/Manager aktif, sesuai ADR-002) |
+| Koreksi field non-owner (title/category/dll) company-wide | ❌                   | ✅ (company-wide, existing) | —                         | ❌                            | ✅ (ADR-002, preserve `owner_id`)                                          |
+| Terima metrik agregat perusahaan                          | tidak relevan        | tidak relevan               | tidak relevan             | ✅ (aggregate-only interface) | tidak relevan (bukan performance member)                                   |
+| Masuk hitungan performance/target                         | ✅                   | ✅                          | ✅                        | ❌                            | ❌ (ADR-002: dikecualikan)                                                 |
+| Jadi penerima eskalasi                                    | ❌                   | ✅ (dari Sales)             | —                         | ✅ (dari Manager, read-only)  | ❌                                                                         |
 
 ### 4.1 Enforcement
 
@@ -466,7 +466,7 @@ permission" dari SUPABASE SECURITY RULES).
 
 ### 5.2 Definisi "melewati dua hari kerja" — **DIPUTUSKAN oleh Product Owner (2026-07-27)**
 
-**Keputusan: Interpretasi X — hari kerja dihitung mulai hari kerja *setelah*
+**Keputusan: Interpretasi X — hari kerja dihitung mulai hari kerja _setelah_
 `due_date`.** Due date itu sendiri tidak dihitung sebagai salah satu dari dua
 hari kerja ambang.
 
@@ -494,6 +494,7 @@ independen di §1.6).
 
 **Opsi 1 — DIPILIH — Import manual tahunan oleh admin (Super Admin/Manager)
 via Settings UI atau seed terkontrol.**
+
 - Kelebihan: tidak ada dependency eksternal, tidak ada biaya API, tidak ada
   kegagalan sinkronisasi jaringan, cocok dengan pola repo ini (data bisnis
   lain — target, holiday cuti bersama tahun berikutnya — memang perlu
@@ -504,6 +505,7 @@ via Settings UI atau seed terkontrol.**
 
 **Opsi 2 — Sinkronisasi otomatis dari API publik (mis. API hari libur
 nasional pihak ketiga).**
+
 - Kelebihan: tidak perlu intervensi tahunan manual untuk hari libur nasional
   baku.
 - Kekurangan: menambah dependency eksternal, kegagalan jaringan/API perlu
@@ -534,7 +536,7 @@ Owner secara eksplisit meminta, tapi tidak menjadi bagian rencana Task 4.
   (INSERT/DELETE oleh admin berwenang), tapi **tidak mengubah histori
   eskalasi yang sudah tercatat** — status Escalated yang sudah tersimpan di
   `activity_log` sebagai audit event historis tetap seperti apa adanya;
-  hanya perhitungan due-state *ke depan* yang memakai kalender terbaru. Ini
+  hanya perhitungan due-state _ke depan_ yang memakai kalender terbaru. Ini
   konsisten dengan prinsip immutability §3.4.
 
 ---
@@ -558,10 +560,10 @@ Owner secara eksplisit meminta, tapi tidak menjadi bagian rencana Task 4.
 
 ### 6.2 Mapping deterministik untuk status lama
 
-| `status` lama | `workflow_status` baru (deterministik) | Alasan |
-|---|---|---|
-| `Done` | `Done` | Sudah terminal, tidak ambigu |
-| `Today` / `Overdue` / `Upcoming` | `Open` | Ketiganya adalah due-state lama yang sekarang jadi nilai turunan (§2.2); Task belum pernah punya `In Progress`/`Waiting External`/`Cancelled` di data lama sehingga tidak bisa dibedakan lebih jauh secara deterministik |
+| `status` lama                    | `workflow_status` baru (deterministik) | Alasan                                                                                                                                                                                                                   |
+| -------------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `Done`                           | `Done`                                 | Sudah terminal, tidak ambigu                                                                                                                                                                                             |
+| `Today` / `Overdue` / `Upcoming` | `Open`                                 | Ketiganya adalah due-state lama yang sekarang jadi nilai turunan (§2.2); Task belum pernah punya `In Progress`/`Waiting External`/`Cancelled` di data lama sehingga tidak bisa dibedakan lebih jauh secara deterministik |
 
 Tidak ada baris existing yang bisa dipetakan deterministik ke
 `In Progress`, `Waiting External`, atau `Cancelled` — nilai-nilai itu tidak
@@ -584,7 +586,7 @@ yang aktif mendarat di `Open` saja.
   kedua kolom ini. Karena §2.4 mewajibkan next-action untuk Task aktif,
   baris lama `Open` dengan `next_action IS NULL` **tidak otomatis melanggar
   constraint** — constraint next-action hanya berlaku pada saat progress
-  update *berikutnya* disimpan (RPC di §3.3), bukan retroaktif terhadap baris
+  update _berikutnya_ disimpan (RPC di §3.3), bukan retroaktif terhadap baris
   yang sudah ada. Baris lama tanpa next action tetap terlihat di daftar Task
   sampai pemiliknya melakukan progress update pertama lewat alur baru, yang
   pada titik itu next-action menjadi wajib.
@@ -718,17 +720,17 @@ adalah cakupan minimal, bukan daftar final yang mengikat penamaan persis.
 
 ## 8. Acceptance Criteria dan Verification Matrix
 
-| # | Kriteria | Verifikasi |
-|---|---|---|
-| AC1 | `workflow_status`, `category`, `next_action`, `next_action_date`, `cancellation_reason` ada di schema dengan constraint next-action sesuai §2.4 | `bunx supabase db reset` + `bun test supabase/tests/tasks.test.ts` |
-| AC2 | `tasks.client_id` nullable, seluruh chain (form, adapter, filter, timeline) menerima Task tanpa Client | Test data-layer + manual browser check Create Task tanpa Client |
-| AC3 | RLS tiap peran diuji langsung lewat Supabase client (bukan mock) untuk Sales own-only, Manager My Tasks + Team Exceptions, Executive Exceptions row-level + aggregate-only, Super Admin correction | `bun test supabase/tests/tasks.test.ts supabase/tests/super-admin-rls.test.ts` + test RLS baru Task 3/10 |
-| AC4 | RPC progress rollback total saat gagal di langkah manapun (dipaksa gagal sengaja) | Integration test forced-failure, verifikasi nol baris `follow_up_logs`/`activity_log` tersisa dan `tasks` tidak berubah |
-| AC5 | Due state (`Upcoming/Today/Overdue/Escalated`) konsisten antara fungsi database dan TypeScript untuk fixture identik, termasuk batas Jumat→Senin, cuti bersama berurutan, akhir tahun, tahun kabisat, dan baris kalender terkoreksi | Test `business-calendar.test.ts` (DB) + `business-calendar.test.ts` (TS) dengan fixture sama |
-| AC6 | Selector Dashboard/Reports/export merekonsiliasi 1:1 dengan sumber due-state baru untuk keempat peran | Selector/component test + perbandingan fixture sebelum/sesudah dengan penjelasan setiap perubahan KPI yang disengaja |
-| AC7 | Browser UAT empat peran: Sales/Manager loop create→progress→escalate, Manager Team Exceptions, Executive Exceptions read-only + aggregate, Super Admin correction tanpa jadi owner | Manual browser check per Task 9/10/17, dicatat dengan bukti (screenshot/log), bukan asumsi |
-| AC8 | Tidak ada regresi RFQ — tidak ada rute/label/kategori RFQ dipulihkan | `rg` untuk literal "RFQ" di file yang disentuh setelah implementasi + review manual |
-| AC9 | Verifikasi lokal (reset, test, typecheck, lint, build, advisors) dipisahkan eksplisit dari verifikasi remote (belum dijalankan sampai Task 18 dengan approval terpisah) | Laporan Task 17 mencantumkan kedua kategori terpisah |
+| #   | Kriteria                                                                                                                                                                                                                            | Verifikasi                                                                                                              |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| AC1 | `workflow_status`, `category`, `next_action`, `next_action_date`, `cancellation_reason` ada di schema dengan constraint next-action sesuai §2.4                                                                                     | `bunx supabase db reset` + `bun test supabase/tests/tasks.test.ts`                                                      |
+| AC2 | `tasks.client_id` nullable, seluruh chain (form, adapter, filter, timeline) menerima Task tanpa Client                                                                                                                              | Test data-layer + manual browser check Create Task tanpa Client                                                         |
+| AC3 | RLS tiap peran diuji langsung lewat Supabase client (bukan mock) untuk Sales own-only, Manager My Tasks + Team Exceptions, Executive Exceptions row-level + aggregate-only, Super Admin correction                                  | `bun test supabase/tests/tasks.test.ts supabase/tests/super-admin-rls.test.ts` + test RLS baru Task 3/10                |
+| AC4 | RPC progress rollback total saat gagal di langkah manapun (dipaksa gagal sengaja)                                                                                                                                                   | Integration test forced-failure, verifikasi nol baris `follow_up_logs`/`activity_log` tersisa dan `tasks` tidak berubah |
+| AC5 | Due state (`Upcoming/Today/Overdue/Escalated`) konsisten antara fungsi database dan TypeScript untuk fixture identik, termasuk batas Jumat→Senin, cuti bersama berurutan, akhir tahun, tahun kabisat, dan baris kalender terkoreksi | Test `business-calendar.test.ts` (DB) + `business-calendar.test.ts` (TS) dengan fixture sama                            |
+| AC6 | Selector Dashboard/Reports/export merekonsiliasi 1:1 dengan sumber due-state baru untuk keempat peran                                                                                                                               | Selector/component test + perbandingan fixture sebelum/sesudah dengan penjelasan setiap perubahan KPI yang disengaja    |
+| AC7 | Browser UAT empat peran: Sales/Manager loop create→progress→escalate, Manager Team Exceptions, Executive Exceptions read-only + aggregate, Super Admin correction tanpa jadi owner                                                  | Manual browser check per Task 9/10/17, dicatat dengan bukti (screenshot/log), bukan asumsi                              |
+| AC8 | Tidak ada regresi RFQ — tidak ada rute/label/kategori RFQ dipulihkan                                                                                                                                                                | `rg` untuk literal "RFQ" di file yang disentuh setelah implementasi + review manual                                     |
+| AC9 | Verifikasi lokal (reset, test, typecheck, lint, build, advisors) dipisahkan eksplisit dari verifikasi remote (belum dijalankan sampai Task 18 dengan approval terpisah)                                                             | Laporan Task 17 mencantumkan kedua kategori terpisah                                                                    |
 
 ---
 
@@ -750,7 +752,7 @@ status terkini:
 3. ~~Authoritative holiday source dan fallback (§5.4)~~ — **DIPUTUSKAN
    2026-07-27:** import manual tahunan, disimpan di tabel database canonical.
 4. ~~Batas waktu tepat untuk escalation (§5.2)~~ — **DIPUTUSKAN 2026-07-27:**
-   Interpretasi X (hari kerja mulai *setelah* due date; due date sendiri
+   Interpretasi X (hari kerja mulai _setelah_ due date; due date sendiri
    tidak dihitung).
 5. ~~Notification query-time vs persisted event~~ — **DIPUTUSKAN
    2026-07-27:** query-time. Notifikasi Today/Overdue/Escalated dihitung

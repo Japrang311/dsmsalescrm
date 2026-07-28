@@ -56,7 +56,7 @@ Enforce Executive exception detail and aggregate-only reporting.
 - `bunx supabase db lint --local`
   - New migration produced no reported issue. The command still reports
     pre-existing function-analysis findings in older functions:
-    `private.migrate_commercial_document_data` (`tmp_ci_pool`), 
+    `private.migrate_commercial_document_data` (`tmp_ci_pool`),
     `public.admin_import_normalized_documents` (`tmp_imported_quotation_ids`),
     and unused variables in `public.reassign_client_owner`.
 - Browser QA on `http://127.0.0.1:8081/tasks` with dev role

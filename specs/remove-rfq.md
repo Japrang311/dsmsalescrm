@@ -30,7 +30,8 @@ Use existing TypeScript/React conventions and keep storage compatibility at
 the data boundary:
 
 ```ts
-const source = row.source === LEGACY_NEW_PRODUCT_SOURCE ? "New Product" : row.source;
+const source =
+  row.source === LEGACY_NEW_PRODUCT_SOURCE ? "New Product" : row.source;
 ```
 
 ## Testing Strategy

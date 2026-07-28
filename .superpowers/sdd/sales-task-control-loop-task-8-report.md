@@ -39,7 +39,7 @@ for now because this task's scope is behavior wiring, not broad deletion.
   submission.
 - `bunx tsc --noEmit` -> clean.
 - `bun --env-file=.env.local test src/lib/data/activity-log.test.ts
-  src/lib/data/task-progress-adapter.test.ts` -> 5 pass, 0 fail.
+src/lib/data/task-progress-adapter.test.ts` -> 5 pass, 0 fail.
 - Full local suite: `bun --env-file=.env.local test` -> 436 pass, 0 fail,
   2004 assertions.
 - `bun run build` -> passed. Warnings were pre-existing style/tooling warnings:

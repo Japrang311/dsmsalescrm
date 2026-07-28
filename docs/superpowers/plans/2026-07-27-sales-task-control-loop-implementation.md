@@ -725,18 +725,18 @@ and deployment action.
 
 ## Risks and Mitigations
 
-| Risk | Impact | Mitigation |
-|---|---|---|
-| Legacy status cutover corrupts KPI or lists | High | Dual-read compatibility, consumer inventory, fixture comparison, and late enum retirement |
-| Progress partially persists | High | One tested transaction/RPC with forced-failure rollback coverage |
-| Executive detail leaks through direct API | High | Direct RLS tests plus aggregate-only contract with explicit function hardening |
-| Holiday sync is missing or stale | High | Canonical database calendar, provenance/health state, visible fallback, boundary tests |
-| Existing data receives invented business values | High | Deterministic-only mapping and explicit review state |
-| Manager work is omitted from Sales metrics | Medium | Treat Manager-owned Task as personal Sales work while keeping exception ownership separate |
-| Waiting External suppresses escalation | Medium | Same required next-date and centralized due-state calculation as other active states |
-| Timeline duplicates old and new events | Medium | Stable source IDs, event-kind normalization, and duplicate-suppression tests |
-| Super Admin becomes business owner | High | Owner eligibility constraint and four-role RLS regression suite |
-| Scope expands into RFQ or external messaging | Medium | Explicit non-goals and focused consumer review |
+| Risk                                            | Impact | Mitigation                                                                                 |
+| ----------------------------------------------- | ------ | ------------------------------------------------------------------------------------------ |
+| Legacy status cutover corrupts KPI or lists     | High   | Dual-read compatibility, consumer inventory, fixture comparison, and late enum retirement  |
+| Progress partially persists                     | High   | One tested transaction/RPC with forced-failure rollback coverage                           |
+| Executive detail leaks through direct API       | High   | Direct RLS tests plus aggregate-only contract with explicit function hardening             |
+| Holiday sync is missing or stale                | High   | Canonical database calendar, provenance/health state, visible fallback, boundary tests     |
+| Existing data receives invented business values | High   | Deterministic-only mapping and explicit review state                                       |
+| Manager work is omitted from Sales metrics      | Medium | Treat Manager-owned Task as personal Sales work while keeping exception ownership separate |
+| Waiting External suppresses escalation          | Medium | Same required next-date and centralized due-state calculation as other active states       |
+| Timeline duplicates old and new events          | Medium | Stable source IDs, event-kind normalization, and duplicate-suppression tests               |
+| Super Admin becomes business owner              | High   | Owner eligibility constraint and four-role RLS regression suite                            |
+| Scope expands into RFQ or external messaging    | Medium | Explicit non-goals and focused consumer review                                             |
 
 ## Definition of Done
 
