@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
@@ -36,8 +37,8 @@ export function TodaysFollowUpList() {
             {rows.length} aktivitas menunggu tindak lanjut
           </p>
         </div>
-        <Button variant="outline" size="sm" className="h-8">
-          Lihat semua
+        <Button variant="outline" size="sm" className="h-8" asChild>
+          <Link to="/tasks">Lihat semua</Link>
         </Button>
       </CardHeader>
       <CardContent className="p-0">
