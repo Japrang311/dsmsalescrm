@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
   Receipt,
   ArrowRight,
@@ -36,6 +36,7 @@ import {
   formatDateShort,
   formatPercent,
 } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 import { useRole } from "@/context/role-context";
 import { NOW, CURRENT_YEAR } from "@/lib/domain";
@@ -71,6 +72,7 @@ export const Route = createFileRoute("/_app/sales-orders/")({
 
 function SalesOrdersRevenuePage() {
   const { role, authReady } = useRole();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const {
     orders,
@@ -362,7 +364,44 @@ function SalesOrdersRevenuePage() {
                     const foc =
                       so.type === "Prototype" && so.prototypeStatus === "FOC";
                     return (
-                      <TableRow key={so.id} className="hover:bg-muted/40">
+                      <TableRow
+                        key={so.id}
+                        className={cn(
+                          "outline-none transition-colors",
+                          !deletedMode &&
+                            "cursor-pointer hover:bg-primary-soft/60 focus-visible:bg-primary-soft/60 focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-primary/50",
+                          deletedMode && "hover:bg-muted/40",
+                        )}
+                        tabIndex={deletedMode ? undefined : 0}
+                        role={deletedMode ? undefined : "link"}
+                        aria-label={
+                          deletedMode
+                            ? undefined
+                            : `Buka detail ${so.soNumber ?? "sales order"}`
+                        }
+                        onClick={
+                          deletedMode
+                            ? undefined
+                            : () =>
+                                navigate({
+                                  to: "/sales-orders/$soId",
+                                  params: { soId: so.id },
+                                })
+                        }
+                        onKeyDown={
+                          deletedMode
+                            ? undefined
+                            : (e) => {
+                                if (e.key === "Enter" || e.key === " ") {
+                                  e.preventDefault();
+                                  navigate({
+                                    to: "/sales-orders/$soId",
+                                    params: { soId: so.id },
+                                  });
+                                }
+                              }
+                        }
+                      >
                         <TableCell className="font-mono text-xs">
                           {so.soNumber}
                         </TableCell>
@@ -414,7 +453,10 @@ function SalesOrdersRevenuePage() {
                             formatRupiahShort(so.value ?? 0)
                           )}
                         </TableCell>
-                        <TableCell className="w-[80px]">
+                        <TableCell
+                          className="w-[80px]"
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           {deletedMode ? (
                             <Button
                               variant="outline"
