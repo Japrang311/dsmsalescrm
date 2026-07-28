@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import {
   LayoutGrid,
   Table as TableIcon,
@@ -71,6 +71,7 @@ type ViewMode = "table" | "board";
 
 export function CommercialViews(props: CommercialViewsProps) {
   const { role, authReady } = useRole();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [showDeleted, setShowDeleted] = useState(false);
   const [restoringId, setRestoringId] = useState<string>();
@@ -358,8 +359,40 @@ export function CommercialViews(props: CommercialViewsProps) {
                     const nextDays = next ? daysBetween(NOW, next) : null;
                     const aging = daysBetween(new Date(it.updatedAt), NOW);
                     const overdue = nextDays !== null && nextDays < 0;
+                    const detailHref =
+                      `${props.detailBasePath}/${it.id}` as never;
                     return (
-                      <TableRow key={it.id} className="hover:bg-muted/40">
+                      <TableRow
+                        key={it.id}
+                        className={cn(
+                          "outline-none transition-colors",
+                          !deletedMode &&
+                            "cursor-pointer hover:bg-primary-soft/60 focus-visible:bg-primary-soft/60 focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-primary/50",
+                          deletedMode && "hover:bg-muted/40",
+                        )}
+                        tabIndex={deletedMode ? undefined : 0}
+                        role={deletedMode ? undefined : "link"}
+                        aria-label={
+                          deletedMode
+                            ? undefined
+                            : `Buka detail ${it.quotationNumber ?? it.projectName ?? "quotation"}`
+                        }
+                        onClick={
+                          deletedMode
+                            ? undefined
+                            : () => navigate({ to: detailHref })
+                        }
+                        onKeyDown={
+                          deletedMode
+                            ? undefined
+                            : (e) => {
+                                if (e.key === "Enter" || e.key === " ") {
+                                  e.preventDefault();
+                                  navigate({ to: detailHref });
+                                }
+                              }
+                        }
+                      >
                         <TableCell className="whitespace-nowrap text-xs">
                           {it.documentDate
                             ? formatDateShort(it.documentDate)
@@ -444,7 +477,10 @@ export function CommercialViews(props: CommercialViewsProps) {
                         <TableCell className="whitespace-nowrap text-xs text-muted-foreground tabular-nums">
                           {aging}h
                         </TableCell>
-                        <TableCell className="w-[80px]">
+                        <TableCell
+                          className="w-[80px]"
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           {deletedMode ? (
                             <Button
                               variant="outline"
@@ -465,9 +501,7 @@ export function CommercialViews(props: CommercialViewsProps) {
                               size="sm"
                               className="h-7 px-2 text-xs"
                             >
-                              <Link
-                                to={`${props.detailBasePath}/${it.id}` as never}
-                              >
+                              <Link to={detailHref}>
                                 Detail <ArrowRight className="ml-1 h-3 w-3" />
                               </Link>
                             </Button>
