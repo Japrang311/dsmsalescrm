@@ -7,11 +7,12 @@ import {
   type RoleFixtureUsers,
 } from "./helpers";
 
-let fixtures: RoleFixtureUsers;
-let clientIds: { own: string; other: string };
+let fixtures: RoleFixtureUsers | undefined;
+let clientIds: { own: string; other: string } | undefined;
 
 beforeAll(async () => {
   fixtures = await createRoleFixtureUsers();
+  const suffix = crypto.randomUUID();
 
   // One client owned by the fixture "sales" user, one owned by someone else
   // entirely (a seeded team member) — this is what lets us prove a sales
@@ -19,7 +20,7 @@ beforeAll(async () => {
   const { data: own, error: ownError } = await adminClient
     .from("clients")
     .insert({
-      name: "Fixture Own Client",
+      name: `Fixture Own Client ${suffix}`,
       source: "Referral",
       owner_id: fixtures.sales.id,
     })
@@ -30,7 +31,7 @@ beforeAll(async () => {
   const { data: other, error: otherError } = await adminClient
     .from("clients")
     .insert({
-      name: "Fixture Other Client",
+      name: `Fixture Other Client ${suffix}`,
       source: "Referral",
       owner_id: "22222222-2222-2222-2222-222222222222",
     })
@@ -42,34 +43,36 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await adminClient
-    .from("clients")
-    .delete()
-    .in("id", [clientIds.own, clientIds.other]);
+  if (clientIds) {
+    await adminClient
+      .from("clients")
+      .delete()
+      .in("id", [clientIds.own, clientIds.other]);
+  }
   await deleteRoleFixtureUsers(fixtures);
 });
 
 describe("clients RLS", () => {
   test("sales role sees only clients they own", async () => {
-    const client = await signInAs(fixtures.sales);
+    const client = await signInAs(fixtures!.sales);
     const { data, error } = await client.from("clients").select("id");
     if (error) throw error;
     const ids = data!.map((row) => row.id);
-    expect(ids).toContain(clientIds.own);
-    expect(ids).not.toContain(clientIds.other);
+    expect(ids).toContain(clientIds!.own);
+    expect(ids).not.toContain(clientIds!.other);
   });
 
   test("manager role sees every client", async () => {
-    const client = await signInAs(fixtures.manager);
+    const client = await signInAs(fixtures!.manager);
     const { data, error } = await client.from("clients").select("id");
     if (error) throw error;
     const ids = data!.map((row) => row.id);
-    expect(ids).toContain(clientIds.own);
-    expect(ids).toContain(clientIds.other);
+    expect(ids).toContain(clientIds!.own);
+    expect(ids).toContain(clientIds!.other);
   });
 
   test("executive role sees every client but cannot write", async () => {
-    const client = await signInAs(fixtures.executive);
+    const client = await signInAs(fixtures!.executive);
     const { data, error } = await client.from("clients").select("id");
     if (error) throw error;
     expect(data!.length).toBeGreaterThanOrEqual(2);
@@ -77,27 +80,27 @@ describe("clients RLS", () => {
     const { error: insertError } = await client.from("clients").insert({
       name: "Should Fail",
       source: "Referral",
-      owner_id: fixtures.executive.id,
+      owner_id: fixtures!.executive.id,
     });
     expect(insertError).not.toBeNull();
   });
 
   test("sales role cannot create a client owned by someone else", async () => {
-    const client = await signInAs(fixtures.sales);
+    const client = await signInAs(fixtures!.sales);
     const { error } = await client.from("clients").insert({
       name: "Should Fail",
       source: "Referral",
-      owner_id: fixtures.manager.id,
+      owner_id: fixtures!.manager.id,
     });
     expect(error).not.toBeNull();
   });
 
   test("sales role cannot update a client they don't own", async () => {
-    const client = await signInAs(fixtures.sales);
+    const client = await signInAs(fixtures!.sales);
     const { data, error } = await client
       .from("clients")
       .update({ status: "Lost" })
-      .eq("id", clientIds.other)
+      .eq("id", clientIds!.other)
       .select("id");
     if (error) throw error;
     // RLS silently filters out rows the policy doesn't match, rather than
@@ -111,7 +114,7 @@ describe("clients RLS", () => {
       .select(
         "address, province, city, industry, website, notes, cp1_name, cp1_position, cp1_email, cp1_phone, cp1_mobile",
       )
-      .eq("id", clientIds.own)
+      .eq("id", clientIds!.own)
       .single();
     if (error) throw error;
     expect(data.address).toBeNull();
@@ -128,7 +131,7 @@ describe("clients RLS", () => {
   });
 
   test("sales role can update their own client's company/contact info", async () => {
-    const client = await signInAs(fixtures.sales);
+    const client = await signInAs(fixtures!.sales);
     const { data, error } = await client
       .from("clients")
       .update({
@@ -144,7 +147,7 @@ describe("clients RLS", () => {
         cp1_phone: "031-1234567",
         cp1_mobile: "0812-3456-7890",
       })
-      .eq("id", clientIds.own)
+      .eq("id", clientIds!.own)
       .select(
         "address, province, city, industry, website, notes, cp1_name, cp1_position, cp1_email, cp1_phone, cp1_mobile",
       )
@@ -164,11 +167,11 @@ describe("clients RLS", () => {
   });
 
   test("sales role cannot update company/contact info on a client they don't own", async () => {
-    const client = await signInAs(fixtures.sales);
+    const client = await signInAs(fixtures!.sales);
     const { data, error } = await client
       .from("clients")
       .update({ address: "Should Not Apply" })
-      .eq("id", clientIds.other)
+      .eq("id", clientIds!.other)
       .select("id");
     if (error) throw error;
     expect(data).toHaveLength(0);
@@ -179,34 +182,111 @@ describe("clients RLS", () => {
     // is never matched for update — RLS silently filters it out (0 rows),
     // the same "no rows changed" signal as the sales-on-other-client case
     // above, not a thrown error.
-    const client = await signInAs(fixtures.executive);
+    const client = await signInAs(fixtures!.executive);
     const { data, error } = await client
       .from("clients")
       .update({ address: "Should Fail" })
-      .eq("id", clientIds.own)
+      .eq("id", clientIds!.own)
       .select("id");
     if (error) throw error;
     expect(data).toHaveLength(0);
   });
 
   test("manager role can update company/contact info on any client", async () => {
-    const client = await signInAs(fixtures.manager);
+    const client = await signInAs(fixtures!.manager);
     const { data, error } = await client
       .from("clients")
       .update({ industry: "Telco Infrastructure" })
-      .eq("id", clientIds.other)
+      .eq("id", clientIds!.other)
       .select("industry")
       .single();
     if (error) throw error;
     expect(data.industry).toBe("Telco Infrastructure");
   });
 
+  test("duplicate client names are blocked after normalization", async () => {
+    const duplicateBaseName = `PT. Duplicate Client ${crypto.randomUUID()}`;
+    const compactDuplicate = duplicateBaseName
+      .replace(/^PT\. /, "pt ")
+      .replace(/\s+/g, "");
+
+    const { data: base, error: baseError } = await adminClient
+      .from("clients")
+      .insert({
+        name: duplicateBaseName,
+        source: "Referral",
+        owner_id: fixtures!.sales.id,
+      })
+      .select("id")
+      .single();
+    if (baseError) throw baseError;
+
+    try {
+      const { error } = await adminClient.from("clients").insert({
+        name: compactDuplicate,
+        source: "Website Inquiry",
+        owner_id: fixtures!.manager.id,
+      });
+
+      expect(error).not.toBeNull();
+      expect(error?.message).toContain("Client name already exists");
+      expect(error?.details).toBe("CLIENT_NAME_DUPLICATE");
+    } finally {
+      await adminClient.from("clients").delete().eq("id", base.id);
+    }
+  });
+
+  test("renaming a client to an existing normalized name is blocked", async () => {
+    const suffix = crypto.randomUUID();
+    const baseName = `PT. Rename Guard ${suffix}`;
+    const targetName = `PT. Rename Target ${suffix}`;
+    const compactTargetName = targetName
+      .replace(/^PT\. /, "pt ")
+      .replace(/\s+/g, "");
+
+    const { data: rows, error: insertError } = await adminClient
+      .from("clients")
+      .insert([
+        {
+          name: baseName,
+          source: "Referral",
+          owner_id: fixtures!.sales.id,
+        },
+        {
+          name: targetName,
+          source: "Referral",
+          owner_id: fixtures!.sales.id,
+        },
+      ])
+      .select("id");
+    if (insertError) throw insertError;
+
+    try {
+      const { error } = await adminClient
+        .from("clients")
+        .update({ name: compactTargetName })
+        .eq("id", rows![0].id);
+
+      expect(error).not.toBeNull();
+      expect(error?.message).toContain("Client name already exists");
+      expect(error?.details).toBe("CLIENT_NAME_DUPLICATE");
+    } finally {
+      await adminClient
+        .from("clients")
+        .delete()
+        .in(
+          "id",
+          rows!.map((row) => row.id),
+        );
+    }
+  });
+
   test("no role can delete a client (archive-only policy, per PRD §9)", async () => {
-    const client = await signInAs(fixtures.manager);
+    const client = await signInAs(fixtures!.manager);
     const { error, count } = await client
       .from("clients")
       .delete({ count: "exact" })
-      .eq("id", clientIds.own);
+      .eq("id", clientIds!.own);
     // No DELETE policy exists at all, so this should either error or match
     // zero rows — never actually remove the row.
     if (!error) {
@@ -215,8 +295,8 @@ describe("clients RLS", () => {
     const { data: stillThere } = await adminClient
       .from("clients")
       .select("id")
-      .eq("id", clientIds.own)
+      .eq("id", clientIds!.own)
       .single();
-    expect(stillThere?.id).toBe(clientIds.own);
+    expect(stillThere?.id).toBe(clientIds!.own);
   });
 });

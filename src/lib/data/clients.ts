@@ -38,6 +38,30 @@ type ClientRow = {
   cp3_mobile: string | null;
 };
 
+const DUPLICATE_CLIENT_NAME_MESSAGE =
+  "Nama client sudah ada. Gunakan record client yang sudah tersedia, jangan buat duplikat.";
+
+export function clientDataErrorMessage(error: unknown): string {
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "message" in error &&
+    typeof error.message === "string" &&
+    (error.message.includes("Client name already exists") ||
+      ("details" in error &&
+        typeof error.details === "string" &&
+        error.details.includes("CLIENT_NAME_DUPLICATE")))
+  ) {
+    return DUPLICATE_CLIENT_NAME_MESSAGE;
+  }
+
+  return error instanceof Error ? error.message : "Unknown error";
+}
+
+function throwClientDataError(error: unknown): never {
+  throw new Error(clientDataErrorMessage(error));
+}
+
 function toContact(row: ClientRow, position: 1 | 2 | 3): ClientContact {
   const name = row[`cp${position}_name`] ?? undefined;
   const jabatan = row[`cp${position}_position`] ?? undefined;
@@ -111,7 +135,7 @@ export async function createClient(input: {
     })
     .select("*")
     .single();
-  if (error) throw error;
+  if (error) throwClientDataError(error);
   return toClient(data);
 }
 
@@ -125,7 +149,7 @@ export async function updateClientStatus(
     .eq("id", id)
     .select("*")
     .single();
-  if (error) throw error;
+  if (error) throwClientDataError(error);
   return toClient(data);
 }
 
@@ -178,7 +202,7 @@ export async function updateClientDetails(
     .eq("id", id)
     .select("*")
     .single();
-  if (error) throw error;
+  if (error) throwClientDataError(error);
   return toClient(data);
 }
 

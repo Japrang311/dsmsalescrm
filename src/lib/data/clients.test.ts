@@ -15,6 +15,7 @@ import {
   listOwners,
   createClient,
   listSalesTeamProfiles,
+  clientDataErrorMessage,
 } from "./clients";
 
 // This module reads a module-level Supabase client, so we point it at
@@ -81,12 +82,13 @@ describe("src/lib/data/clients.ts", () => {
       refresh_token: session.refresh_token,
     });
 
+    const clientName = `Data-layer fixture client ${crypto.randomUUID()}`;
     const created = await createClient({
-      name: "Data-layer fixture client",
+      name: clientName,
       source: "Referral",
       ownerId: session.user.id,
     });
-    expect(created.name).toBe("Data-layer fixture client");
+    expect(created.name).toBe(clientName);
     expect(created.status).toBe("Prospect");
 
     const { data: fromDb } = await adminClient
@@ -94,11 +96,22 @@ describe("src/lib/data/clients.ts", () => {
       .select("name, owner_id")
       .eq("id", created.id)
       .single();
-    expect(fromDb?.name).toBe("Data-layer fixture client");
+    expect(fromDb?.name).toBe(clientName);
     expect(fromDb?.owner_id).toBe(session.user.id);
 
     await adminClient.from("clients").delete().eq("id", created.id);
     await supabase.auth.signOut();
+  });
+
+  test("clientDataErrorMessage() explains duplicate client-name failures", () => {
+    expect(
+      clientDataErrorMessage({
+        message: "Client name already exists: PT. Global Nine Indonesia",
+        details: "CLIENT_NAME_DUPLICATE",
+      }),
+    ).toBe(
+      "Nama client sudah ada. Gunakan record client yang sudah tersedia, jangan buat duplikat.",
+    );
   });
 
   // Regression for Phase 12 Task 6: Super Admin is not a Sales owner and
