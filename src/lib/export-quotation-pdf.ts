@@ -74,6 +74,24 @@ const FONT_TITLE = fs(28);
 
 const LOGO_URL = "/brand/dsm-logo.png";
 
+// --- Page header and footer ------------------------------------------------
+// The sheet's <headerFooter> block, with differentFirst set: page 1 carries the
+// letterhead (logo left, address right) and the tagline; later pages get only a
+// page number. These sit in the margins, measured from the page edge rather
+// than the content area, and their point sizes still ride on the fit-to-width
+// factor because scaleWithDoc defaults to true.
+const HEADER_TOP = 21.6; // pageMargins/@header, 0.3in
+const FOOTER_BOTTOM = PAGE_H - 21.6; // pageMargins/@footer, 0.3in
+
+const COMPANY_ADDRESS = [
+  "Jl. Gedebage Selatan No.173",
+  "Bandung Jawa Barat, Indonesia.",
+  "Phone +62-22-8730-6012",
+];
+const TAGLINE =
+  "Sheet Metal | Steel Structure | Special Vehicle | Special Containers | Design | Prototype | Assembly | Mass Production";
+const TAGLINE_GREY = 148; // &K00-042 — theme 0 at tint -0.42
+
 // --- Public API -----------------------------------------------------------
 
 export type QuotationPdfInput = {
@@ -120,7 +138,7 @@ export async function buildQuotationPdf(
 
   let y = MARGIN_Y;
 
-  drawLogo(doc, logo);
+  drawFirstPageHeader(doc, logo);
   y = drawTitleAndParties(doc, input, y);
   y = drawTableHeader(doc, y);
 
@@ -134,6 +152,7 @@ export async function buildQuotationPdf(
   y = drawTotals(doc, input, items, y);
   y = drawTerms(doc, input, y);
   drawClosing(doc, input, y);
+  drawFooters(doc);
 
   return doc;
 }
@@ -294,12 +313,43 @@ function drawItemBlock(doc: jsPDF, plan: ItemPlan, top: number): number {
 
 // --- Blocks ---------------------------------------------------------------
 
-function drawLogo(doc: jsPDF, logo: LoadedImage | null) {
-  // The workbook carries the logo as a first-page-only header image (LHFIRST),
-  // so it is drawn once, in the top margin, and never repeated.
-  if (!logo) return;
-  const w = 152;
-  doc.addImage(logo.data, "PNG", MARGIN_X, 18, w, w * logo.ratio);
+/** firstHeader: the logo in the left section, the company address in the right. */
+function drawFirstPageHeader(doc: jsPDF, logo: LoadedImage | null) {
+  if (logo) {
+    const w = 152;
+    doc.addImage(logo.data, "PNG", MARGIN_X, 18, w, w * logo.ratio);
+  }
+
+  // The header's &9 sizes the left section, which holds only the picture; the
+  // right section falls back to the default 11pt, same as the sheet body.
+  const lineHeight = FONT_BODY * 1.2;
+  doc.setFont("helvetica", "normal").setFontSize(FONT_BODY).setTextColor(0);
+  COMPANY_ADDRESS.forEach((line, index) => {
+    const mid = HEADER_TOP + lineHeight * (index + 0.5);
+    text(doc, line, PAGE_W - MARGIN_X, mid, "right");
+  });
+}
+
+/**
+ * firstFooter on page 1, oddFooter on the rest. Run once at the end because the
+ * page count is only known then.
+ */
+function drawFooters(doc: jsPDF) {
+  const pageCount = doc.getNumberOfPages();
+  for (let page = 1; page <= pageCount; page += 1) {
+    doc.setPage(page);
+    doc.setFont("helvetica", "normal");
+    if (page === 1) {
+      const size = fs(13);
+      doc.setFontSize(size).setTextColor(TAGLINE_GREY);
+      text(doc, TAGLINE, PAGE_W / 2, FOOTER_BOTTOM - size / 2, "center");
+    } else {
+      const size = fs(9);
+      doc.setFontSize(size).setTextColor(0);
+      const label = `Page ${page} of ${pageCount}`;
+      text(doc, label, PAGE_W / 2, FOOTER_BOTTOM - size / 2, "center");
+    }
+  }
 }
 
 function drawTitleAndParties(
@@ -324,64 +374,60 @@ function drawTitleAndParties(
   const labelRight = x(COL.K - 7);
   const valueLeft = x(COL.K) + PAD;
 
-  const rows: { h: number; label?: string; value?: string }[] = [
-    { h: rh(18), label: "Date", value: formatTemplateDate(item.documentDate) },
-    {
-      h: rh(15),
-      label: "DSM Quotation #",
-      value: item.quotationNumber ?? "-",
-    },
-    {
-      h: rh(14),
-      label: "Customer Reference #",
-      value: input.customerReference,
-    },
-    { h: rh(15), label: "Quotation By #", value: owner.email },
-    { h: rh(14) },
+  // Sheet rows 2–6. The two columns are independent — the left one carries the
+  // client block, the right one the document numbers — and only share these
+  // row heights.
+  const rowHeights = [rh(18), rh(15), rh(14), rh(15), rh(14)];
+  const clientBlock = [client.name, ...quotationAddressLines(item, client)];
+  const documentFields: [string, string][] = [
+    ["Date", formatTemplateDate(item.documentDate)],
+    ["DSM Quotation #", item.quotationNumber ?? "-"],
+    ["Customer Reference #", input.customerReference],
+    ["Quotation By #", owner.email],
   ];
 
-  const addressLines = buildAddressLines(input);
-  let rowTop = y;
-  rows.forEach((row, index) => {
-    const mid = rowTop + row.h / 2;
+  rowHeights.forEach((height, index) => {
+    const mid = y + height / 2;
+
     if (index === 0) {
       doc.setFont("helvetica", "normal");
       text(doc, "Quote To :", center(COL.A, COL.B), mid, "center");
-      doc.setFont("helvetica", "bold");
-      text(doc, client.name, x(COL.C) + PAD, mid, "left");
-    } else {
-      doc.setFont("helvetica", "normal");
-      const addressLine = addressLines[index - 1];
-      if (addressLine) text(doc, addressLine, x(COL.C) + PAD, mid, "left");
     }
-    if (row.label) {
-      doc.setFont("helvetica", "bold");
-      text(doc, row.label, labelRight, mid, "right");
-      doc.setFont("helvetica", "normal");
-      text(doc, row.value ?? "", valueLeft, mid, "left");
+    const clientLine = clientBlock[index];
+    if (clientLine) {
+      // The company name leads the block in bold; address lines follow.
+      doc.setFont("helvetica", index === 0 ? "bold" : "normal");
+      text(doc, clientLine, x(COL.C) + PAD, mid, "left");
     }
-    rowTop += row.h;
-  });
-  y = rowTop;
 
-  // Attention block — the selected client contact.
-  const contact = input.client.contacts[input.picIndex] ?? {};
-  const contactRows: [string, string][] = [
-    ["Attention", contact.name || "-"],
-    ["Mobile", contact.mobile || "-"],
-    ["Tel", contact.phone || "-"],
-    ["Fax", "-"],
-    ["E-mail", contact.email || "-"],
+    const field = documentFields[index];
+    if (field) {
+      doc.setFont("helvetica", "bold");
+      text(doc, field[0], labelRight, mid, "right");
+      doc.setFont("helvetica", "normal");
+      text(doc, field[1], valueLeft, mid, "left");
+    }
+
+    y += height;
+  });
+
+  // Attention block — the selected client contact. Sheet rows 7–11.
+  const contact = client.contacts[input.picIndex] ?? {};
+  const contactRows: [label: string, value: string, height: number][] = [
+    ["Attention", contact.name || "-", rh(13.5)],
+    ["Mobile", contact.mobile || "-", rh(14)],
+    ["Tel", contact.phone || "-", rh(14)],
+    ["Fax", "-", rh(14)],
+    ["E-mail", contact.email || "-", rh(15)],
   ];
-  const contactHeights = [rh(13.5), rh(14), rh(14), rh(14), rh(15)];
-  contactRows.forEach(([label, value], index) => {
-    const mid = y + contactHeights[index] / 2;
-    doc.setFont("helvetica", "normal");
+  doc.setFont("helvetica", "normal");
+  for (const [label, value, height] of contactRows) {
+    const mid = y + height / 2;
     text(doc, label, x(COL.J) - PAD, mid, "right");
     text(doc, ":", x(COL.J) + PAD, mid, "left");
     text(doc, value, valueLeft, mid, "left");
-    y += contactHeights[index];
-  });
+    y += height;
+  }
 
   doc.setFont("helvetica", "italic");
   text(doc, input.validityNote, x(COL.A) + PAD, y + rh(33) / 2, "left");
@@ -392,13 +438,15 @@ function drawTitleAndParties(
 /**
  * Four address lines, mirroring rows 3–6 of the template. Prefers the
  * per-document override (`commercial_documents.client_address`) over the
- * client record, then appends province/city and the country line.
+ * client record, then appends province/city and the country line. Exported so
+ * the preview dialog can show exactly the lines the PDF will print.
  */
-function buildAddressLines(input: QuotationPdfInput): string[] {
-  const source = input.item.clientAddress ?? input.client.address ?? "";
-  const region = [input.client.province, input.client.city]
-    .filter(Boolean)
-    .join(", ");
+export function quotationAddressLines(
+  item: CommercialItem,
+  client: Client,
+): string[] {
+  const source = item.clientAddress ?? client.address ?? "";
+  const region = [client.province, client.city].filter(Boolean).join(", ");
   const lines = [
     ...source
       .split(/\r?\n/)
@@ -430,18 +478,7 @@ function drawTableHeader(doc: jsPDF, top: number): number {
     ["Each", center(COL.I, COL.J)],
     ["Amount", center(COL.J, COL.END)],
   ];
-  for (const [label, cx] of headings) {
-    text(doc, label, cx, mid, "center");
-    const w = doc.getTextWidth(label);
-    doc.setLineWidth(0.4);
-    doc.line(
-      cx - w / 2,
-      mid + FONT_BODY * 0.42,
-      cx + w / 2,
-      mid + FONT_BODY * 0.42,
-    );
-    doc.setLineWidth(1);
-  }
+  for (const [label, cx] of headings) underlinedText(doc, label, cx, mid);
   return top + ROW_HEAD;
 }
 
@@ -548,16 +585,7 @@ function drawClosing(doc: jsPDF, input: QuotationPdfInput, top: number): void {
   text(doc, "Yours sincerely ,", x(COL.I), blockTop + rh(14) * 1.5, "left");
 
   const cx = center(COL.I, COL.END);
-  const nameMid = blockTop + rh(70) + rh(14) / 2;
-  text(doc, input.signerName, cx, nameMid, "center");
-  const nameW = doc.getTextWidth(input.signerName);
-  doc.setLineWidth(0.4);
-  doc.line(
-    cx - nameW / 2,
-    nameMid + FONT_BODY * 0.42,
-    cx + nameW / 2,
-    nameMid + FONT_BODY * 0.42,
-  );
+  underlinedText(doc, input.signerName, cx, blockTop + rh(70) + rh(14) / 2);
   text(doc, input.signerTitle, cx, blockTop + rh(84) + rh(14) / 2, "center");
 }
 
@@ -572,6 +600,18 @@ function text(
 ) {
   if (!value) return;
   doc.text(value, atX, atY, { align, baseline: "middle" });
+}
+
+/**
+ * Centred text with the rule the template draws beneath it — the sheet styles
+ * both the item-table headings and the signer's name as Arial underlined.
+ */
+function underlinedText(doc: jsPDF, value: string, cx: number, mid: number) {
+  text(doc, value, cx, mid, "center");
+  const half = doc.getTextWidth(value) / 2;
+  const ruleY = mid + FONT_BODY * 0.42;
+  doc.setLineWidth(0.4);
+  doc.line(cx - half, ruleY, cx + half, ruleY);
 }
 
 const center = (from: number, to: number) => x(from) + ((to - from) * U) / 2;

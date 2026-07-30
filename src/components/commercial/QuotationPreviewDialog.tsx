@@ -34,6 +34,7 @@ import type { Client, CommercialItem } from "@/lib/domain";
 import {
   buildQuotationPdf,
   QUOTATION_PDF_DEFAULTS,
+  quotationAddressLines,
   quotationPdfFilename,
   type QuotationPdfInput,
 } from "@/lib/export-quotation-pdf";
@@ -196,13 +197,7 @@ function PreviewBody({
     }
   }
 
-  const addressPreview = [
-    item.clientAddress ?? client.address,
-    client.province,
-    client.city,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  const addressPreview = quotationAddressLines(item, client).join(" · ");
 
   return (
     <div className="flex flex-1 flex-col gap-3 overflow-hidden">
