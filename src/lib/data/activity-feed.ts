@@ -45,6 +45,8 @@ const COMMERCIAL_ROUTE: Partial<
   Quotation: { to: "/quotations/$id", label: "Buka Quotation" },
 };
 
+const TASK_INBOX_LINK: FeedLink = { to: "/tasks", label: "Buka Task Inbox" };
+
 function commercialLink(
   item: Pick<CommercialItem, "id" | "type"> | undefined,
 ): FeedLink | undefined {
@@ -55,12 +57,137 @@ function commercialLink(
     : undefined;
 }
 
+function salesOrderLink(
+  salesOrderId: string | undefined,
+): FeedLink | undefined {
+  if (!salesOrderId) return undefined;
+  return {
+    to: "/sales-orders/$soId",
+    params: { soId: salesOrderId },
+    label: "Buka Sales Order",
+  };
+}
+
 type BuildActivityFeedInput = {
   activity: ActivityLogEntry[];
   followUps: FollowUpLog[];
   owners: Record<string, { name: string }>;
   commercialItems: CommercialItem[];
 };
+
+type OwnersById = BuildActivityFeedInput["owners"];
+type CommercialIndex = Map<string, CommercialItem>;
+type ActivityFeedBase = Pick<
+  FeedEvent,
+  "id" | "at" | "clientId" | "ownerName" | "title" | "detail"
+>;
+
+function activityFeedBase(
+  entry: ActivityLogEntry,
+  owners: OwnersById,
+): ActivityFeedBase {
+  return {
+    id: `activity-${entry.id}`,
+    at: entry.createdAt,
+    clientId: entry.clientId,
+    ownerName: owners[entry.actorId]?.name,
+    title: entry.title,
+    detail: entry.detail,
+  };
+}
+
+function teamAdminTargetName(
+  entry: ActivityLogEntry,
+  owners: OwnersById,
+): string | undefined {
+  const targetProfileName = entry.targetProfileId
+    ? owners[entry.targetProfileId]?.name
+    : undefined;
+  return targetProfileName ?? entry.targetProfileSnapshot?.name;
+}
+
+function activityFeedEvent(
+  entry: ActivityLogEntry,
+  owners: OwnersById,
+  commercialIndex: CommercialIndex,
+): FeedEvent | undefined {
+  const base = activityFeedBase(entry, owners);
+
+  switch (entry.kind) {
+    case "client_created":
+      return { ...base, kind: "client_created" };
+    case "client_status_change":
+      return { ...base, kind: "status_change" };
+    case "commercial_item_created":
+      return {
+        ...base,
+        kind: "commercial_created",
+        link: commercialLink(commercialIndex.get(entry.commercialItemId ?? "")),
+      };
+    case "commercial_item_stage_change":
+      return {
+        ...base,
+        kind: "commercial_history",
+        link: commercialLink(commercialIndex.get(entry.commercialItemId ?? "")),
+      };
+    case "task_created":
+      return { ...base, kind: "task_created", link: TASK_INBOX_LINK };
+    case "task_status_change":
+      return { ...base, kind: "task_history", link: TASK_INBOX_LINK };
+    case "sales_order_created":
+      return {
+        ...base,
+        kind: "order_created",
+        link: salesOrderLink(entry.salesOrderId),
+      };
+    case "sales_order_tax_change":
+      return {
+        ...base,
+        kind: "so_tax_change",
+        link: salesOrderLink(entry.salesOrderId),
+      };
+    case "commercial_document_deleted":
+    case "commercial_document_restored":
+      return {
+        ...base,
+        kind: "record_lifecycle",
+        link:
+          entry.kind === "commercial_document_restored"
+            ? commercialLink(
+                commercialIndex.get(entry.commercialDocumentId ?? ""),
+              )
+            : undefined,
+      };
+    case "sales_order_deleted":
+    case "sales_order_restored":
+      return {
+        ...base,
+        kind: "record_lifecycle",
+        link:
+          entry.kind === "sales_order_restored"
+            ? salesOrderLink(entry.salesOrderId)
+            : undefined,
+      };
+    case "team_member_created":
+    case "team_member_profile_updated":
+    case "team_member_role_changed":
+    case "team_member_deactivated":
+    case "team_member_reactivated":
+    case "team_member_ownership_transferred":
+    case "team_member_deleted":
+      return {
+        ...base,
+        kind: "team_admin",
+        ownerName: owners[entry.ownerId]?.name,
+        actorName: owners[entry.actorId]?.name,
+        targetName: teamAdminTargetName(entry, owners),
+        kindLabel: entry.kindLabel,
+        administrativeReason: entry.administrativeReason,
+      };
+    default:
+      return undefined;
+  }
+}
 
 export function buildActivityFeed({
   activity,
@@ -84,111 +211,8 @@ export function buildActivityFeed({
   }));
 
   for (const entry of activity) {
-    const base = {
-      id: `activity-${entry.id}`,
-      at: entry.createdAt,
-      clientId: entry.clientId,
-      ownerName: owners[entry.actorId]?.name,
-      title: entry.title,
-      detail: entry.detail,
-    };
-
-    if (entry.kind === "client_created") {
-      events.push({ ...base, kind: "client_created" });
-    } else if (entry.kind === "client_status_change") {
-      events.push({ ...base, kind: "status_change" });
-    } else if (entry.kind === "commercial_item_created") {
-      events.push({
-        ...base,
-        kind: "commercial_created",
-        link: commercialLink(commercialIndex.get(entry.commercialItemId ?? "")),
-      });
-    } else if (entry.kind === "commercial_item_stage_change") {
-      events.push({
-        ...base,
-        kind: "commercial_history",
-        link: commercialLink(commercialIndex.get(entry.commercialItemId ?? "")),
-      });
-    } else if (entry.kind === "task_created") {
-      events.push({
-        ...base,
-        kind: "task_created",
-        link: { to: "/tasks", label: "Buka Task Inbox" },
-      });
-    } else if (entry.kind === "task_status_change") {
-      events.push({
-        ...base,
-        kind: "task_history",
-        link: { to: "/tasks", label: "Buka Task Inbox" },
-      });
-    } else if (entry.kind === "sales_order_created") {
-      events.push({
-        ...base,
-        kind: "order_created",
-        link: entry.salesOrderId
-          ? {
-              to: "/sales-orders/$soId",
-              params: { soId: entry.salesOrderId },
-              label: "Buka Sales Order",
-            }
-          : undefined,
-      });
-    } else if (entry.kind === "sales_order_tax_change") {
-      events.push({
-        ...base,
-        kind: "so_tax_change",
-        link: entry.salesOrderId
-          ? {
-              to: "/sales-orders/$soId",
-              params: { soId: entry.salesOrderId },
-              label: "Buka Sales Order",
-            }
-          : undefined,
-      });
-    } else if (
-      entry.kind === "commercial_document_deleted" ||
-      entry.kind === "commercial_document_restored"
-    ) {
-      events.push({
-        ...base,
-        kind: "record_lifecycle",
-        link:
-          entry.kind === "commercial_document_restored"
-            ? commercialLink(
-                commercialIndex.get(entry.commercialDocumentId ?? ""),
-              )
-            : undefined,
-      });
-    } else if (
-      entry.kind === "sales_order_deleted" ||
-      entry.kind === "sales_order_restored"
-    ) {
-      events.push({
-        ...base,
-        kind: "record_lifecycle",
-        link:
-          entry.kind === "sales_order_restored" && entry.salesOrderId
-            ? {
-                to: "/sales-orders/$soId",
-                params: { soId: entry.salesOrderId },
-                label: "Buka Sales Order",
-              }
-            : undefined,
-      });
-    } else if (entry.kind.startsWith("team_member_")) {
-      events.push({
-        ...base,
-        kind: "team_admin",
-        ownerName: owners[entry.ownerId]?.name,
-        actorName: owners[entry.actorId]?.name,
-        targetName:
-          (entry.targetProfileId
-            ? owners[entry.targetProfileId]?.name
-            : undefined) ?? entry.targetProfileSnapshot?.name,
-        kindLabel: entry.kindLabel,
-        administrativeReason: entry.administrativeReason,
-      });
-    }
+    const event = activityFeedEvent(entry, owners, commercialIndex);
+    if (event) events.push(event);
   }
 
   return events.sort((a, b) => (a.at < b.at ? 1 : -1));
