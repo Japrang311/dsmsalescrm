@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -252,16 +252,18 @@ function ProfileTab({
   defaultEmail: string;
 }) {
   const settings = useSettings();
-  const prefs =
-    settings.preferences[userId] ??
-    defaultUserPreferences(defaultName, defaultEmail);
+  const prefs = useMemo(
+    () =>
+      settings.preferences[userId] ??
+      defaultUserPreferences(defaultName, defaultEmail),
+    [settings.preferences, userId, defaultName, defaultEmail],
+  );
   const [form, setForm] = useState<UserPreferences>(prefs);
 
   // Refresh local form when userId changes (role switch).
-  const key = userId;
-  useMemo(() => {
+  useEffect(() => {
     setForm(prefs);
-  }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [prefs, userId]);
 
   const dirty = JSON.stringify(form) !== JSON.stringify(prefs);
 
@@ -1305,7 +1307,7 @@ function OrgTab({ canEdit }: { canEdit: boolean }) {
   const [form, setForm] = useState<OrgSettings | null>(null);
   const [saving, setSaving] = useState(false);
 
-  useMemo(() => {
+  useEffect(() => {
     if (org) setForm(org);
   }, [org]);
 

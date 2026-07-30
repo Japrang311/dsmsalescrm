@@ -596,13 +596,13 @@ function TasksInboxPage() {
   };
 
   // -------------------------- Bulk actions --------------------------
-  const selectedIdList = useMemo(
-    () => scopedTasks.filter((t) => selected.has(t.id)).map((t) => t.id),
-    [scopedTasks, selected],
-  );
   const selectedTasks = useMemo(
     () => scopedTasks.filter((t) => selected.has(t.id)),
     [scopedTasks, selected],
+  );
+  const selectedIdList = useMemo(
+    () => selectedTasks.map((t) => t.id),
+    [selectedTasks],
   );
 
   const bulkDone = async () => {
