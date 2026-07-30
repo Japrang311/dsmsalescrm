@@ -47,6 +47,7 @@ import { LogCommercialFollowUpDialog } from "@/components/commercial/LogCommerci
 import { SoftDeleteAction } from "@/components/commercial/SoftDeleteAction";
 import { canManageSoftDeletedRecord } from "@/components/commercial/soft-delete-controls";
 import { ReviseQuotationDialog } from "@/components/clients/CreateRecordDialogs";
+import { QuotationPreviewDialog } from "@/components/commercial/QuotationPreviewDialog";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   listCommercialItems,
@@ -236,6 +237,9 @@ export function CommercialDetailPage({
 
   const client = clients[item.clientId];
   const owner = owners[item.ownerId];
+  // Whoever is signed in signs the exported quotation by hand, so the PDF's
+  // name/title placeholder follows them, not the document's sales owner.
+  const signerProfile = currentUserId ? owners[currentUserId] : undefined;
   const stages = stagesForFlow(item.sourceFlow);
   const relatedTasks = commercialRelatedTasks(allTasks, item.id);
   // Sales Orders don't exist yet (Phase 5) — shown as an honest "not
@@ -591,6 +595,19 @@ export function CommercialDetailPage({
             <LogCommercialFollowUpDialog
               item={item}
               clientName={client?.name ?? "-"}
+            />
+          )}
+          {/* Export is read-only, so it is not gated on canEdit — anyone who
+              can see the quotation can send it. */}
+          {item.type === "Quotation" && client && (
+            <QuotationPreviewDialog
+              item={item}
+              client={client}
+              owner={{ name: owner?.name ?? "", email: owner?.email ?? "" }}
+              signer={{
+                name: signerProfile?.name ?? "",
+                title: ROLE_LABEL[signerProfile?.role ?? role],
+              }}
             />
           )}
           {canEdit && (
@@ -1063,7 +1080,12 @@ function DocumentItemsTable({
                 <TableCell className="font-medium">
                   {line.productName ?? "Nama Product belum diisi"}
                 </TableCell>
-                <TableCell>{line.description ?? "—"}</TableCell>
+                {/* Description carries the multi-line spec block that the
+                    Quotation PDF renders — pre-wrap keeps both the line breaks
+                    and the leading spaces that mark indented sub-items. */}
+                <TableCell className="whitespace-pre-wrap align-top">
+                  {line.description ?? "—"}
+                </TableCell>
                 <TableCell className="text-right tabular-nums">
                   {canEdit ? (
                     <Input

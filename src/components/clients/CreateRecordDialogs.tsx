@@ -21,6 +21,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import {
@@ -170,7 +171,7 @@ export function CreateQuotationDialog(props: SharedProps) {
       {(props.trigger || !controlled) && (
         <DialogTrigger asChild>{props.trigger}</DialogTrigger>
       )}
-      <DialogContent className="flex max-h-[90vh] max-w-xl flex-col overflow-hidden">
+      <DialogContent className="flex max-h-[90vh] max-w-2xl flex-col overflow-hidden">
         <DialogHeader>
           <DialogTitle>Buat Quotation</DialogTitle>
           <DialogDescription>{clientName ?? "Pilih klien"}</DialogDescription>
@@ -302,7 +303,7 @@ export function ReviseQuotationDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent className="flex max-h-[90vh] max-w-xl flex-col overflow-hidden">
+      <DialogContent className="flex max-h-[90vh] max-w-2xl flex-col overflow-hidden">
         <DialogHeader>
           <DialogTitle>Buat Revisi Quotation</DialogTitle>
           <DialogDescription>
@@ -461,7 +462,7 @@ export function CreateSalesOrderDialog(props: SharedProps) {
       {(props.trigger || !controlled) && (
         <DialogTrigger asChild>{props.trigger}</DialogTrigger>
       )}
-      <DialogContent className="flex max-h-[90vh] max-w-xl flex-col overflow-hidden">
+      <DialogContent className="flex max-h-[90vh] max-w-2xl flex-col overflow-hidden">
         <DialogHeader>
           <DialogTitle>Record Sales Order</DialogTitle>
           <DialogDescription>{clientName ?? "Pilih klien"}</DialogDescription>
@@ -717,7 +718,7 @@ export function CreatePrototypeDialog(props: SharedProps) {
       {(props.trigger || !controlled) && (
         <DialogTrigger asChild>{props.trigger}</DialogTrigger>
       )}
-      <DialogContent className="flex max-h-[90vh] max-w-xl flex-col overflow-hidden">
+      <DialogContent className="flex max-h-[90vh] max-w-2xl flex-col overflow-hidden">
         <DialogHeader>
           <DialogTitle>Prototype Request</DialogTitle>
           <DialogDescription>{clientName ?? "Pilih klien"}</DialogDescription>
@@ -881,21 +882,26 @@ function LineItemsSection<
               className="grid grid-cols-[1fr_auto] items-start gap-2 rounded-md border p-3"
             >
               <div className="grid gap-2">
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  <Input
-                    aria-label={`Nama Product item ${index + 1}`}
-                    placeholder="Nama Product"
-                    {...register(
-                      `lineItems.${index}.productName` as Path<TFieldValues>,
-                    )}
-                  />
-                  <Input
+                <Input
+                  aria-label={`Nama Product item ${index + 1}`}
+                  placeholder="Nama Product"
+                  {...register(
+                    `lineItems.${index}.productName` as Path<TFieldValues>,
+                  )}
+                />
+                <div className="grid gap-1">
+                  <Textarea
                     aria-label={`Description item ${index + 1}`}
-                    placeholder="Description / Deskripsi Project"
+                    rows={12}
+                    className="min-h-[260px] font-mono text-xs leading-relaxed"
+                    placeholder={
+                      'Cabinet Dimension : H 2000mm x W 700mm x D 700mm\nProtection Category : IP 55\nMaterial\n  SPCC T 1.4 mm : Frame and 19" Adapter'
+                    }
                     {...register(
                       `lineItems.${index}.description` as Path<TFieldValues>,
                     )}
                   />
+                  <SpecWritingGuide />
                 </div>
                 <div
                   className={cn(
@@ -976,6 +982,55 @@ function LineItemsSection<
         </div>
       )}
     </div>
+  );
+}
+
+// Description is rendered as the spec block of the exported Quotation PDF
+// (see src/lib/export-quotation-pdf.ts), so the four line shapes below are the
+// whole authoring contract. Kept collapsed by default to save dialog height.
+const SPEC_EXAMPLE = `Cabinet Dimension : H 2000mm x W 700mm x D 700mm
+Protection Category : IP 55
+Material
+  Aluminium 1100 T 1.4 mm : Main body, Front and Rear Door
+  SPCC T 1.4 mm : Frame and 19" Adapter
+Accessories : 4 ea Dynabolt, M12 x 100
+: 1 lot, Door Seal
+Packing : Base Pallet Wood, Plastic Wrap, Styrofoam`;
+
+function SpecWritingGuide() {
+  return (
+    <details className="group rounded-md border bg-muted/40 px-3 py-2">
+      <summary className="cursor-pointer list-none text-[11px] font-medium text-foreground/80">
+        Cara menulis Description — klik untuk lihat contoh
+        <span className="ml-1 text-muted-foreground group-open:hidden">▸</span>
+        <span className="ml-1 hidden text-muted-foreground group-open:inline">
+          ▾
+        </span>
+      </summary>
+      <div className="grid gap-2 pt-2 text-[11px] text-muted-foreground">
+        <p>Satu baris di sini = satu baris spesifikasi di PDF.</p>
+        <ul className="grid gap-1">
+          <li>
+            <code>Label : Isi</code> → label di kolom kiri, isi di kolom kanan.
+          </li>
+          <li>
+            <code>Material</code> (tanpa titik dua) → jadi judul kelompok.
+          </li>
+          <li>
+            Diawali <b>spasi</b> → label menjorok, jadi sub-item dari judul di
+            atasnya.
+          </li>
+          <li>
+            Diawali <code>:</code> → hanya isi, sebagai lanjutan baris
+            sebelumnya.
+          </li>
+        </ul>
+        <p className="pt-1 font-medium text-foreground/80">Contoh:</p>
+        <pre className="overflow-x-auto rounded border bg-background p-2 font-mono text-[11px] leading-relaxed text-foreground">
+          {SPEC_EXAMPLE}
+        </pre>
+      </div>
+    </details>
   );
 }
 

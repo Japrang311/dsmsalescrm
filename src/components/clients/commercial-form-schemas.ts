@@ -8,7 +8,8 @@ const optionalPrice = z.coerce
 
 export const lineItemSchema = z.object({
   productName: z.string().trim().min(1, "Nama Product wajib diisi").max(120),
-  description: z.string().trim().max(300).optional(),
+  // Multi-line: each line becomes a spec row in the exported Quotation PDF.
+  description: z.string().trim().max(4000).optional(),
   qty: z.coerce.number().positive("Qty wajib > 0"),
   uom: uomSchema,
   unitPrice: optionalPrice,
