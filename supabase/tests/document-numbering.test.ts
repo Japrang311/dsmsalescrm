@@ -10,6 +10,7 @@ import {
 
 const db = new SQL("postgresql://postgres:postgres@127.0.0.1:54322/postgres");
 const createdClients: string[] = [];
+const externalOwnerSalesOrderIds: string[] = [];
 let fixtures: RoleFixtureUsers | undefined;
 let ownedClientId: string | undefined;
 let hariffClientId: string | undefined;
@@ -31,28 +32,43 @@ function users(): RoleFixtureUsers {
 
 beforeAll(async () => {
   fixtures = await createRoleFixtureUsers();
-  for (const name of [
-    `Numbering Client ${crypto.randomUUID()}`,
-    "PT. HARIFF DAYA TUNGGAL ENGINEERING",
-  ]) {
-    const { data, error } = await adminClient
-      .from("clients")
-      .insert({
-        name,
-        status: "Active Customer",
-        source: "Referral",
-        owner_id: users().sales.id,
-      })
-      .select("id")
-      .single();
-    if (error) throw error;
-    createdClients.push(data.id);
-    if (name.startsWith("Numbering Client")) ownedClientId = data.id;
-    else hariffClientId = data.id;
-  }
+  const { data: ownedClient, error: ownedClientError } = await adminClient
+    .from("clients")
+    .insert({
+      name: `Numbering Client ${crypto.randomUUID()}`,
+      status: "Active Customer",
+      source: "Referral",
+      owner_id: users().sales.id,
+    })
+    .select("id")
+    .single();
+  if (ownedClientError) throw ownedClientError;
+  createdClients.push(ownedClient.id);
+  ownedClientId = ownedClient.id;
+
+  // The seed already contains the one canonical HARIFF client. Reuse it as a
+  // Manager instead of manufacturing a duplicate fixture solely for this
+  // numbering test.
+  const { data: hariffClient, error: hariffClientError } = await adminClient
+    .from("clients")
+    .select("id")
+    .eq("name", "PT. HARIFF DAYA TUNGGAL ENGINEERING")
+    .single();
+  if (hariffClientError) throw hariffClientError;
+  hariffClientId = hariffClient.id;
 });
 
 afterAll(async () => {
+  if (externalOwnerSalesOrderIds.length > 0) {
+    await adminClient
+      .from("activity_log")
+      .delete()
+      .in("sales_order_id", externalOwnerSalesOrderIds);
+    await adminClient
+      .from("sales_orders")
+      .delete()
+      .in("id", externalOwnerSalesOrderIds);
+  }
   if (fixtures) {
     await adminClient
       .from("activity_log")
@@ -278,7 +294,7 @@ describe("Phase 11 atomic document numbering", () => {
   });
 
   test("HARIFF backdate is restricted, rejects duplicates, and consumes no counter", async () => {
-    const salesClient = await signInAs(users().sales);
+    const managerClient = await signInAs(users().manager);
     const before = await db`
       select last_value from private.document_number_counters
       where series = 'SO' and year_code = 94
@@ -298,17 +314,18 @@ describe("Phase 11 atomic document numbering", () => {
       p_items: paidItems,
     };
 
-    const first = await salesClient.rpc("create_sales_order", args);
+    const first = await managerClient.rpc("create_sales_order", args);
     expect(first.error).toBeNull();
     expect(first.data.so_number).toBe(manual);
+    externalOwnerSalesOrderIds.push(first.data.id);
 
-    const duplicate = await salesClient.rpc("create_sales_order", {
+    const duplicate = await managerClient.rpc("create_sales_order", {
       ...args,
       p_customer_po_number: `PO-${crypto.randomUUID()}`,
     });
     expect(duplicate.error?.message).toContain("SO_NUMBER_ALREADY_EXISTS");
 
-    const invalidClient = await salesClient.rpc("create_sales_order", {
+    const invalidClient = await managerClient.rpc("create_sales_order", {
       ...args,
       p_client_id: ownedClientId,
       p_manual_so_number: `${manual}-OTHER`,

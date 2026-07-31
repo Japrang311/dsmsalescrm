@@ -114,6 +114,20 @@ describe("src/lib/data/clients.ts", () => {
     );
   });
 
+  test("clientDataErrorMessage() explains native unique-index race failures", () => {
+    expect(
+      clientDataErrorMessage({
+        code: "23505",
+        message:
+          'duplicate key value violates unique constraint "clients_name_normalized_unique"',
+        details:
+          "Key (name_dedupe_key)=(ptglobalnineindonesia) already exists.",
+      }),
+    ).toBe(
+      "Nama client sudah ada. Gunakan record client yang sudah tersedia, jangan buat duplikat.",
+    );
+  });
+
   // Regression for Phase 12 Task 6: Super Admin is not a Sales owner and
   // must never appear in the "sales team" collection that feeds owner
   // filters, target assignment, and dashboard/report performance tables.

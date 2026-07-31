@@ -42,16 +42,18 @@ const DUPLICATE_CLIENT_NAME_MESSAGE =
   "Nama client sudah ada. Gunakan record client yang sudah tersedia, jangan buat duplikat.";
 
 export function clientDataErrorMessage(error: unknown): string {
-  if (
+  const isDuplicateClientNameError =
     typeof error === "object" &&
     error !== null &&
     "message" in error &&
     typeof error.message === "string" &&
     (error.message.includes("Client name already exists") ||
+      error.message.includes("clients_name_normalized_unique") ||
       ("details" in error &&
         typeof error.details === "string" &&
-        error.details.includes("CLIENT_NAME_DUPLICATE")))
-  ) {
+        error.details.includes("CLIENT_NAME_DUPLICATE")));
+
+  if (isDuplicateClientNameError) {
     return DUPLICATE_CLIENT_NAME_MESSAGE;
   }
 

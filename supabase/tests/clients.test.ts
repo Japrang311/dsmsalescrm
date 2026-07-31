@@ -1,4 +1,5 @@
 import { describe, test, expect, beforeAll, afterAll } from "bun:test";
+import { SQL } from "bun";
 import {
   adminClient,
   createRoleFixtureUsers,
@@ -233,6 +234,63 @@ describe("clients RLS", () => {
       expect(error?.details).toBe("CLIENT_NAME_DUPLICATE");
     } finally {
       await adminClient.from("clients").delete().eq("id", base.id);
+    }
+  });
+
+  test("concurrent transactions cannot create the same normalized client name", async () => {
+    const firstDb = new SQL({
+      url: "postgresql://postgres:postgres@127.0.0.1:54322/postgres",
+      max: 1,
+    });
+    const secondDb = new SQL({
+      url: "postgresql://postgres:postgres@127.0.0.1:54322/postgres",
+      max: 1,
+    });
+    const suffix = crypto.randomUUID();
+    const firstName = `PT. Concurrent Client ${suffix}`;
+    const duplicateName = `pt concurrentclient${suffix}`;
+
+    await firstDb`begin`;
+    await secondDb`begin`;
+
+    try {
+      await firstDb`
+        insert into public.clients (name, source, owner_id)
+        values (${firstName}, 'Referral', ${fixtures!.sales.id})
+      `;
+
+      const secondInsert = (async () => {
+        try {
+          await secondDb`
+            insert into public.clients (name, source, owner_id)
+            values (${duplicateName}, 'Referral', ${fixtures!.manager.id})
+          `;
+          await secondDb`commit`;
+          return null;
+        } catch (error) {
+          await secondDb`rollback`;
+          return error;
+        }
+      })();
+
+      // Keep the first matching row uncommitted while the second transaction
+      // reaches the database. A trigger-only EXISTS check cannot see it; a
+      // unique database guard waits and rejects the duplicate after commit.
+      await Bun.sleep(100);
+      await firstDb`commit`;
+
+      const secondError = await secondInsert;
+      expect(secondError).not.toBeNull();
+      expect(String(secondError)).toContain("clients_name_normalized_unique");
+    } finally {
+      await firstDb`rollback`.catch(() => undefined);
+      await secondDb`rollback`.catch(() => undefined);
+      await adminClient
+        .from("clients")
+        .delete()
+        .in("name", [firstName, duplicateName]);
+      await firstDb.close();
+      await secondDb.close();
     }
   });
 
