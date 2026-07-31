@@ -1,6 +1,93 @@
 # Handoff — DSM Sales Web App V2
 
-Context dump for continuing this work in another tool (Codex). Written 2026-07-18; Phase 11/12 status refreshed 2026-07-19; Phase 11 import-review reconciliation session added 2026-07-19; post-import UX/bugfix session added 2026-07-20; second 2026-07-20 session (pipeline permissions/FK bugfixes) added 2026-07-20; Client Detail/Client List real-data wiring session added 2026-07-21; remote-migration-push + data-restoration session added 2026-07-21; browser-verification + spending_ytd fix + SO edit audit trail session added 2026-07-21; unused-code cleanup + client database (company info/contacts) feature session added 2026-07-22; contact position + Client Detail product/description fixes + commercial item product-name migration reconciliation added 2026-07-22; dynamic per-month sales target UI/calculation update added 2026-07-22; soft-delete implementation, remote Supabase apply, and main/live push closeout added 2026-07-24; RFQ retirement and documentation refresh added 2026-07-25; Sales Task Control Loop spec approval and Phase 1-2 implementation (Tasks 46-52) added 2026-07-27; unified progress timeline Task 53/8 and Manager Team Exceptions Task 54/9 added 2026-07-27; visual design audit Phase 1 (critical usability/responsiveness fixes) added 2026-07-27; Executive exception detail and aggregate-only Task metrics Task 55/10 added 2026-07-27; Dashboard/TopBar consumer migration Task 56/11 added 2026-07-27; Reports consumer migration Task 57/12 added 2026-07-27; export migration Task 58/13 added 2026-07-27; Pipeline/Client Detail/commercial follow-up migration Task 59/14 added 2026-07-27; ownership/account lifecycle migration Task 60/15 added 2026-07-27.
+Context dump for continuing this work in another tool (Codex). Written 2026-07-18; Phase 11/12 status refreshed 2026-07-19; Phase 11 import-review reconciliation session added 2026-07-19; post-import UX/bugfix session added 2026-07-20; second 2026-07-20 session (pipeline permissions/FK bugfixes) added 2026-07-20; Client Detail/Client List real-data wiring session added 2026-07-21; remote-migration-push + data-restoration session added 2026-07-21; browser-verification + spending_ytd fix + SO edit audit trail session added 2026-07-21; unused-code cleanup + client database (company info/contacts) feature session added 2026-07-22; contact position + Client Detail product/description fixes + commercial item product-name migration reconciliation added 2026-07-22; dynamic per-month sales target UI/calculation update added 2026-07-22; soft-delete implementation, remote Supabase apply, and main/live push closeout added 2026-07-24; RFQ retirement and documentation refresh added 2026-07-25; Sales Task Control Loop spec approval and Phase 1-2 implementation (Tasks 46-52) added 2026-07-27; unified progress timeline Task 53/8 and Manager Team Exceptions Task 54/9 added 2026-07-27; visual design audit Phase 1 (critical usability/responsiveness fixes) added 2026-07-27; Executive exception detail and aggregate-only Task metrics Task 55/10 added 2026-07-27; Dashboard/TopBar consumer migration Task 56/11 added 2026-07-27; Reports consumer migration Task 57/12 added 2026-07-27; export migration Task 58/13 added 2026-07-27; Pipeline/Client Detail/commercial follow-up migration Task 59/14 added 2026-07-27; ownership/account lifecycle migration Task 60/15 added 2026-07-27; production deployment audit + RLS/security-advisor review + two security-hardening migrations added 2026-07-30.
+
+## HANDOFF TO CODEX — read this first (2026-07-30)
+
+Session run from Claude Code (not Codex), scope was a production audit + security
+hardening, not feature work. No app code changed; only two new Supabase
+migrations and documentation updates. Read this before assuming the remote
+Supabase project or RFQ migration status is still "pending" — both claims
+below in older sections of this file are now confirmed, not just planned.
+
+- **Confirmed the app is genuinely live in production**, not just deployed
+  once: Vercel project `dsmsalescrm` (`hiulaukgalak` team) auto-deploys every
+  push to `main` via the GitHub integration (`Japrang311/dsmsalescrm`).
+  Checked `list_deployments` — 20 most recent deployments all `READY`/
+  `production`, latest matching local HEAD (`5440633`, "refactor: simplify
+  settings and task state handling").
+- **Confirmed `qhtfixgbcpcitokeryxb` is the live production Supabase
+  backend** (dashboard name `dsmsalescrm`, region ap-northeast-1, Postgres
+  17.6.1, Free Plan org `Japrang311's Org`). This is the same project
+  referenced elsewhere in this file as "DSM Sales Web App V2" — the local
+  `config.toml` `project_id` string `DSM_SALES_WEB_APP_V2` is a separate,
+  local-only Docker-stack identifier and should not be confused with this
+  remote project ref.
+- **RFQ-retirement migrations are no longer remote-pending.** Ran
+  `list_migrations` against `qhtfixgbcpcitokeryxb` live: all local
+  migrations through `20260730033312_prevent_duplicate_client_names` are
+  applied and in sync, including `20260725151142_retire_rfq_rpcs` and
+  `20260725152241_block_authenticated_rfq_creation`. Any older note in this
+  file or in `CLAUDE.md` calling these two "remote-pending" is now stale.
+- **Ran Supabase security + performance advisors** against the remote
+  project and worked through every finding with the owner:
+  - **Fixed (new migrations, applied to remote and tested against local
+    first via `bunx supabase db reset` + `bun run test`):**
+    - `20260730120000_revoke_anon_execute_on_privileged_rpcs` — the `anon`
+      role could call `public.reassign_client_owner` and
+      `public.task_control_loop_metrics` over PostgREST (Postgres grants
+      `EXECUTE` to `PUBLIC` by default on function creation; the original
+      migrations only ever `grant`ed to `authenticated` and never revoked
+      the implicit `PUBLIC` grant). Both functions already reject
+      non-privileged/NULL roles internally (see
+      `20260728091500_fix_null_role_fail_open_gates.sql`), so this was not
+      an active data bypass, but it removed a defense-in-depth gap of
+      exactly the same shape as that prior fail-open bug. Verified fixed
+      via `get_advisors` (the two `anon_security_definer_function_executable`
+      findings disappeared after apply).
+    - `20260730121500_pin_normalized_client_name_search_path` — pinned the
+      mutable `search_path` on `public.normalized_client_name` (`alter
+      function ... set search_path = ''`). It only calls builtins
+      (`regexp_replace`/`lower`/`coalesce`), so an empty path is safe.
+      Verified fixed via `get_advisors`.
+  - **Deliberately left as-is (accepted risk, not a bug):**
+    - `public.client_search_index` is flagged ERROR (`security_definer_view`)
+      but this is intentional — see
+      `20260721000000_expand_client_search_index.sql` and the note in
+      `20260722060000_add_client_company_details.sql:55-59`. It's designed
+      to bypass `clients` RLS on purpose so the client picker can search
+      cross-owner; it only exposes `id`/`name`/`owner_id`. Switching it to
+      `security_invoker = true` would restore per-row RLS and break
+      cross-owner search in the Create dialogs. Left alone.
+    - Leaked Password Protection (Supabase Auth) is off — requires Pro
+      Plan; org is on Free. Owner deferred, not urgent.
+    - 18 unindexed-foreign-key findings (all INFO level) — checked actual
+      row counts (`commercial_documents` 428, `activity_log` 217,
+      `sales_orders` 201, `tasks` 50, `follow_up_logs` 36,
+      `business_calendar_holidays` 0). At this volume Postgres does a fast
+      sequential scan regardless of indexing; owner deferred until a table
+      actually grows large enough to matter.
+- **Reviewed RLS policies on all 12 `public` tables directly** (`pg_policies`
+  + `pg_class.relrowsecurity`), not just the advisor summary. All 12 have
+  RLS enabled. Confirmed the `sales`/`manager`/`executive`/`super_admin`
+  scoping described in `CLAUDE.md` and ADR-002 actually matches the live
+  policies, including one non-obvious point worth remembering: `targets`
+  RLS lets `super_admin` administer target rows (same as `manager`), but
+  `private.is_active_business_owner()` (used in every `with_check`) only
+  returns true for `role in ('sales', 'manager')` — so a `super_admin`
+  account can never itself be the *subject* of a target row. That's what
+  `CLAUDE.md`'s "excluded from targets/performance" actually means; it is
+  not a contradiction with `super_admin` having admin rights over the
+  table. Minor observation, not acted on: `business_calendar_holidays` has
+  no `UPDATE` policy (only `SELECT`/`INSERT`/`DELETE`), so editing an
+  existing holiday requires delete+recreate — worth confirming against the
+  UI if it ever grows an "edit holiday" affordance.
+- **Updated `CLAUDE.md`** to name `qhtfixgbcpcitokeryxb` explicitly, correct
+  the stale "no `.git` yet" note (this repo has been a real git repo on
+  GitHub with Vercel auto-deploy this whole time), remove the "RFQ
+  migrations remote-pending" caveat now that it's disproven, and record
+  the two new migrations plus the three accepted risks above so future
+  sessions don't re-litigate them from scratch.
 
 ## HANDOFF TO CODEX — read this first (2026-07-27)
 
