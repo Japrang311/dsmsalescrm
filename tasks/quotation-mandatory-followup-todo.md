@@ -130,9 +130,10 @@ Task 2 (data layer types/functions)
       buat Quotation baru → Task baru muncul dengan next_action_date benar
       → `clients.next_fu` client tsb ter-update → Activity Compliance card
       naik dari 0% ke 1%.
-- [ ] Konfirmasi eksplisit dari user sebelum migration baru di Task 1
-      di-apply ke Supabase remote (`qhtfixgbcpcitokeryxb`) dan sebelum
-      push ke `main` (auto-deploy Vercel).
+- [x] Konfirmasi eksplisit dari user diterima 2026-08-03 — migration
+      diterapkan ke Supabase remote (`qhtfixgbcpcitokeryxb`) dan kode
+      di-push ke `main` (commit `825cc46`, `86236f9`), Vercel auto-deploy
+      berjalan.
 
 ## Risiko
 
