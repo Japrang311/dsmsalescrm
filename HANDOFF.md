@@ -47,7 +47,7 @@ below in older sections of this file are now confirmed, not just planned.
       findings disappeared after apply).
     - `20260730121500_pin_normalized_client_name_search_path` — pinned the
       mutable `search_path` on `public.normalized_client_name` (`alter
-      function ... set search_path = ''`). It only calls builtins
+function ... set search_path = ''`). It only calls builtins
       (`regexp_replace`/`lower`/`coalesce`), so an empty path is safe.
       Verified fixed via `get_advisors`.
   - **Deliberately left as-is (accepted risk, not a bug):**
@@ -68,20 +68,20 @@ below in older sections of this file are now confirmed, not just planned.
       sequential scan regardless of indexing; owner deferred until a table
       actually grows large enough to matter.
 - **Reviewed RLS policies on all 12 `public` tables directly** (`pg_policies`
-  + `pg_class.relrowsecurity`), not just the advisor summary. All 12 have
-  RLS enabled. Confirmed the `sales`/`manager`/`executive`/`super_admin`
-  scoping described in `CLAUDE.md` and ADR-002 actually matches the live
-  policies, including one non-obvious point worth remembering: `targets`
-  RLS lets `super_admin` administer target rows (same as `manager`), but
-  `private.is_active_business_owner()` (used in every `with_check`) only
-  returns true for `role in ('sales', 'manager')` — so a `super_admin`
-  account can never itself be the *subject* of a target row. That's what
-  `CLAUDE.md`'s "excluded from targets/performance" actually means; it is
-  not a contradiction with `super_admin` having admin rights over the
-  table. Minor observation, not acted on: `business_calendar_holidays` has
-  no `UPDATE` policy (only `SELECT`/`INSERT`/`DELETE`), so editing an
-  existing holiday requires delete+recreate — worth confirming against the
-  UI if it ever grows an "edit holiday" affordance.
+  - `pg_class.relrowsecurity`), not just the advisor summary. All 12 have
+    RLS enabled. Confirmed the `sales`/`manager`/`executive`/`super_admin`
+    scoping described in `CLAUDE.md` and ADR-002 actually matches the live
+    policies, including one non-obvious point worth remembering: `targets`
+    RLS lets `super_admin` administer target rows (same as `manager`), but
+    `private.is_active_business_owner()` (used in every `with_check`) only
+    returns true for `role in ('sales', 'manager')` — so a `super_admin`
+    account can never itself be the _subject_ of a target row. That's what
+    `CLAUDE.md`'s "excluded from targets/performance" actually means; it is
+    not a contradiction with `super_admin` having admin rights over the
+    table. Minor observation, not acted on: `business_calendar_holidays` has
+    no `UPDATE` policy (only `SELECT`/`INSERT`/`DELETE`), so editing an
+    existing holiday requires delete+recreate — worth confirming against the
+    UI if it ever grows an "edit holiday" affordance.
 - **Updated `CLAUDE.md`** to name `qhtfixgbcpcitokeryxb` explicitly, correct
   the stale "no `.git` yet" note (this repo has been a real git repo on
   GitHub with Vercel auto-deploy this whole time), remove the "RFQ
@@ -313,20 +313,26 @@ the four Task Control Loop migrations already present on the linked remote.
 
 ### 2026-07-27 reconciliation checkpoint
 
-- `git status --short --branch` shows `main...origin/main [ahead 3]`.
-  The three local commits ahead of `origin/main` are `b10fb15` (design audit
-  Phase 1 layout polish), `32f9d50` (mobile Quick Create accessibility label),
-  and `17c3fee` (this handoff/design-audit documentation line).
+> Historical checkpoint: this section records the repository state at that
+> moment. It has been superseded by the 2026-07-30 production audit above and
+> the 2026-08-03 checkpoint in `.planning/.continue-here.md`.
+
+- At this historical checkpoint, `git status --short --branch` showed
+  `main...origin/main [ahead 3]`. The three local commits ahead of `origin/main`
+  were `b10fb15` (design audit Phase 1 layout polish), `32f9d50` (mobile Quick
+  Create accessibility label), and `17c3fee` (this handoff/design-audit
+  documentation line).
 - `origin/main` points at `6ad22eb feat: complete task progress timeline and
 manager exceptions`, so Task 53/8 and Task 54/9 are already pushed to Git.
 - `bunx supabase migration list --linked` lists the four Task Control Loop
   migrations through `20260727141000` on both local and remote. This corrects
   the older "remote Supabase has not been touched" and "locally only" wording.
 - Task 55/10 later added
-  `20260727150000_restrict_task_exception_visibility.sql` locally only. It has
-  been applied to the local database via `bunx supabase db reset`, but it has
-  **not** been pushed/applied to remote Supabase and requires a fresh explicit
-  remote gate before any remote mutation.
+  `20260727150000_restrict_task_exception_visibility.sql` locally only at this
+  checkpoint. Newer handoff entries supersede this: Task Control Loop release
+  went through an explicit remote gate on 2026-07-27, and the 2026-07-30
+  production audit confirmed all local migrations through
+  `20260730033312_prevent_duplicate_client_names` are applied on remote.
 - No source-file working-tree diff was present before this reconciliation edit.
   The only new pending change from this checkpoint is this `HANDOFF.md`
   correction unless later work adds more.
@@ -417,10 +423,10 @@ description below as historical unless a newer note explicitly says otherwise.
   `b0dc808 refactor: retire RFQ workflow`.
 - Supabase state: local migrations
   `20260725151142_retire_rfq_rpcs.sql` and
-  `20260725152241_block_authenticated_rfq_creation.sql` exist and were applied
-  locally during implementation, but `supabase migration list --linked` showed
-  both migrations still pending on remote immediately after the Git push. Do not
-  run `supabase db push --linked` without fresh explicit approval naming the
+  `20260725152241_block_authenticated_rfq_creation.sql` were originally local
+  after the 2026-07-25 implementation, then later confirmed applied on remote
+  `qhtfixgbcpcitokeryxb` during the 2026-07-30 production audit. Do not run any
+  future `supabase db push --linked` without fresh explicit approval naming the
   exact project target.
 - Verification recorded for the RFQ retirement implementation: full test suite
   `364 pass / 0 fail / 1825 assertions`, `bunx tsc --noEmit`, changed-file
@@ -1118,11 +1124,11 @@ local-only, which was no longer true.
   pre-existing temp-table lint errors in historical import functions, unrelated
   to this target migration.
 
-1. Read this file's most recent 2026-07-22 continuation first (official 2026 sales target data), then dynamic monthly sales targets, then contact position + Client Detail product/description fixes + commercial item product-name migration reconciliation, then the unused-code cleanup + client database feature section, then the 2026-07-21 browser verification + spending_ytd fix + SO edit audit trail, then remote migration push + data restoration, then Client Detail/Client List wiring, then the 2026-07-20 sessions.
-2. **Git push is not pending as of this refresh**: `main` matched `origin/main` at `816a7fe`. Recheck `git status --short --branch` before relying on this because it is runtime state.
-3. Remote Supabase migration status for the newest migrations (`20260722060000`, `20260722060001`, `20260722070000`, `20260722080000`) was verified in sync during this refresh. Still get explicit owner approval before any future remote mutation, then verify again with `bunx supabase migration list --linked`.
+1. Read this file's 2026-07-30 production audit first, then the 2026-07-27 Sales Task Control Loop release-gate entry, then older 2026-07-22 and 2026-07-21 sections only for historical context.
+2. **Git push is not pending as of the 2026-08-03 documentation refresh**: `main` matched `origin/main` at `8fd6912`. Recheck `git status --short --branch` before relying on this because it is runtime state.
+3. Remote Supabase migration status was confirmed current through `20260730033312_prevent_duplicate_client_names` on `qhtfixgbcpcitokeryxb` during the 2026-07-30 production audit. Still get explicit owner approval before any future remote mutation, then verify again with `bunx supabase migration list --linked` or the current Supabase tooling.
 4. **Before adding any new column to `clients`, `tasks`, `commercial_items`, or `sales_orders`, check the column-level UPDATE grant list in `20260718164503_apply_super_admin_rls_matrix.sql`** and add the new column to a `grant update (...)` statement in the same migration — these four tables do NOT have table-level UPDATE grants, only specific columns are grantable. This bit twice now (`sales_order_items.description` in the prior session, caught after the fact; `clients`' new columns this session, caught before shipping via local RLS tests).
 5. Do a live browser pass on the new "Info Perusahaan & Kontak" card/dialog on Client Detail (once deployed), plus the still-outstanding items from prior sessions: global search, notifications, the Sales Order edit dialog/inline item editor, the Client List page (PPN/Non-PPN/Spending YTD columns, Saved Views), and the client picker in all Create dialogs.
 6. Preserve Activity Log immutability, ownership attribution, task/follow-up/activity foreign keys, and archived legacy evidence.
 7. The ~95 owner-mismatched SOs/commercial documents (21/189 SOs, 74/400 commercial docs) remain an open data-quality backlog item — needs case-by-case correctness judgment, not a mechanical bulk fix. Don't attempt it without the owner's explicit sign-off on the correction approach.
-8. Git has real commits through `816a7fe` and was synced with `origin/main` during this handoff refresh. Treat it normally (stage intentionally, don't `add -A` blindly, never force-push/rewrite history on this Lovable-connected repo).
+8. Git has real commits through `8fd6912` and was synced with `origin/main` during the 2026-08-03 documentation refresh. Treat it normally (stage intentionally, don't `add -A` blindly, never force-push/rewrite history on this Lovable-connected repo).

@@ -1,9 +1,10 @@
 # Spec: Remove RFQ
 
-Status update 2026-07-25: implemented and pushed to `origin/main` as
-`b0dc808 refactor: retire RFQ workflow`. The two RFQ-retirement migrations are
-committed and verified locally, but still require a separate approved Supabase
-remote apply.
+Status update 2026-08-03: implemented and pushed to `origin/main` as
+`b0dc808 refactor: retire RFQ workflow`. The two RFQ-retirement migrations were
+later confirmed applied on the production Supabase project `qhtfixgbcpcitokeryxb`
+during the 2026-07-30 production audit. Future remote mutations still require a
+separate explicit target approval.
 
 ## Objective
 
@@ -45,7 +46,8 @@ const source =
 
 - Always: remove RFQ routes, creation/conversion paths, dropdown entries, and
   RFQ-only stages.
-- Ask first: push/apply any migration to the linked remote Supabase project.
+- Ask first: push/apply any future migration to the linked remote Supabase
+  project.
 - Never: delete historical RFQ rows or rewrite already-applied migrations.
 
 ## Success Criteria
