@@ -84,6 +84,11 @@ afterAll(async () => {
     .from("activity_log")
     .delete()
     .eq("owner_id", fixtures.sales.id);
+  // create_quotation/revise_quotation now insert a linked follow-up Task
+  // per call (spec: docs/superpowers/specs/2026-08-03-quotation-mandatory-followup-design.md)
+  // -- clean these up before commercial_documents/clients, otherwise
+  // tasks.client_id's FK blocks the clients delete below.
+  await adminClient.from("tasks").delete().eq("owner_id", fixtures.sales.id);
   await adminClient
     .from("commercial_documents")
     .delete()
@@ -135,6 +140,8 @@ describe("normalized commercial document adapter", () => {
           unitPrice: 5000,
         },
       ],
+      nextAction: "Telepon PIC untuk konfirmasi harga",
+      nextActionDate: "2095-01-22",
     });
     expect(created.quotationNumber).toMatch(/^DSM-95QUO-\d{4}$/);
     expect(created.items[0]?.lineTotal).toBe(10000);
@@ -151,6 +158,8 @@ describe("normalized commercial document adapter", () => {
           unitPrice: 12000,
         },
       ],
+      nextAction: "Kirim ulang penawaran revisi",
+      nextActionDate: "2095-01-23",
     });
     expect(revised.quotationNumber).toBe(`${created.quotationNumber}_REV.1`);
     expect(revised.supersedesDocumentId).toBe(created.id);
@@ -179,6 +188,8 @@ describe("normalized commercial document adapter", () => {
           unitPrice: 50_000,
         },
       ],
+      nextAction: "Follow up status keputusan client",
+      nextActionDate: "2095-02-08",
     });
 
     await expect(
@@ -222,6 +233,8 @@ describe("normalized commercial document adapter", () => {
           unitPrice: 1000,
         },
       ],
+      nextAction: "Follow up koreksi nomor Quotation",
+      nextActionDate: "2095-03-08",
     });
 
     const corrected = await updateCommercialDocument(created.id, {

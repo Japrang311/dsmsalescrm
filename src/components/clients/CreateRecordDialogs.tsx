@@ -128,6 +128,8 @@ export function CreateQuotationDialog(props: SharedProps) {
       stage: "Quotes Sent",
       note: "",
       lineItems: [emptyLineItem],
+      nextAction: "",
+      nextActionDate: "",
     },
   });
   const { fields, append, remove } = useFieldArray({
@@ -145,6 +147,8 @@ export function CreateQuotationDialog(props: SharedProps) {
         stage: v.stage,
         note: v.note,
         items: v.lineItems,
+        nextAction: v.nextAction,
+        nextActionDate: v.nextActionDate,
       });
       cacheListRecord(
         queryClient,
@@ -213,6 +217,20 @@ export function CreateQuotationDialog(props: SharedProps) {
                 options={[...WEIGHTED_STAGES]}
               />
             </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <FieldText
+                label="Next Action"
+                placeholder="mis. Telepon PIC untuk konfirmasi harga"
+                reg={form.register("nextAction")}
+                error={msg(form.formState.errors, "nextAction")}
+              />
+              <FieldText
+                label="Tanggal Follow-up"
+                type="date"
+                reg={form.register("nextActionDate")}
+                error={msg(form.formState.errors, "nextActionDate")}
+              />
+            </div>
             <FieldText
               label="Note"
               reg={form.register("note")}
@@ -267,6 +285,8 @@ export function ReviseQuotationDialog({
               unitPrice: item.unitPrice ?? 0,
             }))
           : [emptyLineItem],
+      nextAction: "",
+      nextActionDate: "",
     },
   });
   const { fields, append, remove } = useFieldArray({
@@ -280,6 +300,8 @@ export function ReviseQuotationDialog({
         documentDate: value.documentDate,
         note: value.note,
         items: value.lineItems,
+        nextAction: value.nextAction,
+        nextActionDate: value.nextActionDate,
       });
       cacheListRecord(
         queryClient,
@@ -326,6 +348,20 @@ export function ReviseQuotationDialog({
                 label="Note"
                 reg={form.register("note")}
                 error={msg(form.formState.errors, "note")}
+              />
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <FieldText
+                label="Next Action"
+                placeholder="mis. Telepon PIC untuk konfirmasi harga"
+                reg={form.register("nextAction")}
+                error={msg(form.formState.errors, "nextAction")}
+              />
+              <FieldText
+                label="Tanggal Follow-up"
+                type="date"
+                reg={form.register("nextActionDate")}
+                error={msg(form.formState.errors, "nextActionDate")}
               />
             </div>
             <LineItemsSection

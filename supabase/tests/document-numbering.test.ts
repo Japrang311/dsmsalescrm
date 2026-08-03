@@ -74,6 +74,11 @@ afterAll(async () => {
       .from("activity_log")
       .delete()
       .eq("owner_id", fixtures.sales.id);
+    // create_quotation/revise_quotation now insert a linked follow-up Task
+    // per call (spec: docs/superpowers/specs/2026-08-03-quotation-mandatory-followup-design.md)
+    // -- clean these up before commercial_documents/clients, otherwise
+    // tasks.client_id's FK blocks the clients delete below.
+    await adminClient.from("tasks").delete().eq("owner_id", fixtures.sales.id);
     await adminClient
       .from("commercial_documents")
       .delete()
@@ -166,6 +171,8 @@ describe("Phase 11 atomic document numbering", () => {
       p_so_number: null,
       p_note: null,
       p_items: [{ ...paidItems[0], productName: "" }],
+      p_next_action: "Follow up",
+      p_next_action_date: "2094-07-26",
     });
     expect(error?.message).toContain("PRODUCT_NAME_REQUIRED");
 
@@ -179,6 +186,8 @@ describe("Phase 11 atomic document numbering", () => {
         p_so_number: null,
         p_note: null,
         p_items: paidItems,
+        p_next_action: "Follow up",
+        p_next_action_date: "2094-07-26",
       },
     );
     expect(validError).toBeNull();
@@ -197,6 +206,8 @@ describe("Phase 11 atomic document numbering", () => {
         p_so_number: null,
         p_note: "Base",
         p_items: paidItems,
+        p_next_action: "Follow up",
+        p_next_action_date: "2094-07-26",
       },
     );
     expect(baseError).toBeNull();
@@ -210,6 +221,8 @@ describe("Phase 11 atomic document numbering", () => {
         p_so_number: null,
         p_note: "Revision 1",
         p_items: [{ ...paidItems[0], unitPrice: 130_000 }],
+        p_next_action: "Follow up",
+        p_next_action_date: "2094-07-27",
       },
     );
     expect(rev1Error).toBeNull();
@@ -224,6 +237,8 @@ describe("Phase 11 atomic document numbering", () => {
         p_so_number: null,
         p_note: "Revision 2",
         p_items: paidItems,
+        p_next_action: "Follow up",
+        p_next_action_date: "2094-07-28",
       },
     );
     expect(rev2Error).toBeNull();

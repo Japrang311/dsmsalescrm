@@ -216,6 +216,8 @@ export type CreateQuotationInput = {
   soNumber?: string;
   note?: string;
   items: LineItemInput[];
+  nextAction: string;
+  nextActionDate: string;
 };
 
 export async function createQuotation(
@@ -229,6 +231,8 @@ export async function createQuotation(
     p_so_number: input.soNumber ?? null,
     p_note: input.note ?? null,
     p_items: input.items,
+    p_next_action: input.nextAction,
+    p_next_action_date: input.nextActionDate,
   });
   if (error) throw error;
   return toDocument(data as CommercialDocumentRow);
@@ -240,6 +244,8 @@ export type ReviseQuotationInput = {
   soNumber?: string;
   note?: string;
   items: LineItemInput[];
+  nextAction: string;
+  nextActionDate: string;
 };
 
 export async function reviseQuotation(
@@ -253,6 +259,8 @@ export async function reviseQuotation(
     p_so_number: input.soNumber ?? null,
     p_note: input.note ?? null,
     p_items: input.items,
+    p_next_action: input.nextAction,
+    p_next_action_date: input.nextActionDate,
   });
   if (error) throw error;
   return toDocument(data as CommercialDocumentRow);

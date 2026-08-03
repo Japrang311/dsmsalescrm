@@ -42,6 +42,8 @@ export const quotationSchema = z.object({
   ]),
   note: z.string().trim().max(1000).optional(),
   lineItems: paidLineItemsSchema,
+  nextAction: z.string().trim().min(1, "Next Action wajib diisi").max(500),
+  nextActionDate: z.string().min(10, "Tanggal Follow-up wajib diisi"),
 });
 
 export const prototypeRequestSchema = z.object({
