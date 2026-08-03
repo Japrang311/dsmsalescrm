@@ -9,4 +9,4 @@
 - [x] Run reference audit, tests, typecheck, lint, build, and local migration.
 - [x] Push implementation to `origin/main` at `b0dc808`.
 - [x] Update current documentation and ADRs for RFQ retirement.
-- [ ] Apply RFQ-retirement migrations to Supabase remote after explicit target approval.
+- [x] Apply RFQ-retirement migrations to Supabase remote after explicit target approval — confirmed applied on `qhtfixgbcpcitokeryxb` during the 2026-07-30 production audit; see `HANDOFF.md`.

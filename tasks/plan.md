@@ -268,7 +268,11 @@ calendar, escalation, migration/backfill, RLS, and notification decisions.
 - [x] Task 61: Reconcile existing data and retire the legacy status contract —
       done locally 2026-07-27; see
       `.superpowers/sdd/sales-task-control-loop-task-16-report.md`.
-- [ ] Tasks 62-63: Verify locally and pass the separately approved release gate
+- [x] Tasks 62-63: Verify locally and pass the separately approved release gate —
+      Task 62 completed locally 2026-07-27; Task 63 executed after exact owner
+      approval and shipped to production. See
+      `.superpowers/sdd/sales-task-control-loop-task-17-report.md` and
+      `.superpowers/sdd/sales-task-control-loop-task-18-release-gate.md`.
 
 ### Checkpoint 13: Sales Task Control Loop
 
@@ -279,4 +283,7 @@ calendar, escalation, migration/backfill, RLS, and notification decisions.
       boundary
 - [x] Holiday-aware escalation uses one Asia/Jakarta business calendar
 - [x] Existing data migrates without fabricated business values
-- [ ] Remote mutation remains separately approved
+- [x] Remote mutation remained separately approved — Task 63 release gate was
+      executed only after exact owner approval for linked project
+      `qhtfixgbcpcitokeryxb`. Future remote mutations still require fresh
+      exact-target approval.

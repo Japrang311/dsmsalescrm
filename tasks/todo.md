@@ -1690,7 +1690,8 @@ Implementation order: complete Phase 12's schema/RLS foundation before Phase 11 
 
 ## Phase 13: Sales Task Control Loop
 
-**Status:** Proposed — technical specification approval is the first gate.
+**Status:** Complete — Sales Task Control Loop shipped through the explicit
+release gate on 2026-07-27; production/security state refreshed 2026-07-30.
 
 Detailed plan:
 `docs/superpowers/plans/2026-07-27-sales-task-control-loop-implementation.md`
@@ -1717,14 +1718,29 @@ Detailed checklist: `tasks/sales-task-control-loop-todo.md`
 - [x] Task 52: Deliver Task creation and owner lifecycle — done
       2026-07-27; see
       `.superpowers/sdd/sales-task-control-loop-task-7-report.md`
-- [ ] Task 53: Deliver the unified progress timeline
-- [ ] Task 54: Separate Manager My Tasks from Team Exceptions
-- [ ] Task 55: Enforce Executive exception detail and aggregate-only reporting
-- [ ] Task 56: Migrate Dashboard and TopBar consumers
-- [ ] Task 57: Migrate Reports and performance calculations
-- [ ] Task 58: Migrate exports
-- [ ] Task 59: Migrate Pipeline, Client Detail, and commercial follow-up paths
-- [ ] Task 60: Migrate ownership transfer and account lifecycle consumers
-- [ ] Task 61: Reconcile existing data and retire the legacy status contract
-- [ ] Task 62: Run complete local verification and reconcile documentation
-- [ ] Task 63: Release through an explicit remote gate
+- [x] Task 53: Deliver the unified progress timeline — done 2026-07-27; see
+      `.superpowers/sdd/sales-task-control-loop-task-8-report.md`
+- [x] Task 54: Separate Manager My Tasks from Team Exceptions — done
+      2026-07-27; see `.superpowers/sdd/sales-task-control-loop-task-9-report.md`
+- [x] Task 55: Enforce Executive exception detail and aggregate-only reporting —
+      done 2026-07-27; see `.superpowers/sdd/sales-task-control-loop-task-10-report.md`
+- [x] Task 56: Migrate Dashboard and TopBar consumers — done 2026-07-27; see
+      `.superpowers/sdd/sales-task-control-loop-task-11-report.md`
+- [x] Task 57: Migrate Reports and performance calculations — done 2026-07-27;
+      see `.superpowers/sdd/sales-task-control-loop-task-12-report.md`
+- [x] Task 58: Migrate exports — done 2026-07-27; see
+      `.superpowers/sdd/sales-task-control-loop-task-13-report.md`
+- [x] Task 59: Migrate Pipeline, Client Detail, and commercial follow-up paths —
+      done 2026-07-27; see `.superpowers/sdd/sales-task-control-loop-task-14-report.md`
+- [x] Task 60: Migrate ownership transfer and account lifecycle consumers — done
+      2026-07-27; see `.superpowers/sdd/sales-task-control-loop-task-15-report.md`
+- [x] Task 61: Reconcile existing data and retire the legacy status contract —
+      done 2026-07-27; see `.superpowers/sdd/sales-task-control-loop-task-16-report.md`
+- [x] Task 62: Run complete local verification and reconcile documentation —
+      done 2026-07-27; see `.superpowers/sdd/sales-task-control-loop-task-17-report.md`
+- [x] Task 63: Release through an explicit remote gate — executed after exact
+      owner approval 2026-07-27; see
+      `.superpowers/sdd/sales-task-control-loop-task-18-release-gate.md`.
+      Production/security state was refreshed again 2026-07-30: all local
+      migrations through `20260730033312_prevent_duplicate_client_names` were
+      confirmed applied on `qhtfixgbcpcitokeryxb`; see `HANDOFF.md`.
