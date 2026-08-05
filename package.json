@@ -21,6 +21,7 @@
     "audit:deps": "bun audit --json",
     "audit:deps:report": "bun scripts/dependency-risk-report.ts",
     "bundle:report": "bun scripts/bundle-report.ts",
+    "stage3:baseline": "bun run build && bun scripts/stage3-performance-baseline.ts",
     "verify:release-local": "bun run verify:db && bun run verify:app && bun run bundle:report && bun run smoke:runtime && bun run test:e2e"
   },
   "dependencies": {
