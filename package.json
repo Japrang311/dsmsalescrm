@@ -10,7 +10,17 @@
     "preview": "vite preview",
     "lint": "eslint src supabase scripts tests eslint.config.js vite.config.ts --no-error-on-unmatched-pattern",
     "format": "prettier --write .",
-    "test": "bun --env-file=.env.local test"
+    "typecheck": "tsc --noEmit",
+    "test": "bun --env-file=.env.local test",
+    "test:ci": "VITE_SUPABASE_URL=http://127.0.0.1:54321 VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0 SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0 bun test",
+    "verify:app": "bun run lint && bun run typecheck && bun run test && bun run build",
+    "verify:ci:app": "bun run lint && bun run typecheck && bun run test:ci && bun run build",
+    "verify:db": "bunx supabase@2.109.1 db reset --local && bunx supabase@2.109.1 db advisors --local && bunx supabase@2.109.1 db lint --local",
+    "smoke:runtime": "bun scripts/runtime-smoke.ts",
+    "audit:deps": "bun audit --json",
+    "audit:deps:report": "bun scripts/dependency-risk-report.ts",
+    "bundle:report": "bun scripts/bundle-report.ts",
+    "verify:release-local": "bun run verify:db && bun run verify:app && bun run bundle:report && bun run smoke:runtime"
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.3.0",

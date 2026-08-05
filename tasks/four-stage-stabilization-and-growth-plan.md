@@ -172,12 +172,16 @@ Stage 4 acceptance ─> optional Realtime reassessment
 
 #### Task 2.1 — Add explicit verification scripts
 
+**Status:** completed locally
+
 **Files:** `package.json`, scripts/config, documentation.
 
 - Add typecheck, CI test, database verification, runtime smoke, audit artifact, and bundle-report commands.
 - Keep local `.env.local` handling out of committed secrets and define CI-safe equivalents.
 
 #### Task 2.2 — Expand GitHub Actions
+
+**Status:** completed locally; GitHub-hosted run not yet observed
 
 **Files:** `.github/workflows/ci.yml` or focused workflow files.
 
@@ -188,6 +192,8 @@ Stage 4 acceptance ─> optional Realtime reassessment
 **Depends on:** 2.1.
 
 #### Task 2.3 — Classify dependency advisories
+
+**Status:** baseline triage completed; upgrades/exceptions not yet approved
 
 **Files:** dated security report and approved exception file if needed.
 
@@ -202,12 +208,16 @@ Stage 4 acceptance ─> optional Realtime reassessment
 
 #### Task 2.4 — Install approved browser framework
 
+**Status:** blocked pending separate dependency approval
+
 **Files:** package manifest/lockfile, browser config, test fixtures.
 
 - Requires a separate user approval naming the dependency.
 - Build deterministic local Supabase seed/users without committing secrets.
 
 #### Task 2.5 — Automate critical browser workflows
+
+**Status:** pending Task 2.4
 
 **Files:** browser tests grouped by workflow.
 
@@ -218,6 +228,8 @@ Stage 4 acceptance ─> optional Realtime reassessment
 **Depends on:** 2.4 and Stage 1 checkpoint.
 
 #### Task 2.6 — Verify production observability contract
+
+**Status:** environment/release config completed locally; source-map upload and external ingestion pending deployment/observability decision
 
 **Files:** Sentry initialization/config tests and deployment documentation.
 

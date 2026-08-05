@@ -1,6 +1,6 @@
 # Checklist: Four-Stage Stabilization and Growth
 
-**Status:** APPROVED FOR LOCAL EXECUTION — Stage 1 automated local checkpoint passed; browser/manual evidence is partial  
+**Status:** APPROVED FOR LOCAL EXECUTION — Stage 2 guardrail wave partially complete; browser automation remains gated
 **Spec:** `docs/superpowers/specs/2026-08-05-four-stage-stabilization-and-growth-design.md`  
 **Plan:** `tasks/four-stage-stabilization-and-growth-plan.md`
 
@@ -49,10 +49,10 @@
 
 ## Stage 2 — Engineering guardrails
 
-- [ ] Add deterministic typecheck/test/database/runtime/audit/bundle commands.
-- [ ] Expand CI into application, database, runtime, audit, and bundle jobs.
-- [ ] Generate useful non-secret failure artifacts.
-- [ ] Triage all 13 baseline dependency advisories.
+- [x] Add deterministic typecheck/test/database/runtime/audit/bundle commands.
+- [x] Expand CI into application, database, runtime, audit, and bundle jobs.
+- [x] Generate useful non-secret failure artifacts.
+- [x] Triage all 13 baseline dependency advisories.
 - [ ] Add owner and expiry to every approved exception.
 - [ ] Obtain approval before installing browser test dependency.
 - [ ] Automate authentication/protected-route workflow.
@@ -61,9 +61,9 @@
 - [ ] Automate normalized Quotation/Sales Order creation smoke.
 - [ ] Automate representative unauthorized-write denial.
 - [ ] Automate Reports/export smoke.
-- [ ] Verify Sentry environment/release/source-map contract without exposing secrets.
+- [ ] Verify Sentry environment/release/source-map contract without exposing secrets. Environment/release config now has unit coverage; source-map upload and external ingestion remain unverified.
 - [ ] Prove CI passes on a clean clone and fresh local database.
-- [ ] Review dated Stage 2 verification report.
+- [ ] Review dated Stage 2 verification report. Local partial report exists; GitHub-hosted CI/browser/Sentry evidence remains open.
 
 ## Stage 3 — Data and performance
 
