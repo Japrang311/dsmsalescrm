@@ -69,6 +69,22 @@ Orders, Activity) — is implemented, verified locally and against production, a
   aggregate RPCs, Team Settings N+1 → single RPC, export completeness (done per-item, not yet
   reviewed as a single cross-cutting item), route decomposition (Reports/Client Detail/Commercial
   Detail/Pipeline), performance budgets, and the dated Stage 3 before/after report.
+- **Found and fixed an unrelated pre-existing CI flake while pushing this commit**: CI run
+  `31051890808` failed "sales can create a Task, reload, and mark it Done" in Browser E2E flows,
+  reproduced identically on a same-job re-run — not a one-off, and not caused by this Activity Log
+  change (the diff never touches Tasks/business-calendar code). Root cause:
+  `e2e/fixtures.ts`'s `tomorrowIsoDate()` computed "tomorrow" from UTC wall-clock time
+  (`Date.now() + 24h`), but `computeTaskDueState()`'s `asOf` uses `todayInJakarta()`
+  (`src/lib/data/business-calendar.ts`, Asia/Jakarta = UTC+7). Whenever CI's UTC clock is at or
+  past 17:00, Jakarta has already rolled to the next calendar day, so the UTC "+24h tomorrow" and
+  Jakarta's "today" land on the *same* date — the created task is classified `Today`, not
+  `Upcoming`, and the UPCOMING-tab assertion fails. Reproduced the exact date collision locally
+  (`2026-08-05T22:27:13Z` → both computed `2026-08-06`), fixed `tomorrowIsoDate()` to derive
+  tomorrow from Jakarta's calendar date instead, confirmed the full local `bun run test:e2e` (8/8)
+  passes, pushed as a separate commit (`bf7b911`, `f786c68` formatting fix). This bug is
+  time-of-day-dependent, not date-dependent — it will keep intermittently failing on unrelated
+  future PRs if CI happens to run in UTC 17:00–23:59 unless this fix is in `main`, which it now
+  is. Confirmed on CI run `31053232601`: all 7 jobs pass.
 
 ## HANDOFF — Stage 3 Sales Orders pagination DONE and pushed (2026-08-05)
 
