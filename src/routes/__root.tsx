@@ -21,6 +21,15 @@ import {
 
 void initBrowserMonitoring();
 
+function isLoopbackBrowserHost(): boolean {
+  if (typeof window === "undefined") return true;
+  return (
+    window.location.hostname === "127.0.0.1" ||
+    window.location.hostname === "localhost" ||
+    window.location.hostname === "::1"
+  );
+}
+
 function NotFoundComponent() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -148,7 +157,7 @@ function RootComponent() {
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <Outlet />
       <Toaster richColors closeButton position="top-right" />
-      <SpeedInsights route={routeId} />
+      {!isLoopbackBrowserHost() ? <SpeedInsights route={routeId} /> : null}
     </QueryClientProvider>
   );
 }

@@ -208,20 +208,22 @@ Stage 4 acceptance ─> optional Realtime reassessment
 
 #### Task 2.4 — Install approved browser framework
 
-**Status:** blocked pending separate dependency approval
+**Status:** completed locally after owner blocker-resolution approval on 2026-08-05
 
 **Files:** package manifest/lockfile, browser config, test fixtures.
 
-- Requires a separate user approval naming the dependency.
-- Build deterministic local Supabase seed/users without committing secrets.
+- Installed `@playwright/test` and Playwright Chromium locally.
+- Added deterministic local Supabase seed-user fixtures without production Auth mutation.
+- Added Chromium-only config with local preview web server, screenshots on failure, and traces on retry.
 
 #### Task 2.5 — Automate critical browser workflows
 
-**Status:** pending Task 2.4
+**Status:** partially completed locally
 
 **Files:** browser tests grouped by workflow.
 
-- Cover the minimum workflows in the spec.
+- Covered auth/protected-route redirect, seeded login, dashboard CSV export, Task create/reload/Done, client follow-up create/reload, and Executive Task read-only UI.
+- Still open: commercial follow-up browser flow, stage transition/Closed Lost validation, normalized Quotation/Sales Order smoke, and direct unauthorized-write denial.
 - Prefer stable accessible locators and real persisted assertions after reload.
 - Capture screenshots/traces only as CI artifacts.
 

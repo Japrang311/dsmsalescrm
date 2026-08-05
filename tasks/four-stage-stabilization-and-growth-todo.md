@@ -1,6 +1,6 @@
 # Checklist: Four-Stage Stabilization and Growth
 
-**Status:** APPROVED FOR LOCAL EXECUTION — Stage 2 guardrail wave partially complete; browser automation remains gated
+**Status:** APPROVED FOR LOCAL EXECUTION — Stage 2 guardrail wave partially complete; browser automation gate resolved locally
 **Spec:** `docs/superpowers/specs/2026-08-05-four-stage-stabilization-and-growth-design.md`  
 **Plan:** `tasks/four-stage-stabilization-and-growth-plan.md`
 
@@ -10,7 +10,7 @@
 - [x] Approve explicit existing-Task versus new-Task choice.
 - [x] Approve structured `activity_log.event_data`.
 - [x] Approve Stage 4 lineage/Customer PO date fields or reduce Stage 4 scope.
-- [ ] Select browser testing tool; installation remains separately gated.
+- [x] Select browser testing tool; installation remains separately gated. Playwright Chromium selected and installed locally after owner blocker-resolution approval on 2026-08-05.
 - [x] Capture dated reproducible baseline report.
 
 ## Stage 1 — Operational integrity
@@ -54,16 +54,16 @@
 - [x] Generate useful non-secret failure artifacts.
 - [x] Triage all 13 baseline dependency advisories.
 - [x] Add owner and expiry to every approved exception. No approved dependency exception exists as of 2026-08-05; future exceptions must include owner and expiry before acceptance.
-- [ ] Obtain approval before installing browser test dependency.
-- [ ] Automate authentication/protected-route workflow.
-- [ ] Automate Task progress and both follow-up workflows.
+- [x] Obtain approval before installing browser test dependency. Owner resolved the blocker on 2026-08-05; `@playwright/test` and Chromium were installed locally.
+- [x] Automate authentication/protected-route workflow. `e2e/browser-flows.spec.ts` verifies `/reports` redirects to `/login`, seeded Manager login reaches `/dashboard`, and browser console/page errors stay clean.
+- [ ] Automate Task progress and both follow-up workflows. Task create/reload/Done and client follow-up create/reload are automated; commercial-detail follow-up remains open.
 - [ ] Automate stage transitions and Closed Lost validation.
 - [ ] Automate normalized Quotation/Sales Order creation smoke.
-- [ ] Automate representative unauthorized-write denial.
-- [ ] Automate Reports/export smoke.
+- [ ] Automate representative unauthorized-write denial. Executive Task route is browser-verified read-only, but direct unauthorized write denial remains open.
+- [x] Automate Reports/export smoke. Browser E2E verifies Dashboard CSV dropdown download.
 - [ ] Verify Sentry environment/release/source-map contract without exposing secrets. Environment/release config now has unit coverage; source-map upload and external ingestion remain unverified.
 - [x] Prove CI passes on a clean clone and fresh local database. GitHub Actions run `30981687347` passed all five jobs on commit `5e3f358`.
-- [ ] Review dated Stage 2 verification report. Local and GitHub-hosted CI evidence exists; browser automation and Sentry source-map/external-ingestion evidence remain open.
+- [ ] Review dated Stage 2 verification report. Local, GitHub-hosted CI, and local browser automation evidence exists; commercial browser coverage, Sentry source-map/external-ingestion, and CI confirmation of the new browser job remain open.
 
 ## Stage 3 — Data and performance
 

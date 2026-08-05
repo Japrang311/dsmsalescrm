@@ -1,7 +1,7 @@
 # Stage 2 Local Verification — Engineering Guardrails
 
 **Date:** 2026-08-05  
-**Scope:** local-only guardrail implementation and verification. No browser-test dependency installation, remote Supabase action, deployment, or production verification was performed.
+**Scope:** local-only guardrail implementation and verification. Browser-test dependency installation was performed after owner blocker-resolution approval on 2026-08-05. No remote Supabase action, deployment, or production verification was performed.
 
 ## Implemented locally
 
@@ -28,6 +28,16 @@
 - Added `artifacts/` to `.gitignore`.
 - Added dependency-risk triage report for the 13 current advisories.
 - Added Sentry monitoring config helpers for environment/release mapping without exposing DSN values in tests.
+- Added Playwright browser automation:
+  - `@playwright/test` dev dependency.
+  - Chromium-only `playwright.config.ts`.
+  - local preview web server configured against local Supabase.
+  - failure screenshots and retry traces under ignored `artifacts/`.
+  - browser E2E CI job with fresh local Supabase reset and Playwright Chromium install.
+- Fixed the local-production-preview browser blocker:
+  - CSP now allows local loopback Supabase HTTP/WebSocket origins only when `VITE_SUPABASE_URL` is loopback.
+  - Vercel Speed Insights is disabled on loopback browser hosts to avoid local-preview script/MIME console noise.
+  - The inline security headers were moved into a tested helper.
 
 ## Verification results
 
@@ -39,8 +49,30 @@
 | `bun run bundle:report`     | Pass                                | Generated local ignored artifact and printed bundle summary.                                                                   |
 | `bun run smoke:runtime`     | Pass                                | Built preview returned `/login` 200, `/` 307 to `/dashboard`, and required security headers.                                   |
 | `bun run verify:db`         | Pass with baseline db-lint findings | Fresh local database reset and advisors passed; db lint exited 0 with known temp-table analyzer findings and unused variables. |
-| `bun run test:ci`           | Pass                                | 508 pass, 0 fail, 2181 expects, 68 files, using explicit local Supabase env values without `.env.local`.                       |
+| `bun run test:ci`           | Pass                                | 511 pass, 0 fail, 2186 expects, 69 files, using explicit local Supabase env values without `.env.local`.                       |
 | `bun run audit:deps:report` | Pass                                | Reports 13 advisories into a non-secret artifact; does not mark exceptions as approved.                                        |
+| `bun run test:e2e`          | Pass                                | 4/4 Playwright Chromium browser flows passed against local preview and local Supabase.                                         |
+
+## Browser automation evidence
+
+Local browser automation used Playwright Chromium against production preview at
+`http://127.0.0.1:4173` and local Supabase at `http://127.0.0.1:54321`.
+The local Supabase database was reset before the first verification cycle.
+
+Covered flows:
+
+- unauthenticated `/reports` redirects to `/login`;
+- seeded Manager login reaches `/dashboard`;
+- Dashboard CSV dropdown download works;
+- seeded Sales user creates a Task, reloads, marks it Done, reloads again, and sees it in Completed;
+- seeded Sales user records a Client follow-up and sees it after reload;
+- seeded Executive user sees the Tasks exception view as read-only with no `Buat Task` action;
+- each automated flow fails on browser console warnings/errors or page errors.
+
+The first browser probe found a real CSP blocker: local production preview
+could not connect to local Supabase because `connect-src` omitted
+`http://127.0.0.1:54321`. The shipped fix keeps production CSP narrow and adds
+loopback only for loopback Supabase configuration.
 
 ## GitHub-hosted CI verification
 
@@ -87,6 +119,9 @@ No permanent exception was created. Dependency upgrades or dated exceptions stil
 
 ## Not yet verified
 
-- Browser framework installation remains gated by explicit dependency approval.
-- Automated browser workflows are not implemented.
+- New GitHub-hosted CI evidence for the browser E2E job is not yet available until this work is committed and pushed.
+- Commercial-detail follow-up browser automation is not implemented.
+- Stage transition and Closed Lost browser validation are not implemented.
+- Normalized Quotation/Sales Order browser smoke is not implemented.
+- Direct unauthorized-write denial is not automated; only Executive read-only UI is browser-verified.
 - Production Sentry source-map upload and external event ingestion behavior are not verified.
