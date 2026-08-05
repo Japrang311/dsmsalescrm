@@ -1,5 +1,6 @@
 import { describe, test, expect } from "bun:test";
 import {
+  businessCalendarDataErrorMessage,
   computeTaskDueState,
   previewBusinessCalendarCsv,
 } from "./business-calendar";
@@ -60,5 +61,30 @@ describe("previewBusinessCalendarCsv", () => {
       "Baris 2: tanggal harus format YYYY-MM-DD.",
       "Baris 3: label wajib diisi.",
     ]);
+  });
+});
+
+describe("businessCalendarDataErrorMessage", () => {
+  test("explains missing import RPC instead of showing Unknown error", () => {
+    expect(
+      businessCalendarDataErrorMessage({
+        code: "PGRST202",
+        message:
+          "Could not find the function public.import_business_calendar_holidays(p_rows) in the schema cache",
+      }),
+    ).toContain(
+      "RPC import_business_calendar_holidays belum tersedia di database",
+    );
+  });
+
+  test("keeps plain Supabase object messages visible", () => {
+    expect(
+      businessCalendarDataErrorMessage({
+        message: "BUSINESS_CALENDAR_DUPLICATE_DATE",
+        details: "Duplicate holiday_date in import rows.",
+      }),
+    ).toBe(
+      "BUSINESS_CALENDAR_DUPLICATE_DATE · Duplicate holiday_date in import rows.",
+    );
   });
 });

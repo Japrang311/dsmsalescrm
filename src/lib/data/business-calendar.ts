@@ -58,6 +58,9 @@ export type BusinessCalendarImportResult = {
   affectedYears: number[];
 };
 
+const MISSING_IMPORT_RPC_MESSAGE =
+  "RPC import_business_calendar_holidays belum tersedia di database. Apply migration 20260805091908_import_business_calendar_holidays.sql ke Supabase target, lalu coba import ulang.";
+
 type BusinessCalendarHolidayRow = {
   id: string;
   holiday_date: string;
@@ -73,6 +76,36 @@ type BusinessCalendarImportResultRow = {
   max_date: string | null;
   affected_years: number[] | null;
 };
+
+export function businessCalendarDataErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error !== "object" || error === null) return "Unknown error";
+
+  const message =
+    "message" in error && typeof error.message === "string"
+      ? error.message
+      : "";
+  const code =
+    "code" in error && typeof error.code === "string" ? error.code : "";
+  const details =
+    "details" in error && typeof error.details === "string"
+      ? error.details
+      : "";
+  const hint =
+    "hint" in error && typeof error.hint === "string" ? error.hint : "";
+  const combined = [code, message, details, hint].join(" ");
+
+  if (
+    code === "PGRST202" ||
+    combined.includes("import_business_calendar_holidays")
+  ) {
+    return MISSING_IMPORT_RPC_MESSAGE;
+  }
+
+  return (
+    [message, details, hint].filter(Boolean).join(" · ") || "Unknown error"
+  );
+}
 
 function isoDayOfWeek(iso: string): number {
   // 1 = Monday .. 7 = Sunday, matching Postgres extract(isodow from date).
@@ -361,7 +394,7 @@ export async function importBusinessCalendarHolidays(
       })),
     },
   );
-  if (error) throw error;
+  if (error) throw new Error(businessCalendarDataErrorMessage(error));
 
   const [result] = (data ?? []) as BusinessCalendarImportResultRow[];
   return {
