@@ -42,6 +42,12 @@ to production.
   identical (PPN 24.911.768.992 / Non-PPN 149.258.000 / 4 FOC / 209 SO for 2026). The
   `supabase db push` run printed unrelated `pgdelta-target-ca.crt` ENOENT noise from the CLI's
   edge runtime; the migration still applied.
+- Committed as `7d036ba` and pushed to `main`. GitHub Actions run `31020505720`: all 7 jobs pass.
+- Note on the *previous* commit `7a71cd3` (Pipeline pagination): its CI run `31011022207`
+  failed the "Production migration parity" job, because the Pipeline migration was pushed to
+  Supabase *after* the git push. Every other job passed and no code regression was involved —
+  the gate was correctly reporting a real window where production lacked the RPC. Push the
+  migration to Supabase **before** pushing the commit, which is the order used for `7d036ba`.
 
 ## HANDOFF — Stage 3 Pipeline pagination DONE, moving to Tasks pagination (2026-08-05)
 
