@@ -45,8 +45,22 @@ export function expectNoConsoleIssues(issues: string[]) {
   expect(issues, issues.join("\n")).toEqual([]);
 }
 
+// Must match src/lib/data/business-calendar.ts's todayInJakarta(), which
+// the due-state classifier (compute_task_due_state / computeTaskDueState)
+// uses as `asOf`. A UTC-based "+24h" tomorrow drifts a calendar day behind
+// Jakarta whenever the CI runner's UTC clock is past 17:00 (Jakarta is
+// UTC+7, so Jakarta has already rolled to the next day) — the created task
+// then lands in "Today" instead of "Upcoming" and this test's UPCOMING-tab
+// assertion fails, non-deterministically depending on what time CI runs.
 export function tomorrowIsoDate(): string {
-  return new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const todayJakarta = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jakarta",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+  const [year, month, day] = todayJakarta.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day + 1)).toISOString().slice(0, 10);
 }
 
 export function uniqueToken(prefix: string): string {
