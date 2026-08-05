@@ -41,12 +41,16 @@ import {
   type QuotationLostReason,
 } from "@/lib/domain";
 import { updateClientStatus } from "@/lib/data/clients";
-import {
-  describeCommercialItemChanges,
-  updateCommercialItem,
-} from "@/lib/data/commercial-items";
+import { describeCommercialItemChanges } from "@/lib/data/commercial-items";
+import { transitionCommercialStage } from "@/lib/data/commercial-documents";
 import { listSalesOrders } from "@/lib/data/sales-orders";
-import { createTask } from "@/lib/data/tasks";
+import { listTasks } from "@/lib/data/tasks";
+import { activeCommercialTasks } from "@/lib/data/task-relations";
+import {
+  listFollowUpsForCommercialDocument,
+  recordCommercialFollowUp,
+} from "@/lib/data/follow-ups";
+import { buildExplicitFollowUpCommand } from "@/lib/follow-up-command";
 import { COMMERCIAL_STAGES } from "@/lib/data/commercial-stages";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -125,6 +129,16 @@ export function PipelineCardDrawer({
     queryFn: listSalesOrders,
     enabled: authReady,
   });
+  const { data: tasks = [] } = useQuery({
+    queryKey: ["tasks", "all"],
+    queryFn: listTasks,
+    enabled: authReady,
+  });
+  const { data: followUps = [] } = useQuery({
+    queryKey: ["follow-ups", "commercial-document", item?.id ?? ""],
+    queryFn: () => listFollowUpsForCommercialDocument(item?.id ?? ""),
+    enabled: authReady && Boolean(item),
+  });
 
   const { data: currentUserId } = useQuery({
     queryKey: ["current-user-id"],
@@ -146,6 +160,11 @@ export function PipelineCardDrawer({
 
   const [stage, setStage] = useState(currentStage);
   const [nextDate, setNextDate] = useState(currentNext ?? "");
+  const [nextAction, setNextAction] = useState("");
+  const [taskMode, setTaskMode] = useState<"existing_task" | "create_task">(
+    "create_task",
+  );
+  const [taskId, setTaskId] = useState("");
   const [status, setStatus] = useState<ClientStatus>(currentStatus);
   const [lostReason, setLostReason] = useState<QuotationLostReason | "">(
     item?.lostReason ?? "",
@@ -160,6 +179,10 @@ export function PipelineCardDrawer({
     if (!open || !item || !client) return;
     setStage(currentStage);
     setNextDate(currentNext ?? "");
+    setNextAction(`Follow-up stage ${currentStage}`);
+    const activeTasks = activeCommercialTasks(tasks, item.id);
+    setTaskMode(activeTasks.length > 0 ? "existing_task" : "create_task");
+    setTaskId(activeTasks[0]?.id ?? "");
     setStatus(currentStatus);
     setLostReason(item.lostReason ?? "");
     setLostReasonDetail(item.lostReasonDetail ?? "");
@@ -179,17 +202,8 @@ export function PipelineCardDrawer({
     return allSalesOrders.filter((o) => o.clientId === client.id);
   }, [client, allSalesOrders]);
 
-  // No real follow-up log table exists yet (Task 27) — omitted rather than
-  // shown from mock FOLLOW_UP_LOGS, which would be keyed to old mock IDs.
-  const followUps = useMemo(
-    () =>
-      [] as { date: string; method: string; note: string; ownerId: string }[],
-    [],
-  );
-
   // Merged history timeline: commercial-item changes + client status changes
-  // + follow-ups, all from real activity_log now (except follow-ups, which
-  // stay empty until Task 27).
+  // + persisted follow_up_logs for this commercial document.
   const timeline = useMemo(() => {
     type Ev = {
       at: string;
@@ -219,10 +233,10 @@ export function PipelineCardDrawer({
     }
     for (const f of followUps) {
       evs.push({
-        at: f.date,
+        at: f.createdAt,
         kind: "followup",
         title: `Follow-up (${f.method})`,
-        detail: f.note,
+        detail: f.notes ?? "",
         by: profilesById[f.ownerId]?.name,
       });
     }
@@ -305,45 +319,46 @@ export function PipelineCardDrawer({
 
     if (changes.length === 0) return;
     try {
-      // commercial_documents has no next_action_date column post-Phase-11
-      // normalization — updateCommercialItem() rejects that field outright
-      // (see commercial-items.ts). "Next action" now lives on tasks; a
-      // changed date creates a follow-up task instead, below.
-      const updatedItem = await updateCommercialItem(item.id, {
-        stage,
-        lostReason: supportsLostReasonFields
-          ? reasonPatch.lostReason
-          : undefined,
-        lostReasonDetail: supportsLostReasonFields
-          ? reasonPatch.lostReasonDetail
-          : undefined,
-      });
-      const actorId = await getCurrentActorId();
-      if (actorId) {
-        await logActivity({
-          kind: "commercial_item_stage_change",
-          ownerId: currentOwnerId,
-          actorId,
-          clientId: item.clientId,
-          commercialDocumentId: updatedItem.id,
-          title: `${item.description} diperbarui`,
-          detail: describeCommercialItemChanges(changes),
-        });
+      if (!nd) {
+        throw new Error("Tanggal next action wajib untuk progress Task");
       }
-      if (nd && nd !== cn) {
-        await createTask({
-          clientId: item.clientId,
-          ownerId: currentOwnerId,
-          commercialDocumentId: updatedItem.id,
-          title: `Follow-up · ${updatedItem.type} — ${client.name}`,
-          dueDate: nd,
+      const command = buildExplicitFollowUpCommand(
+        taskMode === "existing_task"
+          ? { mode: "existing_task", taskId }
+          : {
+              mode: "create_task",
+              createTaskTitle: `Follow-up · ${item.type} — ${client.name}`,
+              taskDueDate: nd,
+            },
+        {
+          nextAction,
+          nextActionDate: nd,
+          note: describeCommercialItemChanges(changes),
           method: "Phone",
-          priority: "Normal",
-          category: "Follow-Up",
+          result: "Progress Update",
+          fuDate: new Date().toISOString().slice(0, 10),
+        },
+      );
+      if (stage !== currentStage) {
+        await transitionCommercialStage({
+          commercialDocumentId: item.id,
+          expectedFromStage: currentStage,
+          toStage: stage,
+          lostReason: supportsLostReasonFields ? reasonPatch.lostReason : null,
+          lostReasonDetail: supportsLostReasonFields
+            ? reasonPatch.lostReasonDetail
+            : null,
+          ...command,
         });
-        await queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      } else {
+        await recordCommercialFollowUp({
+          commercialDocumentId: item.id,
+          ...command,
+        });
       }
+      await queryClient.invalidateQueries({ queryKey: ["tasks"] });
       await queryClient.invalidateQueries({ queryKey: ["commercial-items"] });
+      await queryClient.invalidateQueries({ queryKey: ["follow-ups"] });
       await queryClient.invalidateQueries({ queryKey: ["activity-log"] });
       toast.success("Pipeline card diperbarui", {
         description: changes
@@ -461,6 +476,59 @@ export function PipelineCardDrawer({
                 onChange={(e) => setNextDate(e.target.value)}
                 className="h-8 text-xs"
               />
+            </div>
+            <div className="flex flex-col gap-1 sm:col-span-2">
+              <Label className="text-[11px]">Next action</Label>
+              <Input
+                value={nextAction}
+                disabled={!canEdit}
+                onChange={(e) => setNextAction(e.target.value)}
+                className="h-8 text-xs"
+                placeholder="cth. Follow-up hasil revisi quotation"
+              />
+            </div>
+            <div className="grid gap-2 sm:col-span-2">
+              <Label className="text-[11px]">Task yang diprogress</Label>
+              <Select
+                value={taskMode}
+                onValueChange={(value) =>
+                  setTaskMode(value as "existing_task" | "create_task")
+                }
+                disabled={!canEdit}
+              >
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="create_task">Buat Task baru</SelectItem>
+                  <SelectItem
+                    value="existing_task"
+                    disabled={
+                      activeCommercialTasks(tasks, item.id).length === 0
+                    }
+                  >
+                    Progress Task existing
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              {taskMode === "existing_task" && (
+                <Select
+                  value={taskId}
+                  onValueChange={setTaskId}
+                  disabled={!canEdit}
+                >
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="Pilih Task aktif" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {activeCommercialTasks(tasks, item.id).map((task) => (
+                      <SelectItem key={task.id} value={task.id}>
+                        {task.title} · {task.dueDate}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
           </div>
 

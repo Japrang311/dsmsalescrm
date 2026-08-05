@@ -405,13 +405,8 @@ function RowActions({
           <DropdownMenuItem
             className="text-amber-700 focus:text-amber-800"
             onSelect={() =>
-              toast.warning(`Arsipkan ${clientName}?`, {
-                description:
-                  "Prototype: klien tidak akan dihapus, hanya disembunyikan dari daftar aktif.",
-                action: {
-                  label: "Arsipkan",
-                  onClick: () => toast.success(`${clientName} diarsipkan`),
-                },
+              toast.info(`Arsip klien belum tersedia`, {
+                description: `${clientName} belum diubah. Arsip klien menunggu kontrak soft-delete client agar history commercial dan follow-up tetap aman.`,
               })
             }
           >

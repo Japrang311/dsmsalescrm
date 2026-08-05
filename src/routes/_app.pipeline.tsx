@@ -15,16 +15,14 @@ import { PipelineAnalytics } from "@/components/pipeline/PipelineAnalytics";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRole } from "@/context/role-context";
 import { NOW, type QuotationLostReason, type Role } from "@/lib/domain";
-import {
-  listCommercialItems,
-  updateCommercialItem,
-} from "@/lib/data/commercial-items";
+import { listCommercialItems } from "@/lib/data/commercial-items";
+import { transitionCommercialStage } from "@/lib/data/commercial-documents";
 import {
   listClients,
   listOwners,
   listSalesTeamProfiles,
 } from "@/lib/data/clients";
-import { createTask, listTasks } from "@/lib/data/tasks";
+import { listTasks } from "@/lib/data/tasks";
 import { activeCommercialTasks } from "@/lib/data/task-relations";
 import { COMMERCIAL_STAGES } from "@/lib/data/commercial-stages";
 import { formatRupiahShort, formatDateShort, daysBetween } from "@/lib/format";
@@ -50,7 +48,8 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn, getErrorMessage } from "@/lib/utils";
-import { getCurrentActorId, logActivity } from "@/lib/data/activity-log";
+import { getCurrentActorId } from "@/lib/data/activity-log";
+import { buildExplicitFollowUpCommand } from "@/lib/follow-up-command";
 import {
   activeLostReasonPatch,
   isLostReasonTracked,
@@ -126,6 +125,11 @@ function PipelineBoard({ role }: { role: Role }) {
     currentNext?: string;
   } | null>(null);
   const [nextDateInput, setNextDateInput] = useState<string>("");
+  const [nextActionInput, setNextActionInput] = useState<string>("");
+  const [taskMode, setTaskMode] = useState<"existing_task" | "create_task">(
+    "create_task",
+  );
+  const [taskIdInput, setTaskIdInput] = useState("");
   const [lostReason, setLostReason] = useState<QuotationLostReason | "">("");
   const [lostReasonDetail, setLostReasonDetail] = useState("");
   const [drawerItemId, setDrawerItemId] = useState<string | null>(null);
@@ -244,7 +248,11 @@ function PipelineBoard({ role }: { role: Role }) {
     if (fromStage === stage) return;
     const client = clientById[item.clientId];
     const currentNext = nextByItem.get(item.id);
+    const activeTasks = activeCommercialTasks(tasks, item.id);
     setNextDateInput(currentNext ?? addDaysISO(NOW, 3));
+    setNextActionInput(`Follow-up stage ${stage}`);
+    setTaskMode(activeTasks.length > 0 ? "existing_task" : "create_task");
+    setTaskIdInput(activeTasks[0]?.id ?? "");
     setLostReason("");
     setLostReasonDetail("");
     setPendingMove({
@@ -277,31 +285,19 @@ function PipelineBoard({ role }: { role: Role }) {
       lostReasonDetail,
     });
     try {
-      // commercial_documents has no next_action_date column post-Phase-11
-      // normalization — updateCommercialItem() rejects that field outright
-      // (see commercial-items.ts). "Next action" now lives on tasks, same
-      // as nextByItem already reads it. Stage is the only thing patched
-      // here; a changed date creates/logs a follow-up task instead.
-      const updatedItem = await updateCommercialItem(item.id, {
-        stage: pendingMove.toStage,
-        lostReason: isLostReasonTracked(item.type, pendingMove.toStage)
-          ? reasonPatch.lostReason
-          : undefined,
-        lostReasonDetail: isLostReasonTracked(item.type, pendingMove.toStage)
-          ? reasonPatch.lostReasonDetail
-          : undefined,
-      });
-      const actorId = await getCurrentActorId();
-      if (actorId) {
-        await logActivity({
-          kind: "commercial_item_stage_change",
-          ownerId: item.ownerId,
-          actorId,
-          clientId: item.clientId,
-          commercialDocumentId: updatedItem.id,
-          title: `${item.description} diperbarui`,
-          detail: [
-            `stage: ${pendingMove.fromStage} → ${pendingMove.toStage}`,
+      const command = buildExplicitFollowUpCommand(
+        taskMode === "existing_task"
+          ? { mode: "existing_task", taskId: taskIdInput }
+          : {
+              mode: "create_task",
+              createTaskTitle: `Follow-up · ${item.type} — ${pendingMove.clientName}`,
+              taskDueDate: nextDateInput,
+            },
+        {
+          nextAction: nextActionInput,
+          nextActionDate: nextDateInput,
+          note: [
+            `Stage ${pendingMove.fromStage} → ${pendingMove.toStage}`,
             isLostReasonTracked(item.type, pendingMove.toStage)
               ? `Alasan lost: ${reasonPatch.lostReason}${
                   reasonPatch.lostReasonDetail
@@ -312,22 +308,26 @@ function PipelineBoard({ role }: { role: Role }) {
           ]
             .filter(Boolean)
             .join("\n"),
-        });
-      }
-      if (nextDateInput && nextDateInput !== pendingMove.currentNext) {
-        await createTask({
-          clientId: item.clientId,
-          ownerId: item.ownerId,
-          commercialDocumentId: updatedItem.id,
-          title: `Follow-up · ${updatedItem.type} — ${pendingMove.clientName}`,
-          dueDate: nextDateInput,
           method: "Phone",
-          priority: "Normal",
-          category: "Follow-Up",
-        });
-        await queryClient.invalidateQueries({ queryKey: ["tasks"] });
-      }
+          result: "Progress Update",
+          fuDate: NOW.toISOString().slice(0, 10),
+        },
+      );
+      await transitionCommercialStage({
+        commercialDocumentId: item.id,
+        expectedFromStage: pendingMove.fromStage,
+        toStage: pendingMove.toStage,
+        lostReason: isLostReasonTracked(item.type, pendingMove.toStage)
+          ? reasonPatch.lostReason
+          : null,
+        lostReasonDetail: isLostReasonTracked(item.type, pendingMove.toStage)
+          ? reasonPatch.lostReasonDetail
+          : null,
+        ...command,
+      });
+      await queryClient.invalidateQueries({ queryKey: ["tasks"] });
       await queryClient.invalidateQueries({ queryKey: ["commercial-items"] });
+      await queryClient.invalidateQueries({ queryKey: ["follow-ups"] });
       await queryClient.invalidateQueries({ queryKey: ["activity-log"] });
       toast.success(`${pendingMove.clientName} → ${pendingMove.toStage}`, {
         description: nextDateInput
@@ -641,6 +641,19 @@ function PipelineBoard({ role }: { role: Role }) {
               </div>
 
               <div className="flex flex-col gap-1.5">
+                <Label htmlFor="next-action-text" className="text-xs">
+                  Next action
+                </Label>
+                <Input
+                  id="next-action-text"
+                  value={nextActionInput}
+                  onChange={(e) => setNextActionInput(e.target.value)}
+                  className="h-9 text-sm"
+                  placeholder="cth. Kirim revisi quotation"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
                 <Label htmlFor="next-action-date" className="text-xs">
                   Next action date
                 </Label>
@@ -669,17 +682,53 @@ function PipelineBoard({ role }: { role: Role }) {
                       {p.label}
                     </Button>
                   ))}
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 px-2 text-[11px]"
-                    onClick={() => setNextDateInput("")}
-                  >
-                    Kosongkan
-                  </Button>
                 </div>
               </div>
+              {pendingMoveItem && (
+                <div className="grid gap-2 rounded-md border bg-muted/30 p-3">
+                  <Label className="text-xs">Task yang diprogress</Label>
+                  <Select
+                    value={taskMode}
+                    onValueChange={(value) =>
+                      setTaskMode(value as "existing_task" | "create_task")
+                    }
+                  >
+                    <SelectTrigger className="h-9">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="create_task">
+                        Buat Task baru
+                      </SelectItem>
+                      <SelectItem
+                        value="existing_task"
+                        disabled={
+                          activeCommercialTasks(tasks, pendingMoveItem.id)
+                            .length === 0
+                        }
+                      >
+                        Progress Task existing
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {taskMode === "existing_task" && (
+                    <Select value={taskIdInput} onValueChange={setTaskIdInput}>
+                      <SelectTrigger className="h-9">
+                        <SelectValue placeholder="Pilih Task aktif" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {activeCommercialTasks(tasks, pendingMoveItem.id).map(
+                          (task) => (
+                            <SelectItem key={task.id} value={task.id}>
+                              {task.title} · {task.dueDate}
+                            </SelectItem>
+                          ),
+                        )}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+              )}
               {collectsLostReason && (
                 <div className="grid gap-3 rounded-md border bg-muted/20 p-3">
                   <div className="grid gap-1.5">

@@ -1,5 +1,10 @@
 import { supabase } from "@/lib/supabase";
-import type { ClientStatus, Task } from "@/lib/domain";
+import type {
+  ClientStatus,
+  Task,
+  TaskDueState,
+  TaskWorkflowStatus,
+} from "@/lib/domain";
 
 export type FollowUpResult =
   | "No Response"
@@ -125,6 +130,18 @@ export async function listFollowUpsForClient(
   return (data ?? []).map(toFollowUpLog);
 }
 
+export async function listFollowUpsForCommercialDocument(
+  commercialDocumentId: string,
+): Promise<FollowUpLog[]> {
+  const { data, error } = await supabase
+    .from("follow_up_logs")
+    .select("*")
+    .eq("commercial_document_id", commercialDocumentId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map(toFollowUpLog);
+}
+
 // Powers the unified Activity Log feed (_app.activity.tsx) — every
 // follow-up the signed-in user can see, unfiltered by client.
 export async function listAllFollowUps(): Promise<FollowUpLog[]> {
@@ -134,4 +151,96 @@ export async function listAllFollowUps(): Promise<FollowUpLog[]> {
     .order("created_at", { ascending: false });
   if (error) throw error;
   return (data ?? []).map(toFollowUpLog);
+}
+
+export type RecordFollowUpCommandInput = {
+  taskId?: string;
+  createTaskTitle?: string;
+  taskDueDate?: string;
+  nextAction: string | null;
+  nextActionDate: string | null;
+  note?: string;
+  method?: Task["method"];
+  result?: FollowUpResult;
+  fuDate?: string;
+  workflowStatusTarget?: TaskWorkflowStatus;
+};
+
+export type RecordClientFollowUpInput = RecordFollowUpCommandInput & {
+  clientId: string;
+};
+
+export type RecordCommercialFollowUpInput = RecordFollowUpCommandInput & {
+  commercialDocumentId: string;
+};
+
+export type RecordFollowUpCommandResult = {
+  taskId: string;
+  followUpLogId: string;
+  activityLogId: string;
+  createdTask: boolean;
+  workflowStatus: TaskWorkflowStatus;
+  dueState: TaskDueState;
+  calendarIncomplete: boolean;
+};
+
+type RecordFollowUpCommandRow = {
+  task_id: string;
+  follow_up_log_id: string;
+  activity_log_id: string;
+  created_task: boolean;
+  workflow_status: TaskWorkflowStatus;
+  due_state: TaskDueState;
+  calendar_incomplete: boolean;
+};
+
+function toRecordFollowUpCommandResult(
+  row: RecordFollowUpCommandRow,
+): RecordFollowUpCommandResult {
+  return {
+    taskId: row.task_id,
+    followUpLogId: row.follow_up_log_id,
+    activityLogId: row.activity_log_id,
+    createdTask: row.created_task,
+    workflowStatus: row.workflow_status,
+    dueState: row.due_state,
+    calendarIncomplete: row.calendar_incomplete,
+  };
+}
+
+function commandArgs(input: RecordFollowUpCommandInput) {
+  return {
+    p_task_id: input.taskId ?? null,
+    p_create_task_title: input.createTaskTitle ?? null,
+    p_task_due_date: input.taskDueDate ?? null,
+    p_next_action: input.nextAction,
+    p_next_action_date: input.nextActionDate,
+    p_note: input.note ?? null,
+    p_method: input.method ?? "Phone",
+    p_result: input.result ?? "Progress Update",
+    p_fu_date: input.fuDate ?? null,
+    p_workflow_status_target: input.workflowStatusTarget ?? "In Progress",
+  };
+}
+
+export async function recordClientFollowUp(
+  input: RecordClientFollowUpInput,
+): Promise<RecordFollowUpCommandResult> {
+  const { data, error } = await supabase.rpc("record_client_follow_up", {
+    p_client_id: input.clientId,
+    ...commandArgs(input),
+  });
+  if (error) throw error;
+  return toRecordFollowUpCommandResult(data![0]);
+}
+
+export async function recordCommercialFollowUp(
+  input: RecordCommercialFollowUpInput,
+): Promise<RecordFollowUpCommandResult> {
+  const { data, error } = await supabase.rpc("record_commercial_follow_up", {
+    p_commercial_document_id: input.commercialDocumentId,
+    ...commandArgs(input),
+  });
+  if (error) throw error;
+  return toRecordFollowUpCommandResult(data![0]);
 }

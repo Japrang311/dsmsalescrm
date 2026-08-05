@@ -11,8 +11,10 @@ import { supabase } from "@/lib/supabase";
 import {
   createQuotation,
   deleteCommercialDocument,
+  getCommercialDocument,
   listCommercialDocuments,
   reviseQuotation,
+  transitionCommercialStage,
   updateCommercialDocument,
 } from "./commercial-documents";
 
@@ -80,6 +82,10 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  await adminClient
+    .from("follow_up_logs")
+    .delete()
+    .eq("owner_id", fixtures.sales.id);
   await adminClient
     .from("activity_log")
     .delete()
@@ -247,6 +253,67 @@ describe("normalized commercial document adapter", () => {
     );
     expect(corrected.documentDate).toBe("2095-03-02");
     expect(corrected.quotationExpiredDate).toBe("2095-04-01");
+    await supabase.auth.signOut();
+  });
+
+  test("transitionCommercialStage() maps stage movement through the atomic RPC", async () => {
+    const authClient = await signInAs(fixtures.sales);
+    const session = (await authClient.auth.getSession()).data.session!;
+    await supabase.auth.setSession({
+      access_token: session.access_token,
+      refresh_token: session.refresh_token,
+    });
+
+    const created = await createQuotation({
+      clientId,
+      documentDate: "2095-04-01",
+      stage: "Negotiation",
+      items: [
+        {
+          productName: "Stage transition adapter item",
+          qty: 1,
+          uom: "Unit",
+          unitPrice: 25_000,
+        },
+      ],
+      nextAction: "Initial quotation follow-up",
+      nextActionDate: "2095-04-08",
+    });
+
+    const { data: task, error: taskError } = await adminClient
+      .from("tasks")
+      .insert({
+        client_id: clientId,
+        commercial_document_id: created.id,
+        owner_id: fixtures.sales.id,
+        title: "Commercial stage adapter Task",
+        due_date: "2095-04-09",
+        method: "Phone",
+        category: "Quotation",
+      })
+      .select("id")
+      .single();
+    if (taskError) throw taskError;
+
+    const result = await transitionCommercialStage({
+      commercialDocumentId: created.id,
+      expectedFromStage: "Negotiation",
+      toStage: "Hot Prospect",
+      taskId: task.id,
+      nextAction: "Confirm decision maker",
+      nextActionDate: "2095-04-10",
+      note: "Adapter stage transition",
+      workflowStatusTarget: "In Progress",
+    });
+
+    expect(result.commercialDocumentId).toBe(created.id);
+    expect(result.fromStage).toBe("Negotiation");
+    expect(result.toStage).toBe("Hot Prospect");
+    expect(result.taskId).toBe(task.id);
+    expect(result.stageActivityLogId).toBeTruthy();
+
+    const updated = await getCommercialDocument(created.id);
+    expect(updated?.stage).toBe("Hot Prospect");
     await supabase.auth.signOut();
   });
 });

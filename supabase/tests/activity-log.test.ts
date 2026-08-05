@@ -415,3 +415,143 @@ describe("client_details_change activity kind", () => {
     }
   });
 });
+
+describe("structured activity_log event_data", () => {
+  test("persists a structured commercial stage-change payload without rewriting detail text", async () => {
+    const fixtures = await createRoleFixtureUsers();
+    let activityId: string | undefined;
+
+    try {
+      const payload = {
+        schema_version: 1,
+        from_stage: "Negotiation",
+        to_stage: "Hot Prospect",
+        effective_at: "2026-08-05T09:30:00+07:00",
+      };
+
+      const { data, error } = await adminClient
+        .from("activity_log")
+        .insert({
+          kind: "commercial_item_stage_change",
+          owner_id: fixtures.sales.id,
+          actor_id: fixtures.sales.id,
+          title: "Stage berubah",
+          detail: "stage: Negotiation -> Hot Prospect",
+          event_data: payload,
+        })
+        .select("id, detail, event_data")
+        .single();
+
+      expect(error).toBeNull();
+      expect(data?.detail).toBe("stage: Negotiation -> Hot Prospect");
+      expect(data?.event_data).toEqual(payload);
+      activityId = data?.id;
+    } finally {
+      if (activityId) {
+        await adminClient.from("activity_log").delete().eq("id", activityId);
+      }
+      await deleteRoleFixtureUsers(fixtures);
+    }
+  });
+
+  test("rejects malformed structured commercial stage-change payloads while preserving legacy rows", async () => {
+    const fixtures = await createRoleFixtureUsers();
+    let legacyActivityId: string | undefined;
+
+    try {
+      const { data: legacy, error: legacyError } = await adminClient
+        .from("activity_log")
+        .insert({
+          kind: "commercial_item_stage_change",
+          owner_id: fixtures.sales.id,
+          actor_id: fixtures.sales.id,
+          title: "Legacy stage text only",
+          detail: "stage: Follow Up -> Negotiation",
+        })
+        .select("id, event_data")
+        .single();
+
+      expect(legacyError).toBeNull();
+      expect(legacy?.event_data).toBeNull();
+      legacyActivityId = legacy?.id;
+
+      const { error } = await adminClient.from("activity_log").insert({
+        kind: "commercial_item_stage_change",
+        owner_id: fixtures.sales.id,
+        actor_id: fixtures.sales.id,
+        title: "Malformed structured stage event",
+        detail: "stage: Negotiation -> Hot Prospect",
+        event_data: {
+          schema_version: 1,
+          from_stage: "Negotiation",
+          effective_at: "2026-08-05T09:30:00+07:00",
+        },
+      });
+
+      expect(error?.code).toBe("23514");
+      expect(error?.message).toContain("activity_log_stage_event_data_valid");
+    } finally {
+      if (legacyActivityId) {
+        await adminClient
+          .from("activity_log")
+          .delete()
+          .eq("id", legacyActivityId);
+      }
+      await deleteRoleFixtureUsers(fixtures);
+    }
+  });
+
+  test("authenticated browser inserts may provide approved event_data but cannot alter append-only rows", async () => {
+    const fixtures = await createRoleFixtureUsers();
+    let activityId: string | undefined;
+
+    try {
+      const client = await signInAs(fixtures.sales);
+      const { data, error } = await client
+        .from("activity_log")
+        .insert({
+          kind: "commercial_item_stage_change",
+          owner_id: fixtures.sales.id,
+          actor_id: fixtures.sales.id,
+          title: "Sales stage event",
+          detail: "stage: Negotiation -> Hot Prospect",
+          event_data: {
+            schema_version: 1,
+            from_stage: "Negotiation",
+            to_stage: "Hot Prospect",
+            effective_at: "2026-08-05T09:30:00+07:00",
+          },
+        })
+        .select("id, event_data")
+        .single();
+
+      expect(error).toBeNull();
+      activityId = data?.id;
+      expect(data?.event_data?.to_stage).toBe("Hot Prospect");
+
+      const { data: updated, error: updateError } = await client
+        .from("activity_log")
+        .update({
+          event_data: {
+            schema_version: 1,
+            from_stage: "Tampered",
+            to_stage: "Closed Won",
+            effective_at: "2026-08-05T10:00:00+07:00",
+          },
+        })
+        .eq("id", activityId)
+        .select("id");
+
+      if (updateError) {
+        expect(updateError).not.toBeNull();
+      } else {
+        expect(updated).toHaveLength(0);
+      }
+    } finally {
+      if (activityId) {
+        await adminClient.from("activity_log").delete().eq("id", activityId);
+      }
+      await deleteRoleFixtureUsers(fixtures);
+    }
+  });
+});

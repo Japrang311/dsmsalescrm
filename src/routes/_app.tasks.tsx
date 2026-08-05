@@ -89,6 +89,7 @@ import { getCurrentActorId, logActivity } from "@/lib/data/activity-log";
 import { formatDateShort, formatRupiahShort } from "@/lib/format";
 import { TaskDetailDrawer } from "@/components/tasks/TaskDetailDrawer";
 import { CreateTaskDialog } from "@/components/tasks/CreateTaskDialog";
+import { CalendarIncompleteWarning } from "@/components/tasks/CalendarIncompleteWarning";
 
 export const Route = createFileRoute("/_app/tasks")({
   head: () => ({
@@ -810,6 +811,8 @@ function TasksInboxPage() {
           {canEdit && <CreateTaskDialog role={role} />}
         </div>
       </header>
+
+      <CalendarIncompleteWarning tasks={tasks} />
 
       {/* View segmented control — Today / Upcoming / Overdue / Completed / Archived */}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">

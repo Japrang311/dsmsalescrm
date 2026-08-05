@@ -75,6 +75,7 @@ import {
   DateRangePicker,
   type PeriodRange,
 } from "@/components/dashboard/DateRangePicker";
+import { CalendarIncompleteWarning } from "@/components/tasks/CalendarIncompleteWarning";
 import { useState } from "react";
 import { NOW, CURRENT_YEAR } from "@/lib/domain";
 import { toast } from "sonner";
@@ -372,6 +373,8 @@ function DashboardPage() {
           </DropdownMenu>
         </div>
       </div>
+
+      <CalendarIncompleteWarning tasks={allTasks} metrics={taskMetrics} />
 
       {/* KPI row */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">

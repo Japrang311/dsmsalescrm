@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
 import { PhoneCall } from "lucide-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -26,8 +26,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { logFollowUp, type FollowUpResult } from "@/lib/data/follow-ups";
-import { getCurrentActorId, logActivity } from "@/lib/data/activity-log";
+import {
+  recordClientFollowUp,
+  type FollowUpResult,
+} from "@/lib/data/follow-ups";
+import { listTasks } from "@/lib/data/tasks";
+import { activeClientTasks } from "@/lib/data/task-relations";
+import { buildExplicitFollowUpCommand } from "@/lib/follow-up-command";
 import { useClientResolution, ClientPickerField } from "./ClientPicker";
 
 const METHODS = ["Phone", "Email", "WhatsApp", "Visit", "Meeting"] as const;
@@ -52,6 +57,14 @@ const schema = z.object({
     .trim()
     .min(4, { message: "Catatan minimal 4 karakter" })
     .max(400, { message: "Catatan maks 400 karakter" }),
+  taskMode: z.enum(["existing_task", "create_task"]),
+  taskId: z.string().optional(),
+  nextAction: z
+    .string()
+    .trim()
+    .min(4, { message: "Next action minimal 4 karakter" })
+    .max(160, { message: "Next action maks 160 karakter" }),
+  nextActionDate: z.string().min(4, { message: "Tanggal next action wajib" }),
 });
 
 type FollowUpValues = z.infer<typeof schema>;
@@ -93,6 +106,7 @@ export function AddFollowUpDialog({
     register,
     handleSubmit,
     control,
+    watch,
     reset,
     formState: { errors, isSubmitting },
   } = useForm<FollowUpValues>({
@@ -102,33 +116,49 @@ export function AddFollowUpDialog({
       result: "Interested",
       fuDate: new Date().toISOString().slice(0, 10),
       notes: "",
+      taskMode: "create_task",
+      taskId: "",
+      nextAction: "",
+      nextActionDate: "",
     },
   });
+  const taskMode = watch("taskMode");
+  const { data: tasks = [] } = useQuery({
+    queryKey: ["tasks", "all"],
+    queryFn: listTasks,
+    enabled: open && Boolean(resolvedClientId),
+  });
+  const activeTasks = resolvedClientId
+    ? activeClientTasks(tasks, resolvedClientId)
+    : [];
 
   const onSubmit = handleSubmit(async (v) => {
     if (!resolvedClientId || !resolvedOwnerId) return;
     try {
-      await logFollowUp({
+      const command = buildExplicitFollowUpCommand(
+        v.taskMode === "existing_task"
+          ? { mode: "existing_task", taskId: v.taskId ?? "" }
+          : {
+              mode: "create_task",
+              createTaskTitle: `Follow-up · ${resolvedClientName}`,
+              taskDueDate: v.nextActionDate,
+            },
+        {
+          nextAction: v.nextAction,
+          nextActionDate: v.nextActionDate,
+          note: v.notes,
+          method: v.method,
+          result: v.result,
+          fuDate: v.fuDate,
+        },
+      );
+      await recordClientFollowUp({
         clientId: resolvedClientId,
-        ownerId: resolvedOwnerId,
-        fuDate: v.fuDate,
-        method: v.method,
-        result: v.result,
-        notes: v.notes,
+        ...command,
       });
       await queryClient.invalidateQueries({ queryKey: ["follow-ups"] });
-      const actorId = await getCurrentActorId();
-      if (actorId) {
-        await logActivity({
-          kind: "task_status_change",
-          ownerId: resolvedOwnerId,
-          actorId,
-          clientId: resolvedClientId,
-          title: `Follow-up dicatat · ${v.result}`,
-          detail: v.notes,
-        });
-        await queryClient.invalidateQueries({ queryKey: ["activity-log"] });
-      }
+      await queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      await queryClient.invalidateQueries({ queryKey: ["activity-log"] });
       toast.success("Follow up tercatat", {
         description: `${resolvedClientName} · ${v.method} · ${v.result}`,
       });
@@ -234,6 +264,73 @@ export function AddFollowUpDialog({
                 {errors.notes.message}
               </p>
             )}
+          </div>
+          <div className="grid gap-2 rounded-md border bg-muted/30 p-3">
+            <Label>Task yang diprogress</Label>
+            <Controller
+              control={control}
+              name="taskMode"
+              render={({ field }) => (
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="create_task">Buat Task baru</SelectItem>
+                    <SelectItem
+                      value="existing_task"
+                      disabled={activeTasks.length === 0}
+                    >
+                      Progress Task existing
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+            />
+            {taskMode === "existing_task" && (
+              <Controller
+                control={control}
+                name="taskId"
+                render={({ field }) => (
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Pilih Task aktif" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {activeTasks.map((task) => (
+                        <SelectItem key={task.id} value={task.id}>
+                          {task.title} · {task.dueDate}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+            )}
+            <div className="grid gap-2 md:grid-cols-2">
+              <div>
+                <Label htmlFor="nextAction">Next action</Label>
+                <Input id="nextAction" {...register("nextAction")} />
+                {errors.nextAction && (
+                  <p className="mt-1 text-xs text-destructive">
+                    {errors.nextAction.message}
+                  </p>
+                )}
+              </div>
+              <div>
+                <Label htmlFor="nextActionDate">Tanggal next action</Label>
+                <Input
+                  id="nextActionDate"
+                  type="date"
+                  {...register("nextActionDate")}
+                />
+                {errors.nextActionDate && (
+                  <p className="mt-1 text-xs text-destructive">
+                    {errors.nextActionDate.message}
+                  </p>
+                )}
+              </div>
+            </div>
           </div>
           <DialogFooter>
             <Button

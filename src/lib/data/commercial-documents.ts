@@ -3,7 +3,10 @@ import type {
   CommercialType,
   QuotationLostReason,
   SourceFlow,
+  TaskDueState,
+  TaskWorkflowStatus,
 } from "@/lib/domain";
+import type { FollowUpResult } from "@/lib/data/follow-ups";
 import type { Uom } from "./document-numbering";
 
 export type LineItemInput = {
@@ -345,4 +348,87 @@ export async function updateCommercialDocumentLineItem(
     .single();
   if (error) throw error;
   return toLineItem(data as LineItemRow);
+}
+
+export type TransitionCommercialStageInput = {
+  commercialDocumentId: string;
+  expectedFromStage: string;
+  toStage: string;
+  taskId?: string;
+  createTaskTitle?: string;
+  taskDueDate?: string;
+  nextAction: string | null;
+  nextActionDate: string | null;
+  note?: string;
+  method?: "Phone" | "Email" | "Visit" | "WhatsApp" | "Meeting";
+  result?: FollowUpResult;
+  fuDate?: string;
+  workflowStatusTarget?: TaskWorkflowStatus;
+  lostReason?: QuotationLostReason | null;
+  lostReasonDetail?: string | null;
+};
+
+export type TransitionCommercialStageResult = {
+  commercialDocumentId: string;
+  fromStage: string;
+  toStage: string;
+  stageActivityLogId: string;
+  taskId: string;
+  followUpLogId: string;
+  taskActivityLogId: string;
+  createdTask: boolean;
+  workflowStatus: TaskWorkflowStatus;
+  dueState: TaskDueState;
+  calendarIncomplete: boolean;
+};
+
+type TransitionCommercialStageRow = {
+  commercial_document_id: string;
+  from_stage: string;
+  to_stage: string;
+  stage_activity_log_id: string;
+  task_id: string;
+  follow_up_log_id: string;
+  task_activity_log_id: string;
+  created_task: boolean;
+  workflow_status: TaskWorkflowStatus;
+  due_state: TaskDueState;
+  calendar_incomplete: boolean;
+};
+
+export async function transitionCommercialStage(
+  input: TransitionCommercialStageInput,
+): Promise<TransitionCommercialStageResult> {
+  const { data, error } = await supabase.rpc("transition_commercial_stage", {
+    p_commercial_document_id: input.commercialDocumentId,
+    p_expected_from_stage: input.expectedFromStage,
+    p_to_stage: input.toStage,
+    p_task_id: input.taskId ?? null,
+    p_create_task_title: input.createTaskTitle ?? null,
+    p_task_due_date: input.taskDueDate ?? null,
+    p_next_action: input.nextAction,
+    p_next_action_date: input.nextActionDate,
+    p_note: input.note ?? null,
+    p_method: input.method ?? "Phone",
+    p_result: input.result ?? "Progress Update",
+    p_fu_date: input.fuDate ?? null,
+    p_workflow_status_target: input.workflowStatusTarget ?? "In Progress",
+    p_lost_reason: input.lostReason ?? null,
+    p_lost_reason_detail: input.lostReasonDetail ?? null,
+  });
+  if (error) throw error;
+  const row = data![0] as TransitionCommercialStageRow;
+  return {
+    commercialDocumentId: row.commercial_document_id,
+    fromStage: row.from_stage,
+    toStage: row.to_stage,
+    stageActivityLogId: row.stage_activity_log_id,
+    taskId: row.task_id,
+    followUpLogId: row.follow_up_log_id,
+    taskActivityLogId: row.task_activity_log_id,
+    createdTask: row.created_task,
+    workflowStatus: row.workflow_status,
+    dueState: row.due_state,
+    calendarIncomplete: row.calendar_incomplete,
+  };
 }
