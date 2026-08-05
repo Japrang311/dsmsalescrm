@@ -148,7 +148,10 @@ function SettingsPage() {
   });
   const currentProfileId = useQuery({
     queryKey: ["current-profile-id"],
-    queryFn: getCurrentProfileId,
+    // Not `queryFn: getCurrentProfileId` directly — see the listTeamMembers
+    // comment below for why a bare function reference with an optional
+    // client-parameter default breaks under React Query.
+    queryFn: () => getCurrentProfileId(),
     enabled: authReady,
   });
 
@@ -435,7 +438,11 @@ function TeamTab({
     isFetching,
   } = useQuery({
     queryKey: ["team-members"],
-    queryFn: listTeamMembers,
+    // Not `queryFn: listTeamMembers` directly: React Query always calls
+    // queryFn with a QueryFunctionContext argument, which would override
+    // listTeamMembers' optional `client` parameter default and break its
+    // internal client.rpc(...) call ("e.rpc is not a function").
+    queryFn: () => listTeamMembers(),
   });
   const [addOpen, setAddOpen] = useState(false);
   const [editing, setEditing] = useState<TeamMember | null>(null);

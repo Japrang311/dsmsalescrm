@@ -275,52 +275,36 @@ describe("Team lifecycle request serialization", () => {
 });
 
 describe("privileged Team roster mapping", () => {
+  // listTeamMembers() reads public.admin_team_summary(), a single
+  // set-returning RPC (Stage 3 N+1 fix) instead of 1 + 4*N per-member
+  // queries. These tests exercise the row-mapping contract, not query
+  // shape, since there's only one call left to shape-check.
   test("includes inactive and all four roles, active ownership counts, and the latest administrative change without a password field", async () => {
-    databaseResults.set("profiles", {
-      data: [
-        {
-          id: "member-1",
-          name: "Ayu",
-          initials: "AY",
-          role: "executive",
-          email: "ayu@example.com",
-          account_status: "inactive",
-          status_changed_at: "2026-07-18T08:00:00Z",
-          status_changed_by: "current-admin",
-          status_change_reason: "Rotasi",
-          password: "must-not-leak",
-        },
-      ],
-      error: null,
-    });
-    databaseResults.set("clients", {
-      data: null,
-      error: null,
-      count: 1,
-    });
-    databaseResults.set("tasks", {
-      data: null,
-      error: null,
-      count: 1,
-    });
-    databaseResults.set("activity_log", {
-      data: [
-        {
-          target_profile_id: "member-1",
-          kind: "team_member_deactivated",
-          title: "Anggota tim dinonaktifkan",
-          administrative_reason: "Rotasi",
-          created_at: "2026-07-18T08:00:00Z",
-        },
-      ],
-      error: null,
-    });
-
     resultForRpc = (call) => {
-      if (call.name === "admin_count_active_commercial_items") {
-        return { data: 1, error: null };
-      }
-      return undefined;
+      if (call.name !== "admin_team_summary") return undefined;
+      return {
+        data: [
+          {
+            id: "member-1",
+            name: "Ayu",
+            initials: "AY",
+            role: "executive",
+            email: "ayu@example.com",
+            account_status: "inactive",
+            status_changed_at: "2026-07-18T08:00:00Z",
+            status_changed_by: "current-admin",
+            status_change_reason: "Rotasi",
+            clients_count: 1,
+            tasks_count: 1,
+            commercial_items_count: 1,
+            last_change_kind: "team_member_deactivated",
+            last_change_title: "Anggota tim dinonaktifkan",
+            last_change_reason: "Rotasi",
+            last_change_at: "2026-07-18T08:00:00Z",
+          },
+        ],
+        error: null,
+      };
     };
 
     const [member] = await team.listTeamMembers(teamClient);
@@ -349,209 +333,88 @@ describe("privileged Team roster mapping", () => {
       },
     });
     expect(member).not.toHaveProperty("password");
-    expect(
-      fromCalls.find((call) => call.table === "profiles")?.select,
-    ).not.toContain("password");
   });
 
-  test("uses exact bounded count requests for clients and tasks via RPC for commercial items", async () => {
-    databaseResults.set("profiles", {
-      data: [
-        {
-          id: "member-1",
-          name: "Ayu",
-          initials: "AY",
+  test("issues a single RPC call regardless of roster size", async () => {
+    resultForRpc = (call) => {
+      if (call.name !== "admin_team_summary") return undefined;
+      return {
+        data: Array.from({ length: 20 }, (_, index) => ({
+          id: `member-${index}`,
+          name: `Member ${index}`,
+          initials: "MM",
           role: "sales",
-          email: "ayu@example.com",
+          email: `member${index}@example.com`,
           account_status: "active",
           status_changed_at: null,
           status_changed_by: null,
           status_change_reason: null,
-        },
-      ],
-      error: null,
-    });
-    databaseResults.set("clients", { data: null, error: null, count: 1001 });
-    databaseResults.set("tasks", { data: null, error: null, count: 1002 });
-    databaseResults.set("activity_log", { data: [], error: null });
-
-    resultForRpc = (call) => {
-      if (call.name === "admin_count_active_commercial_items") {
-        return { data: 1, error: null };
-      }
-      return undefined;
+          clients_count: 1001,
+          tasks_count: 1002,
+          commercial_items_count: 1,
+          last_change_kind: null,
+          last_change_title: null,
+          last_change_reason: null,
+          last_change_at: null,
+        })),
+        error: null,
+      };
     };
 
-    const [member] = await team.listTeamMembers(teamClient);
+    const members = await team.listTeamMembers(teamClient);
 
-    expect(member.ownedActiveCounts).toEqual({
+    expect(members).toHaveLength(20);
+    expect(members[0].ownedActiveCounts).toEqual({
       clients: 1001,
       tasks: 1002,
       commercialItems: 1,
       total: 2004,
     });
-
-    for (const table of ["clients", "tasks"]) {
-      const call = fromCalls.find((entry) => entry.table === table);
-      expect(call?.select).toBe("id");
-      expect(call?.selectOptions).toEqual({ count: "exact", head: true });
-      expect(call?.filters).toContainEqual({
-        method: "eq",
-        args: ["owner_id", "member-1"],
-      });
-    }
     expect(
-      fromCalls.find((entry) => entry.table === "clients")?.filters,
-    ).toContainEqual({ method: "neq", args: ["status", "Lost"] });
-    expect(fromCalls.find((entry) => entry.table === "tasks")?.filters).toEqual(
-      expect.arrayContaining([
-        {
-          method: "in",
-          args: [
-            "workflow_status",
-            ["Open", "In Progress", "Waiting External"],
-          ],
-        },
-        { method: "eq", args: ["archived", false] },
-      ]),
-    );
-    const commercialCall = rpcCalls.find(
-      (call) => call.name === "admin_count_active_commercial_items",
-    );
-    expect(commercialCall).toBeDefined();
-    expect(commercialCall?.params).toEqual({ p_owner_id: "member-1" });
-  });
-
-  test("uses server-side RPC to count active commercial items with normalized predicates", async () => {
-    databaseResults.set("profiles", {
-      data: [
-        {
-          id: "member-1",
-          name: "Ayu",
-          initials: "AY",
-          role: "sales",
-          email: "ayu@example.com",
-          account_status: "active",
-          status_changed_at: null,
-          status_changed_by: null,
-          status_change_reason: null,
-        },
-      ],
-      error: null,
-    });
-    databaseResults.set("clients", { data: null, error: null, count: 0 });
-    databaseResults.set("tasks", { data: null, error: null, count: 0 });
-    databaseResults.set("activity_log", { data: [], error: null });
-
-    resultForRpc = (call) => {
-      if (call.name === "admin_count_active_commercial_items") {
-        return { data: 42, error: null };
-      }
-      return undefined;
-    };
-
-    const [member] = await team.listTeamMembers(teamClient);
-
-    expect(member.ownedActiveCounts.commercialItems).toBe(42);
-    const rpcCall = rpcCalls.find(
-      (call) => call.name === "admin_count_active_commercial_items",
-    );
-    expect(rpcCall).toBeDefined();
-    expect(rpcCall?.params).toEqual({ p_owner_id: "member-1" });
-    // Should NOT paginate; single RPC call only
-    expect(
-      rpcCalls.filter(
-        (call) => call.name === "admin_count_active_commercial_items",
-      ),
+      rpcCalls.filter((call) => call.name === "admin_team_summary"),
     ).toHaveLength(1);
   });
 
-  test("handles stages with tab and non-breaking-space whitespace using server predicate", async () => {
-    databaseResults.set("profiles", {
-      data: [
-        {
-          id: "member-1",
-          name: "Ayu",
-          initials: "AY",
-          role: "sales",
-          email: "ayu@example.com",
-          account_status: "active",
-          status_changed_at: null,
-          status_changed_by: null,
-          status_change_reason: null,
-        },
-      ],
-      error: null,
-    });
-    databaseResults.set("clients", { data: null, error: null, count: 0 });
-    databaseResults.set("tasks", { data: null, error: null, count: 0 });
-    databaseResults.set("activity_log", { data: [], error: null });
-
+  test("omits lastAdministrativeChange when the RPC reports no admin history", async () => {
     resultForRpc = (call) => {
-      if (call.name === "admin_count_active_commercial_items") {
-        // Server correctly counts stages with tab/nbsp as terminal
-        // Stage " \t closed won \t " matches server's lower(btrim(stage)) = 'closed won'
-        return { data: 3, error: null };
-      }
-      return undefined;
+      if (call.name !== "admin_team_summary") return undefined;
+      return {
+        data: [
+          {
+            id: "member-1",
+            name: "Ayu",
+            initials: "AY",
+            role: "sales",
+            email: "ayu@example.com",
+            account_status: "active",
+            status_changed_at: null,
+            status_changed_by: null,
+            status_change_reason: null,
+            clients_count: 0,
+            tasks_count: 0,
+            commercial_items_count: 0,
+            last_change_kind: null,
+            last_change_title: null,
+            last_change_reason: null,
+            last_change_at: null,
+          },
+        ],
+        error: null,
+      };
     };
 
     const [member] = await team.listTeamMembers(teamClient);
 
-    // Server RPC returns 3; client must trust server normalization
-    expect(member.ownedActiveCounts.commercialItems).toBe(3);
+    expect(member).not.toHaveProperty("lastAdministrativeChange");
+    expect(member).not.toHaveProperty("statusChangedAt");
   });
 
-  test("requests only the latest administrative event for each profile", async () => {
-    databaseResults.set("profiles", {
-      data: [
-        {
-          id: "member-1",
-          name: "Ayu",
-          initials: "AY",
-          role: "sales",
-          email: "ayu@example.com",
-          account_status: "active",
-          status_changed_at: null,
-          status_changed_by: null,
-          status_change_reason: null,
-        },
-      ],
-      error: null,
-    });
-    databaseResults.set("clients", { data: null, error: null, count: 0 });
-    databaseResults.set("tasks", { data: null, error: null, count: 0 });
-    databaseResults.set("activity_log", {
-      data: [
-        {
-          target_profile_id: "member-1",
-          kind: "team_member_role_changed",
-          title: "Role anggota tim diubah",
-          administrative_reason: "Promosi",
-          created_at: "2026-07-19T01:00:00Z",
-        },
-      ],
-      error: null,
-    });
-
+  test("propagates an RPC error instead of returning a partial roster", async () => {
     resultForRpc = (call) => {
-      if (call.name === "admin_count_active_commercial_items") {
-        return { data: 0, error: null };
-      }
-      return undefined;
+      if (call.name !== "admin_team_summary") return undefined;
+      return { data: null, error: { message: "INSUFFICIENT_PRIVILEGE" } };
     };
 
-    await team.listTeamMembers(teamClient);
-
-    const call = fromCalls.find((entry) => entry.table === "activity_log");
-    expect(call?.filters).toContainEqual({
-      method: "eq",
-      args: ["target_profile_id", "member-1"],
-    });
-    expect(call?.order).toEqual({
-      column: "created_at",
-      options: { ascending: false },
-    });
-    expect(call?.limit).toBe(1);
+    await expect(team.listTeamMembers(teamClient)).rejects.toBeTruthy();
   });
 });

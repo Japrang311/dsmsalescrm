@@ -82,7 +82,11 @@ export type TeamMember = {
   lastAdministrativeChange?: TeamAdministrativeChange;
 };
 
-type ProfileRow = {
+function throwQueryError(error: unknown): void {
+  if (error) throw error;
+}
+
+type AdminTeamSummaryRow = {
   id: string;
   name: string;
   initials: string;
@@ -92,81 +96,63 @@ type ProfileRow = {
   status_changed_at: string | null;
   status_changed_by: string | null;
   status_change_reason: string | null;
+  clients_count: number;
+  tasks_count: number;
+  commercial_items_count: number;
+  last_change_kind: string | null;
+  last_change_title: string | null;
+  last_change_reason: string | null;
+  last_change_at: string | null;
 };
 
-type AdminActivityRow = {
-  target_profile_id: string | null;
-  kind: string;
-  title: string;
-  administrative_reason: string | null;
-  created_at: string;
-};
+function toTeamMember(row: AdminTeamSummaryRow): TeamMember {
+  const clients = row.clients_count;
+  const tasks = row.tasks_count;
+  const commercialItems = row.commercial_items_count;
 
-const ADMIN_ACTIVITY_KINDS = [
-  "team_member_created",
-  "team_member_profile_updated",
-  "team_member_role_changed",
-  "team_member_deactivated",
-  "team_member_reactivated",
-  "team_member_ownership_transferred",
-  "team_member_deleted",
-] as const;
-
-const TEAM_SUMMARY_BATCH_SIZE = 8;
-const ACTIVE_TRANSFER_WORKFLOW_STATUSES = [
-  "Open",
-  "In Progress",
-  "Waiting External",
-] as const;
-
-function throwQueryError(error: unknown): void {
-  if (error) throw error;
-}
-
-function exactCount(result: { count?: number | null; error: unknown }): number {
-  throwQueryError(result.error);
-  if (result.count == null) {
-    throw new Error("Server tidak mengembalikan exact count.");
-  }
-  return result.count;
-}
-
-async function countActiveCommercialItems(
-  ownerId: string,
-  client: TeamSupabaseClient,
-): Promise<number> {
-  // Call server-side RPC that computes the exact count using the Task 4 transfer
-  // predicate: lower(btrim(stage)) not in ('closed won', 'closed lost', 'revenue recorded', 'closed').
-  // This ensures client and server use identical normalization.
-  const result = await client.rpc("admin_count_active_commercial_items", {
-    p_owner_id: ownerId,
-  });
-  throwQueryError(result.error);
-
-  const count = result.data;
-  if (typeof count !== "number") {
-    throw new Error("Server tidak mengembalikan count komersial.");
-  }
-  return count;
-}
-
-async function mapInBatches<T, R>(
-  items: T[],
-  batchSize: number,
-  mapper: (item: T) => Promise<R>,
-): Promise<R[]> {
-  const mapped: R[] = [];
-  for (let index = 0; index < items.length; index += batchSize) {
-    mapped.push(
-      ...(await Promise.all(items.slice(index, index + batchSize).map(mapper))),
-    );
-  }
-  return mapped;
+  return {
+    id: row.id,
+    name: row.name,
+    initials: row.initials,
+    role: row.role,
+    email: row.email,
+    accountStatus: row.account_status,
+    ...(row.status_changed_at
+      ? { statusChangedAt: row.status_changed_at }
+      : {}),
+    ...(row.status_changed_by
+      ? { statusChangedBy: row.status_changed_by }
+      : {}),
+    ...(row.status_change_reason
+      ? { statusChangeReason: row.status_change_reason }
+      : {}),
+    ownedActiveCounts: {
+      clients,
+      tasks,
+      commercialItems,
+      total: clients + tasks + commercialItems,
+    },
+    ...(row.last_change_kind && row.last_change_title && row.last_change_at
+      ? {
+          lastAdministrativeChange: {
+            kind: row.last_change_kind,
+            title: row.last_change_title,
+            ...(row.last_change_reason
+              ? { reason: row.last_change_reason }
+              : {}),
+            createdAt: row.last_change_at,
+          },
+        }
+      : {}),
+  };
 }
 
 // Privileged RLS readers receive every profile row, including inactive
 // accounts. Ownership totals mirror the server transfer scope: non-Lost
-// clients, workflow-active/unarchived tasks, and non-terminal commercial items.
+// clients, workflow-active/unarchived tasks, and non-terminal commercial
+// items (soft-deleted documents and superseded Quotation revisions
+// excluded). One RPC call computes every member's row server-side
+// (public.admin_team_summary) instead of 1 + 4*N round trips.
 export function listTeamMembers(): Promise<TeamMember[]>;
 export function listTeamMembers(
   client: TeamSupabaseClient,
@@ -174,84 +160,10 @@ export function listTeamMembers(
 export async function listTeamMembers(
   client: TeamSupabaseClient = realTeamClient,
 ): Promise<TeamMember[]> {
-  const profilesResult = await client
-    .from("profiles")
-    .select(
-      "id, name, initials, role, email, account_status, status_changed_at, status_changed_by, status_change_reason",
-    );
-  throwQueryError(profilesResult.error);
-
-  const profiles = (profilesResult.data ?? []) as ProfileRow[];
-  return mapInBatches(profiles, TEAM_SUMMARY_BATCH_SIZE, async (row) => {
-    const [clientsResult, tasksResult, commercialResult, logResult] =
-      await Promise.all([
-        client
-          .from("clients")
-          .select("id", { count: "exact", head: true })
-          .eq("owner_id", row.id)
-          .neq("status", "Lost"),
-        client
-          .from("tasks")
-          .select("id", { count: "exact", head: true })
-          .eq("owner_id", row.id)
-          .in("workflow_status", [...ACTIVE_TRANSFER_WORKFLOW_STATUSES])
-          .eq("archived", false),
-        countActiveCommercialItems(row.id, client),
-        client
-          .from("activity_log")
-          .select(
-            "target_profile_id, kind, title, administrative_reason, created_at",
-          )
-          .eq("target_profile_id", row.id)
-          .in("kind", [...ADMIN_ACTIVITY_KINDS])
-          .order("created_at", { ascending: false })
-          .limit(1),
-      ]);
-
-    const clients = exactCount(clientsResult);
-    const tasks = exactCount(tasksResult);
-    const commercialItems = commercialResult;
-    throwQueryError(logResult.error);
-    const lastChange = (
-      Array.isArray(logResult.data) ? (logResult.data[0] ?? null) : null
-    ) as AdminActivityRow | null;
-
-    return {
-      id: row.id,
-      name: row.name,
-      initials: row.initials,
-      role: row.role,
-      email: row.email,
-      accountStatus: row.account_status,
-      ...(row.status_changed_at
-        ? { statusChangedAt: row.status_changed_at }
-        : {}),
-      ...(row.status_changed_by
-        ? { statusChangedBy: row.status_changed_by }
-        : {}),
-      ...(row.status_change_reason
-        ? { statusChangeReason: row.status_change_reason }
-        : {}),
-      ownedActiveCounts: {
-        clients,
-        tasks,
-        commercialItems,
-        total: clients + tasks + commercialItems,
-      },
-      ...(lastChange
-        ? {
-            lastAdministrativeChange: {
-              kind: lastChange.kind,
-              title: lastChange.title,
-              ...(lastChange.administrative_reason
-                ? { reason: lastChange.administrative_reason }
-                : {}),
-              createdAt: lastChange.created_at,
-            },
-          }
-        : {}),
-    };
-  });
+  const result = await client.rpc("admin_team_summary", {});
+  throwQueryError(result.error);
+  const rows = (result.data ?? []) as AdminTeamSummaryRow[];
+  return rows.map(toTeamMember);
 }
 
 export function getCurrentProfileId(): Promise<string | undefined>;
