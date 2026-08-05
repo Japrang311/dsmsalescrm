@@ -34,7 +34,7 @@ Note: `bun test` (bare, no `run`) will fail with a missing-env-var error — Bun
 
 The repository uses `bun:test`; `bun run test` loads `.env.local` and includes RLS/data-layer/import tests against local Supabase where applicable.
 
-`vite.config.ts` is intentionally minimal — `@lovable.dev/vite-tanstack-config` already wires TanStack devtools, `tanstackStart`, `viteReact`, `tailwindcss`, `tsConfigPaths`, nitro, `@` path alias, and React/TanStack dedupe. Do not re-add any of those plugins manually or the app breaks with duplicate plugins.
+`vite.config.ts` is the canonical manual Vite/TanStack Start wiring for this repo. It directly configures `tanstackStart`, `nitro`, `@vitejs/plugin-react`, `tailwindcss`, `vite-tsconfig-paths`, the `@` path alias, and React/TanStack dedupe. There is no `@lovable.dev/vite-tanstack-config` dependency in `package.json`; do not assume Lovable owns this config indirectly.
 
 ## Architecture
 
@@ -107,4 +107,4 @@ When extending business data, follow the current core business flows (PRD §6):
 
 ### Error handling
 
-`src/lib/error-capture.ts` / `error-page.ts` and `src/lib/lovable-error-reporting.ts` wire SSR/client error capture into Lovable's error reporting pipeline — see `src/server.ts` for the SSR entry (referenced from `vite.config.ts`'s `tanstackStart.server.entry`).
+`src/lib/error-capture.ts`, `src/lib/error-page.ts`, `src/lib/server-monitoring.ts`, and `src/lib/browser-monitoring.ts` wire SSR/client error capture. Sentry is env-gated: set `SENTRY_DSN` for server monitoring and `VITE_SENTRY_DSN` for browser monitoring; without those DSNs the app keeps its local error-page fallback only. See `src/server.ts` for the SSR entry (referenced from `vite.config.ts`'s `tanstackStart.server.entry`).

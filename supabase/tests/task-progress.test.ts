@@ -3,6 +3,7 @@ import {
   adminClient,
   createRoleFixtureUsers,
   deleteRoleFixtureUsers,
+  jakartaDateDaysFromToday,
   signInAs,
   type RoleFixtureUsers,
 } from "./helpers";
@@ -84,7 +85,10 @@ async function runSql(sqlText: string): Promise<void> {
   }
 }
 
-async function insertTask(ownerId: string, dueDate = "2026-07-01") {
+async function insertTask(
+  ownerId: string,
+  dueDate = jakartaDateDaysFromToday(-10),
+) {
   const { data, error } = await adminClient
     .from("tasks")
     .insert({

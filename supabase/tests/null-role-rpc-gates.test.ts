@@ -132,10 +132,7 @@ afterAll(async () => {
     // per call (spec: docs/superpowers/specs/2026-08-03-quotation-mandatory-followup-design.md)
     // -- clean these up before commercial_documents/clients, otherwise
     // tasks.client_id's FK blocks the clients delete below.
-    await adminClient
-      .from("tasks")
-      .delete()
-      .eq("owner_id", users().sales.id);
+    await adminClient.from("tasks").delete().eq("owner_id", users().sales.id);
     await adminClient
       .from("commercial_documents")
       .delete()

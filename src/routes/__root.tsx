@@ -11,6 +11,12 @@ import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { Toaster } from "@/components/ui/sonner";
+import {
+  captureBrowserException,
+  initBrowserMonitoring,
+} from "@/lib/browser-monitoring";
+
+void initBrowserMonitoring();
 
 function NotFoundComponent() {
   return (
@@ -39,6 +45,10 @@ function NotFoundComponent() {
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   console.error(error);
   const router = useRouter();
+
+  useEffect(() => {
+    captureBrowserException(error);
+  }, [error]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">

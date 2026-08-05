@@ -3,6 +3,7 @@ import {
   adminClient,
   createRoleFixtureUsers,
   deleteRoleFixtureUsers,
+  jakartaDateDaysFromToday,
   signInAs,
   type RoleFixtureUsers,
 } from "./helpers";
@@ -28,7 +29,7 @@ beforeAll(async () => {
       client_id: anyClient.id,
       owner_id: fixtures.sales.id,
       title: "Fixture Own Task",
-      due_date: "2026-07-17",
+      due_date: jakartaDateDaysFromToday(-10),
       method: "Phone",
     })
     .select("id")
@@ -41,7 +42,7 @@ beforeAll(async () => {
       client_id: anyClient.id,
       owner_id: "22222222-2222-2222-2222-222222222222",
       title: "Fixture Other Task",
-      due_date: "2026-07-17",
+      due_date: jakartaDateDaysFromToday(-10),
       method: "Phone",
     })
     .select("id")
@@ -216,7 +217,7 @@ describe("tasks new workflow columns (workflow_status/category/next_action)", ()
         client_id: null,
         owner_id: fixtures.sales.id,
         title: "Fixture task without a Client",
-        due_date: "2026-07-17",
+        due_date: jakartaDateDaysFromToday(-10),
         method: "Phone",
       })
       .select("id, client_id")

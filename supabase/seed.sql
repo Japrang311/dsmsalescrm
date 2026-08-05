@@ -228,3 +228,175 @@ values
 -- -----------------------------------------------------------------------
 
 select private.migrate_commercial_document_data();
+
+-- -----------------------------------------------------------------------
+-- Synthetic local workload for realistic development/testing volume.
+--
+-- This is not production data and does not try to preserve real document
+-- numbers. It gives local `db reset` enough normalized Quotation/SO/items
+-- rows to exercise report filters, owner scoping, grouping, dashboard
+-- totals, and list performance against non-trivial shapes.
+-- -----------------------------------------------------------------------
+
+with client_pool as (
+  select
+    id,
+    owner_id,
+    row_number() over (order by id) as rn,
+    count(*) over () as total_clients
+  from public.clients
+),
+quote_source as (
+  select
+    n,
+    c.id as client_id,
+    c.owner_id,
+    (date '2026-01-03' + ((n * 3) % 210)::integer) as document_date,
+    case
+      when n % 7 = 0 then 'Existing / Repeat Order'
+      when n % 11 = 0 then 'Prototype'
+      else 'RFQ / New Product'
+    end::public.source_flow as source_flow,
+    case
+      when n % 13 = 0 then 'Closed Lost'
+      when n % 5 = 0 then 'Negotiation'
+      else 'Quotes Sent'
+    end as stage
+  from generate_series(1, 120) as g(n)
+  join client_pool c
+    on c.rn = ((g.n - 1) % c.total_clients) + 1
+),
+inserted_quotes as (
+  insert into public.commercial_documents (
+    client_id,
+    owner_id,
+    type,
+    source_flow,
+    document_date,
+    quotation_number,
+    quotation_base_number,
+    stage,
+    lost_reason,
+    note
+  )
+  select
+    client_id,
+    owner_id,
+    'Quotation',
+    source_flow,
+    document_date,
+    'DSM-26QUO-SEED-' || lpad(n::text, 4, '0'),
+    'DSM-26QUO-SEED-' || lpad(n::text, 4, '0'),
+    stage,
+    case when stage = 'Closed Lost' then 'Harga tidak kompetitif' else null end,
+    'Synthetic local seed quotation #' || n
+  from quote_source
+  returning id, quotation_number
+)
+insert into public.commercial_document_items (
+  commercial_document_id,
+  product_name,
+  description,
+  qty,
+  uom,
+  unit_price,
+  line_total,
+  line_position
+)
+select
+  q.id,
+  'Panel fabrication seed item ' || p.line_position,
+  'Synthetic quotation detail',
+  (1 + ((right(q.quotation_number, 4)::integer + p.line_position) % 5))::numeric,
+  case when p.line_position = 1 then 'Unit' else 'Pcs' end::public.uom_type,
+  (750000 + (right(q.quotation_number, 4)::integer * 25000))::numeric,
+  (
+    (1 + ((right(q.quotation_number, 4)::integer + p.line_position) % 5))
+    * (750000 + (right(q.quotation_number, 4)::integer * 25000))
+  )::numeric,
+  p.line_position
+from inserted_quotes q
+cross join lateral generate_series(1, 1 + (right(q.quotation_number, 4)::integer % 3)) as p(line_position);
+
+with client_pool as (
+  select
+    id,
+    owner_id,
+    row_number() over (order by id) as rn,
+    count(*) over () as total_clients
+  from public.clients
+),
+order_source as (
+  select
+    n,
+    c.id as client_id,
+    c.owner_id,
+    (date '2026-02-01' + ((n * 5) % 180)::integer) as order_date,
+    case when n % 9 = 0 then 'Prototype' else 'Regular' end::public.so_type as so_type,
+    case
+      when n % 9 = 0 and n % 18 = 0 then 'FOC'
+      when n % 9 = 0 then 'Paid'
+      else null
+    end::public.prototype_status as prototype_status
+  from generate_series(1, 72) as g(n)
+  join client_pool c
+    on c.rn = ((g.n * 2 - 1) % c.total_clients) + 1
+),
+inserted_orders as (
+  insert into public.sales_orders (
+    so_number,
+    customer_po_number,
+    date,
+    client_id,
+    owner_id,
+    type,
+    tax_type,
+    prototype_status,
+    source,
+    number_mode,
+    total_value
+  )
+  select
+    'DSM-26SO-SEED-' || lpad(n::text, 4, '0'),
+    'PO-SEED-' || lpad(n::text, 4, '0'),
+    order_date,
+    client_id,
+    owner_id,
+    so_type,
+    case when n % 4 = 0 then 'Non-PPN' else 'PPN' end::public.tax_type,
+    prototype_status,
+    case
+      when prototype_status = 'FOC' then 'Prototype FOC'
+      when prototype_status = 'Paid' then 'Prototype Paid'
+      when n % 6 = 0 then 'Existing / Repeat Order'
+      else 'RFQ / New Product'
+    end::public.revenue_source,
+    'Manual',
+    case
+      when prototype_status = 'FOC' then null
+      else (2500000 + (n * 175000))::numeric
+    end
+  from order_source
+  returning id, so_number, total_value
+)
+insert into public.sales_order_items (
+  sales_order_id,
+  product_name,
+  description,
+  qty,
+  uom,
+  unit_price,
+  line_total,
+  line_position
+)
+select
+  so.id,
+  'SO seed item ' || p.line_position,
+  'Synthetic sales order detail',
+  p.line_position::numeric,
+  'Pcs'::public.uom_type,
+  case when so.total_value is null then null else (so.total_value / 3)::numeric end,
+  case when so.total_value is null then null else (so.total_value / 3 * p.line_position)::numeric end,
+  p.line_position
+from inserted_orders so
+cross join lateral generate_series(1, 2) as p(line_position);
