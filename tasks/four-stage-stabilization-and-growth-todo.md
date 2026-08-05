@@ -36,14 +36,14 @@
 - [x] Remove or honestly disable fake archive/create/saved-view behavior.
 - [x] Surface incomplete business-calendar warning.
 - [x] Set root document language to Indonesian.
-- [ ] Validate exact cache update and invalidation behavior.
+- [x] Validate exact cache update and invalidation behavior. Confirmed on 2026-08-05: `LogCommercialFollowUpDialog`, the Pipeline drag-drop stage transition, and the Pipeline drawer quick-update all invalidate the same four query-key prefixes (`tasks`, `commercial-items`, `follow-ups`, `activity-log`) matching every consuming query; live-tested a follow-up logged on Quotation Detail correctly propagating to the Pipeline board's next-action badge. Found and fixed a related pre-existing gap in the same area: `CommercialViews.tsx` (Quotations/SO table + board views) read `it.nextActionDate` directly — a field the normalized read path never populates — so "Next FU" always showed "—" regardless of logged follow-ups; now falls back to the earliest active linked Task due date, same as Pipeline's `nextByItem` logic. Typecheck/lint clean, verified in both Table and Board view with zero console errors.
 
 ### Checkpoint
 
 - [x] Fresh local Supabase reset succeeds.
 - [x] Full database and application tests pass.
 - [x] Typecheck, lint, and build pass with warning delta documented.
-- [ ] Manual reload confirms persisted state for each changed flow. Pipeline transition and Client Quick Create follow-up passed local browser reload smoke; commercial-detail follow-up dialog remains unverified in browser.
+- [x] Manual reload confirms persisted state for each changed flow. Pipeline transition, Client Quick Create follow-up, and commercial-detail follow-up dialog (`LogCommercialFollowUpDialog` on Quotation Detail) all passed local browser reload smoke on 2026-08-05 — follow-up entry, new Task, and next-action fields persisted verbatim after reload with zero console errors.
 - [x] Role matrix passes for Sales/Manager/Executive/Super Admin/inactive.
 - [x] Dated Stage 1 verification report is reviewed.
 
@@ -61,7 +61,7 @@
 - [x] Automate normalized Quotation/Sales Order creation smoke. Browser E2E creates a normalized Quotation and Sales Order from Client Detail and verifies routed lists.
 - [x] Automate representative unauthorized-write denial. Browser/RLS E2E verifies Executive read-only Task UI and direct Executive `create_sales_order` RPC denial.
 - [x] Automate Reports/export smoke. Browser E2E verifies Dashboard CSV dropdown download.
-- [ ] Verify Sentry environment/release/source-map contract without exposing secrets. Environment/release config now has unit coverage; source-map upload and external ingestion remain unverified.
+- [x] Verify Sentry environment/release/source-map contract without exposing secrets. Environment/release config already had unit coverage (`monitoring-config.test.ts`, 5 cases). Source-map upload had no implementation at all (no plugin, no `build.sourcemap`, no DSN anywhere) — wired `@sentry/vite-plugin` into `vite.config.ts` on 2026-08-05, gated on `SENTRY_AUTH_TOKEN`/`SENTRY_ORG`/`SENTRY_PROJECT` all being present, a no-op otherwise. Dry-run built twice with throwaway fake credentials (never real secrets) to prove both branches: (1) no token → build succeeds, zero `.map` files emitted; (2) fake token → plugin activates, attempts real upload, fails auth cleanly without crashing the build. That dry run surfaced a real gap: the plugin only deletes local `.map` files after a *successful* upload, so a misconfigured/expired token in production would silently ship full source maps in the public static output (112 files did leak in the failed-upload dry run). Fixed by switching to `sourcemap: "hidden"` — maps are still generated for Sentry but the `sourceMappingURL` comment is omitted, so even an undeleted map isn't linked from the shipped JS (verified: 0 `sourceMappingURL` references in output after the fix). External ingestion into a real Sentry project remains untested — no Sentry project/DSN exists for this app yet; that requires the owner creating one and supplying `SENTRY_DSN`/`VITE_SENTRY_DSN` plus the upload token, which is a credential/account decision outside this pass. Typecheck, full test suite (533 pass), and lint all clean after the change.
 - [x] Prove CI passes on a clean clone and fresh local database. Latest pushed baseline GitHub Actions run `30985051161` passed on commit `dba65bb`; current local browser expansion still needs a post-push CI run.
 - [ ] Review dated Stage 2 verification report. Local browser automation now covers all planned critical workflows; Sentry source-map/external ingestion and GitHub-hosted CI evidence for this uncommitted update remain open.
 

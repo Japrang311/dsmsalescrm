@@ -49,6 +49,8 @@ import {
   listOwners,
   listSalesTeamProfiles,
 } from "@/lib/data/clients";
+import { listTasks } from "@/lib/data/tasks";
+import { activeCommercialTasks } from "@/lib/data/task-relations";
 
 // Quotation is the remaining CommercialViews consumer.
 export type CommercialViewFilter = {
@@ -113,6 +115,11 @@ export function CommercialViews(props: CommercialViewsProps) {
     queryFn: listSalesTeamProfiles,
     enabled: authReady && role !== "sales",
   });
+  const { data: tasks = [] } = useQuery({
+    queryKey: ["tasks", "all"],
+    queryFn: listTasks,
+    enabled: authReady,
+  });
   const clients = useMemo(() => {
     const map: Record<string, (typeof clientList)[number]> = {};
     for (const c of clientList) map[c.id] = c;
@@ -157,6 +164,24 @@ export function CommercialViews(props: CommercialViewsProps) {
       return true;
     });
   }, [scoped, ownerFilter, stageFilter, q, clients]);
+
+  // `nextActionDate` on CommercialItem is not populated by the normalized
+  // read path; fall back to the earliest active linked Task due date, same
+  // as the Pipeline board.
+  const nextByItem = useMemo(() => {
+    const map = new Map<string, string | undefined>();
+    for (const it of filtered) {
+      if (it.nextActionDate) {
+        map.set(it.id, it.nextActionDate);
+        continue;
+      }
+      const related = activeCommercialTasks(tasks, it.id)
+        .map((t) => t.dueDate)
+        .sort();
+      map.set(it.id, related[0]);
+    }
+    return map;
+  }, [filtered, tasks]);
 
   const totalValue = filtered.reduce((s, it) => s + it.estimatedValue, 0);
 
@@ -355,7 +380,7 @@ export function CommercialViews(props: CommercialViewsProps) {
                   {filtered.map((it) => {
                     const client = clients[it.clientId];
                     const owner = owners[it.ownerId];
-                    const next = it.nextActionDate;
+                    const next = nextByItem.get(it.id);
                     const nextDays = next ? daysBetween(NOW, next) : null;
                     const aging = daysBetween(new Date(it.updatedAt), NOW);
                     const overdue = nextDays !== null && nextDays < 0;
@@ -547,7 +572,7 @@ export function CommercialViews(props: CommercialViewsProps) {
                     col.map((it) => {
                       const client = clients[it.clientId];
                       const owner = owners[it.ownerId];
-                      const next = it.nextActionDate;
+                      const next = nextByItem.get(it.id);
                       const nextDays = next ? daysBetween(NOW, next) : null;
                       return (
                         <Link
