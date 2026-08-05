@@ -8,6 +8,11 @@ import type {
 } from "@/lib/domain";
 import type { FollowUpResult } from "@/lib/data/follow-ups";
 import type { Uom } from "./document-numbering";
+import {
+  encodePageCursor,
+  normalizeListPageInput,
+  type ListPageInput,
+} from "@/lib/pagination-contracts";
 
 export type LineItemInput = {
   productName: string;
@@ -162,6 +167,82 @@ export async function listCommercialDocuments(
   const { data, error } = await query;
   if (error) throw error;
   return ((data ?? []) as CommercialDocumentRow[]).map(toDocument);
+}
+
+// ---------------------------------------------------------------------------
+// Stage 3 pagination: bounded per-stage keyset query + aggregate RPC wrapper
+// ---------------------------------------------------------------------------
+
+export type CommercialDocumentPageFilters = {
+  stage?: string;
+  ownerId?: string;
+  clientStatus?: string;
+};
+
+export type CommercialDocumentPage = {
+  rows: CommercialDocumentWithItems[];
+  totalCount: number;
+  nextCursor: string | null;
+};
+
+/**
+ * Bounded keyset-paginated query for Pipeline kanban columns.
+ * Only returns current Quotation revisions (is_current_revision = true) —
+ * the Pipeline bug fix for superseded revisions appearing as duplicate cards.
+ */
+export async function listCommercialDocumentsPage(input: {
+  filters?: CommercialDocumentPageFilters;
+  page?: ListPageInput;
+}): Promise<CommercialDocumentPage> {
+  const filters = input.filters ?? {};
+  const page = normalizeListPageInput(input.page);
+
+  let query = supabase
+    .from("commercial_documents")
+    .select("*, commercial_document_items(*)", { count: "exact" })
+    .neq("type", "RFQ")
+    .is("deleted_at", null)
+    // Bug fix: only current Quotation revisions on the Pipeline board
+    .or("type.neq.Quotation,is_current_revision.eq.true")
+    .order("updated_at", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(page.pageSize + 1);
+
+  if (filters.stage) {
+    query = query.eq("stage", filters.stage);
+  }
+  if (filters.ownerId && filters.ownerId !== "all") {
+    query = query.eq("owner_id", filters.ownerId);
+  }
+  if (filters.clientStatus && filters.clientStatus !== "all") {
+    // Filter by client status via embedded resource join
+    query = query.eq("clients.status", filters.clientStatus);
+  }
+
+  if (page.cursor) {
+    query = query.or(
+      `updated_at.lt.${page.cursor.sortValue},and(updated_at.eq.${page.cursor.sortValue},id.lt.${page.cursor.id})`,
+    );
+  }
+
+  const { data, error, count } = await query;
+  if (error) throw error;
+
+  const rawRows = (data ?? []) as CommercialDocumentRow[];
+  const pageRows = rawRows.slice(0, page.pageSize);
+  const lastRow = pageRows.at(-1);
+
+  return {
+    rows: pageRows.map(toDocument),
+    totalCount: count ?? pageRows.length,
+    nextCursor:
+      rawRows.length > page.pageSize && lastRow
+        ? encodePageCursor({
+            sortValue: lastRow.updated_at,
+            id: lastRow.id,
+          })
+        : null,
+  };
 }
 
 export async function getCommercialDocument(

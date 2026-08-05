@@ -7,16 +7,25 @@ import {
   CalendarClock,
   GripVertical,
   ArrowRight,
+  ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PipelineCardDrawer } from "@/components/pipeline/PipelineCardDrawer";
 import { PipelineAnalytics } from "@/components/pipeline/PipelineAnalytics";
 
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRole } from "@/context/role-context";
 import { NOW, type QuotationLostReason, type Role } from "@/lib/domain";
-import { listCommercialItems } from "@/lib/data/commercial-items";
-import { transitionCommercialStage } from "@/lib/data/commercial-documents";
+import {
+  listCommercialItems,
+  toCommercialItem,
+} from "@/lib/data/commercial-items";
+import {
+  listCommercialDocumentsPage,
+  transitionCommercialStage,
+  type CommercialDocumentPageFilters,
+} from "@/lib/data/commercial-documents";
+import { getPipelineMetrics } from "@/lib/data/pipeline-metrics";
 import {
   listClients,
   listOwners,
@@ -56,6 +65,7 @@ import {
   QUOTATION_LOST_REASONS,
   validateQuotationLostReason,
 } from "@/lib/data/quotation-lost-reasons";
+import { listQueryKey } from "@/lib/pagination-contracts";
 
 export const Route = createFileRoute("/_app/pipeline")({
   head: () => ({
@@ -100,20 +110,65 @@ function PipelinePage() {
 function PipelineBoard({ role }: { role: Role }) {
   const { authReady } = useRole();
   const queryClient = useQueryClient();
-  const { data: items = [], isLoading: itemsLoading } = useQuery({
-    queryKey: ["commercial-items", "all"],
-    queryFn: listCommercialItems,
+
+  const [owner, setOwner] = useState<string>("all");
+  const [status, setStatus] = useState<string>("all");
+  const [nextWindow, setNextWindow] = useState<NextWindow>("all");
+
+  // Per-stage cursors for "load more" pagination
+  const [stageCursors, setStageCursors] = useState<
+    Record<Stage, string | null>
+  >({} as Record<Stage, string | null>);
+
+  const filters = useMemo<CommercialDocumentPageFilters>(
+    () => ({
+      ownerId: owner !== "all" ? owner : undefined,
+      clientStatus: status !== "all" ? status : undefined,
+    }),
+    [owner, status],
+  );
+
+  // Reset cursors when filters change
+  useMemo(() => {
+    setStageCursors({} as Record<Stage, string | null>);
+  }, [filters]);
+
+  // Per-stage paginated queries (6 columns, fetched in parallel)
+  const stageQueries = useQueries({
+    queries: STAGES.map((stage) => ({
+      queryKey: listQueryKey("commercial-documents", "page", {
+        filters: { ...filters, stage },
+        page: { pageSize: 50, cursor: stageCursors[stage] ?? null },
+      }),
+      queryFn: () =>
+        listCommercialDocumentsPage({
+          filters: { ...filters, stage },
+          page: { pageSize: 50, cursor: stageCursors[stage] ?? null },
+        }),
+      enabled: authReady,
+    })),
+  });
+
+  // Aggregate metrics query (server-side totals, replaces client-side compute)
+  const { data: metrics } = useQuery({
+    queryKey: listQueryKey("commercial-documents", "aggregate", {
+      filters,
+    }),
+    queryFn: () =>
+      getPipelineMetrics({
+        ownerId: filters.ownerId,
+        clientStatus: filters.clientStatus as
+          | import("@/lib/domain").ClientStatus
+          | undefined,
+      }),
     enabled: authReady,
   });
+
   const { data: tasks = [] } = useQuery({
     queryKey: ["tasks", "all"],
     queryFn: listTasks,
     enabled: authReady,
   });
-
-  const [owner, setOwner] = useState<string>("all");
-  const [status, setStatus] = useState<string>("all");
-  const [nextWindow, setNextWindow] = useState<NextWindow>("all");
 
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverStage, setDragOverStage] = useState<Stage | null>(null);
@@ -155,12 +210,19 @@ function PipelineBoard({ role }: { role: Role }) {
     return map;
   }, [clientList]);
 
+  // Flatten all loaded items across stages for lookups (drag source, drawer, etc.)
+  const allLoadedItems = useMemo(() => {
+    return stageQueries.flatMap((q) =>
+      (q.data?.rows ?? []).map(toCommercialItem),
+    );
+  }, [stageQueries]);
+
   // For each commercial item, compute the earliest upcoming (or most-overdue) task date.
   // `items` is the real commercial_items data, so it.nextActionDate is
   // already authoritative — only fall back to related tasks if it's unset.
   const nextByItem = useMemo(() => {
     const map = new Map<string, string | undefined>();
-    for (const it of items) {
+    for (const it of allLoadedItems) {
       if (it.nextActionDate) {
         map.set(it.id, it.nextActionDate);
         continue;
@@ -171,43 +233,8 @@ function PipelineBoard({ role }: { role: Role }) {
       map.set(it.id, related[0]);
     }
     return map;
-  }, [items, tasks]);
+  }, [allLoadedItems, tasks]);
 
-  const filtered = useMemo(() => {
-    return items.filter((it) => {
-      const client = clientById[it.clientId];
-      if (!client) return false;
-      if (owner !== "all" && it.ownerId !== owner) return false;
-      if (status !== "all" && client.status !== status) return false;
-      const next = nextByItem.get(it.id);
-      if (nextWindow !== "all") {
-        if (nextWindow === "none") {
-          if (next) return false;
-        } else {
-          if (!next) return false;
-          const d = daysBetween(NOW, next);
-          if (nextWindow === "overdue" && d >= 0) return false;
-          if (nextWindow === "today" && d !== 0) return false;
-          if (nextWindow === "week" && (d < 0 || d > 7)) return false;
-        }
-      }
-      return true;
-    });
-  }, [items, clientById, owner, status, nextWindow, nextByItem]);
-
-  const grouped = useMemo(() => {
-    const g = new Map<Stage, typeof items>();
-    for (const s of STAGES) g.set(s, []);
-    for (const it of filtered) {
-      const key = (STAGES as readonly string[]).includes(it.stage)
-        ? (it.stage as Stage)
-        : "Quotes Sent";
-      g.get(key)!.push(it);
-    }
-    return g;
-  }, [filtered]);
-
-  const totalValue = filtered.reduce((s, it) => s + it.estimatedValue, 0);
   const activeFilters =
     (owner !== "all" ? 1 : 0) +
     (status !== "all" ? 1 : 0) +
@@ -219,7 +246,7 @@ function PipelineBoard({ role }: { role: Role }) {
     enabled: authReady,
   });
   const pendingMoveItem = pendingMove
-    ? items.find((item) => item.id === pendingMove.itemId)
+    ? allLoadedItems.find((item) => item.id === pendingMove.itemId)
     : undefined;
   const collectsLostReason =
     pendingMove && pendingMoveItem
@@ -238,10 +265,20 @@ function PipelineBoard({ role }: { role: Role }) {
 
   const canDrag = role !== "executive";
 
+  function loadMore(stage: Stage) {
+    const query = stageQueries[STAGES.indexOf(stage)];
+    if (query.data?.nextCursor) {
+      setStageCursors((prev) => ({
+        ...prev,
+        [stage]: query.data.nextCursor,
+      }));
+    }
+  }
+
   function handleDrop(stage: Stage) {
     setDragOverStage(null);
     if (!draggingId) return;
-    const item = items.find((i) => i.id === draggingId);
+    const item = allLoadedItems.find((i) => i.id === draggingId);
     setDraggingId(null);
     if (!item) return;
     const fromStage = item.stage as Stage;
@@ -266,7 +303,7 @@ function PipelineBoard({ role }: { role: Role }) {
 
   async function confirmMove() {
     if (!pendingMove) return;
-    const item = items.find((i) => i.id === pendingMove.itemId);
+    const item = allLoadedItems.find((i) => i.id === pendingMove.itemId);
     if (!item) return;
     const lostReasonError = validateQuotationLostReason({
       type: item.type,
@@ -325,8 +362,11 @@ function PipelineBoard({ role }: { role: Role }) {
           : null,
         ...command,
       });
+      // Invalidate all stage pages + aggregate + related queries
+      await queryClient.invalidateQueries({
+        queryKey: ["commercial-documents"],
+      });
       await queryClient.invalidateQueries({ queryKey: ["tasks"] });
-      await queryClient.invalidateQueries({ queryKey: ["commercial-items"] });
       await queryClient.invalidateQueries({ queryKey: ["follow-ups"] });
       await queryClient.invalidateQueries({ queryKey: ["activity-log"] });
       toast.success(`${pendingMove.clientName} → ${pendingMove.toStage}`, {
@@ -342,7 +382,10 @@ function PipelineBoard({ role }: { role: Role }) {
     setPendingMove(null);
   }
 
-  if (!authReady || itemsLoading) {
+  const isLoading =
+    !authReady || stageQueries.some((q) => q.isLoading) || !metrics;
+
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center rounded-lg border border-dashed py-16 text-sm text-muted-foreground">
         Loading pipeline…
@@ -360,8 +403,8 @@ function PipelineBoard({ role }: { role: Role }) {
             Commercial Pipeline
           </h1>
           <p className="text-sm text-muted-foreground">
-            {filtered.length} item · Total estimasi{" "}
-            {formatRupiahShort(totalValue)}
+            {metrics.totals.itemCount} item · Total estimasi{" "}
+            {formatRupiahShort(metrics.totals.totalValue)}
             {canDrag && (
               <span className="ml-2 hidden md:inline text-muted-foreground/70">
                 · Drag kartu untuk pindah stage
@@ -441,7 +484,7 @@ function PipelineBoard({ role }: { role: Role }) {
 
       {/* Analytics */}
       <PipelineAnalytics
-        items={filtered}
+        metrics={metrics}
         showOwners={role !== "sales"}
         ownerById={ownerById}
       />
@@ -451,9 +494,11 @@ function PipelineBoard({ role }: { role: Role }) {
           board simply ends at "Commit". */}
       <div className="relative">
         <div className="flex gap-3 overflow-x-auto pb-3">
-          {STAGES.map((stage) => {
-            const col = grouped.get(stage) ?? [];
+          {STAGES.map((stage, stageIndex) => {
+            const query = stageQueries[stageIndex];
+            const col = (query.data?.rows ?? []).map(toCommercialItem);
             const sum = col.reduce((s, it) => s + it.estimatedValue, 0);
+            const hasMore = query.data?.nextCursor !== null;
             const isDropTarget = dragOverStage === stage && draggingId !== null;
             return (
               <div
@@ -487,7 +532,8 @@ function PipelineBoard({ role }: { role: Role }) {
                       {stage}
                     </p>
                     <p className="text-[11px] text-muted-foreground tabular-nums">
-                      {col.length} · {formatRupiahShort(sum)}
+                      {col.length}
+                      {hasMore ? "+" : ""} · {formatRupiahShort(sum)}
                     </p>
                   </div>
                   <span
@@ -499,6 +545,7 @@ function PipelineBoard({ role }: { role: Role }) {
                     )}
                   >
                     {col.length}
+                    {hasMore ? "+" : ""}
                   </span>
                 </div>
 
@@ -603,15 +650,26 @@ function PipelineBoard({ role }: { role: Role }) {
                       );
                     })
                   )}
+
+                  {/* Load more button for stages with additional items */}
+                  {hasMore && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="mt-1 w-full text-xs text-muted-foreground"
+                      onClick={() => loadMore(stage)}
+                      disabled={query.isFetching}
+                    >
+                      <ChevronDown className="mr-1 h-3 w-3" />
+                      {query.isFetching ? "Memuat…" : "Muat lebih banyak"}
+                    </Button>
+                  )}
                 </div>
               </div>
             );
           })}
         </div>
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-border-strong/40 to-transparent"
-        />
+        <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-background to-transparent" />
       </div>
 
       <Dialog
@@ -793,18 +851,19 @@ function PipelineBoard({ role }: { role: Role }) {
         }}
         item={
           drawerItemId
-            ? (items.find((i) => i.id === drawerItemId) ?? null)
+            ? (allLoadedItems.find((i) => i.id === drawerItemId) ?? null)
             : null
         }
         client={
           drawerItemId
             ? (clientById[
-                items.find((i) => i.id === drawerItemId)?.clientId ?? ""
+                allLoadedItems.find((i) => i.id === drawerItemId)?.clientId ??
+                  ""
               ] ?? null)
             : null
         }
         currentNext={drawerItemId ? nextByItem.get(drawerItemId) : undefined}
-        allItems={items}
+        allItems={allLoadedItems}
         profilesById={ownerById}
       />
     </div>
