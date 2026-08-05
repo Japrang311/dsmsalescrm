@@ -1,10 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import {
   DateRangePicker,
   type PeriodRange,
 } from "@/components/dashboard/DateRangePicker";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -16,8 +16,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { listClients, listOwners } from "@/lib/data/clients";
-import { listCommercialItems } from "@/lib/data/commercial-items";
-import { listAllFollowUps } from "@/lib/data/follow-ups";
 import { useRole } from "@/context/role-context";
 import {
   Activity,
@@ -54,9 +52,15 @@ import {
   exportActivityPdf,
   type ActivityExportEvent,
 } from "@/lib/export-activity";
-import { listActivityLog } from "@/lib/data/activity-log";
-import { buildActivityFeed, type FeedEvent } from "@/lib/data/activity-feed";
-import { matchesActivitySearch } from "@/lib/data/activity-search";
+import type { FeedEvent } from "@/lib/data/activity-feed";
+import {
+  listActivityFeedPage,
+  listAllActivityFeedEvents,
+  listRelatedActivityFeedEvents,
+  mapActivityFeedRow,
+  type ActivityFeedFilters,
+} from "@/lib/data/activity-feed-page";
+import { listQueryKey, serializeListFilters } from "@/lib/pagination-contracts";
 
 export const Route = createFileRoute("/_app/activity")({
   head: () => ({
@@ -150,51 +154,25 @@ function methodIcon(method: string) {
   }
 }
 
-function ActivityPage() {
-  const { role } = useRole();
+const PAGE_SIZE = 25;
 
-  // Persisted rows from activity_log. RLS scopes the result for the signed-in
-  // role, so the UI must not re-implement ownership filtering.
-  const { data: realActivity = [] } = useQuery({
-    queryKey: ["activity-log"],
-    queryFn: listActivityLog,
-  });
-  // Real follow-up logs (Task 27) — separate table, not activity_log.
-  const { data: realFollowUps = [] } = useQuery({
-    queryKey: ["follow-ups", "all"],
-    queryFn: listAllFollowUps,
-  });
+function ActivityPage() {
+  const { role, authReady } = useRole();
+
+  // owners/clients stay small, unbounded lookups — same pattern as every
+  // other route (Sales Orders, Clients). The heavy reads (activity_log +
+  // follow_up_logs merged into one timeline) are server-paginated below via
+  // the activity_feed_events view.
   const { data: owners = {} } = useQuery({
     queryKey: ["profiles", "owners"],
     queryFn: listOwners,
+    enabled: authReady,
   });
   const { data: clientList = [] } = useQuery({
     queryKey: ["clients", "all"],
     queryFn: listClients,
+    enabled: authReady,
   });
-  const { data: commercialItems = [] } = useQuery({
-    queryKey: ["commercial-items", "all"],
-    queryFn: listCommercialItems,
-  });
-
-  const clientName = useCallback(
-    (id?: string) => {
-      if (!id) return undefined;
-      return clientList.find((c) => c.id === id)?.name;
-    },
-    [clientList],
-  );
-
-  const events = useMemo<FeedEvent[]>(
-    () =>
-      buildActivityFeed({
-        activity: realActivity,
-        followUps: realFollowUps,
-        owners,
-        commercialItems,
-      }),
-    [realActivity, realFollowUps, owners, commercialItems],
-  );
 
   const [kindFilter, setKindFilter] = useState<string>("all");
   const [ownerFilter, setOwnerFilter] = useState<string>("all");
@@ -219,65 +197,68 @@ function ActivityPage() {
     return { from, to };
   }, [rangePreset, customRange]);
 
-  const scoped = useMemo(() => {
-    const fromMs = activeRange ? activeRange.from.getTime() : null;
-    const toMs = activeRange
-      ? new Date(
-          activeRange.to.getFullYear(),
-          activeRange.to.getMonth(),
-          activeRange.to.getDate(),
-          23,
-          59,
-          59,
-          999,
-        ).getTime()
-      : null;
-    return events.filter((e) => {
-      if (fromMs !== null && toMs !== null) {
-        const t = new Date(e.at).getTime();
-        if (Number.isNaN(t) || t < fromMs || t > toMs) return false;
-      }
-      if (kindFilter !== "all" && e.kind !== kindFilter) return false;
-      if (ownerFilter !== "all" && e.ownerName !== ownerFilter) return false;
-      if (query) {
-        if (
-          !matchesActivitySearch(
-            {
-              ...e,
-              clientName: clientName(e.clientId),
-            },
-            query,
-            KIND_META[e.kind].label,
+  const clientsById = useMemo(() => {
+    const map: Record<string, (typeof clientList)[number]> = {};
+    for (const c of clientList) map[c.id] = c;
+    return map;
+  }, [clientList]);
+  const clientName = (id?: string) => (id ? clientsById[id]?.name : undefined);
+
+  const serverFilters = useMemo<ActivityFeedFilters>(
+    () => ({
+      from: activeRange?.from,
+      to: activeRange
+        ? new Date(
+            activeRange.to.getFullYear(),
+            activeRange.to.getMonth(),
+            activeRange.to.getDate(),
+            23,
+            59,
+            59,
+            999,
           )
-        ) {
-          return false;
-        }
-      }
-      return true;
-    });
-  }, [events, kindFilter, ownerFilter, query, activeRange, clientName]);
-
-  const PAGE_SIZE = 25;
-  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
-
-  // Reset pagination when filters change the result set
-  useEffect(() => {
-    setVisibleCount(PAGE_SIZE);
-  }, [
-    scoped.length,
-    query,
-    kindFilter,
-    ownerFilter,
-    rangePreset,
-    customRange.from,
-    customRange.to,
-  ]);
-
-  const visible = useMemo(
-    () => scoped.slice(0, visibleCount),
-    [scoped, visibleCount],
+        : undefined,
+      feedKind: kindFilter,
+      ownerId: ownerFilter,
+      query,
+    }),
+    [activeRange, kindFilter, ownerFilter, query],
   );
-  const hasMore = visibleCount < scoped.length;
+  const filterKey = useMemo(
+    () =>
+      serializeListFilters({
+        from: serverFilters.from?.toISOString(),
+        to: serverFilters.to?.toISOString(),
+        feedKind: serverFilters.feedKind,
+        ownerId: serverFilters.ownerId,
+        query: serverFilters.query,
+      }),
+    [serverFilters],
+  );
+
+  const feedQuery = useInfiniteQuery({
+    queryKey: listQueryKey("activity-log", "page", {
+      filters: { key: filterKey },
+    }),
+    queryFn: ({ pageParam }: { pageParam: string | null }) =>
+      listActivityFeedPage({
+        filters: serverFilters,
+        page: { pageSize: PAGE_SIZE, cursor: pageParam },
+      }),
+    initialPageParam: null as string | null,
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
+    enabled: authReady,
+  });
+
+  const events = useMemo<FeedEvent[]>(
+    () =>
+      (feedQuery.data?.pages ?? []).flatMap((page) =>
+        page.rows.map((row) => mapActivityFeedRow(row, owners)),
+      ),
+    [feedQuery.data, owners],
+  );
+  const totalCount = feedQuery.data?.pages[0]?.totalCount ?? 0;
+  const hasMore = feedQuery.hasNextPage;
 
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
@@ -286,26 +267,29 @@ function ActivityPage() {
     if (!el) return;
     const io = new IntersectionObserver(
       (entries) => {
-        if (entries.some((x) => x.isIntersecting)) {
-          setVisibleCount((c) => Math.min(c + PAGE_SIZE, scoped.length));
+        if (
+          entries.some((x) => x.isIntersecting) &&
+          !feedQuery.isFetchingNextPage
+        ) {
+          void feedQuery.fetchNextPage();
         }
       },
       { rootMargin: "400px 0px" },
     );
     io.observe(el);
     return () => io.disconnect();
-  }, [hasMore, scoped.length]);
+  }, [hasMore, feedQuery]);
 
   const grouped = useMemo(() => {
     const m = new Map<string, FeedEvent[]>();
-    for (const e of visible) {
+    for (const e of events) {
       const day = e.at.slice(0, 10);
       const arr = m.get(day) ?? [];
       arr.push(e);
       m.set(day, arr);
     }
     return Array.from(m.entries()).sort((a, b) => (a[0] < b[0] ? 1 : -1));
-  }, [visible]);
+  }, [events]);
 
   const rangeLabel = useMemo(() => {
     if (rangePreset === "all") return "Semua waktu";
@@ -317,33 +301,44 @@ function ActivityPage() {
     return `${rangePreset} hari terakhir`;
   }, [rangePreset, customRange]);
 
-  function handleExport(format: "CSV" | "PDF") {
-    const payload: ActivityExportEvent[] = scoped.map((e) => ({
-      id: e.id,
-      at: e.at,
-      kindLabel: e.kindLabel ?? KIND_META[e.kind].label,
-      clientName: clientName(e.clientId),
-      ownerName: e.ownerName,
-      title: e.title,
-      detail: e.detail,
-      linkLabel: e.link?.label,
-    }));
-    const meta = {
-      role,
-      rangeLabel,
-      filters: {
-        keyword: query || undefined,
-        kind:
-          kindFilter === "all"
-            ? "Semua jenis"
-            : (KIND_META[kindFilter as FeedEvent["kind"]]?.label ?? kindFilter),
-        owner: ownerFilter === "all" ? "Semua owner" : ownerFilter,
-      },
-      fromISO: (activeRange?.from ?? new Date(0)).toISOString().slice(0, 10),
-      toISO: (activeRange?.to ?? new Date()).toISOString().slice(0, 10),
-    };
+  // Export must cover every filtered event, not just the loaded pages, so
+  // it fetches the full filtered set on demand — same pattern as Sales
+  // Orders' export.
+  async function handleExport(format: "CSV" | "PDF") {
     const toastId = toast.loading(`Menyiapkan Activity Log (${format})…`);
     try {
+      const rows = await listAllActivityFeedEvents(serverFilters);
+      const payload: ActivityExportEvent[] = rows.map((row) => {
+        const e = mapActivityFeedRow(row, owners);
+        return {
+          id: e.id,
+          at: e.at,
+          kindLabel: e.kindLabel ?? KIND_META[e.kind].label,
+          clientName: clientName(e.clientId),
+          ownerName: e.ownerName,
+          title: e.title,
+          detail: e.detail,
+          linkLabel: e.link?.label,
+        };
+      });
+      const meta = {
+        role,
+        rangeLabel,
+        filters: {
+          keyword: query || undefined,
+          kind:
+            kindFilter === "all"
+              ? "Semua jenis"
+              : (KIND_META[kindFilter as FeedEvent["kind"]]?.label ??
+                kindFilter),
+          owner:
+            ownerFilter === "all"
+              ? "Semua owner"
+              : (owners[ownerFilter]?.name ?? ownerFilter),
+        },
+        fromISO: (activeRange?.from ?? new Date(0)).toISOString().slice(0, 10),
+        toISO: (activeRange?.to ?? new Date()).toISOString().slice(0, 10),
+      };
       const count =
         format === "CSV"
           ? exportActivityCsv(payload, meta)
@@ -359,7 +354,6 @@ function ActivityPage() {
           description: err.message + " Ubah filter dan coba lagi.",
         });
         return;
-        return;
       }
       console.error("[export] activity failed", err);
       toast.error(`Gagal export Activity Log`, {
@@ -370,34 +364,28 @@ function ActivityPage() {
     }
   }
 
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const selected = useMemo(
+  const [selected, setSelected] = useState<FeedEvent | null>(null);
+  const relatedQuery = useQuery({
+    queryKey: ["activity-log", "related", selected?.id],
+    queryFn: () =>
+      listRelatedActivityFeedEvents({
+        excludeEventId: selected!.id,
+        at: selected!.at,
+        clientId: selected!.clientId,
+        commercialItemId: selected!.commercialItemId,
+        salesOrderId: selected!.salesOrderId,
+      }),
+    enabled:
+      !!selected &&
+      (!!selected.clientId ||
+        !!selected.commercialItemId ||
+        !!selected.salesOrderId),
+  });
+  const relatedEvents = useMemo<FeedEvent[]>(
     () =>
-      selectedId ? (events.find((e) => e.id === selectedId) ?? null) : null,
-    [selectedId, events],
+      (relatedQuery.data ?? []).map((row) => mapActivityFeedRow(row, owners)),
+    [relatedQuery.data, owners],
   );
-  const relatedEvents = useMemo<FeedEvent[]>(() => {
-    if (!selected) return [];
-    const selTime = new Date(selected.at).getTime();
-    const windowMs = 7 * 24 * 60 * 60 * 1000;
-    const selLinkKey = selected.link
-      ? `${selected.link.to}:${selected.link.params?.id ?? ""}`
-      : null;
-    return events
-      .filter((e) => {
-        if (e.id === selected.id) return false;
-        const sameClient =
-          !!selected.clientId && e.clientId === selected.clientId;
-        const sameLink =
-          !!selLinkKey &&
-          e.link &&
-          `${e.link.to}:${e.link.params?.id ?? ""}` === selLinkKey;
-        if (!sameClient && !sameLink) return false;
-        const t = new Date(e.at).getTime();
-        return Math.abs(t - selTime) <= windowMs;
-      })
-      .slice(0, 30);
-  }, [selected, events]);
 
   return (
     <div className="space-y-6 p-6">
@@ -463,7 +451,7 @@ function ActivityPage() {
               <SelectContent>
                 <SelectItem value="all">Semua owner</SelectItem>
                 {Object.entries(owners).map(([id, m]) => (
-                  <SelectItem key={id} value={m.name}>
+                  <SelectItem key={id} value={id}>
                     {m.name}
                   </SelectItem>
                 ))}
@@ -491,7 +479,7 @@ function ActivityPage() {
             )}
           </div>
           <div className="flex items-center justify-end text-sm text-muted-foreground md:col-span-3 lg:col-span-4">
-            {scoped.length} aktivitas
+            {totalCount} aktivitas
             {activeRange && (
               <span className="ml-2 text-xs">
                 · {activeRange.from.toLocaleDateString("id-ID")} —{" "}
@@ -533,7 +521,7 @@ function ActivityPage() {
                       <button
                         key={e.id}
                         type="button"
-                        onClick={() => setSelectedId(e.id)}
+                        onClick={() => setSelected(e)}
                         className="flex w-full gap-3 p-4 text-left transition-colors hover:bg-muted/40 focus:outline-none focus-visible:bg-muted/60"
                       >
                         <div
@@ -598,13 +586,13 @@ function ActivityPage() {
           <div ref={sentinelRef} />
           <div className="pt-2 text-center text-xs text-muted-foreground">
             {hasMore
-              ? `Memuat lebih banyak… (${visible.length} dari ${scoped.length})`
-              : `Menampilkan semua ${scoped.length} aktivitas`}
+              ? `Memuat lebih banyak… (${events.length} dari ${totalCount})`
+              : `Menampilkan semua ${totalCount} aktivitas`}
           </div>
         </div>
       )}
 
-      <Sheet open={!!selected} onOpenChange={(o) => !o && setSelectedId(null)}>
+      <Sheet open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
         <SheetContent
           side="right"
           className="w-full sm:max-w-lg overflow-y-auto"
@@ -679,7 +667,7 @@ function ActivityPage() {
                               to="/clients/$clientId"
                               params={{ clientId: selected.clientId }}
                               className="text-primary hover:underline"
-                              onClick={() => setSelectedId(null)}
+                              onClick={() => setSelected(null)}
                             >
                               {cName}
                             </Link>
@@ -717,7 +705,7 @@ function ActivityPage() {
                         <Link
                           to={selected.link.to as never}
                           params={(selected.link.params ?? {}) as never}
-                          onClick={() => setSelectedId(null)}
+                          onClick={() => setSelected(null)}
                         >
                           {selected.link.label} →
                         </Link>
@@ -746,7 +734,7 @@ function ActivityPage() {
                                 </span>
                                 <button
                                   type="button"
-                                  onClick={() => setSelectedId(r.id)}
+                                  onClick={() => setSelected(r)}
                                   className="w-full rounded-md p-2 text-left hover:bg-muted/40"
                                 >
                                   <div className="flex flex-wrap items-center gap-2">

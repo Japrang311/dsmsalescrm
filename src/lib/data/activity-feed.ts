@@ -32,6 +32,10 @@ export type FeedEvent = {
   title: string;
   detail?: string;
   link?: FeedLink;
+  // Raw ids behind `link`, kept so callers (the related-events lookup) can
+  // query "same underlying record" without re-parsing link.params.
+  commercialItemId?: string;
+  salesOrderId?: string;
 };
 
 // Direct Order/Prototype/Customer PO no longer have a dedicated list/detail

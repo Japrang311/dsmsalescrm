@@ -2,7 +2,75 @@
 
 Context dump for continuing this work in another tool (Codex). Written 2026-07-18; Phase 11/12 status refreshed 2026-07-19; Phase 11 import-review reconciliation session added 2026-07-19; post-import UX/bugfix session added 2026-07-20; second 2026-07-20 session (pipeline permissions/FK bugfixes) added 2026-07-20; Client Detail/Client List real-data wiring session added 2026-07-21; remote-migration-push + data-restoration session added 2026-07-21; browser-verification + spending_ytd fix + SO edit audit trail session added 2026-07-21; unused-code cleanup + client database (company info/contacts) feature session added 2026-07-22; contact position + Client Detail product/description fixes + commercial item product-name migration reconciliation added 2026-07-22; dynamic per-month sales target UI/calculation update added 2026-07-22; soft-delete implementation, remote Supabase apply, and main/live push closeout added 2026-07-24; RFQ retirement and documentation refresh added 2026-07-25; Sales Task Control Loop spec approval and Phase 1-2 implementation (Tasks 46-52) added 2026-07-27; unified progress timeline Task 53/8 and Manager Team Exceptions Task 54/9 added 2026-07-27; visual design audit Phase 1 (critical usability/responsiveness fixes) added 2026-07-27; Executive exception detail and aggregate-only Task metrics Task 55/10 added 2026-07-27; Dashboard/TopBar consumer migration Task 56/11 added 2026-07-27; Reports consumer migration Task 57/12 added 2026-07-27; export migration Task 58/13 added 2026-07-27; Pipeline/Client Detail/commercial follow-up migration Task 59/14 added 2026-07-27; ownership/account lifecycle migration Task 60/15 added 2026-07-27; production deployment audit + RLS/security-advisor review + two security-hardening migrations added 2026-07-30; Stage 1/Stage 2 checklist closeout + Sentry source-map wiring + commercial Next FU fix (commit `7ae20aa`, pushed, CI green) + Stage 3 Pipeline-pagination brainstorming in progress added 2026-08-05.
 
-## HANDOFF — Stage 3 Sales Orders pagination DONE and pushed (2026-08-05, read this first)
+## HANDOFF — Stage 3 Activity Log pagination DONE and pushed (2026-08-06, read this first)
+
+Latest state, ahead of everything below. Stage 3 checklist item "Paginate Activity with server
+filters and stable order" — the last of the four data-pagination items (Clients, Pipeline, Sales
+Orders, Activity) — is implemented, verified locally and against production, and pushed.
+
+- **Why this one needed a different design than the other three:** Activity Log isn't one table.
+  `src/routes/_app.activity.tsx` merged `activity_log` (355 rows) and `follow_up_logs` (79 rows)
+  into one timeline in the browser (`buildActivityFeed()`), with free-text search running over
+  *enriched* fields (constructed titles, resolved owner/client names) rather than raw DB columns.
+  A mechanical per-table keyset (the Clients/Pipeline/Sales Orders pattern) doesn't apply to a
+  merged, search-across-enriched-fields feed. Owner explicitly chose the full redesign over a
+  cheaper partial fix (see the design-options question and answer in this session).
+- New migration `20260805140000_add_activity_feed_events_view.sql`: view
+  `public.activity_feed_events`, `security_invoker = true` (critical — without it the view would
+  run with the view owner's privileges and silently bypass RLS on `activity_log`/
+  `follow_up_logs`/`clients`/`profiles` for every caller). UNIONs both tables, maps each row's raw
+  `activity_kind` to the UI's `FeedEvent.kind` bucket (`client_created`, `status_change`,
+  `commercial_history`, `record_lifecycle`, `team_admin`, etc.), and **excludes** `db_kind`s with
+  no bucket mapping (`client_details_change`, `task_progress`, `sales_order_header_change`,
+  `sales_order_item_change`) — this matches, byte-for-byte, what the old client-side
+  `activityFeedEvent()` already silently dropped (verified: production has 355 activity_log rows,
+  228 map to a bucket, 127 are the four excluded kinds; 228 + 79 follow-ups = 307, exactly the
+  view's row count). Also computes a lowercased `search_text` column (title, detail,
+  administrative reason, kind label, client/owner/actor/target names via LEFT JOIN) so search can
+  run as a single server-side `ilike`.
+- `src/lib/data/activity-feed-page.ts`: `listActivityFeedPage()` (keyset pagination, page size 25,
+  cursor `at`+`event_id`), `listAllActivityFeedEvents()` (unbounded-but-filtered, for export),
+  `listRelatedActivityFeedEvents()` (bounded query for the drawer's "Perubahan Terkait" panel —
+  previously an in-memory scan of every event ever fetched, now a targeted query matched by
+  client/commercial-item/sales-order id within ±7 days), and `mapActivityFeedRow()` (pure mapper,
+  view row → `FeedEvent`, mirrors the old `activityFeedEvent()` link-building logic).
+- Route now uses `useInfiniteQuery` (new to this codebase, appropriate here since Activity Log is
+  the one paginated view that's an append-on-scroll timeline, not a prev/next table) to preserve
+  the existing infinite-scroll UX while reading bounded pages.
+- **Owner filter changed from name-keyed to id-keyed** (`SelectItem value={id}` instead of
+  `value={m.name}`) — matches every other owner filter in the app (Sales Orders, Clients,
+  Pipeline) and is more correct (two owners can't collide on name). Small, deliberate UX-neutral
+  fix bundled with the pagination work, not scope creep — the old design also duplicated the same
+  fragility Sales Orders had before its own owner-id fix.
+- `src/lib/data/activity-log.ts` (`listActivityLog`), `src/lib/data/follow-ups.ts`
+  (`listAllFollowUps`), and `src/lib/data/activity-feed.ts` (`buildActivityFeed`,
+  `matchesActivitySearch`) are now **unused by any route** but were deliberately left in place —
+  each still has its own dedicated test coverage and no call site outside the route this session
+  rewired. Do not delete without checking test coverage first.
+- Verification: typecheck clean, lint 0 errors, `bun run test` 550 pass / 0 fail (9 new tests in
+  `activity-feed-page.test.ts` covering pagination/merge-ordering, kind-mapping exclusion, kind
+  filter, owner filter, free-text search across both sources, and Sales-vs-Manager RLS scoping),
+  build succeeds. Browser-verified on local dev server as Sales (Nur Iman): inserted one
+  `activity_log` row + one `follow_up_logs` row directly via SQL (local seed has zero rows in
+  either table — nothing to see without doing this), confirmed both appear merged and
+  newest-first, opened the detail drawer, confirmed "Perubahan Terkait" correctly found the
+  other event (same client, within window) via the new targeted query — first snapshot read
+  race-conditioned before the query resolved and showed 0, a second snapshot immediately after
+  showed the correct 1, not a real bug. Confirmed drawer-to-drawer navigation via a related
+  event, then CSV export (2 rows). Console clean throughout. Cleaned up both smoke-test rows
+  afterward.
+- Migration pushed to production `qhtfixgbcpcitokeryxb` (same `pgdelta-target-ca.crt` ENOENT CLI
+  noise as the Sales Orders push — cosmetic, migration still applies; see that section below).
+  Cross-checked the production view's row count directly against raw table counts before trusting
+  it (228 + 79 = 307, matches exactly).
+- **All four Stage 3 pagination checklist items (Clients, Pipeline, Sales Orders, Activity) are
+  now done.** Remaining Stage 3 items: prove page navigation has no duplicate/missing rows
+  (informal spot-checks done per-item so far, no dedicated cross-cutting test), dashboard/report
+  aggregate RPCs, Team Settings N+1 → single RPC, export completeness (done per-item, not yet
+  reviewed as a single cross-cutting item), route decomposition (Reports/Client Detail/Commercial
+  Detail/Pipeline), performance budgets, and the dated Stage 3 before/after report.
+
+## HANDOFF — Stage 3 Sales Orders pagination DONE and pushed (2026-08-05)
 
 Latest state, ahead of everything below. Stage 3 checklist item "Paginate Sales Orders with
 server filters and stable order" is implemented, verified locally, and its migration is applied
