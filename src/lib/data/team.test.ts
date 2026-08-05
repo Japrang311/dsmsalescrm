@@ -1,5 +1,6 @@
 import { afterEach, beforeAll, describe, expect, mock, test } from "bun:test";
 import { FunctionsHttpError } from "@supabase/supabase-js";
+import type { TeamSupabaseClient } from "./team";
 
 type QueryResult = { data: unknown; error: unknown; count?: number | null };
 
@@ -70,30 +71,35 @@ function queryFor(table: string) {
       call.range = { from, to };
       return query;
     },
-    then(resolve: (value: QueryResult) => unknown) {
+    then<TResult1 = QueryResult, TResult2 = never>(
+      onfulfilled?:
+        | ((value: QueryResult) => TResult1 | PromiseLike<TResult1>)
+        | null,
+      onrejected?:
+        | ((reason: unknown) => TResult2 | PromiseLike<TResult2>)
+        | null,
+    ) {
       return Promise.resolve(
         resultForCall?.(call) ??
           databaseResults.get(table) ?? { data: [], error: null },
-      ).then(resolve);
+      ).then(onfulfilled, onrejected);
     },
   };
   return query;
 }
 
-mock.module("@/lib/supabase", () => ({
-  supabase: {
-    functions: { invoke },
-    from: (table: string) => queryFor(table),
-    rpc: async (name: string, params: Record<string, unknown>) => {
-      const call = { name, params };
-      rpcCalls.push(call);
-      return resultForRpc?.(call) ?? { data: null, error: null };
-    },
-    auth: {
-      getUser: async () => ({ data: { user: { id: "current-admin" } } }),
-    },
+const teamClient = {
+  functions: { invoke },
+  from: (table: string) => queryFor(table),
+  rpc: async (name: string, params: Record<string, unknown>) => {
+    const call = { name, params };
+    rpcCalls.push(call);
+    return resultForRpc?.(call) ?? { data: null, error: null };
   },
-}));
+  auth: {
+    getUser: async () => ({ data: { user: { id: "current-admin" } } }),
+  },
+} satisfies TeamSupabaseClient;
 
 let team: typeof import("./team");
 
@@ -116,30 +122,43 @@ afterEach(() => {
 
 describe("Team lifecycle request serialization", () => {
   test("serializes all seven lifecycle actions exactly", async () => {
-    await team.createTeamMember({
-      name: "Ayu",
-      email: "ayu@example.com",
-      initials: "AY",
-      role: "sales",
-      password: "temporary-password",
-    });
-    await team.updateTeamMemberProfile("member-1", {
-      name: "Ayu Putri",
-      initials: "AP",
-    });
+    await team.createTeamMember(
+      {
+        name: "Ayu",
+        email: "ayu@example.com",
+        initials: "AY",
+        role: "sales",
+        password: "temporary-password",
+      },
+      teamClient,
+    );
+    await team.updateTeamMemberProfile(
+      "member-1",
+      {
+        name: "Ayu Putri",
+        initials: "AP",
+      },
+      teamClient,
+    );
     await team.changeTeamMemberRole(
       "member-1",
       "manager",
       "Promosi kuartal ini",
+      teamClient,
     );
-    await team.deactivateTeamMember("member-1", "Cuti panjang");
-    await team.reactivateTeamMember("member-1", "Kembali bekerja");
+    await team.deactivateTeamMember("member-1", "Cuti panjang", teamClient);
+    await team.reactivateTeamMember("member-1", "Kembali bekerja", teamClient);
     await team.transferTeamOwnership(
       "member-1",
       "member-2",
       "Rebalancing akun",
+      teamClient,
     );
-    await team.deleteEligibleTeamMember("member-1", "Akun duplikat");
+    await team.deleteEligibleTeamMember(
+      "member-1",
+      "Akun duplikat",
+      teamClient,
+    );
 
     expect(invoke.mock.calls.map((call) => call[0])).toEqual(
       Array(7).fill("manage-team-member"),
@@ -238,7 +257,11 @@ describe("Team lifecycle request serialization", () => {
     });
 
     try {
-      await team.deleteEligibleTeamMember("member-1", "Akun tidak digunakan");
+      await team.deleteEligibleTeamMember(
+        "member-1",
+        "Akun tidak digunakan",
+        teamClient,
+      );
       throw new Error("expected TeamAdminError");
     } catch (error) {
       expect(error).toBeInstanceOf(team.TeamAdminError);
@@ -300,7 +323,7 @@ describe("privileged Team roster mapping", () => {
       return undefined;
     };
 
-    const [member] = await team.listTeamMembers();
+    const [member] = await team.listTeamMembers(teamClient);
 
     expect(member).toEqual({
       id: "member-1",
@@ -359,7 +382,7 @@ describe("privileged Team roster mapping", () => {
       return undefined;
     };
 
-    const [member] = await team.listTeamMembers();
+    const [member] = await team.listTeamMembers(teamClient);
 
     expect(member.ownedActiveCounts).toEqual({
       clients: 1001,
@@ -427,7 +450,7 @@ describe("privileged Team roster mapping", () => {
       return undefined;
     };
 
-    const [member] = await team.listTeamMembers();
+    const [member] = await team.listTeamMembers(teamClient);
 
     expect(member.ownedActiveCounts.commercialItems).toBe(42);
     const rpcCall = rpcCalls.find(
@@ -473,7 +496,7 @@ describe("privileged Team roster mapping", () => {
       return undefined;
     };
 
-    const [member] = await team.listTeamMembers();
+    const [member] = await team.listTeamMembers(teamClient);
 
     // Server RPC returns 3; client must trust server normalization
     expect(member.ownedActiveCounts.commercialItems).toBe(3);
@@ -518,7 +541,7 @@ describe("privileged Team roster mapping", () => {
       return undefined;
     };
 
-    await team.listTeamMembers();
+    await team.listTeamMembers(teamClient);
 
     const call = fromCalls.find((entry) => entry.table === "activity_log");
     expect(call?.filters).toContainEqual({

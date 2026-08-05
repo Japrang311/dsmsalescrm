@@ -1,6 +1,53 @@
 import { FunctionsHttpError } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 
+type TeamQueryResult<T = unknown> = {
+  data: T | null;
+  error: unknown;
+  count?: number | null;
+};
+
+export type TeamQueryBuilder = {
+  select(
+    columns: string,
+    options?: { count?: string; head?: boolean },
+  ): TeamQueryBuilder;
+  eq(column: string, value: unknown): TeamQueryBuilder;
+  neq(column: string, value: unknown): TeamQueryBuilder;
+  not(column: string, operator: string, value: unknown): TeamQueryBuilder;
+  in(column: string, values: unknown[]): TeamQueryBuilder;
+  order(column: string, options?: unknown): TeamQueryBuilder;
+  limit(value: number): TeamQueryBuilder;
+  range(from: number, to: number): TeamQueryBuilder;
+  then<TResult1 = TeamQueryResult, TResult2 = never>(
+    onfulfilled?:
+      | ((value: TeamQueryResult) => TResult1 | PromiseLike<TResult1>)
+      | null,
+    onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
+  ): PromiseLike<TResult1 | TResult2>;
+};
+
+export type TeamSupabaseClient = {
+  from(table: string): TeamQueryBuilder;
+  rpc(
+    name: string,
+    params: Record<string, unknown>,
+  ): PromiseLike<TeamQueryResult>;
+  auth: {
+    getUser(): PromiseLike<{
+      data: { user?: { id: string } | null };
+    }>;
+  };
+  functions: {
+    invoke(
+      name: string,
+      options: { body: Record<string, unknown> },
+    ): PromiseLike<TeamQueryResult>;
+  };
+};
+
+const realTeamClient = supabase as unknown as TeamSupabaseClient;
+
 // Task 6 will make this the canonical application-wide Role union. Keeping the
 // explicit four-role contract local here prevents Team management from
 // weakening its server contract while the older role context is migrated.
@@ -76,19 +123,22 @@ function throwQueryError(error: unknown): void {
   if (error) throw error;
 }
 
-function exactCount(result: { count: number | null; error: unknown }): number {
+function exactCount(result: { count?: number | null; error: unknown }): number {
   throwQueryError(result.error);
-  if (result.count === null) {
+  if (result.count == null) {
     throw new Error("Server tidak mengembalikan exact count.");
   }
   return result.count;
 }
 
-async function countActiveCommercialItems(ownerId: string): Promise<number> {
+async function countActiveCommercialItems(
+  ownerId: string,
+  client: TeamSupabaseClient,
+): Promise<number> {
   // Call server-side RPC that computes the exact count using the Task 4 transfer
   // predicate: lower(btrim(stage)) not in ('closed won', 'closed lost', 'revenue recorded', 'closed').
   // This ensures client and server use identical normalization.
-  const result = await supabase.rpc("admin_count_active_commercial_items", {
+  const result = await client.rpc("admin_count_active_commercial_items", {
     p_owner_id: ownerId,
   });
   throwQueryError(result.error);
@@ -117,8 +167,14 @@ async function mapInBatches<T, R>(
 // Privileged RLS readers receive every profile row, including inactive
 // accounts. Ownership totals mirror the server transfer scope: non-Lost
 // clients, workflow-active/unarchived tasks, and non-terminal commercial items.
-export async function listTeamMembers(): Promise<TeamMember[]> {
-  const profilesResult = await supabase
+export function listTeamMembers(): Promise<TeamMember[]>;
+export function listTeamMembers(
+  client: TeamSupabaseClient,
+): Promise<TeamMember[]>;
+export async function listTeamMembers(
+  client: TeamSupabaseClient = realTeamClient,
+): Promise<TeamMember[]> {
+  const profilesResult = await client
     .from("profiles")
     .select(
       "id, name, initials, role, email, account_status, status_changed_at, status_changed_by, status_change_reason",
@@ -129,19 +185,19 @@ export async function listTeamMembers(): Promise<TeamMember[]> {
   return mapInBatches(profiles, TEAM_SUMMARY_BATCH_SIZE, async (row) => {
     const [clientsResult, tasksResult, commercialResult, logResult] =
       await Promise.all([
-        supabase
+        client
           .from("clients")
           .select("id", { count: "exact", head: true })
           .eq("owner_id", row.id)
           .neq("status", "Lost"),
-        supabase
+        client
           .from("tasks")
           .select("id", { count: "exact", head: true })
           .eq("owner_id", row.id)
           .in("workflow_status", [...ACTIVE_TRANSFER_WORKFLOW_STATUSES])
           .eq("archived", false),
-        countActiveCommercialItems(row.id),
-        supabase
+        countActiveCommercialItems(row.id, client),
+        client
           .from("activity_log")
           .select(
             "target_profile_id, kind, title, administrative_reason, created_at",
@@ -156,7 +212,9 @@ export async function listTeamMembers(): Promise<TeamMember[]> {
     const tasks = exactCount(tasksResult);
     const commercialItems = commercialResult;
     throwQueryError(logResult.error);
-    const lastChange = (logResult.data?.[0] ?? null) as AdminActivityRow | null;
+    const lastChange = (
+      Array.isArray(logResult.data) ? (logResult.data[0] ?? null) : null
+    ) as AdminActivityRow | null;
 
     return {
       id: row.id,
@@ -196,8 +254,14 @@ export async function listTeamMembers(): Promise<TeamMember[]> {
   });
 }
 
-export async function getCurrentProfileId(): Promise<string | undefined> {
-  const { data } = await supabase.auth.getUser();
+export function getCurrentProfileId(): Promise<string | undefined>;
+export function getCurrentProfileId(
+  client: TeamSupabaseClient,
+): Promise<string | undefined>;
+export async function getCurrentProfileId(
+  client: TeamSupabaseClient = realTeamClient,
+): Promise<string | undefined> {
+  const { data } = await client.auth.getUser();
   return data.user?.id;
 }
 
@@ -281,11 +345,11 @@ async function mapInvokeError(error: unknown): Promise<TeamAdminError> {
 
 async function invokeManageTeamMember<T>(
   body: Record<string, unknown>,
+  client: TeamSupabaseClient,
 ): Promise<T> {
-  const { data, error } = await supabase.functions.invoke<T | ErrorPayload>(
-    "manage-team-member",
-    { body },
-  );
+  const { data, error } = await client.functions.invoke("manage-team-member", {
+    body,
+  });
   if (error) throw await mapInvokeError(error);
   if (data && typeof data === "object" && "error" in data) {
     throw errorFromPayload(data as ErrorPayload);
@@ -307,78 +371,105 @@ function administrativeReason(reason: string): string {
 
 type ActionResult = { id: string; action?: string };
 
-export async function createTeamMember(input: {
-  name: string;
-  email: string;
-  initials: string;
-  role: AppRole;
-  password: string;
-}): Promise<ActionResult> {
-  return invokeManageTeamMember({ action: "create", ...input });
+export async function createTeamMember(
+  input: {
+    name: string;
+    email: string;
+    initials: string;
+    role: AppRole;
+    password: string;
+  },
+  client: TeamSupabaseClient = realTeamClient,
+): Promise<ActionResult> {
+  return invokeManageTeamMember({ action: "create", ...input }, client);
 }
 
 export async function updateTeamMemberProfile(
   id: string,
   profile: { name: string; initials: string },
+  client: TeamSupabaseClient = realTeamClient,
 ): Promise<ActionResult> {
-  return invokeManageTeamMember({ action: "update_profile", id, ...profile });
+  return invokeManageTeamMember(
+    { action: "update_profile", id, ...profile },
+    client,
+  );
 }
 
 export async function changeTeamMemberRole(
   id: string,
   role: AppRole,
   reason: string,
+  client: TeamSupabaseClient = realTeamClient,
 ): Promise<ActionResult> {
-  return invokeManageTeamMember({
-    action: "change_role",
-    id,
-    role,
-    reason: administrativeReason(reason),
-  });
+  return invokeManageTeamMember(
+    {
+      action: "change_role",
+      id,
+      role,
+      reason: administrativeReason(reason),
+    },
+    client,
+  );
 }
 
 export async function deactivateTeamMember(
   id: string,
   reason: string,
+  client: TeamSupabaseClient = realTeamClient,
 ): Promise<ActionResult> {
-  return invokeManageTeamMember({
-    action: "deactivate",
-    id,
-    reason: administrativeReason(reason),
-  });
+  return invokeManageTeamMember(
+    {
+      action: "deactivate",
+      id,
+      reason: administrativeReason(reason),
+    },
+    client,
+  );
 }
 
 export async function reactivateTeamMember(
   id: string,
   reason: string,
+  client: TeamSupabaseClient = realTeamClient,
 ): Promise<ActionResult> {
-  return invokeManageTeamMember({
-    action: "reactivate",
-    id,
-    reason: administrativeReason(reason),
-  });
+  return invokeManageTeamMember(
+    {
+      action: "reactivate",
+      id,
+      reason: administrativeReason(reason),
+    },
+    client,
+  );
 }
 
 export async function transferTeamOwnership(
   fromId: string,
   toId: string,
   reason: string,
+  client: TeamSupabaseClient = realTeamClient,
 ): Promise<ActionResult> {
-  return invokeManageTeamMember({
-    action: "transfer_ownership",
-    fromId,
-    toId,
-    reason: administrativeReason(reason),
-  });
+  return invokeManageTeamMember(
+    {
+      action: "transfer_ownership",
+      fromId,
+      toId,
+      reason: administrativeReason(reason),
+    },
+    client,
+  );
 }
 
 export async function deleteEligibleTeamMember(
   id: string,
   reason: string,
+  client: TeamSupabaseClient = realTeamClient,
 ): Promise<ActionResult> {
-  return invokeManageTeamMember({
-    action: "delete_eligible_account",
-    id,
-    reason: administrativeReason(reason),
-  });
+  return invokeManageTeamMember(
+    {
+      action: "delete_eligible_account",
+      id,
+      reason: administrativeReason(reason),
+    },
+    client,
+  );
 }
