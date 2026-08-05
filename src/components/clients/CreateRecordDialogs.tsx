@@ -858,7 +858,12 @@ function FieldText({
   return (
     <div>
       <Label>{label}</Label>
-      <Input type={type} placeholder={placeholder} {...reg} />
+      <Input
+        type={type}
+        aria-label={label}
+        placeholder={placeholder}
+        {...reg}
+      />
       {description && (
         <p className="mt-1 text-[11px] text-muted-foreground">{description}</p>
       )}

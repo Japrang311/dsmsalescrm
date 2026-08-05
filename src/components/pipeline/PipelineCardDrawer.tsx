@@ -446,7 +446,10 @@ export function PipelineCardDrawer({
                 onValueChange={handleStageChange}
                 disabled={!canEdit}
               >
-                <SelectTrigger className="h-8 text-xs">
+                <SelectTrigger
+                  className="h-8 text-xs"
+                  data-testid="pipeline-drawer-stage-select"
+                >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -640,7 +643,10 @@ export function PipelineCardDrawer({
                     setLostReason(value as QuotationLostReason)
                   }
                 >
-                  <SelectTrigger id="drawer-lost-reason">
+                  <SelectTrigger
+                    id="drawer-lost-reason"
+                    data-testid="pipeline-drawer-lost-reason-select"
+                  >
                     <SelectValue placeholder="Pilih alasan closed lost" />
                   </SelectTrigger>
                   <SelectContent>

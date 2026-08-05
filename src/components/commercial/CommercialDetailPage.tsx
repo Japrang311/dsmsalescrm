@@ -67,6 +67,7 @@ import {
   listCommercialItemHistory,
   logActivity,
 } from "@/lib/data/activity-log";
+import { listFollowUpsForCommercialDocument } from "@/lib/data/follow-ups";
 import {
   activeLostReasonPatch,
   isLostReasonTracked,
@@ -162,6 +163,11 @@ export function CommercialDetailPage({
   const { data: history = [] } = useQuery({
     queryKey: ["activity-log", "commercial-item", itemId],
     queryFn: () => listCommercialItemHistory(itemId),
+    enabled: authReady,
+  });
+  const { data: followUps = [] } = useQuery({
+    queryKey: ["follow-ups", "commercial-document", itemId],
+    queryFn: () => listFollowUpsForCommercialDocument(itemId),
     enabled: authReady,
   });
   const { data: currentUserId } = useQuery({
@@ -968,6 +974,48 @@ export function CommercialDetailPage({
                         <span>{t.workflowStatus}</span>
                         <span>{t.dueState ?? "-"}</span>
                       </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              <Separator className="my-3" />
+
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Riwayat Follow-Up
+              </p>
+              {followUps.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  Belum ada follow-up terkait.
+                </p>
+              ) : (
+                <ul className="flex flex-col gap-1.5">
+                  {followUps.slice(0, 6).map((followUp) => (
+                    <li
+                      key={followUp.id}
+                      className="rounded-md border bg-muted/30 p-2 text-xs"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-medium">
+                          {followUp.method} · {followUp.result}
+                        </span>
+                        <span className="tabular-nums text-muted-foreground">
+                          {formatDateShort(followUp.fuDate)}
+                        </span>
+                      </div>
+                      {followUp.notes && (
+                        <p className="mt-1 text-[11px] text-muted-foreground">
+                          {followUp.notes}
+                        </p>
+                      )}
+                      {followUp.nextAction && (
+                        <p className="mt-1 text-[10px] text-muted-foreground/80">
+                          Next: {followUp.nextAction}
+                          {followUp.nextFuDate
+                            ? ` · ${formatDateShort(followUp.nextFuDate)}`
+                            : ""}
+                        </p>
+                      )}
                     </li>
                   ))}
                 </ul>

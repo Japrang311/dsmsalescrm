@@ -56,14 +56,14 @@
 - [x] Add owner and expiry to every approved exception. No approved dependency exception exists as of 2026-08-05; future exceptions must include owner and expiry before acceptance.
 - [x] Obtain approval before installing browser test dependency. Owner resolved the blocker on 2026-08-05; `@playwright/test` and Chromium were installed locally.
 - [x] Automate authentication/protected-route workflow. `e2e/browser-flows.spec.ts` verifies `/reports` redirects to `/login`, seeded Manager login reaches `/dashboard`, and browser console/page errors stay clean.
-- [ ] Automate Task progress and both follow-up workflows. Task create/reload/Done and client follow-up create/reload are automated; commercial-detail follow-up remains open.
-- [ ] Automate stage transitions and Closed Lost validation.
-- [ ] Automate normalized Quotation/Sales Order creation smoke.
-- [ ] Automate representative unauthorized-write denial. Executive Task route is browser-verified read-only, but direct unauthorized write denial remains open.
+- [x] Automate Task progress and both follow-up workflows. Browser E2E covers Task create/reload/Done, client follow-up create/reload, and commercial-detail follow-up create/reload.
+- [x] Automate stage transitions and Closed Lost validation. Browser E2E proves Closed Lost cannot proceed without the reason dialog and persists after reason selection.
+- [x] Automate normalized Quotation/Sales Order creation smoke. Browser E2E creates a normalized Quotation and Sales Order from Client Detail and verifies routed lists.
+- [x] Automate representative unauthorized-write denial. Browser/RLS E2E verifies Executive read-only Task UI and direct Executive `create_sales_order` RPC denial.
 - [x] Automate Reports/export smoke. Browser E2E verifies Dashboard CSV dropdown download.
 - [ ] Verify Sentry environment/release/source-map contract without exposing secrets. Environment/release config now has unit coverage; source-map upload and external ingestion remain unverified.
-- [x] Prove CI passes on a clean clone and fresh local database. GitHub Actions run `30981687347` passed all five jobs on commit `5e3f358`.
-- [ ] Review dated Stage 2 verification report. Local, GitHub-hosted CI, and local browser automation evidence exists; commercial browser coverage, Sentry source-map/external-ingestion, and CI confirmation of the new browser job remain open.
+- [x] Prove CI passes on a clean clone and fresh local database. Latest pushed baseline GitHub Actions run `30985051161` passed on commit `dba65bb`; current local browser expansion still needs a post-push CI run.
+- [ ] Review dated Stage 2 verification report. Local browser automation now covers all planned critical workflows; Sentry source-map/external ingestion and GitHub-hosted CI evidence for this uncommitted update remain open.
 
 ## Stage 3 — Data and performance
 

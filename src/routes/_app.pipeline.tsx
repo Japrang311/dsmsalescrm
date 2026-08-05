@@ -458,6 +458,8 @@ function PipelineBoard({ role }: { role: Role }) {
             return (
               <div
                 key={stage}
+                data-testid="pipeline-column"
+                data-stage={stage}
                 onDragOver={(e) => {
                   if (!canDrag || !draggingId) return;
                   e.preventDefault();
@@ -523,6 +525,8 @@ function PipelineBoard({ role }: { role: Role }) {
                       return (
                         <div
                           key={it.id}
+                          data-testid="pipeline-card"
+                          data-commercial-document-id={it.id}
                           draggable={canMoveThis}
                           onDragStart={(e) => {
                             if (!canMoveThis) return;

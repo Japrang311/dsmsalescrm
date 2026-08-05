@@ -218,12 +218,12 @@ Stage 4 acceptance ─> optional Realtime reassessment
 
 #### Task 2.5 — Automate critical browser workflows
 
-**Status:** partially completed locally
+**Status:** completed locally for planned critical browser workflows
 
 **Files:** browser tests grouped by workflow.
 
-- Covered auth/protected-route redirect, seeded login, dashboard CSV export, Task create/reload/Done, client follow-up create/reload, and Executive Task read-only UI.
-- Still open: commercial follow-up browser flow, stage transition/Closed Lost validation, normalized Quotation/Sales Order smoke, and direct unauthorized-write denial.
+- Covered auth/protected-route redirect, seeded login, dashboard CSV export, Task create/reload/Done, client follow-up create/reload, commercial-detail follow-up create/reload, Closed Lost stage transition validation/persistence, normalized Quotation/Sales Order creation smoke, Executive Task read-only UI, and direct Executive `create_sales_order` RPC denial.
+- Remaining browser evidence gap: none for the planned local Stage 2 browser workflows.
 - Prefer stable accessible locators and real persisted assertions after reload.
 - Capture screenshots/traces only as CI artifacts.
 

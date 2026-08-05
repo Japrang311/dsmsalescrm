@@ -51,7 +51,7 @@
 | `bun run verify:db`         | Pass with baseline db-lint findings | Fresh local database reset and advisors passed; db lint exited 0 with known temp-table analyzer findings and unused variables. |
 | `bun run test:ci`           | Pass                                | 511 pass, 0 fail, 2186 expects, 69 files, using explicit local Supabase env values without `.env.local`.                       |
 | `bun run audit:deps:report` | Pass                                | Reports 13 advisories into a non-secret artifact; does not mark exceptions as approved.                                        |
-| `bun run test:e2e`          | Pass                                | 4/4 Playwright Chromium browser flows passed against local preview and local Supabase.                                         |
+| `bun run test:e2e`          | Pass                                | 8/8 Playwright Chromium browser flows passed against local preview and local Supabase.                                         |
 
 ## Browser automation evidence
 
@@ -66,7 +66,12 @@ Covered flows:
 - Dashboard CSV dropdown download works;
 - seeded Sales user creates a Task, reloads, marks it Done, reloads again, and sees it in Completed;
 - seeded Sales user records a Client follow-up and sees it after reload;
+- seeded Sales user creates a normalized Quotation and sees it through the Quotations route search;
+- seeded Sales user creates a normalized Sales Order and sees it through the Sales Orders route;
+- seeded Sales user records a commercial-detail follow-up and sees it after reload;
+- seeded Sales user moves a Pipeline Quotation to Closed Lost only after the reason dialog is satisfied, then sees the card in Closed Lost after reload;
 - seeded Executive user sees the Tasks exception view as read-only with no `Buat Task` action;
+- seeded Executive user is denied by the direct `create_sales_order` RPC boundary with `ACTIVE_MUTATING_ROLE_REQUIRED`;
 - each automated flow fails on browser console warnings/errors or page errors.
 
 The first browser probe found a real CSP blocker: local production preview
@@ -76,9 +81,11 @@ loopback only for loopback Supabase configuration.
 
 ## GitHub-hosted CI verification
 
-**Commit:** `5e3f358` (`fix: isolate team data tests from app supabase client`)
-**Run:** `30981687347`
+**Latest pushed baseline commit:** `dba65bb` (`test: add browser e2e guardrail`)
+**Latest pushed baseline run:** `30985051161`
 **Result:** Pass on GitHub-hosted clean runner with fresh local Supabase database.
+
+The browser-flow expansion in this report is local-only until this work is committed, pushed, and a new GitHub-hosted run passes.
 
 | Job                             | Result | Duration |
 | ------------------------------- | ------ | -------- |
@@ -93,6 +100,9 @@ because `src/lib/data/team.test.ts` globally mocked `@/lib/supabase`, which
 could replace the application Supabase singleton before other data-layer tests
 called `supabase.auth.setSession`. The follow-up commit replaced that global
 module mock with an injected fake Team client.
+
+An earlier recovery run `30981687347` also passed on commit `5e3f358`
+(`fix: isolate team data tests from app supabase client`).
 
 ## Bundle snapshot
 
@@ -120,8 +130,4 @@ No permanent exception was created. Dependency upgrades or dated exceptions stil
 ## Not yet verified
 
 - New GitHub-hosted CI evidence for the browser E2E job is not yet available until this work is committed and pushed.
-- Commercial-detail follow-up browser automation is not implemented.
-- Stage transition and Closed Lost browser validation are not implemented.
-- Normalized Quotation/Sales Order browser smoke is not implemented.
-- Direct unauthorized-write denial is not automated; only Executive read-only UI is browser-verified.
 - Production Sentry source-map upload and external event ingestion behavior are not verified.
