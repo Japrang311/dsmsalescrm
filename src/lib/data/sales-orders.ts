@@ -7,6 +7,11 @@ import type {
 } from "@/lib/domain";
 import type { LineItemInput } from "./commercial-documents";
 import type { Uom } from "./document-numbering";
+import {
+  encodePageCursor,
+  normalizeListPageInput,
+  type ListPageInput,
+} from "@/lib/pagination-contracts";
 
 export type SalesOrderLineItem = {
   id: string;
@@ -165,6 +170,91 @@ export async function listSalesOrders(
   return ((data ?? []) as SalesOrderRow[])
     .map(toSalesOrder)
     .sort(compareSalesOrdersByNewestNumber);
+}
+
+export type SalesOrderListFilters = {
+  from?: Date;
+  to?: Date;
+  ownerId?: string;
+  clientId?: string;
+  taxType?: string; // "all" | "PPN" | "Non-PPN"
+  source?: string; // "all" | RevenueSource | "Prototype FOC"
+  soType?: string; // "all" | SoType
+  deleted?: boolean;
+};
+
+export type SalesOrdersPage = {
+  rows: SalesOrderDocument[];
+  totalCount: number;
+  nextCursor: string | null;
+};
+
+// Bounded per-page keyset load, same shape as listClientRowsPage /
+// listCommercialDocumentsPage. Ordered by so_number descending: every series
+// zero-pads its sequence to three digits (DSM-26SO001 … DSM-26SO160), so a
+// plain text sort matches compareSalesOrdersByNewestNumber's natural-number
+// order within a series and year. created_at is not usable here — imported
+// rows share a handful of bulk-insert timestamps.
+export async function listSalesOrdersPage(input: {
+  filters?: SalesOrderListFilters;
+  page?: ListPageInput;
+}): Promise<SalesOrdersPage> {
+  const filters = input.filters ?? {};
+  const page = normalizeListPageInput(input.page);
+  let query = supabase
+    .from("sales_orders")
+    .select("*, sales_order_items(*)", { count: "exact" })
+    .order("so_number", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(page.pageSize + 1);
+
+  query = filters.deleted
+    ? query.not("deleted_at", "is", null)
+    : query.is("deleted_at", null);
+
+  if (filters.from) query = query.gte("date", isoDate(filters.from));
+  if (filters.to) query = query.lte("date", isoDate(filters.to));
+  if (filters.ownerId && filters.ownerId !== "all")
+    query = query.eq("owner_id", filters.ownerId);
+  if (filters.clientId && filters.clientId !== "all")
+    query = query.eq("client_id", filters.clientId);
+  if (filters.taxType && filters.taxType !== "all")
+    query = query.eq("tax_type", filters.taxType);
+  if (filters.soType && filters.soType !== "all")
+    query = query.eq("type", filters.soType);
+  if (filters.source && filters.source !== "all") {
+    query = query.eq(
+      "source",
+      filters.source === "New Product" ? "RFQ / New Product" : filters.source,
+    );
+  }
+
+  if (page.cursor) {
+    const sortValue = JSON.stringify(page.cursor.sortValue);
+    query = query.or(
+      `so_number.lt.${sortValue},and(so_number.eq.${sortValue},id.lt.${page.cursor.id})`,
+    );
+  }
+
+  const { data, error, count } = await query;
+  if (error) throw error;
+
+  const rawRows = (data ?? []) as SalesOrderRow[];
+  const pageRows = rawRows.slice(0, page.pageSize);
+  const lastRow = pageRows.at(-1);
+
+  return {
+    rows: pageRows.map(toSalesOrder),
+    totalCount: count ?? pageRows.length,
+    nextCursor:
+      rawRows.length > page.pageSize && lastRow
+        ? encodePageCursor({ sortValue: lastRow.so_number, id: lastRow.id })
+        : null,
+  };
+}
+
+function isoDate(date: Date): string {
+  return date.toISOString().slice(0, 10);
 }
 
 export async function getSalesOrder(

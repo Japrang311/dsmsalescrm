@@ -1,8 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
   Receipt,
   ArrowRight,
+  ChevronLeft,
+  ChevronRight,
   Download,
   TrendingUp,
   FileSpreadsheet,
@@ -47,17 +49,26 @@ import {
 } from "@/components/reports/ReportFilterBar";
 import { filterSalesOrders } from "@/lib/report-selectors";
 import { ROLE_LABEL } from "@/context/role-context";
-import { useDashboardData } from "@/hooks/use-dashboard-data";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   compareSalesOrdersByNewestNumber,
   listSalesOrders,
+  listSalesOrdersPage,
   restoreSalesOrder,
+  type SalesOrderListFilters,
 } from "@/lib/data/sales-orders";
+import { getSalesOrdersMetrics } from "@/lib/data/sales-orders-metrics";
 import {
-  canShowDeletedMode,
-  salesOrdersQueryKey,
-} from "@/components/commercial/deleted-mode";
+  listClients,
+  listOwners,
+  listSalesTeamProfiles,
+} from "@/lib/data/clients";
+import {
+  DEFAULT_PAGE_SIZE,
+  listQueryKey,
+  serializeListFilters,
+} from "@/lib/pagination-contracts";
+import { canShowDeletedMode } from "@/components/commercial/deleted-mode";
 import {
   exportSalesOrdersPdf,
   exportSalesOrdersXlsx,
@@ -74,31 +85,90 @@ function SalesOrdersRevenuePage() {
   const { role, authReady } = useRole();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const {
-    orders,
-    clients: clientList,
-    ownersById,
-    salesTeam,
-    isLoading,
-  } = useDashboardData();
   const [showDeleted, setShowDeleted] = useState(false);
   const [restoringId, setRestoringId] = useState<string>();
   const deletedMode = showDeleted && canShowDeletedMode(role);
-  const deletedOrders = useQuery({
-    queryKey: salesOrdersQueryKey(true),
-    queryFn: () => listSalesOrders({ deleted: true }),
-    enabled: authReady && deletedMode,
-  });
-  const sourceOrders = useMemo(
-    () => (deletedMode ? (deletedOrders.data ?? []) : orders),
-    [deletedMode, deletedOrders.data, orders],
-  );
 
   const [filters, setFilters] = useState<ReportFilters>(() =>
     defaultReportFilters({ from: new Date(CURRENT_YEAR, 0, 1), to: NOW }),
   );
   const patch = (p: Partial<ReportFilters>) =>
     setFilters((s) => ({ ...s, ...p }));
+
+  const { data: clientList = [] } = useQuery({
+    queryKey: ["clients", "all"],
+    queryFn: listClients,
+    enabled: authReady,
+  });
+  const { data: ownersById = {} } = useQuery({
+    queryKey: ["profiles", "owners"],
+    queryFn: listOwners,
+    enabled: authReady,
+  });
+  const { data: salesTeam = [] } = useQuery({
+    queryKey: ["profiles", "sales-team"],
+    queryFn: listSalesTeamProfiles,
+    enabled: authReady,
+  });
+
+  // Server-side equivalents of the client-side filterSalesOrders predicate.
+  const serverFilters = useMemo<SalesOrderListFilters>(
+    () => ({
+      from: filters.range.from,
+      to: filters.range.to,
+      ownerId: filters.ownerId,
+      clientId: filters.clientId,
+      taxType: filters.taxType,
+      source: filters.source,
+      soType: filters.soType,
+      deleted: deletedMode,
+    }),
+    [filters, deletedMode],
+  );
+  const filterKey = useMemo(
+    () =>
+      serializeListFilters({
+        from: filters.range.from.toISOString(),
+        to: filters.range.to.toISOString(),
+        ownerId: filters.ownerId,
+        clientId: filters.clientId,
+        taxType: filters.taxType,
+        source: filters.source,
+        soType: filters.soType,
+        deleted: deletedMode,
+      }),
+    [filters, deletedMode],
+  );
+
+  const [page, setPage] = useState(1);
+  const [pageCursors, setPageCursors] = useState<Record<number, string | null>>(
+    { 1: null },
+  );
+  useEffect(() => {
+    setPage(1);
+    setPageCursors({ 1: null });
+  }, [filterKey]);
+
+  const currentCursor = pageCursors[page] ?? null;
+  const ordersPage = useQuery({
+    queryKey: listQueryKey("sales-orders", "page", {
+      filters: { key: filterKey },
+      page: { pageSize: DEFAULT_PAGE_SIZE, cursor: currentCursor },
+    }),
+    queryFn: () =>
+      listSalesOrdersPage({
+        filters: serverFilters,
+        page: { pageSize: DEFAULT_PAGE_SIZE, cursor: currentCursor },
+      }),
+    enabled: authReady,
+  });
+  const metricsQuery = useQuery({
+    queryKey: listQueryKey("sales-orders", "aggregate", {
+      filters: { key: filterKey },
+    }),
+    queryFn: () => getSalesOrdersMetrics(serverFilters),
+    enabled: authReady && !deletedMode,
+  });
 
   const clients = useMemo(() => {
     const map: Record<string, (typeof clientList)[number]> = {};
@@ -107,48 +177,43 @@ function SalesOrdersRevenuePage() {
   }, [clientList]);
   const owners = ownersById;
 
-  const rows = useMemo(
-    () =>
-      filterSalesOrders(sourceOrders, filters).sort(
-        compareSalesOrdersByNewestNumber,
-      ),
-    [sourceOrders, filters],
-  );
+  const rows = ordersPage.data?.rows ?? [];
+  const totalRows = ordersPage.data?.totalCount ?? 0;
+  const isLoading = !authReady || ordersPage.isLoading;
 
   const summary = useMemo(() => {
-    let ppn = 0;
-    let nonPpn = 0;
-    let newProduct = 0;
-    let existing = 0;
-    let protoPaid = 0;
-    let focCount = 0;
-    for (const s of rows) {
-      const v = s.value ?? 0;
-      if (s.taxType === "PPN") ppn += v;
-      else if (s.taxType === "Non-PPN") nonPpn += v;
-      if (s.source === "New Product") newProduct += v;
-      else if (s.source === "Existing / Repeat Order") existing += v;
-      else if (s.source === "Prototype Paid") protoPaid += v;
-      if (s.type === "Prototype" && s.prototypeStatus === "FOC") focCount += 1;
-    }
-    const total = ppn + nonPpn;
-    return { ppn, nonPpn, total, newProduct, existing, protoPaid, focCount };
-  }, [rows]);
+    const m = metricsQuery.data;
+    return {
+      ppn: m?.ppnValue ?? 0,
+      nonPpn: m?.nonPpnValue ?? 0,
+      total: (m?.ppnValue ?? 0) + (m?.nonPpnValue ?? 0),
+      newProduct: m?.newProductValue ?? 0,
+      existing: m?.existingValue ?? 0,
+      protoPaid: m?.prototypePaidValue ?? 0,
+      focCount: m?.focCount ?? 0,
+    };
+  }, [metricsQuery.data]);
 
-  const exportContext = useMemo<SalesOrdersExportContext>(
-    () => ({
-      role,
-      range: filters.range,
-      rows,
-      clientsById: clients,
-      ownersById,
-      summary,
-    }),
-    [role, filters.range, rows, clients, ownersById, summary],
-  );
-
-  const handleExport = (format: "xlsx" | "pdf") => {
+  // Export must cover every filtered SO, not just the visible page, so it
+  // fetches the full filtered set on demand instead of reusing `rows`.
+  const handleExport = async (format: "xlsx" | "pdf") => {
     try {
+      const allOrders = await queryClient.fetchQuery({
+        queryKey: ["sales-orders", "all"],
+        queryFn: () => listSalesOrders(),
+      });
+      const exportRows = filterSalesOrders(allOrders, filters).sort(
+        compareSalesOrdersByNewestNumber,
+      );
+      const exportContext: SalesOrdersExportContext = {
+        role,
+        range: filters.range,
+        rows: exportRows,
+        clientsById: clients,
+        ownersById,
+        summary,
+      };
+
       if (format === "xlsx") {
         const rowCount = exportSalesOrdersXlsx(exportContext);
         toast.success("Sales Orders Excel dibuat", {
@@ -159,7 +224,7 @@ function SalesOrdersRevenuePage() {
 
       exportSalesOrdersPdf(exportContext);
       toast.success("Sales Orders PDF dibuat", {
-        description: `${rows.length} SO · ${formatRupiahShort(summary.total)}.`,
+        description: `${exportRows.length} SO · ${formatRupiahShort(summary.total)}.`,
       });
     } catch (error) {
       if (error instanceof EmptyExportError) {
@@ -175,19 +240,22 @@ function SalesOrdersRevenuePage() {
     }
   };
 
+  const changePage = (nextPage: number) => {
+    if (nextPage > page) {
+      const nextCursor = ordersPage.data?.nextCursor;
+      if (!nextCursor) return;
+      setPageCursors((current) => ({ ...current, [nextPage]: nextCursor }));
+    }
+    setPage(nextPage);
+  };
+
   async function restoreOrder(id: string) {
     setRestoringId(id);
     try {
       await restoreSalesOrder(id);
       await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: salesOrdersQueryKey(false),
-          exact: true,
-        }),
-        queryClient.invalidateQueries({
-          queryKey: salesOrdersQueryKey(true),
-          exact: true,
-        }),
+        // Covers every sales-orders cache shape: "all", "page", "aggregate".
+        queryClient.invalidateQueries({ queryKey: ["sales-orders"] }),
         queryClient.invalidateQueries({ queryKey: ["activity-log"] }),
       ]);
       toast.success("Sales Order dipulihkan");
@@ -201,7 +269,7 @@ function SalesOrdersRevenuePage() {
     }
   }
 
-  if (isLoading || (deletedMode && deletedOrders.isLoading)) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center rounded-lg border border-dashed py-16 text-sm text-muted-foreground">
         Loading sales orders…
@@ -217,7 +285,7 @@ function SalesOrdersRevenuePage() {
             <Receipt className="h-5 w-5 text-primary" /> Sales Orders & Revenue
           </h1>
           <p className="text-sm text-muted-foreground">
-            {rows.length} SO {deletedMode ? "terhapus" : "aktif"} · Scope:{" "}
+            {totalRows} SO {deletedMode ? "terhapus" : "aktif"} · Scope:{" "}
             {ROLE_LABEL[role]}
             {!deletedMode &&
               " · SO FOC ditampilkan sebagai Rp0 dan tidak masuk ke revenue."}
@@ -491,6 +559,35 @@ function SalesOrdersRevenuePage() {
                   })}
                 </TableBody>
               </Table>
+            </div>
+            <div className="flex items-center justify-between border-t px-3 py-2 text-xs text-muted-foreground">
+              <span>
+                {`${(page - 1) * DEFAULT_PAGE_SIZE + 1}–${(page - 1) * DEFAULT_PAGE_SIZE + rows.length} dari ${totalRows}`}
+              </span>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  aria-label="Halaman sebelumnya"
+                  disabled={page <= 1}
+                  onClick={() => changePage(page - 1)}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="tabular-nums">
+                  {page} /{" "}
+                  {Math.max(1, Math.ceil(totalRows / DEFAULT_PAGE_SIZE))}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  aria-label="Halaman berikutnya"
+                  disabled={!ordersPage.data?.nextCursor}
+                  onClick={() => changePage(page + 1)}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>

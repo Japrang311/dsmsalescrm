@@ -2,13 +2,107 @@
 
 Context dump for continuing this work in another tool (Codex). Written 2026-07-18; Phase 11/12 status refreshed 2026-07-19; Phase 11 import-review reconciliation session added 2026-07-19; post-import UX/bugfix session added 2026-07-20; second 2026-07-20 session (pipeline permissions/FK bugfixes) added 2026-07-20; Client Detail/Client List real-data wiring session added 2026-07-21; remote-migration-push + data-restoration session added 2026-07-21; browser-verification + spending_ytd fix + SO edit audit trail session added 2026-07-21; unused-code cleanup + client database (company info/contacts) feature session added 2026-07-22; contact position + Client Detail product/description fixes + commercial item product-name migration reconciliation added 2026-07-22; dynamic per-month sales target UI/calculation update added 2026-07-22; soft-delete implementation, remote Supabase apply, and main/live push closeout added 2026-07-24; RFQ retirement and documentation refresh added 2026-07-25; Sales Task Control Loop spec approval and Phase 1-2 implementation (Tasks 46-52) added 2026-07-27; unified progress timeline Task 53/8 and Manager Team Exceptions Task 54/9 added 2026-07-27; visual design audit Phase 1 (critical usability/responsiveness fixes) added 2026-07-27; Executive exception detail and aggregate-only Task metrics Task 55/10 added 2026-07-27; Dashboard/TopBar consumer migration Task 56/11 added 2026-07-27; Reports consumer migration Task 57/12 added 2026-07-27; export migration Task 58/13 added 2026-07-27; Pipeline/Client Detail/commercial follow-up migration Task 59/14 added 2026-07-27; ownership/account lifecycle migration Task 60/15 added 2026-07-27; production deployment audit + RLS/security-advisor review + two security-hardening migrations added 2026-07-30; Stage 1/Stage 2 checklist closeout + Sentry source-map wiring + commercial Next FU fix (commit `7ae20aa`, pushed, CI green) + Stage 3 Pipeline-pagination brainstorming in progress added 2026-08-05.
 
-## HANDOFF — Stage 3 Pipeline pagination in progress (2026-08-05, read this first)
+## HANDOFF — Stage 3 Sales Orders pagination DONE and pushed (2026-08-05, read this first)
+
+Latest state, ahead of everything below. Stage 3 checklist item "Paginate Sales Orders with
+server filters and stable order" is implemented, verified locally, and its migration is applied
+to production.
+
+- `src/lib/data/sales-orders.ts` — `listSalesOrdersPage()`: keyset pagination, page size 25,
+  cursor `so_number`+`id`, server-side filters for date range / owner / client / tax type /
+  source / SO type / deleted mode.
+- **Ordering decision:** sorts by `so_number` descending, *not* `created_at`. Production has 209
+  active Sales Orders but only 21 distinct `created_at` values (bulk Sheet import), so a
+  created_at sort is effectively arbitrary. Every series zero-pads its sequence to three digits
+  (`DSM-26SO001` … `DSM-26SO160`, `DSM-26NP017`, `DSM-26PROTY008`), so plain text ordering equals
+  the natural-number order `compareSalesOrdersByNewestNumber` produces, within a series and year.
+  Series group separately (NP / PROTY / SO), which is acceptable. Regression test:
+  "pages by SO number descending regardless of insert order" in `sales-orders.test.ts`.
+- `src/lib/data/sales-orders-metrics.ts` + migration
+  `20260805130000_add_sales_orders_metrics_rpc.sql` — RPC `sales_orders_metrics()` (security
+  definer, same filters) returning PPN / Non-PPN / per-source totals and FOC count, replacing
+  client-side summation over the full list. Follows the `pipeline_metrics` precedent.
+- `src/routes/_app.sales-orders.index.tsx` — dropped `useDashboardData()` (it fetched all sales
+  orders, tasks, commercial items and targets just for this page); now uses targeted
+  clients/owners/sales-team queries with the same query keys plus the paged + aggregate queries.
+  Added a prev/next pagination footer. Restore-from-deleted now invalidates the `["sales-orders"]`
+  prefix so every cache shape ("all", "page", "aggregate") refreshes.
+- **Export deliberately still covers the full filtered set**, not just the visible page: it
+  fetches all orders on demand inside `handleExport` and re-applies `filterSalesOrders`. Do not
+  "optimize" this into exporting `rows`.
+- Verification: typecheck clean, lint 0 errors, `bun run test` 541 pass / 0 fail, build succeeds.
+  Browser-checked on the local dev server as Sales (Nur Iman): 21 SO, correct descending SO
+  numbers, KPI tiles and Revenue-by-Source populated from the RPC, footer reads "1–21 dari 21",
+  console clean. **Not yet click-through-verified across more than one page** — the local Sales
+  account only sees 21 of the 72 seeded orders, and verifying a second page needs a Manager
+  login, which the owner has to perform.
+- Migration `20260805130000_add_sales_orders_metrics_rpc.sql` pushed to production
+  `qhtfixgbcpcitokeryxb` with owner approval and confirmed in sync (`migration list --linked`).
+  Production RPC output cross-checked against a direct aggregate query over the same range —
+  identical (PPN 24.911.768.992 / Non-PPN 149.258.000 / 4 FOC / 209 SO for 2026). The
+  `supabase db push` run printed unrelated `pgdelta-target-ca.crt` ENOENT noise from the CLI's
+  edge runtime; the migration still applied.
+
+## HANDOFF — Stage 3 Pipeline pagination DONE, moving to Tasks pagination (2026-08-05)
 
 Session run from Claude Code. Continues `tasks/four-stage-stabilization-and-growth-plan.md` /
 `tasks/four-stage-stabilization-and-growth-todo.md` (the four-stage stabilization program —
 not the Phase 1-15 Task Control Loop work described lower in this file). Picking this up in
 another tool: **do not re-ask the questions already answered below**, they were asked and
 answered explicitly by the owner this session.
+
+**Pipeline pagination (commercial_documents/Pipeline checklist item) is DONE, migration pushed
+to production, and manually re-verified against live production data — do not redo, see the
+"Stage 3 Pipeline pagination — COMPLETED" section immediately below.** The design-decisions
+section right after it is now historical context only. Current active work is the next
+sequential Stage 3 checklist item: **Paginate Tasks with server filters and stable order**
+(not yet started — no code changed for it in this repo yet).
+
+### Owner reprioritization (2026-08-05, after Pipeline pagination shipped)
+
+Same reasoning as the earlier Pipeline-before-Tasks reprioritization: Tasks is only 98 rows in
+production (checked 2026-08-05), no real performance pressure, and its pagination design is
+non-trivial (5 due-state buckets computed from `due_date` + business calendar + workflow status,
+not a simple SQL filter — plus Manager My-Tasks/Team-Exceptions and Executive aggregate-only
+modes). **Owner chose to skip Tasks for now and do Sales Orders next** (211 rows + 418 nested
+items — the other heavy table flagged in the Stage 3 baseline report alongside
+commercial_documents). Tasks pagination remains not started; revisit after Sales Orders.
+
+### Stage 3 Pipeline pagination — COMPLETED (2026-08-05)
+
+- Migration `20260805120000_add_pipeline_metrics_rpc.sql` (RPC `pipeline_metrics()`, security
+  definer, excludes non-`is_current_revision` Quotations and soft-deleted docs) pushed to
+  production project `qhtfixgbcpcitokeryxb` via `supabase db push --linked` and confirmed
+  in sync (`supabase migration list --linked` shows local/remote match).
+- `src/lib/data/commercial-documents.ts` — `listCommercialDocumentsPage()` bounded per-stage
+  keyset pagination (page size 50, cursor `updated_at`+`id`), also filters non-current
+  Quotation revisions (fixes the bug flagged in decision 4 below — chosen option: fix in same
+  pass, confirmed by owner).
+- `src/lib/data/pipeline-metrics.ts` — RPC wrapper for header/analytics aggregates.
+- `_app.pipeline.tsx` — 6 parallel per-stage `useQueries`, "Muat lebih banyak" per column,
+  drag-and-drop restricted to loaded cards only (Option A trade-off from decision below).
+- `PipelineAnalytics.tsx` — consumes RPC `metrics` instead of client-side compute over the
+  full unbounded list.
+- New tests: `src/lib/data/pipeline-metrics.test.ts`, `src/lib/data/commercial-documents-page.test.ts`.
+- Full verification: typecheck clean, lint 0 errors, `bun run test` 537 pass/0 fail, build
+  succeeds.
+- **Manual production re-verification (2026-08-05, separate session after deploy)**: logged in
+  as Super Admin on `https://dsmsalescrm.vercel.app/pipeline` — board shows 418 items /
+  Rp108,17 milyar, matches a direct read-only DB query filtering
+  `is_current_revision = true` (12 non-current Quotation revisions correctly excluded, e.g.
+  `DSM-26QUO-0420`). Load-more on Closed Won/Closed Lost columns (>50 items each) confirmed
+  loading more cards. Owner filter (`Nur Iman`) confirmed server-side re-filter of both board
+  and summary stats. Card drawer confirmed showing quick-update fields, linked
+  Quotations/Sales Orders, and full stage/revision history. Created a persistent local test
+  account (`qa.pipeline.test@dutasolusimetalindo.com`, role Sales, owner said leave it in
+  production for reuse — do not delete without being asked) to confirm role-based Pipeline
+  access has no console errors. Filter-by-status and drag-and-drop were not re-tested live
+  (judged low-risk: same server-side mechanism as the already-tested owner filter, and
+  drag-and-drop already has automated test coverage).
+- **Found a pre-existing, unrelated bug while verifying**: Settings → Tim & Role tab fails to
+  render the member list (`e.from is not a function`, `src/routes/_app.settings.tsx`),
+  reproduced twice. **Owner decision: defer this fix until every Stage 1-4 checklist item is
+  all-green — do not fix it now.**
 
 ### What's done and pushed (commit `7ae20aa` on `main`, CI green)
 

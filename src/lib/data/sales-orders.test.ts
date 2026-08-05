@@ -13,6 +13,7 @@ import {
   deleteSalesOrder,
   getSalesOrder,
   listSalesOrders,
+  listSalesOrdersPage,
   restoreSalesOrder,
 } from "./sales-orders";
 
@@ -166,6 +167,107 @@ describe("normalized Sales Order adapter", () => {
       unitPrice: null,
       lineTotal: null,
     });
+    await supabase.auth.signOut();
+  });
+
+  test("pages active rows with server filters and no duplicate cursor rows", async () => {
+    await authenticateSales();
+    const created = [];
+    const taxTypes = ["PPN", "Non-PPN", "PPN"] as const;
+    for (let index = 0; index < taxTypes.length; index += 1) {
+      const taxType = taxTypes[index];
+      created.push(
+        await createSalesOrder({
+          clientId,
+          date: `2096-03-0${index + 1}`,
+          customerPoNumber: `PO-PAGE-${index + 1}`,
+          type: "Regular",
+          taxType,
+          source: "Existing / Repeat Order",
+          numberMode: "Manual",
+          manualSoNumber: `DSM-96SO92${index + 1}`,
+          items: [
+            {
+              productName: `Pagination item ${index + 1}`,
+              qty: 1,
+              uom: "Pcs",
+              unitPrice: 1_000 + index,
+            },
+          ],
+        }),
+      );
+    }
+
+    const firstPage = await listSalesOrdersPage({
+      filters: {
+        from: new Date(2096, 2, 1),
+        to: new Date(2096, 2, 31),
+        taxType: "PPN",
+      },
+      page: { pageSize: 1 },
+    });
+    expect(firstPage.rows).toHaveLength(1);
+    expect(firstPage.totalCount).toBe(2);
+    expect(firstPage.nextCursor).not.toBeNull();
+
+    const secondPage = await listSalesOrdersPage({
+      filters: {
+        from: new Date(2096, 2, 1),
+        to: new Date(2096, 2, 31),
+        taxType: "PPN",
+      },
+      page: { pageSize: 1, cursor: firstPage.nextCursor },
+    });
+    expect(secondPage.rows).toHaveLength(1);
+    expect(secondPage.nextCursor).toBeNull();
+    expect(secondPage.rows[0].id).not.toBe(firstPage.rows[0].id);
+    expect([firstPage.rows[0].id, secondPage.rows[0].id].sort()).toEqual(
+      [created[0].id, created[2].id].sort(),
+    );
+    await supabase.auth.signOut();
+  });
+
+  test("pages by SO number descending regardless of insert order", async () => {
+    await authenticateSales();
+    // Inserted out of order on purpose: creation order is 941, 943, 942, so a
+    // created_at-based sort would return 942 first. Imported production rows
+    // share only a handful of created_at values, so SO number is the only
+    // meaningful newest-first key.
+    for (const soNumber of ["DSM-96SO941", "DSM-96SO943", "DSM-96SO942"]) {
+      await createSalesOrder({
+        clientId,
+        date: "2096-05-01",
+        customerPoNumber: `PO-ORDER-${soNumber}`,
+        type: "Regular",
+        taxType: "PPN",
+        source: "Existing / Repeat Order",
+        numberMode: "Manual",
+        manualSoNumber: soNumber,
+        items: [
+          { productName: soNumber, qty: 1, uom: "Pcs", unitPrice: 1_000 },
+        ],
+      });
+    }
+
+    const filters = {
+      from: new Date(2096, 4, 1),
+      to: new Date(2096, 4, 31),
+    };
+    const firstPage = await listSalesOrdersPage({
+      filters,
+      page: { pageSize: 2 },
+    });
+    expect(firstPage.rows.map((row) => row.soNumber)).toEqual([
+      "DSM-96SO943",
+      "DSM-96SO942",
+    ]);
+
+    const secondPage = await listSalesOrdersPage({
+      filters,
+      page: { pageSize: 2, cursor: firstPage.nextCursor },
+    });
+    expect(secondPage.rows.map((row) => row.soNumber)).toEqual(["DSM-96SO941"]);
+    expect(secondPage.nextCursor).toBeNull();
     await supabase.auth.signOut();
   });
 });
