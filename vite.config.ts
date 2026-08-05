@@ -49,7 +49,12 @@ export default defineConfig(({ mode }) => {
           },
         },
       }),
-      nitro({ defaultPreset: "vercel" }),
+      nitro({
+        defaultPreset: "vercel",
+        // Supabase lives in ap-northeast-1 (Tokyo). Keep the SSR function in the
+        // same region (hnd1) so every query is a local hop, not a trans-Pacific one.
+        vercel: { functions: { regions: ["hnd1"] } },
+      }),
       react(),
       tailwindcss(),
     ],
