@@ -1,6 +1,6 @@
 # Checklist: Four-Stage Stabilization and Growth
 
-**Status:** APPROVED FOR LOCAL EXECUTION — Stage 2 guardrail wave partially complete; browser automation gate resolved locally
+**Status:** APPROVED FOR LOCAL EXECUTION — Stage 1 and Stage 2 checkpoints closed as of 2026-08-05; Stage 3 in progress
 **Spec:** `docs/superpowers/specs/2026-08-05-four-stage-stabilization-and-growth-design.md`  
 **Plan:** `tasks/four-stage-stabilization-and-growth-plan.md`
 
@@ -63,7 +63,7 @@
 - [x] Automate Reports/export smoke. Browser E2E verifies Dashboard CSV dropdown download.
 - [x] Verify Sentry environment/release/source-map contract without exposing secrets. Environment/release config already had unit coverage (`monitoring-config.test.ts`, 5 cases). Source-map upload had no implementation at all (no plugin, no `build.sourcemap`, no DSN anywhere) — wired `@sentry/vite-plugin` into `vite.config.ts` on 2026-08-05, gated on `SENTRY_AUTH_TOKEN`/`SENTRY_ORG`/`SENTRY_PROJECT` all being present, a no-op otherwise. Dry-run built twice with throwaway fake credentials (never real secrets) to prove both branches: (1) no token → build succeeds, zero `.map` files emitted; (2) fake token → plugin activates, attempts real upload, fails auth cleanly without crashing the build. That dry run surfaced a real gap: the plugin only deletes local `.map` files after a *successful* upload, so a misconfigured/expired token in production would silently ship full source maps in the public static output (112 files did leak in the failed-upload dry run). Fixed by switching to `sourcemap: "hidden"` — maps are still generated for Sentry but the `sourceMappingURL` comment is omitted, so even an undeleted map isn't linked from the shipped JS (verified: 0 `sourceMappingURL` references in output after the fix). External ingestion into a real Sentry project remains untested — no Sentry project/DSN exists for this app yet; that requires the owner creating one and supplying `SENTRY_DSN`/`VITE_SENTRY_DSN` plus the upload token, which is a credential/account decision outside this pass. Typecheck, full test suite (533 pass), and lint all clean after the change.
 - [x] Prove CI passes on a clean clone and fresh local database. Latest pushed baseline GitHub Actions run `30985051161` passed on commit `dba65bb`; current local browser expansion still needs a post-push CI run.
-- [ ] Review dated Stage 2 verification report. Local browser automation now covers all planned critical workflows; Sentry source-map/external ingestion and GitHub-hosted CI evidence for this uncommitted update remain open.
+- [x] Review dated Stage 2 verification report. `docs/reports/2026-08-05-stage-2-local-verification.md` updated on 2026-08-05 with GitHub-hosted CI run `31004149430` on commit `7ae20aa` (all 7 jobs pass) and the Sentry source-map wiring/dry-run verification. Only remaining gap: production Sentry source-map upload against a real project and external event ingestion, blocked on the owner creating a Sentry project and supplying `SENTRY_DSN`/upload token — a credential decision outside this pass.
 
 ## Stage 3 — Data and performance
 

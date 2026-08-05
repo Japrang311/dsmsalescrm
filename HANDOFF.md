@@ -1,6 +1,146 @@
 # Handoff — DSM Sales Web App V2
 
-Context dump for continuing this work in another tool (Codex). Written 2026-07-18; Phase 11/12 status refreshed 2026-07-19; Phase 11 import-review reconciliation session added 2026-07-19; post-import UX/bugfix session added 2026-07-20; second 2026-07-20 session (pipeline permissions/FK bugfixes) added 2026-07-20; Client Detail/Client List real-data wiring session added 2026-07-21; remote-migration-push + data-restoration session added 2026-07-21; browser-verification + spending_ytd fix + SO edit audit trail session added 2026-07-21; unused-code cleanup + client database (company info/contacts) feature session added 2026-07-22; contact position + Client Detail product/description fixes + commercial item product-name migration reconciliation added 2026-07-22; dynamic per-month sales target UI/calculation update added 2026-07-22; soft-delete implementation, remote Supabase apply, and main/live push closeout added 2026-07-24; RFQ retirement and documentation refresh added 2026-07-25; Sales Task Control Loop spec approval and Phase 1-2 implementation (Tasks 46-52) added 2026-07-27; unified progress timeline Task 53/8 and Manager Team Exceptions Task 54/9 added 2026-07-27; visual design audit Phase 1 (critical usability/responsiveness fixes) added 2026-07-27; Executive exception detail and aggregate-only Task metrics Task 55/10 added 2026-07-27; Dashboard/TopBar consumer migration Task 56/11 added 2026-07-27; Reports consumer migration Task 57/12 added 2026-07-27; export migration Task 58/13 added 2026-07-27; Pipeline/Client Detail/commercial follow-up migration Task 59/14 added 2026-07-27; ownership/account lifecycle migration Task 60/15 added 2026-07-27; production deployment audit + RLS/security-advisor review + two security-hardening migrations added 2026-07-30.
+Context dump for continuing this work in another tool (Codex). Written 2026-07-18; Phase 11/12 status refreshed 2026-07-19; Phase 11 import-review reconciliation session added 2026-07-19; post-import UX/bugfix session added 2026-07-20; second 2026-07-20 session (pipeline permissions/FK bugfixes) added 2026-07-20; Client Detail/Client List real-data wiring session added 2026-07-21; remote-migration-push + data-restoration session added 2026-07-21; browser-verification + spending_ytd fix + SO edit audit trail session added 2026-07-21; unused-code cleanup + client database (company info/contacts) feature session added 2026-07-22; contact position + Client Detail product/description fixes + commercial item product-name migration reconciliation added 2026-07-22; dynamic per-month sales target UI/calculation update added 2026-07-22; soft-delete implementation, remote Supabase apply, and main/live push closeout added 2026-07-24; RFQ retirement and documentation refresh added 2026-07-25; Sales Task Control Loop spec approval and Phase 1-2 implementation (Tasks 46-52) added 2026-07-27; unified progress timeline Task 53/8 and Manager Team Exceptions Task 54/9 added 2026-07-27; visual design audit Phase 1 (critical usability/responsiveness fixes) added 2026-07-27; Executive exception detail and aggregate-only Task metrics Task 55/10 added 2026-07-27; Dashboard/TopBar consumer migration Task 56/11 added 2026-07-27; Reports consumer migration Task 57/12 added 2026-07-27; export migration Task 58/13 added 2026-07-27; Pipeline/Client Detail/commercial follow-up migration Task 59/14 added 2026-07-27; ownership/account lifecycle migration Task 60/15 added 2026-07-27; production deployment audit + RLS/security-advisor review + two security-hardening migrations added 2026-07-30; Stage 1/Stage 2 checklist closeout + Sentry source-map wiring + commercial Next FU fix (commit `7ae20aa`, pushed, CI green) + Stage 3 Pipeline-pagination brainstorming in progress added 2026-08-05.
+
+## HANDOFF — Stage 3 Pipeline pagination in progress (2026-08-05, read this first)
+
+Session run from Claude Code. Continues `tasks/four-stage-stabilization-and-growth-plan.md` /
+`tasks/four-stage-stabilization-and-growth-todo.md` (the four-stage stabilization program —
+not the Phase 1-15 Task Control Loop work described lower in this file). Picking this up in
+another tool: **do not re-ask the questions already answered below**, they were asked and
+answered explicitly by the owner this session.
+
+### What's done and pushed (commit `7ae20aa` on `main`, CI green)
+
+- **Stage 1 and Stage 2 of the checklist are fully closed.** Every checkbox in
+  `tasks/four-stage-stabilization-and-growth-todo.md` under those two headings is checked, each
+  with a dated note on how it was verified. Do not reopen these without new information.
+- Fixed a real bug found while validating cache invalidation: `CommercialViews.tsx` (used by the
+  Quotations index Table+Board views) read `item.nextActionDate` directly — a field the
+  normalized read path never populates — so "Next FU" always showed "—". Now falls back to the
+  earliest active linked Task due date, same pattern as Pipeline's `nextByItem`.
+- Wired Sentry source-map upload (`@sentry/vite-plugin` in `vite.config.ts`), gated on
+  `SENTRY_AUTH_TOKEN`/`SENTRY_ORG`/`SENTRY_PROJECT` all being present (no-op otherwise). Uses
+  `sourcemap: "hidden"` after a dry run with throwaway fake credentials proved the plugin only
+  deletes local `.map` files after a *successful* upload — a failed/misconfigured token would
+  otherwise leak maps into the public static output. No Sentry project/DSN exists for this app
+  yet; production source-map upload and external event ingestion remain genuinely unverified
+  until the owner creates a Sentry project and supplies real credentials (a credential/account
+  decision, not an engineering task).
+- GitHub Actions run `31004149430` on `7ae20aa`: all 7 jobs pass. (First attempt had one
+  transient Docker port-bind flake in "Application and RLS tests", unrelated to the change;
+  re-running just that job passed clean.)
+- Both dated Stage 1 and Stage 2 verification reports
+  (`docs/reports/2026-08-05-stage-2-local-verification.md`) are updated to match.
+
+### What's in progress — Stage 3 commercial_documents/Pipeline pagination design
+
+Currently mid-`superpowers:brainstorming` for the checklist item "Paginate commercial
+documents/Pipeline with server filters and stable order". **No design doc has been written yet**
+(nothing under `docs/superpowers/specs/` for this), **no code has been changed for this item**.
+Resume by continuing the brainstorming skill's clarifying-questions loop, or re-run it fresh —
+either way, treat the decisions below as already made so you don't re-ask them:
+
+1. **Real production row counts** (checked live against Supabase project `qhtfixgbcpcitokeryxb`
+   via the Supabase MCP `execute_sql` tool, 2026-08-05): `tasks` 98, `commercial_documents` 436
+   (+788 nested items), `sales_orders` 211 (+418 nested items), `activity_log` 354, `clients` 75.
+   The local seed baseline in `docs/reports/2026-08-05-stage-3-performance-baseline.md` only had
+   12 tasks / 126 commercial documents — much smaller than real production. Re-check row counts
+   again if much time has passed; they'll have grown.
+2. **Owner decision:** the checklist's written order (Tasks → commercial/Pipeline → Sales Orders
+   → Activity) is **not** risk-ordered. Given real row counts above, `commercial_documents` and
+   `sales_orders` are the heaviest (nested items, largest payload) and were already flagged
+   "primary Stage 3 pagination target" / highest risk in the Stage 3 baseline report. Tasks at 98
+   rows is not an urgent performance problem. **Owner chose to reprioritize: do
+   commercial_documents/Pipeline before Tasks**, following the baseline report's risk ranking
+   rather than the checklist's written order. Update the checklist ordering note if you act on
+   this.
+3. **Owner decision:** `commercial_documents` is read by two structurally different UIs sharing
+   one data layer (`src/lib/data/commercial-items.ts` → `commercial-documents.ts`):
+   - `src/routes/_app.pipeline.tsx` (812 lines) — Kanban board grouped by stage, drag-and-drop
+     cards between stage columns via the `transitionCommercialStage` RPC. This is the
+     daily-driver sales UI.
+   - `src/components/commercial/CommercialViews.tsx` (649 lines), used by
+     `_app.quotations.index.tsx` — has a Table mode (flat, no drag-drop, closest analog to the
+     already-paginated Clients route) and a Board mode (kanban-style but read-only, no
+     drag-drop).
+   **Owner chose: focus on Pipeline (the kanban drag-drop board) first**, Quotations
+   Table/Board later.
+4. **Open, unanswered question — was asked, owner said "checkpoint, continue with another
+   agent" before answering:** Pipeline (`_app.pipeline.tsx`) does **not** filter
+   `isCurrentRevision !== false` for Quotations the way `CommercialViews.tsx`'s `scoped` memo
+   does (see `CommercialViews.tsx` around the `scoped` useMemo). This means superseded Quotation
+   revisions currently still show as separate cards on the Pipeline board and count toward the
+   header summary values (Total Pipeline / Open Value / stage percentages) — a real data-
+   correctness bug, independent of pagination. **Ask the owner: fix this in the same pass as the
+   pagination work (recommended — the new server query needs a revision-filter decision anyway),
+   or log it separately and keep pagination behavior-identical to today including this bug?**
+
+### Design considerations already surfaced (not yet decided/presented as options)
+
+- **Summary stats problem:** `PipelineAnalytics` and the header cards (Total Pipeline, Open
+  Value, Won Value, Win Rate, per-stage %) are currently computed client-side from the *full*
+  in-memory `items` array (all non-deleted commercial_documents, fetched via
+  `["commercial-items", "all"]` / `listCommercialItems()`). If Pipeline moves to bounded
+  per-stage loading, these numbers can no longer be computed from what's rendered — they need a
+  server aggregate RPC (count/sum per stage, respecting the same owner/status/nextWindow
+  filters). The Stage 3 baseline report explicitly calls out
+  `task_control_loop_metrics_rpc` as "the healthy aggregate pattern Stage 3 should copy" — follow
+  that precedent.
+- **Kanban ≠ flat list:** the established `src/lib/pagination-contracts.ts` keyset-cursor pattern
+  (used mechanically for Clients: `src/lib/data/clients.ts:listClientRowsPage` +
+  `src/routes/_app.clients.index.tsx`) assumes one flat cursor across one list. A kanban board
+  with 6 stage columns needs either 6 independent per-column cursors/queries (bounded load per
+  column, e.g. top N most-recent, with a per-column "load more"), or some other shape — this
+  still needs to be designed, not copied mechanically from Clients.
+- **Drag-and-drop across pagination boundary:** undecided whether a card outside the initially
+  loaded N-per-column must be draggable (would need eager-loading or a different interaction),
+  or whether it's acceptable that only already-loaded cards can be dragged until the column is
+  expanded.
+- **Client-status filter:** the existing `status` filter dropdown filters by the *client's*
+  status, not the document's — currently done via a client-side join against a separately
+  fetched `clients` list. Whether this moves server-side (via a Supabase embedded-resource
+  filter on the `clients` foreign-key relation) or stays a client-side post-filter on the loaded
+  page is still open.
+- **Rough options sketched (not yet presented to the owner as a formal choice):**
+  - **A (leaning recommended):** bounded-per-stage keyset load (extend
+    `listCommercialDocuments`/add a paginated variant, called per-stage with a small limit e.g.
+    50) + a new aggregate RPC for the header/analytics numbers, following the
+    `task_control_loop_metrics_rpc` pattern.
+  - **B (minimal/quick-win):** don't implement true per-column pagination yet; just move the
+    summary-stat computation to a server RPC and trim the per-card payload. Doesn't actually
+    close the checklist item's "paginate" wording, but is lower risk if time is short.
+  - **C (not recommended):** replace the kanban board with a server-paginated flat list
+    filterable by stage, dropping drag-and-drop. Bigger UX change than what was asked for; the
+    owner has already verified and relies on the current drag-drop flow (see the 2026-08-05
+    18:05 memory entries about testing bidirectional stage transitions in production).
+
+### Stage 3 already-done items (for context, don't redo)
+
+- `bun run stage3:baseline` → `docs/reports/2026-08-05-stage-3-performance-baseline.md` (the row-
+  count/payload/timing baseline referenced above).
+- Manager holiday administration (Master Data) + CSV preview/validation/atomic import via
+  `import_business_calendar_holidays(jsonb)`, with duplicate/invalid/incomplete-year test
+  coverage.
+- `src/lib/pagination-contracts.ts` — the typed, resource-agnostic keyset-cursor contract
+  (`normalizeListPageInput`, `encodePageCursor`/`decodePageCursor`, `listQueryKey`). Already
+  lists `"commercial-documents"` and `"tasks"` in its `ListResource` union, ready to use.
+- Clients pagination: `src/lib/data/clients.ts:listClientRowsPage` (server-side search/status/
+  source/owner/next-FU filters, keyset cursor on `created_at`+`id`) wired into
+  `src/routes/_app.clients.index.tsx`. This is the reference implementation for the *mechanical*
+  parts of the pattern (query shape, cursor encode/decode, `listQueryKey` usage) — Pipeline's
+  kanban shape still needs its own design as noted above.
+
+### Environment notes
+
+- Local dev server runs on **port 8080** (`bun run dev`), not 3000 — port 3000 on this machine is
+  an unrelated `whatsapp-bridge` process, not this app.
+- Local Supabase: `bunx supabase start` / `bunx supabase status`. Some auxiliary services
+  (imgproxy, pooler) showed as stopped mid-session but the API (`54321`) and DB (`54322`) stayed
+  up; not investigated further, wasn't a blocker.
+- **The owner asked (2026-08-05) to always respond in Bahasa Indonesia** — saved to this
+  project's Claude memory (`feedback_bahasa_indonesia.md`). If your tool doesn't share that
+  memory store, the owner will likely repeat this preference.
 
 ## HANDOFF TO CODEX — read this first (2026-07-30)
 

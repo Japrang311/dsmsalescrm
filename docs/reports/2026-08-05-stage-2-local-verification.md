@@ -81,19 +81,25 @@ loopback only for loopback Supabase configuration.
 
 ## GitHub-hosted CI verification
 
-**Latest pushed baseline commit:** `dba65bb` (`test: add browser e2e guardrail`)
-**Latest pushed baseline run:** `30985051161`
-**Result:** Pass on GitHub-hosted clean runner with fresh local Supabase database.
-
-The browser-flow expansion in this report is local-only until this work is committed, pushed, and a new GitHub-hosted run passes.
+**Latest pushed commit:** `7ae20aa` (`fix: derive commercial Next FU from tasks, wire Sentry source-map upload`)
+**Latest pushed run:** `31004149430`
+**Result:** Pass on GitHub-hosted clean runner with fresh local Supabase database, all 7 jobs green.
 
 | Job                             | Result | Duration |
 | ------------------------------- | ------ | -------- |
-| Static checks                   | Pass   | 32s      |
-| Local database gates            | Pass   | 2m33s    |
-| Application and RLS tests       | Pass   | 3m52s    |
-| Runtime smoke and bundle report | Pass   | 25s      |
-| Dependency risk report          | Pass   | 9s       |
+| Static checks                   | Pass   | 30s      |
+| Local database gates            | Pass   | 2m34s    |
+| Application and RLS tests       | Pass   | 3m41s    |
+| Runtime smoke and bundle report | Pass   | 22s      |
+| Dependency risk report          | Pass   | 8s       |
+| Production migration parity     | Pass   | 11s      |
+| Browser E2E flows               | Pass   | 3m55s    |
+
+`Application and RLS tests` failed on the first attempt of this run
+(`failed to bind host port for 0.0.0.0:54322: address already in use`) — a
+transient Docker networking flake on the GitHub-hosted runner starting local
+Supabase, unrelated to the pushed change. Re-running only that job passed
+cleanly on the same commit.
 
 The previous Stage 2 CI run `30978352284` failed in `Application and RLS tests`
 because `src/lib/data/team.test.ts` globally mocked `@/lib/supabase`, which
@@ -102,7 +108,9 @@ called `supabase.auth.setSession`. The follow-up commit replaced that global
 module mock with an injected fake Team client.
 
 An earlier recovery run `30981687347` also passed on commit `5e3f358`
-(`fix: isolate team data tests from app supabase client`).
+(`fix: isolate team data tests from app supabase client`), and baseline run
+`30985051161` passed on commit `dba65bb` before the browser E2E and Sentry
+source-map work in this report was pushed.
 
 ## Bundle snapshot
 
@@ -126,8 +134,9 @@ No permanent exception was created. Dependency upgrades or dated exceptions stil
 - Server environment order: `SENTRY_ENVIRONMENT`, `VERCEL_ENV`, then `NODE_ENV`.
 - Server release order: `SENTRY_RELEASE`, then `VERCEL_GIT_COMMIT_SHA`.
 - Unit coverage: `src/lib/monitoring-config.test.ts`.
+- Source-map upload wired via `@sentry/vite-plugin` in `vite.config.ts`, gated on `SENTRY_AUTH_TOKEN`/`SENTRY_ORG`/`SENTRY_PROJECT` all being present — a no-op build otherwise. Uses `sourcemap: "hidden"` (maps generated for upload but not linked from shipped JS via `sourceMappingURL`), because a dry run with throwaway fake credentials proved the plugin only deletes local `.map` files after a *successful* upload: a failed/misconfigured upload left 112 map files in the public static output. Hidden mode means an undeleted map still isn't reachable through normal devtools/browser flow.
+- Verified without real secrets: two local dry-run builds with throwaway fake `SENTRY_AUTH_TOKEN`/`SENTRY_ORG`/`SENTRY_PROJECT` values — no-token build emits zero `.map` files, fake-token build activates the plugin, attempts a real upload, fails cleanly on auth (`Project not found`) without breaking the build, and after the hidden-sourcemap fix emits zero `sourceMappingURL` references in shipped JS.
 
 ## Not yet verified
 
-- New GitHub-hosted CI evidence for the browser E2E job is not yet available until this work is committed and pushed.
-- Production Sentry source-map upload and external event ingestion behavior are not verified.
+- Production Sentry source-map upload against a real Sentry project and external event ingestion: no Sentry project/DSN exists for this app yet. Requires the owner to create a Sentry project and supply `SENTRY_DSN`/`VITE_SENTRY_DSN` plus an upload auth token — a credential/account decision outside this pass.
