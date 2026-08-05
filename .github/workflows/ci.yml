@@ -155,6 +155,36 @@ jobs:
           path: artifacts/bundle-report.json
           if-no-files-found: ignore
 
+  migration_parity:
+    name: Production migration parity
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # Pull requests only report drift: a PR is allowed to add a migration
+      # that production has not been given yet. Pushes to main are what Vercel
+      # deploys, so there the check must fail.
+      - name: Check migration parity (pull request, warn only)
+        if: github.event_name == 'pull_request'
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: bun scripts/check-migration-parity.ts --warn-only
+
+      - name: Check migration parity (main)
+        if: github.event_name == 'push'
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: bun scripts/check-migration-parity.ts
+
   dependency_risk:
     name: Dependency risk report
     runs-on: ubuntu-latest

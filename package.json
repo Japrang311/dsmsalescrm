@@ -18,6 +18,7 @@
     "verify:ci:app": "bun run lint && bun run typecheck && bun run test:ci && bun run build",
     "verify:db": "bunx supabase@2.109.1 db reset --local && bunx supabase@2.109.1 db advisors --local && bunx supabase@2.109.1 db lint --local",
     "smoke:runtime": "bun scripts/runtime-smoke.ts",
+    "check:migration-parity": "bun scripts/check-migration-parity.ts",
     "audit:deps": "bun audit --json",
     "audit:deps:report": "bun scripts/dependency-risk-report.ts",
     "bundle:report": "bun scripts/bundle-report.ts",
