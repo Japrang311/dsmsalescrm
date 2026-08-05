@@ -14,6 +14,7 @@ import {
   User2,
   Target as TargetIcon,
   Database,
+  CalendarDays,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -79,6 +80,12 @@ import {
   updateOrgSettings,
   type OrgSettings,
 } from "@/lib/data/org-settings";
+import {
+  deleteBusinessCalendarHoliday,
+  importBusinessCalendarHolidays,
+  listBusinessCalendarHolidayRows,
+  previewBusinessCalendarCsv,
+} from "@/lib/data/business-calendar";
 import {
   listTeamMembers,
   createTeamMember,
@@ -1304,8 +1311,24 @@ function OrgTab({ canEdit }: { canEdit: boolean }) {
     queryKey: ["org-settings"],
     queryFn: getOrgSettings,
   });
+  const {
+    data: holidays = [],
+    isLoading: holidaysLoading,
+    isError: holidaysIsError,
+    error: holidaysError,
+  } = useQuery({
+    queryKey: ["business-calendar-holidays"],
+    queryFn: listBusinessCalendarHolidayRows,
+  });
   const [form, setForm] = useState<OrgSettings | null>(null);
   const [saving, setSaving] = useState(false);
+  const [holidayCsv, setHolidayCsv] = useState(
+    "holiday_date,label,source\n2026-01-01,Tahun Baru,manual-import",
+  );
+  const [importingHolidays, setImportingHolidays] = useState(false);
+  const [deletingHolidayId, setDeletingHolidayId] = useState<string | null>(
+    null,
+  );
 
   useEffect(() => {
     if (org) setForm(org);
@@ -1320,6 +1343,10 @@ function OrgTab({ canEdit }: { canEdit: boolean }) {
   }
 
   const dirty = JSON.stringify(form) !== JSON.stringify(org);
+  const holidayPreview = previewBusinessCalendarCsv(holidayCsv);
+  const holidayYears = [
+    ...new Set(holidays.map((holiday) => holiday.holidayDate.slice(0, 4))),
+  ].sort();
 
   return (
     <div className="space-y-4">
@@ -1433,6 +1460,217 @@ function OrgTab({ canEdit }: { canEdit: boolean }) {
                 <Save className="mr-1.5 h-4 w-4" />{" "}
                 {saving ? "Menyimpan…" : "Simpan"}
               </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CalendarDays className="h-5 w-5 text-primary" />
+            Kalender Hari Libur
+          </CardTitle>
+          <CardDescription>
+            Kalender bisnis Asia/Jakarta dipakai untuk menghitung due state
+            Task. Import CSV divalidasi dulu di browser lalu disimpan lewat satu
+            RPC atomik.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {!canEdit && (
+            <div className="rounded-md border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+              Hanya Manager atau Super Admin yang dapat mengubah kalender.
+            </div>
+          )}
+
+          <div className="grid gap-3 sm:grid-cols-3">
+            <SummaryCard
+              label="Total tanggal"
+              value={String(holidays.length)}
+              hint="Row aktif di kalender"
+            />
+            <SummaryCard
+              label="Tahun tercakup"
+              value={holidayYears.length ? holidayYears.join(", ") : "—"}
+              hint="Tahun tanpa row akan memicu warning"
+            />
+            <SummaryCard
+              label="Preview valid"
+              value={`${holidayPreview.validRows.length} row`}
+              hint={
+                holidayPreview.errors.length
+                  ? `${holidayPreview.errors.length} error`
+                  : "Siap import"
+              }
+            />
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
+            <Field label="CSV holiday_date,label,source">
+              <Textarea
+                value={holidayCsv}
+                disabled={!canEdit || importingHolidays}
+                onChange={(e) => setHolidayCsv(e.target.value)}
+                className="min-h-36 font-mono text-xs"
+              />
+            </Field>
+            <div className="space-y-3 rounded-md border bg-muted/20 p-3">
+              <div>
+                <p className="text-sm font-medium">Preview import</p>
+                <p className="text-xs text-muted-foreground">
+                  Tahun:{" "}
+                  {holidayPreview.affectedYears.length
+                    ? holidayPreview.affectedYears.join(", ")
+                    : "—"}
+                </p>
+              </div>
+              {holidayPreview.errors.length > 0 ? (
+                <ul className="space-y-1 text-xs text-destructive">
+                  {holidayPreview.errors.slice(0, 5).map((error) => (
+                    <li key={error}>• {error}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  {holidayPreview.validRows.length} row valid. Import akan
+                  mengganti tanggal yang sama dan menambah tanggal baru.
+                </p>
+              )}
+              <Button
+                disabled={
+                  !canEdit ||
+                  importingHolidays ||
+                  holidayPreview.validRows.length === 0 ||
+                  holidayPreview.errors.length > 0
+                }
+                onClick={() => {
+                  void (async () => {
+                    setImportingHolidays(true);
+                    try {
+                      const result = await importBusinessCalendarHolidays(
+                        holidayPreview.validRows,
+                      );
+                      await queryClient.invalidateQueries({
+                        queryKey: ["business-calendar-holidays"],
+                      });
+                      await queryClient.invalidateQueries({
+                        queryKey: ["tasks"],
+                      });
+                      toast.success("Kalender hari libur diimport", {
+                        description: `${result.importedCount} row · ${result.affectedYears.join(", ")}`,
+                      });
+                    } catch (error) {
+                      toast.error("Import kalender gagal", {
+                        description:
+                          error instanceof Error
+                            ? error.message
+                            : "Unknown error",
+                      });
+                    } finally {
+                      setImportingHolidays(false);
+                    }
+                  })();
+                }}
+              >
+                {importingHolidays ? "Mengimport…" : "Import kalender"}
+              </Button>
+            </div>
+          </div>
+
+          {holidaysLoading ? (
+            <div className="rounded-md border border-dashed py-8 text-center text-sm text-muted-foreground">
+              Memuat kalender…
+            </div>
+          ) : holidaysIsError ? (
+            <div className="rounded-md border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+              {holidaysError instanceof Error
+                ? holidaysError.message
+                : "Kalender gagal dimuat."}
+            </div>
+          ) : (
+            <div className="rounded-md border border-border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Tanggal</TableHead>
+                    <TableHead>Label</TableHead>
+                    <TableHead>Source</TableHead>
+                    <TableHead>Synced</TableHead>
+                    {canEdit && (
+                      <TableHead className="w-[90px] text-right">
+                        Aksi
+                      </TableHead>
+                    )}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {holidays.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={canEdit ? 5 : 4}
+                        className="h-20 text-center text-sm text-muted-foreground"
+                      >
+                        Belum ada hari libur. Due-state akan menampilkan
+                        calendar incomplete untuk tahun tanpa data.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    holidays.map((holiday) => (
+                      <TableRow key={holiday.id}>
+                        <TableCell className="font-medium tabular-nums">
+                          {holiday.holidayDate}
+                        </TableCell>
+                        <TableCell>{holiday.label}</TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {holiday.source}
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground">
+                          {holiday.syncedAt.slice(0, 10)}
+                        </TableCell>
+                        {canEdit && (
+                          <TableCell className="text-right">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              disabled={deletingHolidayId === holiday.id}
+                              aria-label={`Hapus libur ${holiday.holidayDate}`}
+                              onClick={() => {
+                                void (async () => {
+                                  setDeletingHolidayId(holiday.id);
+                                  try {
+                                    await deleteBusinessCalendarHoliday(
+                                      holiday.id,
+                                    );
+                                    await queryClient.invalidateQueries({
+                                      queryKey: ["business-calendar-holidays"],
+                                    });
+                                    await queryClient.invalidateQueries({
+                                      queryKey: ["tasks"],
+                                    });
+                                    toast.success("Hari libur dihapus");
+                                  } catch (error) {
+                                    toast.error("Gagal menghapus hari libur", {
+                                      description:
+                                        error instanceof Error
+                                          ? error.message
+                                          : "Unknown error",
+                                    });
+                                  } finally {
+                                    setDeletingHolidayId(null);
+                                  }
+                                })();
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
             </div>
           )}
         </CardContent>

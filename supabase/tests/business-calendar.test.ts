@@ -183,3 +183,87 @@ describe("business_calendar_holidays RLS", () => {
     }
   });
 });
+
+describe("import_business_calendar_holidays RPC", () => {
+  test("manager can import multiple rows atomically", async () => {
+    const client = await signInAs(fixtures.manager);
+    const dates = ["2032-01-01", "2032-01-02"];
+
+    try {
+      const { data, error } = await client.rpc(
+        "import_business_calendar_holidays",
+        {
+          p_rows: [
+            {
+              holiday_date: dates[0],
+              label: "Import Tahun Baru",
+              source: "test",
+            },
+            {
+              holiday_date: dates[1],
+              label: "Import Cuti Bersama",
+              source: "test",
+            },
+          ],
+        },
+      );
+
+      expect(error).toBeNull();
+      expect(data?.[0]).toMatchObject({
+        imported_count: 2,
+        min_date: dates[0],
+        max_date: dates[1],
+        affected_years: [2032],
+      });
+
+      const rows = await client
+        .from("business_calendar_holidays")
+        .select("holiday_date, label")
+        .in("holiday_date", dates)
+        .order("holiday_date");
+      expect(rows.error).toBeNull();
+      expect(rows.data).toEqual([
+        { holiday_date: dates[0], label: "Import Tahun Baru" },
+        { holiday_date: dates[1], label: "Import Cuti Bersama" },
+      ]);
+    } finally {
+      await adminClient
+        .from("business_calendar_holidays")
+        .delete()
+        .in("holiday_date", dates);
+    }
+  });
+
+  test("duplicate dates reject the whole import", async () => {
+    const client = await signInAs(fixtures.manager);
+    const { error } = await client.rpc("import_business_calendar_holidays", {
+      p_rows: [
+        { holiday_date: "2032-02-01", label: "A", source: "test" },
+        { holiday_date: "2032-02-01", label: "B", source: "test" },
+      ],
+    });
+
+    expect(error?.message).toBe("BUSINESS_CALENDAR_DUPLICATE_DATE");
+
+    const rows = await adminClient
+      .from("business_calendar_holidays")
+      .select("id")
+      .eq("holiday_date", "2032-02-01");
+    expect(rows.data).toEqual([]);
+  });
+
+  test("sales cannot import holidays", async () => {
+    const client = await signInAs(fixtures.sales);
+    const { error } = await client.rpc("import_business_calendar_holidays", {
+      p_rows: [
+        {
+          holiday_date: "2032-03-01",
+          label: "Unauthorized import",
+          source: "test",
+        },
+      ],
+    });
+
+    expect(error?.message).toBe("BUSINESS_CALENDAR_ADMIN_REQUIRED");
+  });
+});

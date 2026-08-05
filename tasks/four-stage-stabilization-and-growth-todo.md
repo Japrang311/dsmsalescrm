@@ -69,9 +69,9 @@
 
 - [ ] Create anonymized representative performance fixture. Current baseline persists only anonymized metrics from seeded local data; synthetic larger-scale fixture remains open.
 - [x] Capture query/payload/bundle/timing baseline. `bun run stage3:baseline` writes `docs/reports/2026-08-05-stage-3-performance-baseline.md` and ignored JSON artifact.
-- [ ] Build Manager holiday administration.
-- [ ] Build CSV preview/validation/atomic import.
-- [ ] Test duplicate dates, invalid rows, and incomplete-year reporting.
+- [x] Build Manager holiday administration. Master Data now lists business-calendar rows and lets Manager/Super Admin delete entries.
+- [x] Build CSV preview/validation/atomic import. Settings preview validates CSV locally, then writes through `import_business_calendar_holidays(jsonb)` in one DB transaction.
+- [x] Test duplicate dates, invalid rows, and incomplete-year reporting. Parser tests cover invalid/missing/duplicate rows; DB tests cover duplicate rejection, Manager import, Sales denial, and existing incomplete-calendar fixtures.
 - [x] Define typed pagination and query-key contracts. `src/lib/pagination-contracts.ts` defines bounded page size, opaque cursor, stable filter serialization, and shape-separated query keys with unit coverage.
 - [ ] Paginate Clients with server filters and stable order.
 - [ ] Paginate Tasks with server filters and stable order.
