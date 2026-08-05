@@ -16,6 +16,7 @@ import {
   createClient,
   listSalesTeamProfiles,
   clientDataErrorMessage,
+  listClientRowsPage,
 } from "./clients";
 
 // This module reads a module-level Supabase client, so we point it at
@@ -70,6 +71,31 @@ describe("src/lib/data/clients.ts", () => {
     const fetched = await getClientById(anyClient.id);
     expect(fetched?.id).toBe(anyClient.id);
     expect(owners[anyClient.ownerId]).toBeDefined();
+
+    await supabase.auth.signOut();
+  });
+
+  test("listClientRowsPage() pages clients with a stable cursor and no overlap", async () => {
+    const fixtureClient = await signInAs(fixtures.manager);
+    const session = (await fixtureClient.auth.getSession()).data.session!;
+    await supabase.auth.setSession({
+      access_token: session.access_token,
+      refresh_token: session.refresh_token,
+    });
+
+    const firstPage = await listClientRowsPage({ page: { pageSize: 2 } });
+    expect(firstPage.rows).toHaveLength(2);
+    expect(firstPage.totalCount).toBeGreaterThanOrEqual(2);
+
+    if (firstPage.nextCursor) {
+      const secondPage = await listClientRowsPage({
+        page: { pageSize: 2, cursor: firstPage.nextCursor },
+      });
+      const firstIds = new Set(firstPage.rows.map((row) => row.client.id));
+      expect(secondPage.rows.every((row) => !firstIds.has(row.client.id))).toBe(
+        true,
+      );
+    }
 
     await supabase.auth.signOut();
   });

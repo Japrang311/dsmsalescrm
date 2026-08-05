@@ -38,18 +38,25 @@ export function ClientsTable({
   page,
   pageSize,
   onPageChange,
+  totalRows,
+  hasNextPage,
+  serverPaginated = false,
 }: {
   rows: ClientListRow[];
   density: Density;
   page: number;
   pageSize: number;
   onPageChange: (n: number) => void;
+  totalRows?: number;
+  hasNextPage?: boolean;
+  serverPaginated?: boolean;
 }) {
   const navigate = useNavigate();
   const [sortKey, setSortKey] = useState<SortKey>("spending");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
   const sorted = useMemo(() => {
+    if (serverPaginated) return rows;
     const arr = [...rows];
     arr.sort((a, b) => {
       const dir = sortDir === "asc" ? 1 : -1;
@@ -69,14 +76,14 @@ export function ClientsTable({
       }
     });
     return arr;
-  }, [rows, sortKey, sortDir]);
+  }, [rows, serverPaginated, sortKey, sortDir]);
 
-  const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
+  const rowCount = totalRows ?? sorted.length;
+  const totalPages = Math.max(1, Math.ceil(rowCount / pageSize));
   const currentPage = Math.min(page, totalPages);
-  const pageRows = sorted.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize,
-  );
+  const pageRows = serverPaginated
+    ? sorted
+    : sorted.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const cellPad = density === "compact" ? "py-1.5 px-2.5" : "py-3 px-3";
   const textSize = density === "compact" ? "text-[12px]" : "text-sm";
@@ -110,36 +117,41 @@ export function ClientsTable({
           <thead className="border-b bg-muted/40 text-left text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
             <tr>
               <Th
-                onClick={() => toggleSort("name")}
+                onClick={() => !serverPaginated && toggleSort("name")}
                 label="Client"
                 active={sortKey === "name"}
+                disabled={serverPaginated}
               />
               <th className={cn("font-medium", cellPad)}>Status</th>
               <th className={cn("font-medium", cellPad)}>Source</th>
               <th className={cn("font-medium", cellPad)}>Sales</th>
               <Th
-                onClick={() => toggleSort("spending")}
+                onClick={() => !serverPaginated && toggleSort("spending")}
                 label="Spending YTD"
                 active={sortKey === "spending"}
                 align="right"
+                disabled={serverPaginated}
               />
               <th className={cn("text-right font-medium", cellPad)}>PPN</th>
               <th className={cn("text-right font-medium", cellPad)}>Non-PPN</th>
               <Th
-                onClick={() => toggleSort("lastFu")}
+                onClick={() => !serverPaginated && toggleSort("lastFu")}
                 label="Last FU"
                 active={sortKey === "lastFu"}
+                disabled={serverPaginated}
               />
               <Th
-                onClick={() => toggleSort("nextFu")}
+                onClick={() => !serverPaginated && toggleSort("nextFu")}
                 label="Next FU"
                 active={sortKey === "nextFu"}
+                disabled={serverPaginated}
               />
               <Th
-                onClick={() => toggleSort("active")}
+                onClick={() => !serverPaginated && toggleSort("active")}
                 label="Active Items"
                 active={sortKey === "active"}
                 align="right"
+                disabled={serverPaginated}
               />
               <th
                 className={cn("font-medium", cellPad)}
@@ -306,7 +318,7 @@ export function ClientsTable({
         <span>
           {sorted.length === 0
             ? "0"
-            : `${(currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, sorted.length)} dari ${sorted.length}`}
+            : `${(currentPage - 1) * pageSize + 1}–${Math.min((currentPage - 1) * pageSize + pageRows.length, rowCount)} dari ${rowCount}`}
         </span>
         <div className="flex items-center gap-1">
           <Button
@@ -323,7 +335,9 @@ export function ClientsTable({
           <Button
             variant="ghost"
             size="sm"
-            disabled={currentPage >= totalPages}
+            disabled={
+              serverPaginated ? !hasNextPage : currentPage >= totalPages
+            }
             onClick={() => onPageChange(currentPage + 1)}
           >
             <ChevronRight className="h-4 w-4" />
@@ -339,11 +353,13 @@ function Th({
   label,
   active,
   align = "left",
+  disabled = false,
 }: {
   onClick: () => void;
   label: string;
   active: boolean;
   align?: "left" | "right";
+  disabled?: boolean;
 }) {
   return (
     <th
@@ -355,9 +371,11 @@ function Th({
     >
       <button
         onClick={onClick}
+        disabled={disabled}
         className={cn(
           "inline-flex items-center gap-1 hover:text-foreground",
           active && "text-foreground",
+          disabled && "cursor-default hover:text-muted-foreground",
         )}
       >
         {label}

@@ -73,7 +73,7 @@
 - [x] Build CSV preview/validation/atomic import. Settings preview validates CSV locally, then writes through `import_business_calendar_holidays(jsonb)` in one DB transaction.
 - [x] Test duplicate dates, invalid rows, and incomplete-year reporting. Parser tests cover invalid/missing/duplicate rows; DB tests cover duplicate rejection, Manager import, Sales denial, and existing incomplete-calendar fixtures.
 - [x] Define typed pagination and query-key contracts. `src/lib/pagination-contracts.ts` defines bounded page size, opaque cursor, stable filter serialization, and shape-separated query keys with unit coverage.
-- [ ] Paginate Clients with server filters and stable order.
+- [x] Paginate Clients with server filters and stable order. Clients route now reads bounded cursor pages from Supabase with server-side search/status/source/owner/next-FU filters; Spending YTD remains display-only until aggregate/RPC work makes it server-filterable.
 - [ ] Paginate Tasks with server filters and stable order.
 - [ ] Paginate commercial documents/Pipeline with server filters and stable order.
 - [ ] Paginate Sales Orders with server filters and stable order.
