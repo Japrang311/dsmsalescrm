@@ -42,6 +42,26 @@
 | `bun run test:ci`           | Pass                                | 508 pass, 0 fail, 2181 expects, 68 files, using explicit local Supabase env values without `.env.local`.                       |
 | `bun run audit:deps:report` | Pass                                | Reports 13 advisories into a non-secret artifact; does not mark exceptions as approved.                                        |
 
+## GitHub-hosted CI verification
+
+**Commit:** `5e3f358` (`fix: isolate team data tests from app supabase client`)
+**Run:** `30981687347`
+**Result:** Pass on GitHub-hosted clean runner with fresh local Supabase database.
+
+| Job                             | Result | Duration |
+| ------------------------------- | ------ | -------- |
+| Static checks                   | Pass   | 32s      |
+| Local database gates            | Pass   | 2m33s    |
+| Application and RLS tests       | Pass   | 3m52s    |
+| Runtime smoke and bundle report | Pass   | 25s      |
+| Dependency risk report          | Pass   | 9s       |
+
+The previous Stage 2 CI run `30978352284` failed in `Application and RLS tests`
+because `src/lib/data/team.test.ts` globally mocked `@/lib/supabase`, which
+could replace the application Supabase singleton before other data-layer tests
+called `supabase.auth.setSession`. The follow-up commit replaced that global
+module mock with an injected fake Team client.
+
 ## Bundle snapshot
 
 - Client JS files: 110.
@@ -67,8 +87,6 @@ No permanent exception was created. Dependency upgrades or dated exceptions stil
 
 ## Not yet verified
 
-- GitHub-hosted CI has not been observed after push.
 - Browser framework installation remains gated by explicit dependency approval.
 - Automated browser workflows are not implemented.
 - Production Sentry source-map upload and external event ingestion behavior are not verified.
-- Clean-clone verification is not yet proven.

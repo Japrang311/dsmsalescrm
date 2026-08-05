@@ -53,7 +53,7 @@
 - [x] Expand CI into application, database, runtime, audit, and bundle jobs.
 - [x] Generate useful non-secret failure artifacts.
 - [x] Triage all 13 baseline dependency advisories.
-- [ ] Add owner and expiry to every approved exception.
+- [x] Add owner and expiry to every approved exception. No approved dependency exception exists as of 2026-08-05; future exceptions must include owner and expiry before acceptance.
 - [ ] Obtain approval before installing browser test dependency.
 - [ ] Automate authentication/protected-route workflow.
 - [ ] Automate Task progress and both follow-up workflows.
@@ -62,8 +62,8 @@
 - [ ] Automate representative unauthorized-write denial.
 - [ ] Automate Reports/export smoke.
 - [ ] Verify Sentry environment/release/source-map contract without exposing secrets. Environment/release config now has unit coverage; source-map upload and external ingestion remain unverified.
-- [ ] Prove CI passes on a clean clone and fresh local database.
-- [ ] Review dated Stage 2 verification report. Local partial report exists; GitHub-hosted CI/browser/Sentry evidence remains open.
+- [x] Prove CI passes on a clean clone and fresh local database. GitHub Actions run `30981687347` passed all five jobs on commit `5e3f358`.
+- [ ] Review dated Stage 2 verification report. Local and GitHub-hosted CI evidence exists; browser automation and Sentry source-map/external-ingestion evidence remain open.
 
 ## Stage 3 — Data and performance
 
