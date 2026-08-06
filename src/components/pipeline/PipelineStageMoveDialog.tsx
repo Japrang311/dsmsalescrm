@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/select";
 import {
   NOW,
+  toLocalIsoDate,
   type CommercialItem,
   type QuotationLostReason,
   type Task,
@@ -30,7 +31,7 @@ import { QUOTATION_LOST_REASONS } from "@/lib/data/quotation-lost-reasons";
 function addDaysISO(base: string | Date, days: number): string {
   const d = new Date(base);
   d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
+  return toLocalIsoDate(d);
 }
 
 export type PendingPipelineMove = {

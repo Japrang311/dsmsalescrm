@@ -17,7 +17,12 @@ import {
 
 import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRole } from "@/context/role-context";
-import { NOW, type QuotationLostReason, type Role } from "@/lib/domain";
+import {
+  NOW,
+  toLocalIsoDate,
+  type QuotationLostReason,
+  type Role,
+} from "@/lib/domain";
 import {
   listCommercialItems,
   toCommercialItem,
@@ -65,7 +70,7 @@ type Stage = (typeof STAGES)[number];
 function addDaysISO(base: string | Date, days: number): string {
   const d = new Date(base);
   d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
+  return toLocalIsoDate(d);
 }
 
 function PipelinePage() {
@@ -345,7 +350,7 @@ function PipelineBoardPage({ role }: { role: Role }) {
             .join("\n"),
           method: "Phone",
           result: "Progress Update",
-          fuDate: NOW.toISOString().slice(0, 10),
+          fuDate: toLocalIsoDate(NOW),
         },
       );
       await transitionCommercialStage({

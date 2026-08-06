@@ -1,9 +1,10 @@
 import { supabase } from "@/lib/supabase";
-import type {
-  Client,
-  ClientContact,
-  ClientSource,
-  ClientStatus,
+import {
+  toLocalIsoDate,
+  type Client,
+  type ClientContact,
+  type ClientSource,
+  type ClientStatus,
 } from "@/lib/domain";
 import {
   encodePageCursor,
@@ -367,7 +368,7 @@ export async function listClientRowsPage(input: {
 }): Promise<ClientRowsPage> {
   const filters = input.filters ?? {};
   const page = normalizeListPageInput(input.page);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = toLocalIsoDate(new Date());
   let query = supabase
     .from("clients")
     .select("*", { count: "exact" })
@@ -398,9 +399,7 @@ export async function listClientRowsPage(input: {
       const days = filters.nextFuWindow === "7d" ? 7 : 30;
       const end = new Date();
       end.setDate(end.getDate() + days);
-      query = query
-        .gte("next_fu", today)
-        .lte("next_fu", end.toISOString().slice(0, 10));
+      query = query.gte("next_fu", today).lte("next_fu", toLocalIsoDate(end));
     }
   }
 

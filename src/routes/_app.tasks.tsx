@@ -65,7 +65,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { useRole } from "@/context/role-context";
-import { NOW } from "@/lib/domain";
+import { NOW, toLocalIsoDate } from "@/lib/domain";
 import type { Role, Task, CommercialItem } from "@/lib/domain";
 import {
   listActiveTasks,
@@ -561,7 +561,7 @@ function TasksInboxPage() {
   const handleSnooze = async (t: Task) => {
     const next = new Date(t.dueDate);
     next.setDate(next.getDate() + 1);
-    const iso = next.toISOString().slice(0, 10);
+    const iso = toLocalIsoDate(next);
     const prevDueDate = t.dueDate;
     try {
       await updateTask(t.id, { dueDate: iso });
@@ -653,7 +653,7 @@ function TasksInboxPage() {
     const client = t.clientId ? clientsById[t.clientId] : undefined;
     const due = new Date(NOW);
     due.setDate(due.getDate() + (kind === "Quotation" ? 2 : 3));
-    const iso = due.toISOString().slice(0, 10);
+    const iso = toLocalIsoDate(due);
     try {
       const childTask = await createTask({
         clientId: t.clientId,
@@ -781,7 +781,7 @@ function TasksInboxPage() {
         targets.map(async (t) => {
           const next = new Date(t.dueDate);
           next.setDate(next.getDate() + 1);
-          const iso = next.toISOString().slice(0, 10);
+          const iso = toLocalIsoDate(next);
           await updateTask(t.id, { dueDate: iso });
           await logTaskEvent(
             t,

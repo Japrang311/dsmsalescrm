@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { toLocalIsoDate } from "@/lib/domain";
 
 // Same loose filter shape as SalesOrderListFilters so the page and the
 // aggregate can be driven by one ReportFilters state without casts; "all"
@@ -37,7 +38,7 @@ type SalesOrdersMetricsRow = {
 };
 
 function isoDate(date: Date): string {
-  return date.toISOString().slice(0, 10);
+  return toLocalIsoDate(date);
 }
 
 function optional(value: string | undefined): string | null {

@@ -8,6 +8,7 @@ import {
   type RoleFixtureUsers,
 } from "../../../supabase/tests/helpers";
 import { supabase } from "@/lib/supabase";
+import { NOW, toLocalIsoDate } from "@/lib/domain";
 import {
   createSalesOrder,
   deleteSalesOrder,
@@ -268,6 +269,36 @@ describe("normalized Sales Order adapter", () => {
     });
     expect(secondPage.rows.map((row) => row.soNumber)).toEqual(["DSM-96SO941"]);
     expect(secondPage.nextCursor).toBeNull();
+    await supabase.auth.signOut();
+  });
+
+  // Regression test for the reported bug: a Sales Order created today did
+  // not appear on the list. Root cause was isoDate() converting NOW (local
+  // midnight) through .toISOString(), which rolls back to the previous
+  // calendar day in any timezone ahead of UTC (this test suite runs in
+  // GMT+7) -- so `to: NOW` excluded every row dated "today".
+  test("a Sales Order dated today is included when filtering to: NOW", async () => {
+    await authenticateSales();
+    const soNumber = `DSM-96SO${crypto.randomUUID().slice(0, 4)}`;
+    await createSalesOrder({
+      clientId,
+      date: toLocalIsoDate(NOW),
+      customerPoNumber: "PO-TODAY-BUG",
+      type: "Regular",
+      taxType: "PPN",
+      source: "Existing / Repeat Order",
+      numberMode: "Manual",
+      manualSoNumber: soNumber,
+      items: [
+        { productName: "Today item", qty: 1, uom: "Pcs", unitPrice: 1_000 },
+      ],
+    });
+
+    const page = await listSalesOrdersPage({
+      filters: { from: new Date(NOW.getFullYear(), 0, 1), to: NOW },
+      page: { pageSize: 50 },
+    });
+    expect(page.rows.some((row) => row.soNumber === soNumber)).toBe(true);
     await supabase.auth.signOut();
   });
 });

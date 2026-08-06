@@ -26,7 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import type { CommercialItem } from "@/lib/domain";
+import { toLocalIsoDate, type CommercialItem } from "@/lib/domain";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { listTasks } from "@/lib/data/tasks";
 import { activeCommercialTasks } from "@/lib/data/task-relations";
@@ -95,7 +95,7 @@ export function LogCommercialFollowUpDialog({
     else setUncontrolled(o);
   };
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = toLocalIsoDate(new Date());
 
   const {
     register,

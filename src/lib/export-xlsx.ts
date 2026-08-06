@@ -7,7 +7,7 @@ import {
   dashboardExportTopCustomers,
   type DashboardExportContext,
 } from "@/lib/dashboard-export-data";
-import type { DateRange } from "@/lib/domain";
+import { toLocalIsoDate, type DateRange } from "@/lib/domain";
 import { EmptyExportError } from "@/lib/export-csv";
 import { formatPercent, formatRupiahShort } from "@/lib/format";
 
@@ -25,7 +25,7 @@ const IDR_FMT = '"Rp" #,##0;[Red]-"Rp" #,##0;"-"';
 const PCT_FMT = "0.00%";
 const DATE_FMT = "yyyy-mm-dd";
 
-const iso = (d: Date) => d.toISOString().slice(0, 10);
+const iso = (d: Date) => toLocalIsoDate(d);
 const stamp = (range: DateRange) => `${iso(range.from)}_${iso(range.to)}`;
 
 type ColType = "text" | "idr" | "pct" | "date" | "int";

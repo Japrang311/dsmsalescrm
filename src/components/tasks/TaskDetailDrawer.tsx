@@ -32,7 +32,12 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRole } from "@/context/role-context";
-import type { Task, TaskCategory, TaskWorkflowStatus } from "@/lib/domain";
+import {
+  toLocalIsoDate,
+  type Task,
+  type TaskCategory,
+  type TaskWorkflowStatus,
+} from "@/lib/domain";
 import { listClients, listOwners } from "@/lib/data/clients";
 import { listCommercialItems } from "@/lib/data/commercial-items";
 import { updateTask } from "@/lib/data/tasks";
@@ -267,7 +272,7 @@ export function TaskDetailDrawer({
   const quickSnooze = async (days: number) => {
     const next = new Date(task.dueDate);
     next.setDate(next.getDate() + days);
-    const iso = next.toISOString().slice(0, 10);
+    const iso = toLocalIsoDate(next);
     const prev = dueDate;
     setDueDate(iso);
     try {

@@ -277,6 +277,32 @@ function SalesOrdersRevenuePage() {
     );
   }
 
+  if (ordersPage.isError) {
+    return (
+      <div className="space-y-3 rounded-md border border-destructive/40 bg-destructive/5 px-4 py-4">
+        <div>
+          <p className="text-sm font-medium text-destructive">
+            Data Sales Order gagal dimuat.
+          </p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {ordersPage.error instanceof Error
+              ? ordersPage.error.message
+              : "Periksa koneksi atau hak akses, lalu coba lagi."}
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={ordersPage.isFetching}
+          onClick={() => void ordersPage.refetch()}
+        >
+          <RotateCcw className="mr-1.5 h-4 w-4" />
+          {ordersPage.isFetching ? "Mencoba lagi…" : "Coba lagi"}
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">

@@ -33,7 +33,7 @@ import {
   getTopCustomers,
   getRiskAlertCounts,
 } from "./sales-performance-metrics";
-import { NOW, CURRENT_YEAR, CURRENT_MONTH } from "@/lib/domain";
+import { NOW, CURRENT_YEAR, CURRENT_MONTH, toLocalIsoDate } from "@/lib/domain";
 
 // Proves the Dashboard KPI row's RPC-aggregated totals (sales_orders_metrics
 // + pipeline_metrics, Stage 3) reconcile exactly with the pre-RPC client-side
@@ -45,9 +45,10 @@ let fixtures: RoleFixtureUsers;
 let clientId: string;
 let commitDocumentId: string;
 
-function isoDate(d: Date): string {
-  return d.toISOString().slice(0, 10);
-}
+// Uses toLocalIsoDate, not `.toISOString().slice(0, 10)` -- the latter
+// rolls local-midnight NOW back a calendar day in GMT+7, which would date
+// these fixtures "yesterday" instead of "today" as intended below.
+const isoDate = toLocalIsoDate;
 
 beforeAll(async () => {
   fixtures = await createRoleFixtureUsers();

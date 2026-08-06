@@ -35,6 +35,7 @@ import { cn, getErrorMessage } from "@/lib/utils";
 import { formatRupiahShort, formatDateShort } from "@/lib/format";
 import { useRole } from "@/context/role-context";
 import {
+  toLocalIsoDate,
   type CommercialItem,
   type Client,
   type ClientStatus,
@@ -336,7 +337,7 @@ export function PipelineCardDrawer({
           note: describeCommercialItemChanges(changes),
           method: "Phone",
           result: "Progress Update",
-          fuDate: new Date().toISOString().slice(0, 10),
+          fuDate: toLocalIsoDate(new Date()),
         },
       );
       if (stage !== currentStage) {

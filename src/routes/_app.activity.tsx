@@ -61,6 +61,7 @@ import {
   type ActivityFeedFilters,
 } from "@/lib/data/activity-feed-page";
 import { listQueryKey, serializeListFilters } from "@/lib/pagination-contracts";
+import { toLocalIsoDate } from "@/lib/domain";
 
 export const Route = createFileRoute("/_app/activity")({
   head: () => ({
@@ -336,8 +337,8 @@ function ActivityPage() {
               ? "Semua owner"
               : (owners[ownerFilter]?.name ?? ownerFilter),
         },
-        fromISO: (activeRange?.from ?? new Date(0)).toISOString().slice(0, 10),
-        toISO: (activeRange?.to ?? new Date()).toISOString().slice(0, 10),
+        fromISO: toLocalIsoDate(activeRange?.from ?? new Date(0)),
+        toISO: toLocalIsoDate(activeRange?.to ?? new Date()),
       };
       const count =
         format === "CSV"

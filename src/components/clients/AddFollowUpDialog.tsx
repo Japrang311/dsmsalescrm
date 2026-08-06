@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { PhoneCall } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { toLocalIsoDate } from "@/lib/domain";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -114,7 +115,7 @@ export function AddFollowUpDialog({
     defaultValues: {
       method: "Phone",
       result: "Interested",
-      fuDate: new Date().toISOString().slice(0, 10),
+      fuDate: toLocalIsoDate(new Date()),
       notes: "",
       taskMode: "create_task",
       taskId: "",

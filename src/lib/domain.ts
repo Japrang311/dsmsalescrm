@@ -214,4 +214,10 @@ export type Task = {
   archived?: boolean;
 };
 
-export { CURRENT_MONTH, CURRENT_YEAR, NOW, PINNED_TODAY } from "@/lib/app-time";
+export {
+  CURRENT_MONTH,
+  CURRENT_YEAR,
+  NOW,
+  PINNED_TODAY,
+  toLocalIsoDate,
+} from "@/lib/app-time";

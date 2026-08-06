@@ -31,7 +31,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { CommercialItem, TaxType, PrototypeStatus } from "@/lib/domain";
+import {
+  toLocalIsoDate,
+  type CommercialItem,
+  type TaxType,
+  type PrototypeStatus,
+} from "@/lib/domain";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   createPrototypeRequest,
@@ -52,7 +57,7 @@ import {
   type SalesOrderValues,
 } from "./commercial-form-schemas";
 
-const todayIso = () => new Date().toISOString().slice(0, 10);
+const todayIso = () => toLocalIsoDate(new Date());
 
 // clientId/clientName/ownerId are optional: when a dialog is opened from a
 // client's own page these are already known and passed in directly: no

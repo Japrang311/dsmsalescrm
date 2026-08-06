@@ -1,9 +1,10 @@
 import { supabase } from "@/lib/supabase";
-import type {
-  PrototypeStatus,
-  RevenueSource,
-  SoType,
-  TaxType,
+import {
+  toLocalIsoDate,
+  type PrototypeStatus,
+  type RevenueSource,
+  type SoType,
+  type TaxType,
 } from "@/lib/domain";
 import type { LineItemInput } from "./commercial-documents";
 import type { Uom } from "./document-numbering";
@@ -254,7 +255,7 @@ export async function listSalesOrdersPage(input: {
 }
 
 function isoDate(date: Date): string {
-  return date.toISOString().slice(0, 10);
+  return toLocalIsoDate(date);
 }
 
 export async function getSalesOrder(
