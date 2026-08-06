@@ -801,3 +801,106 @@ export function riskAlerts(
   }
   return alerts;
 }
+
+// ---------------------------------------------------------------------------
+// RPC-backed variants — sales_task_client_metrics / sales_orders_top_customers
+// / dashboard_risk_alert_counts (20260806160000) and the already-existing
+// pipeline_metrics/sales_orders_owner_ytd. Same output shape as the
+// full-array selectors above, read from pre-aggregated RPC rows instead.
+// ---------------------------------------------------------------------------
+
+export function quotationFunnelFromPipeline(
+  stages: { stage: string; itemCount: number; totalValue: number }[],
+) {
+  return FUNNEL_STAGES.map((stage) => {
+    const found = stages.find((s) => s.stage === stage);
+    return {
+      stage,
+      count: found?.itemCount ?? 0,
+      value: found?.totalValue ?? 0,
+    };
+  });
+}
+
+export function forecastVsAchievementFromPipeline(
+  stages: { stage: string; totalValue: number }[],
+  achievement: number,
+  ytdTargetExecutive: number,
+) {
+  const pipeline = stages.reduce((s, st) => {
+    if (st.stage === "Closed Won" || st.stage === "Closed Lost") return s;
+    return s + (forecastValue(st.totalValue, st.stage) ?? 0);
+  }, 0);
+  const forecast = achievement + pipeline;
+  return { achievement, forecast, target: ytdTargetExecutive };
+}
+
+export function salesPerformanceFromRpc(
+  ownerYtd: { ownerId: string; revenue: number }[],
+  taskClientMetrics: {
+    ownerId: string;
+    openTasks: number;
+    overdueTasks: number;
+    activeClients: number;
+  }[],
+  salesTeam: SalesTeamMember[],
+  byMember: TargetsByMember,
+) {
+  const revenueByOwner = new Map(ownerYtd.map((o) => [o.ownerId, o.revenue]));
+  const metricsByOwner = new Map(taskClientMetrics.map((m) => [m.ownerId, m]));
+  return salesTeam
+    .map((member) => {
+      const revenue = revenueByOwner.get(member.id) ?? 0;
+      const target = sumTargetsThroughMonth(targetsFor(byMember, member.id));
+      const m = metricsByOwner.get(member.id);
+      return {
+        member,
+        revenue,
+        target,
+        pct: target > 0 ? revenue / target : 0,
+        overdue: m?.overdueTasks ?? 0,
+        openTasks: m?.openTasks ?? 0,
+        activeClients: m?.activeClients ?? 0,
+      };
+    })
+    .sort((a, b) => b.revenue - a.revenue);
+}
+
+export function riskAlertsFromCounts(counts: {
+  overdueTaskCount: number;
+  bigPendingCommitCount: number;
+  bigPendingCommitValue: number;
+  dormantHighValueClientCount: number;
+}) {
+  const alerts: Array<{
+    id: string;
+    severity: "high" | "medium";
+    title: string;
+    detail: string;
+  }> = [];
+  if (counts.overdueTaskCount > 0) {
+    alerts.push({
+      id: "r1",
+      severity: "high",
+      title: `${counts.overdueTaskCount} follow-up overdue`,
+      detail: "Tersebar di beberapa sales; segera dijadwalkan ulang.",
+    });
+  }
+  if (counts.bigPendingCommitCount > 0) {
+    alerts.push({
+      id: "r2",
+      severity: "medium",
+      title: `${counts.bigPendingCommitCount} PO besar tertahan`,
+      detail: `Total nilai menunggu konfirmasi: ${counts.bigPendingCommitValue.toLocaleString("id-ID")} rupiah.`,
+    });
+  }
+  if (counts.dormantHighValueClientCount > 0) {
+    alerts.push({
+      id: "r3",
+      severity: "medium",
+      title: `${counts.dormantHighValueClientCount} client high-value dormant`,
+      detail: "Prioritaskan re-engagement bulan ini.",
+    });
+  }
+  return alerts;
+}

@@ -12,6 +12,7 @@ import { getSalesOrdersMetrics } from "./sales-orders-metrics";
 import { getPipelineMetrics } from "./pipeline-metrics";
 import { listSalesOrders } from "./sales-orders";
 import { listCommercialItems } from "./commercial-items";
+import { createTask, listTasks } from "./tasks";
 import {
   revenueByTax,
   revenueBySource,
@@ -20,11 +21,18 @@ import {
   activeCommercialCount,
   monthlyRevenueTrend,
   targetPerSales,
+  isActiveTask,
+  isTaskOverdueLike,
 } from "./dashboard-selectors";
 import {
   getSalesOrdersMonthlyTrend,
   getSalesOrdersOwnerYtd,
 } from "./sales-orders-trend";
+import {
+  getSalesTaskClientMetrics,
+  getTopCustomers,
+  getRiskAlertCounts,
+} from "./sales-performance-metrics";
 import { NOW, CURRENT_YEAR, CURRENT_MONTH } from "@/lib/domain";
 
 // Proves the Dashboard KPI row's RPC-aggregated totals (sales_orders_metrics
@@ -137,9 +145,31 @@ beforeAll(async () => {
       line_position: 1,
     });
   if (itemsError) throw itemsError;
+
+  // One open (due today) and one overdue (due 30 days ago) task, for the
+  // sales_task_client_metrics / dashboard_risk_alert_counts reconciliation.
+  await createTask({
+    clientId,
+    ownerId: fixtures.sales.id,
+    title: "Recon open task",
+    dueDate: isoDate(NOW),
+    method: "Phone",
+    priority: "Normal",
+  });
+  const overdueDate = new Date(NOW);
+  overdueDate.setDate(overdueDate.getDate() - 30);
+  await createTask({
+    clientId,
+    ownerId: fixtures.sales.id,
+    title: "Recon overdue task",
+    dueDate: isoDate(overdueDate),
+    method: "Phone",
+    priority: "Normal",
+  });
 });
 
 afterAll(async () => {
+  await adminClient.from("tasks").delete().eq("owner_id", fixtures.sales.id);
   await adminClient
     .from("commercial_document_items")
     .delete()
@@ -248,5 +278,50 @@ describe("Dashboard KPI RPC vs client-side selector reconciliation", () => {
       {},
     );
     expect(localPerSales[0]?.achievement).toBe(rpcOwnerRevenue ?? 0);
+  });
+
+  test("sales_task_client_metrics matches isActiveTask/isTaskOverdueLike/active-client counts over a full fetch", async () => {
+    const tasks = await listTasks();
+    const localOpen = tasks.filter(
+      (t) => t.ownerId === fixtures.sales.id && isActiveTask(t),
+    ).length;
+    const localOverdue = tasks.filter(
+      (t) => t.ownerId === fixtures.sales.id && isTaskOverdueLike(t),
+    ).length;
+
+    const metrics = await getSalesTaskClientMetrics({
+      ownerId: fixtures.sales.id,
+    });
+    const row = metrics.find((m) => m.ownerId === fixtures.sales.id);
+
+    expect(row?.openTasks ?? 0).toBe(localOpen);
+    expect(row?.overdueTasks ?? 0).toBe(localOverdue);
+    expect(row?.activeClients ?? 0).toBeGreaterThanOrEqual(1);
+  });
+
+  test("sales_orders_top_customers ranks the fixture client with its full revenue total", async () => {
+    const orders = await listSalesOrders();
+    const expectedRevenue = orders
+      .filter((o) => o.clientId === clientId)
+      .reduce((s, o) => s + (o.value ?? 0), 0);
+
+    const top = await getTopCustomers({ ownerId: fixtures.sales.id });
+    const row = top.find((c) => c.clientId === clientId);
+
+    expect(row?.revenue).toBe(expectedRevenue);
+  });
+
+  test("dashboard_risk_alert_counts' overdue_task_count matches isTaskOverdueLike over a full fetch", async () => {
+    const tasks = await listTasks();
+    const localOverdue = tasks.filter(
+      (t) => t.ownerId === fixtures.sales.id && isTaskOverdueLike(t),
+    ).length;
+
+    const counts = await getRiskAlertCounts({ ownerId: fixtures.sales.id });
+
+    expect(counts.overdueTaskCount).toBe(localOverdue);
+    // Fixture's Commit-stage item (Rp9.000) is well under the 400 juta
+    // "big pending PO" threshold, so it must not be counted.
+    expect(counts.bigPendingCommitCount).toBe(0);
   });
 });
