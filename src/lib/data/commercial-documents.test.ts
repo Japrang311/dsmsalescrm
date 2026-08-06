@@ -13,6 +13,7 @@ import {
   deleteCommercialDocument,
   getCommercialDocument,
   listCommercialDocuments,
+  listCommercialDocumentsPage,
   reviseQuotation,
   transitionCommercialStage,
   updateCommercialDocument,
@@ -314,6 +315,35 @@ describe("normalized commercial document adapter", () => {
 
     const updated = await getCommercialDocument(created.id);
     expect(updated?.stage).toBe("Hot Prospect");
+    await supabase.auth.signOut();
+  });
+
+  test("listCommercialDocumentsPage() pages a stage with a stable cursor and no overlap", async () => {
+    const authClient = await signInAs(fixtures.manager);
+    const session = (await authClient.auth.getSession()).data.session!;
+    await supabase.auth.setSession({
+      access_token: session.access_token,
+      refresh_token: session.refresh_token,
+    });
+
+    const firstPage = await listCommercialDocumentsPage({
+      filters: { stage: "Quotes Sent" },
+      page: { pageSize: 2 },
+    });
+    expect(firstPage.rows.length).toBe(2);
+    expect(firstPage.totalCount).toBeGreaterThan(2);
+    expect(firstPage.nextCursor).not.toBeNull();
+
+    const secondPage = await listCommercialDocumentsPage({
+      filters: { stage: "Quotes Sent" },
+      page: { pageSize: 2, cursor: firstPage.nextCursor },
+    });
+    const firstIds = new Set(firstPage.rows.map((row) => row.id));
+    expect(secondPage.rows.every((row) => !firstIds.has(row.id))).toBe(true);
+    expect(secondPage.rows.every((row) => row.stage === "Quotes Sent")).toBe(
+      true,
+    );
+
     await supabase.auth.signOut();
   });
 });
