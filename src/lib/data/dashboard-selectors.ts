@@ -255,6 +255,81 @@ export function ytdCumulativeTrend(
 }
 
 // ---------------------------------------------------------------------------
+// Revenue trend — RPC-backed variants (sales_orders_monthly_trend /
+// sales_orders_owner_ytd, 20260806150000). Same shape/output as
+// monthlyRevenueTrend/ytdCumulativeTrend/targetPerSales above, but read
+// pre-aggregated rows instead of reducing a full unbounded orders fetch.
+// ---------------------------------------------------------------------------
+
+export function monthlyRevenueTrendFromRpc(
+  trend: { month: number; revenue: number }[],
+  role: Role,
+  salesUserId: string,
+  byMember: TargetsByMember,
+  companyTarget: MonthlyTarget[],
+) {
+  const targetArr = targetArrFor(role, salesUserId, byMember, companyTarget);
+  const byMonth = new Map(trend.map((t) => [t.month, t.revenue]));
+  return Array.from({ length: CURRENT_MONTH }, (_, i) => {
+    const m = i + 1;
+    return {
+      month: new Date(CURRENT_YEAR, i, 1).toLocaleDateString("id-ID", {
+        month: "short",
+      }),
+      revenue: byMonth.get(m) ?? 0,
+      target: targetForMonth(targetArr, m),
+    };
+  });
+}
+
+export function ytdCumulativeTrendFromRpc(
+  trend: { month: number; revenue: number }[],
+  role: Role,
+  salesUserId: string,
+  byMember: TargetsByMember,
+  companyTarget: MonthlyTarget[],
+) {
+  const targetArr = targetArrFor(role, salesUserId, byMember, companyTarget);
+  const byMonth = new Map(trend.map((t) => [t.month, t.revenue]));
+  let cumRev = 0;
+  let cumTgt = 0;
+  return Array.from({ length: CURRENT_MONTH }, (_, i) => {
+    const m = i + 1;
+    cumRev += byMonth.get(m) ?? 0;
+    cumTgt += targetForMonth(targetArr, m);
+    return {
+      month: new Date(CURRENT_YEAR, i, 1).toLocaleDateString("id-ID", {
+        month: "short",
+      }),
+      achievement: cumRev,
+      target: cumTgt,
+    };
+  });
+}
+
+export function sumTrendRevenue(trend: { month: number; revenue: number }[]) {
+  return trend.reduce((s, t) => s + t.revenue, 0);
+}
+
+export function targetPerSalesFromRpc(
+  ownerYtd: { ownerId: string; revenue: number }[],
+  salesTeam: SalesTeamMember[],
+  byMember: TargetsByMember,
+) {
+  const byOwner = new Map(ownerYtd.map((o) => [o.ownerId, o.revenue]));
+  return salesTeam.map((member) => {
+    const achievement = byOwner.get(member.id) ?? 0;
+    const target = sumTargetsThroughMonth(targetsFor(byMember, member.id));
+    return {
+      name: member.name.split(" ")[0],
+      fullName: member.name,
+      target,
+      achievement,
+    };
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Revenue (arbitrary date range — used by Reports)
 // ---------------------------------------------------------------------------
 

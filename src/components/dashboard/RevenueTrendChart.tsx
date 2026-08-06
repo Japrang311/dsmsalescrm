@@ -1,3 +1,4 @@
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Bar,
@@ -12,17 +13,24 @@ import {
   ComposedChart,
 } from "recharts";
 import type { Role } from "@/lib/domain";
-import { monthlyRevenueTrend } from "@/lib/data/dashboard-selectors";
+import { monthlyRevenueTrendFromRpc } from "@/lib/data/dashboard-selectors";
+import { getSalesOrdersMonthlyTrend } from "@/lib/data/sales-orders-trend";
 import { useDashboardData } from "@/hooks/use-dashboard-data";
+import { useRole } from "@/context/role-context";
 import { formatRupiahShort } from "@/lib/format";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 export function RevenueTrendChart({ role }: { role: Role }) {
   const isMobile = useIsMobile();
-  const { orders, targetsByMember, companyTarget, currentUserId } =
-    useDashboardData();
-  const data = monthlyRevenueTrend(
-    orders,
+  const { authReady } = useRole();
+  const { targetsByMember, companyTarget, currentUserId } = useDashboardData();
+  const trendQuery = useQuery({
+    queryKey: ["sales-orders", "monthly-trend", "dashboard"],
+    queryFn: () => getSalesOrdersMonthlyTrend(),
+    enabled: authReady,
+  });
+  const data = monthlyRevenueTrendFromRpc(
+    trendQuery.data ?? [],
     role,
     currentUserId ?? "",
     targetsByMember,

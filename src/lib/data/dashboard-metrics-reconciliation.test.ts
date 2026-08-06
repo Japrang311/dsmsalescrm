@@ -18,8 +18,14 @@ import {
   prototypeSummary,
   waitingPoValue,
   activeCommercialCount,
+  monthlyRevenueTrend,
+  targetPerSales,
 } from "./dashboard-selectors";
-import { NOW, CURRENT_YEAR } from "@/lib/domain";
+import {
+  getSalesOrdersMonthlyTrend,
+  getSalesOrdersOwnerYtd,
+} from "./sales-orders-trend";
+import { NOW, CURRENT_YEAR, CURRENT_MONTH } from "@/lib/domain";
 
 // Proves the Dashboard KPI row's RPC-aggregated totals (sales_orders_metrics
 // + pipeline_metrics, Stage 3) reconcile exactly with the pre-RPC client-side
@@ -188,5 +194,59 @@ describe("Dashboard KPI RPC vs client-side selector reconciliation", () => {
 
     expect(commitStage?.totalValue ?? 0).toBe(localWaitingPo);
     expect(rpc.totals.itemCount).toBe(localActiveCount);
+  });
+
+  test("sales_orders_monthly_trend's current-month bucket matches a full fetch summed by month", async () => {
+    const orders = await listSalesOrders();
+    const localCurrentMonthRevenue = orders
+      .filter((o) => {
+        const d = new Date(o.date);
+        return (
+          d.getFullYear() === CURRENT_YEAR && d.getMonth() + 1 === CURRENT_MONTH
+        );
+      })
+      .reduce((s, o) => s + (o.value ?? 0), 0);
+
+    const trend = await getSalesOrdersMonthlyTrend({
+      ownerId: fixtures.sales.id,
+    });
+    const rpcCurrentMonth = trend.find((t) => t.month === CURRENT_MONTH);
+
+    expect(rpcCurrentMonth?.revenue ?? 0).toBe(localCurrentMonthRevenue);
+
+    // monthlyRevenueTrend's own revenue-per-month numbers must also match
+    // the RPC's, proving the RPC-backed and pre-RPC selectors agree exactly.
+    const localTrend = monthlyRevenueTrend(
+      orders,
+      "sales",
+      fixtures.sales.id,
+      {},
+      [],
+    );
+    const localCurrent = localTrend.find((_, i) => i === CURRENT_MONTH - 1);
+    expect(localCurrent?.revenue).toBe(rpcCurrentMonth?.revenue ?? 0);
+  });
+
+  test("sales_orders_owner_ytd matches a full fetch summed by owner", async () => {
+    const orders = await listSalesOrders();
+    const localOwnerRevenue = orders.reduce((s, o) => s + (o.value ?? 0), 0);
+
+    const ownerYtd = await getSalesOrdersOwnerYtd({
+      ownerId: fixtures.sales.id,
+    });
+    const rpcOwnerRevenue = ownerYtd.find(
+      (o) => o.ownerId === fixtures.sales.id,
+    )?.revenue;
+
+    expect(rpcOwnerRevenue ?? 0).toBe(localOwnerRevenue);
+
+    // targetPerSales's achievement must also match the RPC's revenue value
+    // for the same owner, proving the RPC-backed and pre-RPC selectors agree.
+    const localPerSales = targetPerSales(
+      orders,
+      [{ id: fixtures.sales.id, name: "Fixture Sales", initials: "FS" }],
+      {},
+    );
+    expect(localPerSales[0]?.achievement).toBe(rpcOwnerRevenue ?? 0);
   });
 });
