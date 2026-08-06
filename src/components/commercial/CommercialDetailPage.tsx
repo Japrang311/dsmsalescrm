@@ -24,6 +24,7 @@ import {
 import { documentNumberExample } from "@/lib/data/document-numbering";
 import { listClients, listOwners } from "@/lib/data/clients";
 import { listTasks } from "@/lib/data/tasks";
+import { listSalesOrders } from "@/lib/data/sales-orders";
 import { commercialRelatedTasks } from "@/lib/data/task-relations";
 import {
   getCurrentActorId,
@@ -133,6 +134,14 @@ export function CommercialDetailPage({
     queryFn: getCurrentActorId,
     enabled: authReady,
   });
+  const { data: allSalesOrders = [] } = useQuery({
+    queryKey: ["sales-orders", "all"],
+    queryFn: () => listSalesOrders(),
+    enabled: authReady,
+  });
+  const linkedSalesOrder = allSalesOrders.find(
+    (so) => so.sourceCommercialDocumentId === itemId,
+  );
 
   const [stage, setStage] = useState(item?.stage ?? "");
   const [quotationNumber, setQuotationNumber] = useState(
@@ -521,6 +530,7 @@ export function CommercialDetailPage({
           navigate({ to: `${backHref}/${documentId}` as never })
         }
         onSave={() => void persist()}
+        hasLinkedSalesOrder={Boolean(linkedSalesOrder)}
       />
 
       <div className="grid gap-4 md:grid-cols-3">
@@ -570,6 +580,11 @@ export function CommercialDetailPage({
         <CommercialDetailSidebar
           backHref={backHref}
           quotationHistory={quotationHistory}
+          linkedSalesOrder={
+            linkedSalesOrder
+              ? { id: linkedSalesOrder.id, soNumber: linkedSalesOrder.soNumber }
+              : undefined
+          }
           relatedTasks={relatedTasks}
           followUps={followUps}
           history={history}

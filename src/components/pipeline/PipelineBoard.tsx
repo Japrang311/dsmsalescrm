@@ -30,6 +30,10 @@ type Props = {
   onDrop: (stage: CommercialStage) => void;
   onLoadMore: (stage: CommercialStage) => void;
   onCardClick: (itemId: string) => void;
+  // Derived live, not stored: Closed Won Quotations with no linked Sales
+  // Order yet.
+  pendingSoItemIds: Set<string>;
+  onCreateSoForItem: (itemId: string) => void;
 };
 
 export function PipelineBoard({
@@ -46,6 +50,8 @@ export function PipelineBoard({
   onDrop,
   onLoadMore,
   onCardClick,
+  pendingSoItemIds,
+  onCreateSoForItem,
 }: Props) {
   return (
     <div className="relative">
@@ -171,6 +177,22 @@ export function PipelineBoard({
                         <p className="line-clamp-2 text-[11px] text-muted-foreground">
                           {it.description}
                         </p>
+                        {pendingSoItemIds.has(it.id) && (
+                          <div className="flex items-center justify-between gap-2 rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-[10px] text-amber-800">
+                            <span className="font-medium">SO belum dibuat</span>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-5 px-1.5 text-[10px] text-amber-800 hover:text-amber-900"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onCreateSoForItem(it.id);
+                              }}
+                            >
+                              Buat SO
+                            </Button>
+                          </div>
+                        )}
                         <div className="flex items-center justify-between pt-0.5">
                           <span className="text-[12px] font-semibold tabular-nums text-foreground">
                             {formatRupiahShort(it.estimatedValue)}

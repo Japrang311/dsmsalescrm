@@ -93,6 +93,10 @@ type Props = {
   currentNext?: string;
   allItems: CommercialItem[];
   profilesById: Record<string, { name: string }>;
+  // Mirrors the same pipeline drag-and-drop hand-off in the board route:
+  // a Quotation moved to Closed Won from this drawer should also open the
+  // Create Sales Order flow, pre-filled and locked to this Quotation.
+  onWonWithoutSo?: (item: CommercialItem) => void;
 };
 
 const FIELD_LABEL: Record<string, string> = {
@@ -111,6 +115,7 @@ export function PipelineCardDrawer({
   profilesById,
   client,
   currentNext,
+  onWonWithoutSo,
 }: Props) {
   const { role, authReady } = useRole();
   const queryClient = useQueryClient();
@@ -366,6 +371,9 @@ export function PipelineCardDrawer({
           .map((c) => FIELD_LABEL[c.field] ?? c.field)
           .join(", "),
       });
+      if (stage === "Closed Won" && item.type === "Quotation") {
+        onWonWithoutSo?.(item);
+      }
     } catch (error) {
       toast.error("Gagal menyimpan perubahan", {
         description: getErrorMessage(error),

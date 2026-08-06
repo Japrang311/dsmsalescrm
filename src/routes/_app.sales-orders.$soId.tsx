@@ -99,6 +99,9 @@ function SalesOrderDetail() {
           (ci.customerPoNumber && ci.clientId === so.clientId),
       )
     : [];
+  const sourceQuotation = so?.sourceCommercialDocumentId
+    ? items.find((ci) => ci.id === so.sourceCommercialDocumentId)
+    : undefined;
 
   if (!authReady || isLoading) {
     return (
@@ -232,6 +235,21 @@ function SalesOrderDetail() {
                 {so.prototypeStatus ? ` · ${so.prototypeStatus}` : ""}
               </Cell>
               <Cell label="Jumlah item">{so.items.length}</Cell>
+              {so.sourceCommercialDocumentId && (
+                <Cell label="Dari Quotation">
+                  {sourceQuotation ? (
+                    <Link
+                      to="/quotations/$id"
+                      params={{ id: sourceQuotation.id }}
+                      className="font-mono text-xs hover:text-primary"
+                    >
+                      {sourceQuotation.quotationNumber}
+                    </Link>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">—</span>
+                  )}
+                </Cell>
+              )}
               {so.backdateReason && (
                 <Cell label="Alasan Backdate">{so.backdateReason}</Cell>
               )}

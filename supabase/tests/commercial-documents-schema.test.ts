@@ -167,6 +167,7 @@ const EXPECTED_TABLES: Record<string, ExpectedTable> = {
       },
       backdate_reason: { dataType: "text", nullable: true },
       total_value: { dataType: "numeric", nullable: true },
+      source_commercial_document_id: { dataType: "uuid", nullable: true },
       created_at: { dataType: "timestamp with time zone", nullable: false },
       updated_at: { dataType: "timestamp with time zone", nullable: false },
       deleted_at: { dataType: "timestamp with time zone", nullable: true },

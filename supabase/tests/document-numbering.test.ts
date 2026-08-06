@@ -93,7 +93,7 @@ afterAll(async () => {
   }
   await db`
     delete from private.document_number_counters
-    where year_code in (91, 92, 93, 94)
+    where year_code in (91, 92, 93, 94, 97)
   `;
   await deleteRoleFixtureUsers(fixtures);
   await db.end();
@@ -256,6 +256,92 @@ describe("Phase 11 atomic document numbering", () => {
       ),
     ).toEqual([false, false, true]);
     expect(chain[2]?.supersedes_document_id).toBe(rev1.id);
+  });
+
+  test("links a Sales Order to its source Quotation, rejects a second SO on the same Quotation, and blocks further revision", async () => {
+    // Isolated year_code (97), untouched by sibling numbering tests in this
+    // file, so this test's numbering has no ordering dependency on them.
+    // Also defensively clears any row orphaned by an interrupted prior run
+    // (this file's afterAll only cleans up by the current run's fixture
+    // owner_id, so a run that dies before reaching cleanup can leak a row
+    // tied to a stale owner_id that a later run never matches).
+    await db`
+      delete from private.document_number_counters
+      where series = 'QUO' and year_code = 97
+    `;
+    await db`
+      delete from public.commercial_documents
+      where quotation_number = 'DSM-97QUO-0001'
+    `;
+    const salesClient = await signInAs(users().sales);
+    const { data: quotation, error: quotationError } = await salesClient.rpc(
+      "create_quotation",
+      {
+        p_client_id: ownedClientId,
+        p_document_date: "2097-07-19",
+        p_client_address: null,
+        p_stage: "Closed Won",
+        p_so_number: null,
+        p_note: null,
+        p_items: paidItems,
+        p_next_action: "Follow up",
+        p_next_action_date: "2097-07-26",
+      },
+    );
+    expect(quotationError).toBeNull();
+
+    const { data: so, error: soError } = await salesClient.rpc(
+      "create_sales_order",
+      {
+        p_client_id: ownedClientId,
+        p_date: "2097-07-19",
+        p_customer_po_number: `PO-${crypto.randomUUID()}`,
+        p_type: "Regular",
+        p_tax_type: "PPN",
+        p_prototype_status: null,
+        p_source: "Existing / Repeat Order",
+        p_number_mode: "Manual",
+        p_manual_so_number: `DSM-97SO-${crypto.randomUUID().slice(0, 8)}`,
+        p_backdate_reason: null,
+        p_items: paidItems,
+        p_source_commercial_document_id: quotation.id,
+      },
+    );
+    expect(soError).toBeNull();
+    expect(so.source_commercial_document_id).toBe(quotation.id);
+
+    const { error: duplicateError } = await salesClient.rpc(
+      "create_sales_order",
+      {
+        p_client_id: ownedClientId,
+        p_date: "2097-07-20",
+        p_customer_po_number: `PO-${crypto.randomUUID()}`,
+        p_type: "Regular",
+        p_tax_type: "PPN",
+        p_prototype_status: null,
+        p_source: "Existing / Repeat Order",
+        p_number_mode: "Manual",
+        p_manual_so_number: `DSM-97SO-${crypto.randomUUID().slice(0, 8)}`,
+        p_backdate_reason: null,
+        p_items: paidItems,
+        p_source_commercial_document_id: quotation.id,
+      },
+    );
+    expect(duplicateError?.message).toContain(
+      "QUOTATION_ALREADY_HAS_SALES_ORDER",
+    );
+
+    const { error: reviseError } = await salesClient.rpc("revise_quotation", {
+      p_document_id: quotation.id,
+      p_document_date: "2097-07-21",
+      p_client_address: null,
+      p_so_number: null,
+      p_note: "Attempted post-SO revision",
+      p_items: paidItems,
+      p_next_action: "Follow up",
+      p_next_action_date: "2097-07-28",
+    });
+    expect(reviseError?.message).toContain("QUOTATION_ALREADY_HAS_SALES_ORDER");
   });
 
   test("accepts manually assigned SO, NP, and PROTY numbers", async () => {

@@ -14,6 +14,7 @@ import {
   PipelineStageMoveDialog,
   type PendingPipelineMove,
 } from "@/components/pipeline/PipelineStageMoveDialog";
+import { CreateSalesOrderDialog } from "@/components/clients/CreateRecordDialogs";
 
 import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRole } from "@/context/role-context";
@@ -39,6 +40,7 @@ import {
   listSalesTeamProfiles,
 } from "@/lib/data/clients";
 import { listTasks } from "@/lib/data/tasks";
+import { listSalesOrders } from "@/lib/data/sales-orders";
 import { activeCommercialTasks } from "@/lib/data/task-relations";
 import {
   COMMERCIAL_STAGES,
@@ -157,6 +159,11 @@ function PipelineBoardPage({ role }: { role: Role }) {
     queryFn: listTasks,
     enabled: authReady,
   });
+  const { data: allSalesOrders = [] } = useQuery({
+    queryKey: ["sales-orders", "all"],
+    queryFn: () => listSalesOrders(),
+    enabled: authReady,
+  });
 
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverStage, setDragOverStage] = useState<Stage | null>(null);
@@ -172,6 +179,14 @@ function PipelineBoardPage({ role }: { role: Role }) {
   const [lostReason, setLostReason] = useState<QuotationLostReason | "">("");
   const [lostReasonDetail, setLostReasonDetail] = useState("");
   const [drawerItemId, setDrawerItemId] = useState<string | null>(null);
+  const [wonQuotationForSo, setWonQuotationForSo] = useState<{
+    id: string;
+    quotationNumber?: string;
+    projectName?: string;
+    clientId: string;
+    clientName: string;
+    ownerId: string;
+  } | null>(null);
 
   const { data: clientList = [] } = useQuery({
     queryKey: ["clients", "all"],
@@ -237,6 +252,47 @@ function PipelineBoardPage({ role }: { role: Role }) {
       }),
     [stageQueries],
   );
+
+  // Live derived flag, not a stored status: a Closed Won Quotation counts as
+  // "SO belum dibuat" only while no Sales Order references it as source —
+  // it resolves itself automatically once an SO is created through any path.
+  const linkedQuotationIds = useMemo(
+    () =>
+      new Set(
+        allSalesOrders
+          .map((so) => so.sourceCommercialDocumentId)
+          .filter((id): id is string => !!id),
+      ),
+    [allSalesOrders],
+  );
+  const pendingSoItemIds = useMemo(
+    () =>
+      new Set(
+        allLoadedItems
+          .filter(
+            (it) =>
+              it.stage === "Closed Won" &&
+              it.type === "Quotation" &&
+              !linkedQuotationIds.has(it.id),
+          )
+          .map((it) => it.id),
+      ),
+    [allLoadedItems, linkedQuotationIds],
+  );
+
+  function openCreateSoForItem(itemId: string) {
+    const item = allLoadedItems.find((i) => i.id === itemId);
+    if (!item) return;
+    const client = clientById[item.clientId];
+    setWonQuotationForSo({
+      id: item.id,
+      quotationNumber: item.quotationNumber,
+      projectName: item.projectName,
+      clientId: item.clientId,
+      clientName: client?.name ?? "-",
+      ownerId: item.ownerId,
+    });
+  }
 
   const activeFilters =
     (owner !== "all" ? 1 : 0) +
@@ -377,6 +433,16 @@ function PipelineBoardPage({ role }: { role: Role }) {
           ? `Next action ${formatDateShort(nextDateInput)}`
           : "Tanpa next action",
       });
+      if (pendingMove.toStage === "Closed Won" && item.type === "Quotation") {
+        setWonQuotationForSo({
+          id: item.id,
+          quotationNumber: item.quotationNumber,
+          projectName: item.projectName,
+          clientId: item.clientId,
+          clientName: pendingMove.clientName,
+          ownerId: item.ownerId,
+        });
+      }
     } catch (error) {
       toast.error("Gagal memindahkan pipeline card", {
         description: getErrorMessage(error),
@@ -465,6 +531,8 @@ function PipelineBoardPage({ role }: { role: Role }) {
         onDrop={(stage: CommercialStage) => handleDrop(stage)}
         onLoadMore={(stage: CommercialStage) => loadMore(stage)}
         onCardClick={setDrawerItemId}
+        pendingSoItemIds={pendingSoItemIds}
+        onCreateSoForItem={openCreateSoForItem}
       />
 
       <PipelineStageMoveDialog
@@ -491,6 +559,30 @@ function PipelineBoardPage({ role }: { role: Role }) {
         onConfirm={() => void confirmMove()}
       />
 
+      <CreateSalesOrderDialog
+        open={wonQuotationForSo !== null}
+        onOpenChange={(v) => {
+          if (!v) setWonQuotationForSo(null);
+        }}
+        clientId={wonQuotationForSo?.clientId}
+        clientName={wonQuotationForSo?.clientName}
+        ownerId={wonQuotationForSo?.ownerId}
+        sourceCommercialDocument={
+          wonQuotationForSo
+            ? {
+                id: wonQuotationForSo.id,
+                quotationNumber: wonQuotationForSo.quotationNumber,
+                projectName: wonQuotationForSo.projectName,
+              }
+            : undefined
+        }
+        onCreated={() => {
+          void queryClient.invalidateQueries({
+            queryKey: ["sales-orders"],
+          });
+        }}
+      />
+
       <PipelineCardDrawer
         open={drawerItemId !== null}
         onOpenChange={(v) => {
@@ -512,6 +604,7 @@ function PipelineBoardPage({ role }: { role: Role }) {
         currentNext={drawerItemId ? nextByItem.get(drawerItemId) : undefined}
         allItems={allLoadedItems}
         profilesById={ownerById}
+        onWonWithoutSo={(item) => openCreateSoForItem(item.id)}
       />
     </div>
   );

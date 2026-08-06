@@ -12,6 +12,7 @@ import type { FollowUpLog } from "@/lib/data/follow-ups";
 export function CommercialDetailSidebar({
   backHref,
   quotationHistory,
+  linkedSalesOrder,
   relatedTasks,
   followUps,
   history,
@@ -19,6 +20,7 @@ export function CommercialDetailSidebar({
 }: {
   backHref: string;
   quotationHistory: CommercialItem[];
+  linkedSalesOrder?: { id: string; soNumber: string };
   relatedTasks: Task[];
   followUps: FollowUpLog[];
   history: CommercialItemHistoryEntry[];
@@ -26,6 +28,24 @@ export function CommercialDetailSidebar({
 }) {
   return (
     <div className="flex flex-col gap-4">
+      {linkedSalesOrder && (
+        <Card>
+          <CardContent className="p-4">
+            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Sales Order
+            </p>
+            <Link
+              to="/sales-orders/$soId"
+              params={{ soId: linkedSalesOrder.id }}
+              className="flex items-center justify-between rounded-md border bg-muted/30 p-2 text-xs hover:border-primary/40"
+            >
+              <span className="font-mono">{linkedSalesOrder.soNumber}</span>
+              <Badge variant="default">Won</Badge>
+            </Link>
+          </CardContent>
+        </Card>
+      )}
+
       {quotationHistory.length > 0 && (
         <Card>
           <CardContent className="p-4">

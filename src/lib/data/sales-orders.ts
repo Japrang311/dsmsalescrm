@@ -43,6 +43,7 @@ export type SalesOrderDocument = {
   value: number | null;
   qty?: number;
   unitPrice?: number;
+  sourceCommercialDocumentId: string | null;
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
@@ -76,6 +77,7 @@ type SalesOrderRow = {
   number_mode: SalesOrderDocument["numberMode"];
   backdate_reason: string | null;
   total_value: number | null;
+  source_commercial_document_id: string | null;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
@@ -140,6 +142,7 @@ function toSalesOrder(row: SalesOrderRow): SalesOrderDocument {
     qty: items.length === 1 ? (items[0].qty ?? undefined) : undefined,
     unitPrice:
       items.length === 1 ? (items[0].unitPrice ?? undefined) : undefined,
+    sourceCommercialDocumentId: row.source_commercial_document_id,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     deletedAt: row.deleted_at,
@@ -302,6 +305,7 @@ export type CreateSalesOrderInput = {
   manualSoNumber: string;
   backdateReason?: string;
   items: LineItemInput[];
+  sourceCommercialDocumentId?: string;
 };
 
 export async function createSalesOrder(
@@ -322,6 +326,7 @@ export async function createSalesOrder(
     p_manual_so_number: manualSoNumber || null,
     p_backdate_reason: backdateReason || null,
     p_items: input.items,
+    p_source_commercial_document_id: input.sourceCommercialDocumentId ?? null,
   });
   if (error) throw error;
   return toSalesOrder(data as SalesOrderRow);

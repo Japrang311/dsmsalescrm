@@ -26,6 +26,7 @@ export function CommercialDetailHeader({
   onDeleted,
   onRevised,
   onSave,
+  hasLinkedSalesOrder,
 }: {
   item: CommercialItem;
   client: Client | undefined;
@@ -42,6 +43,7 @@ export function CommercialDetailHeader({
   onDeleted: () => void;
   onRevised: (documentId: string) => void;
   onSave: () => void;
+  hasLinkedSalesOrder: boolean;
 }) {
   return (
     <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
@@ -85,6 +87,7 @@ export function CommercialDetailHeader({
           <ReviseQuotationDialog
             document={item}
             onRevised={onRevised}
+            hasLinkedSalesOrder={hasLinkedSalesOrder}
             trigger={<Button variant="outline">Buat Revisi</Button>}
           />
         )}

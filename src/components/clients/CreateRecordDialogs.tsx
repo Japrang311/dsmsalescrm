@@ -267,10 +267,18 @@ export function ReviseQuotationDialog({
   document,
   trigger,
   onRevised,
+  // A Quotation that already has a linked Sales Order can never be revised
+  // again — price/discount changes must happen before the SO exists (user
+  // decision, 2026-08-06). The server (revise_quotation RPC) enforces this
+  // too; this is the friendlier front door so the user sees why instead of
+  // hitting a raw QUOTATION_ALREADY_HAS_SALES_ORDER error after filling the
+  // whole form.
+  hasLinkedSalesOrder = false,
 }: {
   document: CommercialItem;
   trigger: ReactNode;
   onRevised?: (documentId: string) => void;
+  hasLinkedSalesOrder?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const queryClient = useQueryClient();
@@ -337,54 +345,63 @@ export function ReviseQuotationDialog({
             {document.quotationNumber} akan dipertahankan sebagai riwayat.
           </DialogDescription>
         </DialogHeader>
-        <form
-          onSubmit={onSubmit}
-          className="flex flex-1 flex-col gap-3 overflow-hidden"
-        >
-          <div className="grid gap-3 overflow-y-auto pr-1">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <FieldText
-                label="Date"
-                type="date"
-                reg={form.register("documentDate")}
-                error={msg(form.formState.errors, "documentDate")}
-              />
-              <FieldText
-                label="Note"
-                reg={form.register("note")}
-                error={msg(form.formState.errors, "note")}
-              />
-            </div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <FieldText
-                label="Next Action"
-                placeholder="mis. Telepon PIC untuk konfirmasi harga"
-                reg={form.register("nextAction")}
-                error={msg(form.formState.errors, "nextAction")}
-              />
-              <FieldText
-                label="Tanggal Follow-up"
-                type="date"
-                reg={form.register("nextActionDate")}
-                error={msg(form.formState.errors, "nextActionDate")}
-              />
-            </div>
-            <LineItemsSection
-              fields={fields}
-              append={() => append(emptyLineItem)}
-              remove={remove}
-              register={form.register}
-              lineItems={lineItems}
-              errorMessage={form.formState.errors.lineItems?.message as string}
-              showMoney
-            />
+        {hasLinkedSalesOrder ? (
+          <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
+            Quotation ini sudah punya Sales Order — revisi harga harus dilakukan
+            sebelum SO dibuat.
           </div>
-          <Footer
-            onCancel={() => setOpen(false)}
-            submitting={form.formState.isSubmitting}
-            label="Buat Revisi"
-          />
-        </form>
+        ) : (
+          <form
+            onSubmit={onSubmit}
+            className="flex flex-1 flex-col gap-3 overflow-hidden"
+          >
+            <div className="grid gap-3 overflow-y-auto pr-1">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <FieldText
+                  label="Date"
+                  type="date"
+                  reg={form.register("documentDate")}
+                  error={msg(form.formState.errors, "documentDate")}
+                />
+                <FieldText
+                  label="Note"
+                  reg={form.register("note")}
+                  error={msg(form.formState.errors, "note")}
+                />
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <FieldText
+                  label="Next Action"
+                  placeholder="mis. Telepon PIC untuk konfirmasi harga"
+                  reg={form.register("nextAction")}
+                  error={msg(form.formState.errors, "nextAction")}
+                />
+                <FieldText
+                  label="Tanggal Follow-up"
+                  type="date"
+                  reg={form.register("nextActionDate")}
+                  error={msg(form.formState.errors, "nextActionDate")}
+                />
+              </div>
+              <LineItemsSection
+                fields={fields}
+                append={() => append(emptyLineItem)}
+                remove={remove}
+                register={form.register}
+                lineItems={lineItems}
+                errorMessage={
+                  form.formState.errors.lineItems?.message as string
+                }
+                showMoney
+              />
+            </div>
+            <Footer
+              onCancel={() => setOpen(false)}
+              submitting={form.formState.isSubmitting}
+              label="Buat Revisi"
+            />
+          </form>
+        )}
       </DialogContent>
     </Dialog>
   );
@@ -403,7 +420,19 @@ const emptySoLineItem = {
 };
 type SoValues = SalesOrderValues;
 
-export function CreateSalesOrderDialog(props: SharedProps) {
+type CreateSalesOrderDialogProps = SharedProps & {
+  // Pipeline "Closed Won" hand-off: when present, this Sales Order is being
+  // created as the direct outcome of that Quotation winning. The link is
+  // read-only here — a Quotation can be linked to at most one Sales Order
+  // (enforced server-side), so the source is locked, not just defaulted.
+  sourceCommercialDocument?: {
+    id: string;
+    quotationNumber?: string;
+    projectName?: string;
+  };
+};
+
+export function CreateSalesOrderDialog(props: CreateSalesOrderDialogProps) {
   const { open, setOpen, controlled } = useDialogState(props);
   const queryClient = useQueryClient();
   const {
@@ -461,6 +490,7 @@ export function CreateSalesOrderDialog(props: SharedProps) {
           ...item,
           unitPrice: foc ? undefined : item.unitPrice,
         })),
+        sourceCommercialDocumentId: props.sourceCommercialDocument?.id,
       });
       cacheListRecord(queryClient, ["sales-orders", "all"], created);
       await queryClient.invalidateQueries({ queryKey: ["sales-orders"] });
@@ -513,6 +543,17 @@ export function CreateSalesOrderDialog(props: SharedProps) {
           className="flex flex-1 flex-col gap-3 overflow-hidden"
         >
           <div className="grid gap-3 overflow-y-auto pr-1">
+            {props.sourceCommercialDocument && (
+              <div className="rounded-md border border-primary/40 bg-primary/5 p-3">
+                <Label>Dari Quotation</Label>
+                <p className="text-sm text-muted-foreground">
+                  {props.sourceCommercialDocument.quotationNumber ?? "—"}
+                  {props.sourceCommercialDocument.projectName
+                    ? ` · ${props.sourceCommercialDocument.projectName}`
+                    : ""}
+                </p>
+              </div>
+            )}
             {needsPicker && (
               <ClientPickerField
                 clients={clients}

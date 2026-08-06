@@ -177,16 +177,16 @@ Explicitly **not** in scope for this sweep (format an already-correct, user-pick
 **Description:** No existing FK links `sales_orders` back to the `commercial_documents` row it originated from. Add one, additive at the schema level (column stays nullable — the no-Quotation repeat-order flow legitimately has no source document) but **unique** so a Quotation can be linked to at most one Sales Order, per user decision (mandatory 1:1). Blocked on open question 2 (plan doc) about Quotation revisions before finalizing which id (per-revision row vs. `quotationBaseNumber`) the constraint targets — resolve that first.
 
 **Acceptance criteria:**
-- [ ] New migration adds `sales_orders.source_commercial_document_id uuid references public.commercial_documents(id)`, nullable at the column level, with a `unique` constraint
-- [ ] Column is indexed (the unique constraint provides this automatically)
-- [ ] Existing rows unaffected (`null` for all pre-existing SOs); no backfill attempted (per CLAUDE.md's "no inferred legacy backfill" convention)
-- [ ] RLS on `sales_orders` unchanged (column addition doesn't need new policies)
-- [ ] Attempting to insert a second SO with the same `source_commercial_document_id` fails at the DB level with a clear constraint-violation error
+- [x] New migration adds `sales_orders.source_commercial_document_id uuid references public.commercial_documents(id)`, nullable at the column level, with a `unique` constraint
+- [x] Column is indexed (the unique constraint provides this automatically)
+- [x] Existing rows unaffected (`null` for all pre-existing SOs); no backfill attempted (per CLAUDE.md's "no inferred legacy backfill" convention)
+- [x] RLS on `sales_orders` unchanged (column addition doesn't need new policies)
+- [x] Attempting to insert a second SO with the same `source_commercial_document_id` fails at the DB level with a clear constraint-violation error
 
 **Verification:**
-- [ ] `bunx supabase db reset` applies cleanly locally
-- [ ] `bun run test` passes (existing sales-orders tests unaffected)
-- [ ] Migration comment explains the purpose, matching this repo's migration-comment convention
+- [x] `bunx supabase db reset` applies cleanly locally
+- [x] `bun run test` passes (existing sales-orders tests unaffected)
+- [x] Migration comment explains the purpose, matching this repo's migration-comment convention
 
 **Dependencies:** None
 
@@ -202,16 +202,16 @@ Explicitly **not** in scope for this sweep (format an already-correct, user-pick
 **Description:** Accept an optional source document id end to end: RPC parameter, `CreateSalesOrderInput` type, `createSalesOrder()` call, and the `SalesOrderDocument` read-side type/mapping so it round-trips back out for display.
 
 **Acceptance criteria:**
-- [ ] `create_sales_order` RPC accepts an optional `p_source_commercial_document_id uuid default null` and writes it
-- [ ] `CreateSalesOrderInput` (`src/lib/data/sales-orders.ts`) gains an optional `sourceCommercialDocumentId?: string`
-- [ ] `SalesOrderDocument` (read side) exposes the field back out (e.g. `sourceCommercialDocumentId`) so detail pages can render a link
-- [ ] Omitting the field (existing/repeat-order flow) behaves exactly as today — `null`, no error, no required-field prompt
-- [ ] Attempting to create a second SO against a Quotation that already has one produces a clear, user-facing error (surfacing the DB unique-constraint violation as a real message, not a raw Postgres error)
+- [x] `create_sales_order` RPC accepts an optional `p_source_commercial_document_id uuid default null` and writes it
+- [x] `CreateSalesOrderInput` (`src/lib/data/sales-orders.ts`) gains an optional `sourceCommercialDocumentId?: string`
+- [x] `SalesOrderDocument` (read side) exposes the field back out (e.g. `sourceCommercialDocumentId`) so detail pages can render a link
+- [x] Omitting the field (existing/repeat-order flow) behaves exactly as today — `null`, no error, no required-field prompt
+- [x] Attempting to create a second SO against a Quotation that already has one produces a clear, user-facing error (surfacing the DB unique-constraint violation as a real message, not a raw Postgres error)
 
 **Verification:**
-- [ ] Tests pass: `bun run test`
-- [ ] New/updated test in `src/lib/data/sales-orders.test.ts` (or equivalent) proving a created SO with the field set round-trips correctly, and proving omitting it still works
-- [ ] `bunx tsc --noEmit` clean
+- [x] Tests pass: `bun run test`
+- [x] New/updated test in `src/lib/data/sales-orders.test.ts` (or equivalent) proving a created SO with the field set round-trips correctly, and proving omitting it still works
+- [x] `bunx tsc --noEmit` clean
 
 **Dependencies:** Task 3.1
 
@@ -229,15 +229,15 @@ Explicitly **not** in scope for this sweep (format an already-correct, user-pick
 **Description:** `CreateSalesOrderDialog`'s `SharedProps` currently only takes `clientId`/`clientName`/`ownerId`. Extend it to optionally accept a source Quotation reference (id + display info) that gets threaded into the `createSalesOrder()` call from Task 3.2, and shown as read-only, locked context in the dialog ("Dari Quotation: QUO-...") when present — this field is not user-editable when set, since the Closed-Won flow (Task 3.4) requires it.
 
 **Acceptance criteria:**
-- [ ] `CreateSalesOrderDialog` accepts an optional `sourceCommercialDocument?: { id: string; quotationNumber?: string; projectName?: string }` prop
-- [ ] When present, the dialog shows a read-only banner referencing the source Quotation (not editable/removable from within the dialog)
-- [ ] The submit handler passes `sourceCommercialDocumentId` through to `createSalesOrder()`
-- [ ] When absent (existing call sites: Client Detail quick-action, Quick Create), the dialog behaves exactly as today — no visual change, no required field
+- [x] `CreateSalesOrderDialog` accepts an optional `sourceCommercialDocument?: { id: string; quotationNumber?: string; projectName?: string }` prop
+- [x] When present, the dialog shows a read-only banner referencing the source Quotation (not editable/removable from within the dialog)
+- [x] The submit handler passes `sourceCommercialDocumentId` through to `createSalesOrder()`
+- [x] When absent (existing call sites: Client Detail quick-action, Quick Create), the dialog behaves exactly as today — no visual change, no required field
 
 **Verification:**
-- [ ] Tests pass: `bun run test`
-- [ ] `bunx tsc --noEmit` clean
-- [ ] Manual check: open the dialog from an existing call site (Client Detail) with no source prop — confirm unchanged
+- [x] Tests pass: `bun run test`
+- [x] `bunx tsc --noEmit` clean
+- [x] Manual check: open the dialog from an existing call site (Client Detail) with no source prop — confirm unchanged
 
 **Dependencies:** Task 3.2
 
@@ -253,17 +253,17 @@ Explicitly **not** in scope for this sweep (format an already-correct, user-pick
 **Description:** Mirror the existing `Closed Lost` → lost-reason pattern in `_app.pipeline.tsx`/`PipelineStageMoveDialog.tsx`. After a successful stage transition to `"Closed Won"`, open `CreateSalesOrderDialog` pre-filled with the moved card's client/owner and the source document reference. Per user decision (2026-08-06): the dialog **can be closed** without submitting. When closed unsubmitted, the card stays `Closed Won` but is now in a derived "SO belum dibuat" pending state — derived by checking whether any Sales Order references this Quotation as `source_commercial_document_id` (no new stored status column; a Closed Won Quotation with no linked SO *is* the pending state, computed live), so there's no second source of truth to keep in sync.
 
 **Acceptance criteria:**
-- [ ] Moving a card to `Closed Won` completes the stage transition exactly as today (unchanged), then opens `CreateSalesOrderDialog` pre-filled and locked to that Quotation
-- [ ] Closing the dialog without submitting leaves the card `Closed Won`; the Pipeline board visibly flags it (e.g. a badge/indicator on the card, consistent with the board's existing visual language in `PipelineBoard.tsx`) as pending an SO
-- [ ] The pending flag is a live derived check (no linked SO exists for this Quotation), not a stored status — resolves itself automatically once an SO is created through any path
-- [ ] Re-opening a pending card offers a way back into the Create Sales Order flow (e.g. clicking the pending badge, or an action on the card)
-- [ ] Moving to any other stage (including `Closed Lost`) shows no change in behavior
-- [ ] The existing no-Quotation Sales Order creation paths (Quick Create, Client Detail) are completely unaffected
+- [x] Moving a card to `Closed Won` completes the stage transition exactly as today (unchanged), then opens `CreateSalesOrderDialog` pre-filled and locked to that Quotation
+- [x] Closing the dialog without submitting leaves the card `Closed Won`; the Pipeline board visibly flags it (e.g. a badge/indicator on the card, consistent with the board's existing visual language in `PipelineBoard.tsx`) as pending an SO
+- [x] The pending flag is a live derived check (no linked SO exists for this Quotation), not a stored status — resolves itself automatically once an SO is created through any path
+- [x] Re-opening a pending card offers a way back into the Create Sales Order flow (e.g. clicking the pending badge, or an action on the card)
+- [x] Moving to any other stage (including `Closed Lost`) shows no change in behavior
+- [x] The existing no-Quotation Sales Order creation paths (Quick Create, Client Detail) are completely unaffected
 
 **Verification:**
-- [ ] Tests pass: `bun run test`
-- [ ] `bunx tsc --noEmit` and `bun run lint` clean
-- [ ] Browser-verified: move a real Quotation card to Closed Won, close the dialog without submitting, confirm the card shows the pending flag and reload the page to confirm it's derived (not lost on refetch); complete the SO from the pending state and confirm the flag clears
+- [x] Tests pass: `bun run test`
+- [x] `bunx tsc --noEmit` and `bun run lint` clean
+- [x] Browser-verified: move a real Quotation card to Closed Won, close the dialog without submitting, confirm the card shows the pending flag and reload the page to confirm it's derived (not lost on refetch); complete the SO from the pending state and confirm the flag clears
 
 **Dependencies:** Task 3.3
 
@@ -282,16 +282,16 @@ Explicitly **not** in scope for this sweep (format an already-correct, user-pick
 **Description:** Per user decision (2026-08-06): once a Quotation has a linked Sales Order, it can no longer be revised — price/discount changes must happen before the SO exists (before/at PO release). `ReviseQuotationDialog` (`src/components/clients/CreateRecordDialogs.tsx`) currently has no awareness of SO linkage; it needs to check for one and refuse.
 
 **Acceptance criteria:**
-- [ ] `ReviseQuotationDialog`'s trigger (or the dialog itself on open) checks whether the target Quotation has a linked Sales Order (`source_commercial_document_id` referencing it)
-- [ ] If linked: the revise action is disabled/blocked with a clear inline explanation (e.g. "Quotation ini sudah punya Sales Order — revisi harga harus dilakukan sebelum SO dibuat")
-- [ ] If not linked: revise behaves exactly as today, unchanged
-- [ ] The `create_sales_order` RPC itself also rejects being pointed at an already-revised-away Quotation if such a state could otherwise occur (defense in depth — confirm whether this is reachable given Task 3.1's unique constraint, or if the UI-level block is sufficient alone)
+- [x] `ReviseQuotationDialog`'s trigger (or the dialog itself on open) checks whether the target Quotation has a linked Sales Order (`source_commercial_document_id` referencing it)
+- [x] If linked: the revise action is disabled/blocked with a clear inline explanation (e.g. "Quotation ini sudah punya Sales Order — revisi harga harus dilakukan sebelum SO dibuat")
+- [x] If not linked: revise behaves exactly as today, unchanged
+- [x] The `create_sales_order` RPC itself also rejects being pointed at an already-revised-away Quotation if such a state could otherwise occur (defense in depth — confirm whether this is reachable given Task 3.1's unique constraint, or if the UI-level block is sufficient alone)
 
 **Verification:**
-- [ ] Tests pass: `bun run test`
-- [ ] New test: attempt to revise a Quotation with a linked SO, confirm it's rejected (both UI-level and, if applicable, RPC-level)
-- [ ] `bunx tsc --noEmit` clean
-- [ ] Browser-verified: create an SO from a Closed Won Quotation, then attempt to revise that Quotation, confirm it's blocked with a clear message
+- [x] Tests pass: `bun run test`
+- [x] New test: attempt to revise a Quotation with a linked SO, confirm it's rejected (both UI-level and, if applicable, RPC-level)
+- [x] `bunx tsc --noEmit` clean
+- [x] Browser-verified: create an SO from a Closed Won Quotation, then attempt to revise that Quotation, confirm it's blocked with a clear message
 
 **Dependencies:** Task 3.2 (needs the lineage column to check against)
 
@@ -308,13 +308,13 @@ Explicitly **not** in scope for this sweep (format an already-correct, user-pick
 **Description:** Once an SO carries `sourceCommercialDocumentId`, surface it. On the Sales Order's detail view (`CommercialDetailPage.tsx` if SO detail reuses it, or wherever SO detail renders), show a link back to the source Quotation. On the Quotation's detail page, optionally show any SO(s) created from it.
 
 **Acceptance criteria:**
-- [ ] Sales Order detail shows a "Dari Quotation" link to the source document when `sourceCommercialDocumentId` is set, nothing when it's `null`
-- [ ] Quotation detail shows a reverse link/list to any SO(s) referencing it as source (query by `source_commercial_document_id = this.id`)
-- [ ] No visual change for SOs/Quotations with no lineage relationship
+- [x] Sales Order detail shows a "Dari Quotation" link to the source document when `sourceCommercialDocumentId` is set, nothing when it's `null`
+- [x] Quotation detail shows a reverse link/list to any SO(s) referencing it as source (query by `source_commercial_document_id = this.id`)
+- [x] No visual change for SOs/Quotations with no lineage relationship
 
 **Verification:**
-- [ ] Tests pass: `bun run test`
-- [ ] Browser-verified: create an SO via the Task 3.4 flow, confirm both directions of the link render correctly
+- [x] Tests pass: `bun run test`
+- [x] Browser-verified: create an SO via the Task 3.4 flow, confirm both directions of the link render correctly
 
 **Dependencies:** Task 3.2, Task 3.4
 
@@ -328,11 +328,11 @@ Explicitly **not** in scope for this sweep (format an already-correct, user-pick
 ---
 
 ### Checkpoint: Phase 3
-- [ ] Moving a Pipeline card to Closed Won opens Create Sales Order pre-filled with the client and locked to that Quotation
-- [ ] Closing without submitting leaves a visible, self-resolving "SO belum dibuat" flag on the card
-- [ ] A second SO cannot be linked to an already-linked Quotation (DB-enforced, surfaced as a clear UI error)
-- [ ] A Quotation with a linked SO can no longer be revised (clear inline explanation, not a silent disable)
-- [ ] The created SO stores a reference back to the Quotation; both detail pages show the link
-- [ ] Creating a Sales Order directly with no Quotation (Quick Create / repeat-order flow) still works completely unchanged
-- [ ] `bun run test`, `bunx tsc --noEmit`, `bun run lint` all clean; browser-verified end to end
+- [x] Moving a Pipeline card to Closed Won opens Create Sales Order pre-filled with the client and locked to that Quotation
+- [x] Closing without submitting leaves a visible, self-resolving "SO belum dibuat" flag on the card
+- [x] A second SO cannot be linked to an already-linked Quotation (DB-enforced, surfaced as a clear UI error)
+- [x] A Quotation with a linked SO can no longer be revised (clear inline explanation, not a silent disable)
+- [x] The created SO stores a reference back to the Quotation; both detail pages show the link
+- [x] Creating a Sales Order directly with no Quotation (Quick Create / repeat-order flow) still works completely unchanged
+- [x] `bun run test`, `bunx tsc --noEmit`, `bun run lint` all clean; browser-verified end to end
 - [ ] Review with human before shipping
