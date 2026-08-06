@@ -605,44 +605,6 @@ export function todaysFollowUps(
 // Manager-specific
 // ---------------------------------------------------------------------------
 
-export function salesPerformance(
-  orders: SalesOrder[],
-  tasks: Task[],
-  clients: Client[],
-  salesTeam: SalesTeamMember[],
-  byMember: TargetsByMember,
-) {
-  return salesTeam
-    .map((member) => {
-      const memberOrders = orders.filter(
-        (s) =>
-          s.ownerId === member.id &&
-          new Date(s.date).getFullYear() === CURRENT_YEAR,
-      );
-      const revenue = memberOrders.reduce((s, o) => s + paidRevenue(o), 0);
-      const target = sumTargetsThroughMonth(targetsFor(byMember, member.id));
-      const overdue = tasks.filter(
-        (t) => t.ownerId === member.id && isTaskOverdueLike(t),
-      ).length;
-      const openTasks = tasks.filter(
-        (t) => t.ownerId === member.id && isActiveTask(t),
-      ).length;
-      const activeClients = clients.filter(
-        (c) => c.ownerId === member.id && c.status !== "Lost",
-      ).length;
-      return {
-        member,
-        revenue,
-        target,
-        pct: target > 0 ? revenue / target : 0,
-        overdue,
-        openTasks,
-        activeClients,
-      };
-    })
-    .sort((a, b) => b.revenue - a.revenue);
-}
-
 export function activityCompliance(clients: Client[]) {
   const active = clients.filter((c) => c.status !== "Lost");
   const withNext = active.filter((c) => Boolean(c.nextFu)).length;

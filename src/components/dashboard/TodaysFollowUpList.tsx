@@ -1,3 +1,4 @@
+import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -6,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Phone, Mail, MessageSquare, MapPin, Users } from "lucide-react";
 
 import { todaysFollowUps } from "@/lib/data/dashboard-selectors";
+import { listActiveTasks } from "@/lib/data/tasks";
 import { useDashboardData } from "@/hooks/use-dashboard-data";
 import { formatDateShort, formatRupiahShort } from "@/lib/format";
 import { useRole } from "@/context/role-context";
@@ -21,9 +23,23 @@ const METHOD_ICON = {
 // RLS already scopes `tasks` to what the logged-in user can see — no role
 // prop needed here anymore (unlike the old mock version).
 export function TodaysFollowUpList() {
-  const { role } = useRole();
-  const { tasks, clients, items, ownersById } = useDashboardData();
-  const rows = todaysFollowUps(tasks, clients, items, ownersById).slice(0, 8);
+  const { role, authReady } = useRole();
+  const { clients, items, ownersById } = useDashboardData();
+  // Today/Overdue/Escalated can only ever come from the still-open working
+  // set, never Done/Cancelled/archived rows — same queryKey as the Tasks
+  // Inbox page, so this reuses its cache instead of pulling the full
+  // ever-growing task history via useDashboardData()'s unbounded listTasks().
+  const activeTasksQuery = useQuery({
+    queryKey: ["tasks", "active"],
+    queryFn: listActiveTasks,
+    enabled: authReady,
+  });
+  const rows = todaysFollowUps(
+    activeTasksQuery.data ?? [],
+    clients,
+    items,
+    ownersById,
+  ).slice(0, 8);
   const canCompleteTasks = role !== "executive";
 
   return (
