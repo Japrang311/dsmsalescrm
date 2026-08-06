@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   Phone,
@@ -59,16 +59,24 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { useRole } from "@/context/role-context";
 import { NOW } from "@/lib/domain";
 import type { Role, Task, CommercialItem } from "@/lib/domain";
 import {
-  listTasks,
+  listActiveTasks,
+  listTasksPage,
   updateTask,
   createTask,
   describeTaskChanges,
+  type TaskHistoryView,
+  type TaskListFilters,
 } from "@/lib/data/tasks";
+import { listQueryKey } from "@/lib/pagination-contracts";
 import { recordTaskProgress } from "@/lib/data/task-progress";
 import {
   filterExecutiveTaskExceptions,
@@ -131,6 +139,8 @@ const COMMERCIAL_OPTIONS = [
   "Sales Order",
   "none",
 ] as const;
+
+const HISTORY_PAGE_SIZE = 25;
 
 type ViewKey = "today" | "upcoming" | "overdue" | "completed" | "archived";
 type ManagerTaskMode = "my-tasks" | "team-exceptions";
@@ -215,9 +225,9 @@ function TasksInboxPage() {
   const { role, authReady } = useRole();
   const queryClient = useQueryClient();
 
-  const { data: tasks = [], isLoading: tasksLoading } = useQuery({
-    queryKey: ["tasks", "all"],
-    queryFn: listTasks,
+  const { data: activeTasks = [], isLoading: tasksLoading } = useQuery({
+    queryKey: ["tasks", "active"],
+    queryFn: listActiveTasks,
     enabled: authReady,
   });
   const { data: currentActorId } = useQuery({
@@ -275,6 +285,14 @@ function TasksInboxPage() {
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
 
+  // Completed/Archived are server-paginated in bounded pages, not a full
+  // month's worth of history, so the month-grid Calendar view (which needs
+  // every task in the visible month at once) doesn't apply to them.
+  const isHistoryView = activeView === "completed" || activeView === "archived";
+  useEffect(() => {
+    if (isHistoryView && view === "calendar") setView("agenda");
+  }, [isHistoryView, view]);
+
   const toggleSelected = (id: string) => {
     setSelected((prev) => {
       const next = new Set(prev);
@@ -304,14 +322,123 @@ function TasksInboxPage() {
 
   const scopedTasks = useMemo(() => {
     if (role === "executive") {
-      return filterExecutiveTaskExceptions(tasks, profilesById);
+      return filterExecutiveTaskExceptions(activeTasks, profilesById);
     }
-    if (role !== "manager") return tasks;
+    if (role !== "manager") return activeTasks;
     if (managerTaskMode === "team-exceptions") {
-      return filterManagerTeamExceptions(tasks, profilesById);
+      return filterManagerTeamExceptions(activeTasks, profilesById);
     }
-    return filterManagerMyTasks(tasks, currentActorId);
-  }, [role, managerTaskMode, tasks, profilesById, currentActorId]);
+    return filterManagerMyTasks(activeTasks, currentActorId);
+  }, [role, managerTaskMode, activeTasks, profilesById, currentActorId]);
+
+  // Completed/Archived history views are server-paginated (see
+  // listTasksPage() in lib/data/tasks.ts) instead of being sliced out of
+  // activeTasks, which deliberately excludes them. filterExecutiveTaskExceptions
+  // and filterManagerTeamExceptions both require archived=false and an active
+  // workflow status, so executive exceptions and manager team-exceptions mode
+  // can never show any Completed/Archived rows -- history fetching is skipped
+  // entirely for those, matching what scopedTasks already implies.
+  const historyRoleBlocked =
+    role === "executive" ||
+    (role === "manager" && managerTaskMode === "team-exceptions");
+  const managerMyTasksOwnerMismatch =
+    role === "manager" &&
+    managerTaskMode === "my-tasks" &&
+    ownerId !== "all" &&
+    ownerId !== currentActorId;
+  const managerMyTasksMissingActor =
+    role === "manager" && managerTaskMode === "my-tasks" && !currentActorId;
+  const historyBlocked =
+    historyRoleBlocked ||
+    managerMyTasksOwnerMismatch ||
+    managerMyTasksMissingActor;
+
+  const historyEffectiveOwnerId =
+    role === "manager" && managerTaskMode === "my-tasks"
+      ? (ownerId !== "all" ? ownerId : currentActorId) || undefined
+      : ownerId !== "all"
+        ? ownerId
+        : undefined;
+
+  const historyMatchingClientIds = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return undefined;
+    return clientList
+      .filter((c) => c.name.toLowerCase().includes(q))
+      .map((c) => c.id);
+  }, [query, clientList]);
+
+  const historyCommercialItemIds = useMemo(():
+    | string[]
+    | "none"
+    | undefined => {
+    if (commercialType === "all") return undefined;
+    if (commercialType === "none") return "none";
+    return commercialItems
+      .filter((c) => c.type === commercialType)
+      .map((c) => c.id);
+  }, [commercialType, commercialItems]);
+
+  const historyFilters = useMemo<TaskListFilters>(
+    () => ({
+      ownerId: historyEffectiveOwnerId,
+      method: method !== "all" ? method : undefined,
+      priority: priority !== "all" ? priority : undefined,
+      search: query.trim() || undefined,
+      clientIds: historyMatchingClientIds,
+      commercialItemIds: historyCommercialItemIds,
+    }),
+    [
+      historyEffectiveOwnerId,
+      method,
+      priority,
+      query,
+      historyMatchingClientIds,
+      historyCommercialItemIds,
+    ],
+  );
+
+  function useTaskHistory(view: TaskHistoryView) {
+    return useInfiniteQuery({
+      queryKey: listQueryKey("tasks", "page", {
+        filters: { ...historyFilters, view },
+      }),
+      queryFn: ({ pageParam }: { pageParam: string | null }) =>
+        listTasksPage({
+          view,
+          filters: historyFilters,
+          page: { pageSize: HISTORY_PAGE_SIZE, cursor: pageParam },
+        }),
+      initialPageParam: null as string | null,
+      getNextPageParam: (lastPage) => lastPage.nextCursor,
+      enabled: authReady && !historyBlocked,
+    });
+  }
+
+  const completedQuery = useTaskHistory("completed");
+  const archivedQuery = useTaskHistory("archived");
+  const completedRows = useMemo(
+    () => (completedQuery.data?.pages ?? []).flatMap((p) => p.rows),
+    [completedQuery.data],
+  );
+  const archivedRows = useMemo(
+    () => (archivedQuery.data?.pages ?? []).flatMap((p) => p.rows),
+    [archivedQuery.data],
+  );
+  const completedTotal = historyBlocked
+    ? 0
+    : (completedQuery.data?.pages[0]?.totalCount ?? 0);
+  const archivedTotal = historyBlocked
+    ? 0
+    : (archivedQuery.data?.pages[0]?.totalCount ?? 0);
+
+  const knownTasksById = useMemo(() => {
+    const map = new Map<string, Task>();
+    for (const t of activeTasks) map.set(t.id, t);
+    for (const t of completedRows) map.set(t.id, t);
+    for (const t of archivedRows) map.set(t.id, t);
+    return map;
+  }, [activeTasks, completedRows, archivedRows]);
 
   // Filtered by common criteria (excluding view). Applied before view split so
   // per-view counts always reflect current filters.
@@ -358,8 +485,13 @@ function TasksInboxPage() {
       archived: 0,
     };
     for (const t of commonFiltered) c[viewForTask(t, Boolean(t.archived))]++;
+    // commonFiltered is scoped to activeTasks, which never includes
+    // Completed/Archived rows -- those two counts come from the paginated
+    // history queries' server-side totals instead.
+    c.completed = completedTotal;
+    c.archived = archivedTotal;
     return c;
-  }, [commonFiltered]);
+  }, [commonFiltered, completedTotal, archivedTotal]);
 
   const filtered = useMemo(
     () =>
@@ -597,9 +729,15 @@ function TasksInboxPage() {
   };
 
   // -------------------------- Bulk actions --------------------------
+  // Looks up across activeTasks + whatever history pages are loaded, not
+  // just scopedTasks, so bulk actions still work on selected rows rendered
+  // from the paginated Completed/Archived views.
   const selectedTasks = useMemo(
-    () => scopedTasks.filter((t) => selected.has(t.id)),
-    [scopedTasks, selected],
+    () =>
+      [...selected]
+        .map((id) => knownTasksById.get(id))
+        .filter((t): t is Task => Boolean(t)),
+    [selected, knownTasksById],
   );
   const selectedIdList = useMemo(
     () => selectedTasks.map((t) => t.id),
@@ -719,9 +857,7 @@ function TasksInboxPage() {
   };
 
   const handleOpen = (t: Task) => setOpenTaskId(t.id);
-  const openTask = openTaskId
-    ? (tasks.find((t) => t.id === openTaskId) ?? null)
-    : null;
+  const openTask = openTaskId ? (knownTasksById.get(openTaskId) ?? null) : null;
   const isManagerTeamExceptions =
     role === "manager" && managerTaskMode === "team-exceptions";
   const pageTitle =
@@ -782,7 +918,10 @@ function TasksInboxPage() {
               >
                 <AlertTriangle className="h-3.5 w-3.5" /> Team Exceptions
                 <span className="num rounded bg-muted px-1 text-[10px]">
-                  {filterManagerTeamExceptions(tasks, profilesById).length}
+                  {
+                    filterManagerTeamExceptions(activeTasks, profilesById)
+                      .length
+                  }
                 </span>
               </ToggleGroupItem>
             </ToggleGroup>
@@ -804,6 +943,12 @@ function TasksInboxPage() {
             <ToggleGroupItem
               value="calendar"
               className="h-8 gap-1.5 px-2.5 text-xs"
+              disabled={isHistoryView}
+              title={
+                isHistoryView
+                  ? "Kalender tidak tersedia untuk Completed/Archived — riwayat dimuat bertahap, bukan sekaligus"
+                  : undefined
+              }
             >
               <CalendarDays className="h-3.5 w-3.5" /> Kalender
             </ToggleGroupItem>
@@ -812,7 +957,7 @@ function TasksInboxPage() {
         </div>
       </header>
 
-      <CalendarIncompleteWarning tasks={tasks} />
+      <CalendarIncompleteWarning tasks={activeTasks} />
 
       {/* View segmented control — Today / Upcoming / Overdue / Completed / Archived */}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
@@ -947,73 +1092,116 @@ function TasksInboxPage() {
         </CardContent>
       </Card>
 
-      {view === "agenda" ? (
-        <div className="flex flex-col gap-3">
-          {(["overdue", "today", "week", "later", "done"] as Bucket[]).map(
-            (b) => {
-              const rows = grouped[b];
-              if (rows.length === 0) return null;
-              const meta = BUCKET_META[b];
-              const ids = rows.map((r) => r.id);
-              const allSelected =
-                ids.length > 0 && ids.every((id) => selected.has(id));
-              const someSelected =
-                !allSelected && ids.some((id) => selected.has(id));
-              return (
-                <Card key={b} className="border-border shadow-none">
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle
-                      className={`flex items-center gap-2 text-sm font-semibold ${meta.tone}`}
-                    >
-                      <Checkbox
-                        checked={
-                          allSelected
-                            ? true
-                            : someSelected
-                              ? "indeterminate"
-                              : false
-                        }
-                        onCheckedChange={(v) =>
-                          setBucketSelection(ids, v === true)
-                        }
-                        aria-label={`Pilih semua ${meta.title}`}
-                      />
-                      {meta.title}
-                      <span className="ml-1 text-xs font-normal text-muted-foreground">
-                        {rows.length}
-                      </span>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-0">
-                    <ul className="divide-y divide-border">
-                      {rows.map((task) => (
-                        <TaskRow
-                          key={task.id}
-                          task={task}
-                          isArchived={Boolean(task.archived)}
-                          canEdit={canEdit}
-                          onDone={handleDone}
-                          onSnooze={handleSnooze}
-                          onUndo={handleUndo}
-                          onOpen={handleOpen}
-                          onArchive={handleArchive}
-                          onUnarchive={handleUnarchive}
-                          onCreateChildTask={handleCreateChildTask}
-                          onMoveWaitingPO={handleMoveWaitingPO}
-                          onLogFollowUp={handleOpen}
-                          selected={selected.has(task.id)}
-                          onToggleSelect={canEdit ? toggleSelected : undefined}
-                          clientsById={clientsById}
-                          profilesById={profilesById}
-                          commercialItemsById={commercialItemsById}
-                        />
-                      ))}
-                    </ul>
-                  </CardContent>
-                </Card>
-              );
-            },
+      {view === "agenda" && isHistoryView ? (
+        <TaskHistorySection
+          title={activeView === "completed" ? "Selesai" : "Diarsipkan"}
+          tone={
+            activeView === "completed"
+              ? BUCKET_META.done.tone
+              : "text-muted-foreground"
+          }
+          totalCount={
+            activeView === "completed" ? completedTotal : archivedTotal
+          }
+          rows={activeView === "completed" ? completedRows : archivedRows}
+          isLoading={
+            (activeView === "completed" ? completedQuery : archivedQuery)
+              .isLoading
+          }
+          isFetchingNextPage={
+            (activeView === "completed" ? completedQuery : archivedQuery)
+              .isFetchingNextPage
+          }
+          hasNextPage={Boolean(
+            (activeView === "completed" ? completedQuery : archivedQuery)
+              .hasNextPage,
           )}
+          onLoadMore={() =>
+            void (
+              activeView === "completed" ? completedQuery : archivedQuery
+            ).fetchNextPage()
+          }
+          canEdit={canEdit}
+          onDone={handleDone}
+          onSnooze={handleSnooze}
+          onUndo={handleUndo}
+          onOpen={handleOpen}
+          onArchive={handleArchive}
+          onUnarchive={handleUnarchive}
+          onCreateChildTask={handleCreateChildTask}
+          onMoveWaitingPO={handleMoveWaitingPO}
+          onLogFollowUp={handleOpen}
+          selected={selected}
+          onToggleSelect={toggleSelected}
+          clientsById={clientsById}
+          profilesById={profilesById}
+          commercialItemsById={commercialItemsById}
+        />
+      ) : view === "agenda" ? (
+        <div className="flex flex-col gap-3">
+          {(["overdue", "today", "week", "later"] as Bucket[]).map((b) => {
+            const rows = grouped[b];
+            if (rows.length === 0) return null;
+            const meta = BUCKET_META[b];
+            const ids = rows.map((r) => r.id);
+            const allSelected =
+              ids.length > 0 && ids.every((id) => selected.has(id));
+            const someSelected =
+              !allSelected && ids.some((id) => selected.has(id));
+            return (
+              <Card key={b} className="border-border shadow-none">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle
+                    className={`flex items-center gap-2 text-sm font-semibold ${meta.tone}`}
+                  >
+                    <Checkbox
+                      checked={
+                        allSelected
+                          ? true
+                          : someSelected
+                            ? "indeterminate"
+                            : false
+                      }
+                      onCheckedChange={(v) =>
+                        setBucketSelection(ids, v === true)
+                      }
+                      aria-label={`Pilih semua ${meta.title}`}
+                    />
+                    {meta.title}
+                    <span className="ml-1 text-xs font-normal text-muted-foreground">
+                      {rows.length}
+                    </span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <ul className="divide-y divide-border">
+                    {rows.map((task) => (
+                      <TaskRow
+                        key={task.id}
+                        task={task}
+                        isArchived={Boolean(task.archived)}
+                        canEdit={canEdit}
+                        onDone={handleDone}
+                        onSnooze={handleSnooze}
+                        onUndo={handleUndo}
+                        onOpen={handleOpen}
+                        onArchive={handleArchive}
+                        onUnarchive={handleUnarchive}
+                        onCreateChildTask={handleCreateChildTask}
+                        onMoveWaitingPO={handleMoveWaitingPO}
+                        onLogFollowUp={handleOpen}
+                        selected={selected.has(task.id)}
+                        onToggleSelect={canEdit ? toggleSelected : undefined}
+                        clientsById={clientsById}
+                        profilesById={profilesById}
+                        commercialItemsById={commercialItemsById}
+                      />
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
+            );
+          })}
 
           {filtered.length === 0 && (
             <EmptyState
@@ -1132,6 +1320,148 @@ function TasksInboxPage() {
         </div>
       )}
     </div>
+  );
+}
+
+// Completed/Archived history: server-paginated (listTasksPage()), loaded in
+// bounded pages and appended on scroll via an IntersectionObserver sentinel,
+// same "load more on scroll" pattern as the Activity Log feed.
+function TaskHistorySection({
+  title,
+  tone,
+  totalCount,
+  rows,
+  isLoading,
+  isFetchingNextPage,
+  hasNextPage,
+  onLoadMore,
+  canEdit,
+  onDone,
+  onSnooze,
+  onUndo,
+  onOpen,
+  onArchive,
+  onUnarchive,
+  onCreateChildTask,
+  onMoveWaitingPO,
+  onLogFollowUp,
+  selected,
+  onToggleSelect,
+  clientsById,
+  profilesById,
+  commercialItemsById,
+}: {
+  title: string;
+  tone: string;
+  totalCount: number;
+  rows: Task[];
+  isLoading: boolean;
+  isFetchingNextPage: boolean;
+  hasNextPage: boolean;
+  onLoadMore: () => void;
+  canEdit: boolean;
+  onDone: (t: Task) => void;
+  onSnooze: (t: Task) => void;
+  onUndo: (t: Task) => void;
+  onOpen: (t: Task) => void;
+  onArchive: (t: Task) => void;
+  onUnarchive: (t: Task) => void;
+  onCreateChildTask: (t: Task, kind: "Quotation" | "Prototype") => void;
+  onMoveWaitingPO: (t: Task) => void;
+  onLogFollowUp: (t: Task) => void;
+  selected: Set<string>;
+  onToggleSelect: (id: string) => void;
+  clientsById: ClientLookup;
+  profilesById: ProfileLookup;
+  commercialItemsById: CommercialLookup;
+}) {
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!hasNextPage) return;
+    const el = sentinelRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((x) => x.isIntersecting) && !isFetchingNextPage) {
+          onLoadMore();
+        }
+      },
+      { rootMargin: "400px 0px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [hasNextPage, isFetchingNextPage, onLoadMore]);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center rounded-lg border border-dashed py-16 text-sm text-muted-foreground">
+        Memuat riwayat…
+      </div>
+    );
+  }
+
+  if (rows.length === 0) {
+    return (
+      <EmptyState
+        className="py-12"
+        icon={Inbox}
+        title="Belum ada riwayat"
+        description="Tidak ada task yang cocok dengan filter saat ini."
+      />
+    );
+  }
+
+  return (
+    <Card className="border-border shadow-none">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle
+          className={`flex items-center gap-2 text-sm font-semibold ${tone}`}
+        >
+          {title}
+          <span className="ml-1 text-xs font-normal text-muted-foreground">
+            {totalCount}
+          </span>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="p-0">
+        <ul className="divide-y divide-border">
+          {rows.map((task) => (
+            <TaskRow
+              key={task.id}
+              task={task}
+              isArchived={Boolean(task.archived)}
+              canEdit={canEdit}
+              onDone={onDone}
+              onSnooze={onSnooze}
+              onUndo={onUndo}
+              onOpen={onOpen}
+              onArchive={onArchive}
+              onUnarchive={onUnarchive}
+              onCreateChildTask={onCreateChildTask}
+              onMoveWaitingPO={onMoveWaitingPO}
+              onLogFollowUp={onLogFollowUp}
+              selected={selected.has(task.id)}
+              onToggleSelect={canEdit ? onToggleSelect : undefined}
+              clientsById={clientsById}
+              profilesById={profilesById}
+              commercialItemsById={commercialItemsById}
+            />
+          ))}
+        </ul>
+        <div ref={sentinelRef} className="h-px" />
+        {isFetchingNextPage && (
+          <div className="py-3 text-center text-xs text-muted-foreground">
+            Memuat lebih banyak…
+          </div>
+        )}
+        {!hasNextPage && (
+          <div className="py-3 text-center text-[11px] text-muted-foreground">
+            Semua task ditampilkan.
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
