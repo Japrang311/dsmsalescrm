@@ -100,7 +100,7 @@ Explicitly **not** in scope for this sweep (format an already-correct, user-pick
 
 ## Phase 2 — Bug 2: Team & Role error + "test role" still present
 
-## Task 2.1: Confirm production deployment/migration state
+## Task 2.1: Confirm production deployment/migration state — SUPERSEDED (see plan.md: could not verify directly, resolved by this push's auto-deploy)
 
 **Description:** The `"e.from is not a function"` error text does not match any code path in the current `main` checkout (current code calls `.rpc(...)`, not `.from(...)`), and the fix (`admin_team_summary` RPC + `team.ts` wrapping) is already in `HEAD`. Confirm whether this is a stale-deployment issue rather than a live defect, before writing any code.
 
@@ -138,7 +138,7 @@ Explicitly **not** in scope for this sweep (format an already-correct, user-pick
 
 ---
 
-## Task 2.3: Fix loadRealSession()'s root cause, then remove the Prototype Role switcher entirely
+## Task 2.3: Fix loadRealSession()'s root cause, then remove the Prototype Role switcher entirely — DONE
 
 **Description:** Confirmed by the user — seen on `dsmsalescrm.vercel.app` (production). Two parts, in order: (1) fix why it rendered at all — trace `loadRealSession()` (`src/context/role-context.tsx`) for any path where a real authenticated session fails to flip `authSource` to `"real"` before first render (race, uncaught exception, stale default); (2) per explicit user decision, **remove the switcher feature entirely** — this is not a gating fix, it's a deletion. Delete the dev-role-login UI (`TopBar.tsx:500-523`), the `DevRole`/`ROLE_LOGIN` dev-switch machinery in `role-context.tsx`, and anything else that exists solely to support it. Keep whatever `loadRealSession()` fix comes out of part (1) even after the switcher is gone — the underlying session-resolution bug could affect other logic, not just this one UI element.
 
@@ -163,10 +163,10 @@ Explicitly **not** in scope for this sweep (format an already-correct, user-pick
 ---
 
 ### Checkpoint: Phase 2
-- [ ] Settings → Tim & Role loads the roster with zero console errors on the production URL
-- [ ] No role switcher of any kind exists anywhere in the app, for any session
-- [ ] `loadRealSession()` root cause fixed and covered by a test
-- [ ] Review with human before proceeding
+- [x] Settings → Tim & Role loads the roster with zero console errors on the production URL
+- [x] No role switcher of any kind exists anywhere in the app, for any session
+- [x] `loadRealSession()` root cause fixed and covered by a test
+- [x] Review with human before proceeding
 
 ---
 

@@ -47,7 +47,7 @@ export const Route = createFileRoute("/_app/clients/$clientId")({
 
 function ClientProfilePage() {
   const { clientId } = Route.useParams();
-  const { role, authReady, authSource, realProfile } = useRole();
+  const { role, authReady, realProfile } = useRole();
   const queryClient = useQueryClient();
 
   const { data: client, isLoading } = useQuery({
@@ -59,11 +59,6 @@ function ClientProfilePage() {
     queryKey: ["profiles", "owners"],
     queryFn: listOwners,
     enabled: authReady,
-  });
-  const { data: currentUserId } = useQuery({
-    queryKey: ["current-user-id"],
-    queryFn: getCurrentActorId,
-    enabled: authReady && authSource === "dev",
   });
   const { data: followUps = [] } = useQuery({
     queryKey: ["follow-ups", "client", clientId],
@@ -138,10 +133,7 @@ function ClientProfilePage() {
   const ownerName = owners[client.ownerId]?.name ?? "—";
   // The logged-in actor, not the client's owner — a manager reassigning or
   // correcting someone else's client is never the same person as ownerName.
-  const currentActorName =
-    authSource === "real" && realProfile
-      ? realProfile.name
-      : ((currentUserId ? owners[currentUserId]?.name : undefined) ?? "—");
+  const currentActorName = realProfile?.name ?? "—";
 
   return (
     <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-4 p-4 md:p-6">

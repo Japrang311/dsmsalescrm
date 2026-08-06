@@ -59,16 +59,17 @@ Original DB-investigation findings (still true, ruled out other causes first):
 - [ ] A simulated query failure renders a visible error state instead of an empty table
 - [ ] `bun run test` passes, `bunx tsc --noEmit` clean
 
-### Phase 2: Bug 2 — Team & Role error + test role (both confirmed on production)
+### Phase 2: Bug 2 — Team & Role error + test role (both confirmed on production) — DONE (2026-08-07)
 
-- [ ] Task 2.1: Confirm production deployment/migration state against the fix commit
-- [ ] Task 2.2 (conditional): Redeploy / reapply migration if Task 2.1 finds a gap
-- [ ] Task 2.3: Fix the `loadRealSession()` root cause, then remove the Prototype Role switcher entirely
+- [x] Task 2.1: Confirm production deployment/migration state against the fix commit — **could not verify directly**: the Vercel MCP connector available in this session is authenticated to a different account (`list_projects`/`list_teams` return empty/unrelated results for `dsmsalescrm`), and no credentials were available to sign in to the live production URL. Superseded regardless — CLAUDE.md confirms Vercel auto-deploys every push to `main`, so pushing this phase's fix triggers a fresh production build independent of whatever the prior deployment state was.
+- [x] Task 2.2: N/A — no redeploy action needed beyond the normal push (see above)
+- [x] Task 2.3: Removed the Prototype Role switcher entirely, per user decision. `loadRealSession()` simplified to always require a real Supabase Auth session — no more dev-switcher fallback branch to race against or leak from. `DevRole`, `ROLE_LOGIN`, `SEED_EMAILS`, `signInForRole`, and `setRole` all deleted from `role-context.tsx`; `authSource` field removed from the context entirely (every session is now unconditionally a real one). Cleaned up the two downstream consumers (`TopBar.tsx`, `_app.clients.$clientId.tsx`) that had `authSource === "dev"`-gated fallback queries — both simplified to read `realProfile` directly.
 
 ### Checkpoint: Phase 2
-- [ ] Settings → Tim & Role loads the roster with zero console errors on the production URL
-- [ ] No role switcher of any kind exists in the app for any session (dev or production) — feature removed, not just hidden
-- [ ] `loadRealSession()`'s failure path fixed (defensive, in case other `authSource === "dev"` logic remains elsewhere)
+- [x] Settings → Tim & Role loads the roster with zero console errors — verified locally (Sales Manager login, full 7-account roster renders correctly)
+- [x] No role switcher of any kind exists in the app for any session — verified: profile dropdown now shows only "Signed in as [name] / [role] / Profile / Preferences / Sign out", confirmed via a fresh sign-out → real /login form (no seed-account auto-fallback) → sign back in round trip
+- [x] `571 tests passing, `bunx tsc --noEmit`, `bun run lint` all clean
+- [ ] Production verification (Settings → Tim & Role loading cleanly, switcher absent) still needs the user to check `dsmsalescrm.vercel.app` directly after this push deploys — not verifiable by the agent this session
 
 ### Phase 3: Bug 3 — Pipeline Closed Won → Create Sales Order (mandatory, 1:1, dismissible with a pending-SO status)
 
