@@ -1,17 +1,19 @@
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import {
-  GitBranch,
-  Filter,
-  User2,
-  CalendarClock,
-  GripVertical,
-  ArrowRight,
-  ChevronDown,
-} from "lucide-react";
+import { GitBranch } from "lucide-react";
 import { toast } from "sonner";
 import { PipelineCardDrawer } from "@/components/pipeline/PipelineCardDrawer";
 import { PipelineAnalytics } from "@/components/pipeline/PipelineAnalytics";
+import { PipelineFilterBar } from "@/components/pipeline/PipelineFilterBar";
+import type { PipelineNextWindow } from "@/components/pipeline/PipelineFilterBar";
+import {
+  PipelineBoard,
+  type PipelineColumnData,
+} from "@/components/pipeline/PipelineBoard";
+import {
+  PipelineStageMoveDialog,
+  type PendingPipelineMove,
+} from "@/components/pipeline/PipelineStageMoveDialog";
 
 import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRole } from "@/context/role-context";
@@ -33,38 +35,20 @@ import {
 } from "@/lib/data/clients";
 import { listTasks } from "@/lib/data/tasks";
 import { activeCommercialTasks } from "@/lib/data/task-relations";
-import { COMMERCIAL_STAGES } from "@/lib/data/commercial-stages";
-import { formatRupiahShort, formatDateShort, daysBetween } from "@/lib/format";
-import { StatusBadge } from "@/components/clients/StatusBadges";
+import {
+  COMMERCIAL_STAGES,
+  type CommercialStage,
+} from "@/lib/data/commercial-stages";
+import { formatRupiahShort, formatDateShort } from "@/lib/format";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { cn, getErrorMessage } from "@/lib/utils";
 import { getCurrentActorId } from "@/lib/data/activity-log";
 import { buildExplicitFollowUpCommand } from "@/lib/follow-up-command";
 import {
   activeLostReasonPatch,
   isLostReasonTracked,
-  QUOTATION_LOST_REASONS,
   validateQuotationLostReason,
 } from "@/lib/data/quotation-lost-reasons";
+import { getErrorMessage } from "@/lib/utils";
 import { listQueryKey } from "@/lib/pagination-contracts";
 
 export const Route = createFileRoute("/_app/pipeline")({
@@ -77,7 +61,6 @@ export const Route = createFileRoute("/_app/pipeline")({
 const STAGES = COMMERCIAL_STAGES;
 
 type Stage = (typeof STAGES)[number];
-type NextWindow = "all" | "overdue" | "today" | "week" | "none";
 
 function addDaysISO(base: string | Date, days: number): string {
   const d = new Date(base);
@@ -104,16 +87,16 @@ function PipelinePage() {
     );
   }
 
-  return <PipelineBoard role={role} />;
+  return <PipelineBoardPage role={role} />;
 }
 
-function PipelineBoard({ role }: { role: Role }) {
+function PipelineBoardPage({ role }: { role: Role }) {
   const { authReady } = useRole();
   const queryClient = useQueryClient();
 
   const [owner, setOwner] = useState<string>("all");
   const [status, setStatus] = useState<string>("all");
-  const [nextWindow, setNextWindow] = useState<NextWindow>("all");
+  const [nextWindow, setNextWindow] = useState<PipelineNextWindow>("all");
 
   // Per-stage cursors for "load more" pagination
   const [stageCursors, setStageCursors] = useState<
@@ -172,13 +155,9 @@ function PipelineBoard({ role }: { role: Role }) {
 
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverStage, setDragOverStage] = useState<Stage | null>(null);
-  const [pendingMove, setPendingMove] = useState<{
-    itemId: string;
-    fromStage: Stage;
-    toStage: Stage;
-    clientName: string;
-    currentNext?: string;
-  } | null>(null);
+  const [pendingMove, setPendingMove] = useState<PendingPipelineMove | null>(
+    null,
+  );
   const [nextDateInput, setNextDateInput] = useState<string>("");
   const [nextActionInput, setNextActionInput] = useState<string>("");
   const [taskMode, setTaskMode] = useState<"existing_task" | "create_task">(
@@ -234,6 +213,25 @@ function PipelineBoard({ role }: { role: Role }) {
     }
     return map;
   }, [allLoadedItems, tasks]);
+
+  // Per-stage column data for the board (rows/sum/hasMore/isFetching), keeps
+  // PipelineBoard decoupled from the raw useQueries result shape.
+  const stageColumns: PipelineColumnData[] = useMemo(
+    () =>
+      STAGES.map((stage, stageIndex) => {
+        const query = stageQueries[stageIndex];
+        const items = (query.data?.rows ?? []).map(toCommercialItem);
+        const sum = items.reduce((s, it) => s + it.estimatedValue, 0);
+        return {
+          stage,
+          items,
+          sum,
+          hasMore: query.data?.nextCursor !== null,
+          isFetching: query.isFetching,
+        };
+      }),
+    [stageQueries],
+  );
 
   const activeFilters =
     (owner !== "all" ? 1 : 0) +
@@ -427,60 +425,16 @@ function PipelineBoard({ role }: { role: Role }) {
         )}
       </div>
 
-      {/* Filter bar */}
-      <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-card p-2.5">
-        <span className="flex items-center gap-1 pl-1 pr-2 text-xs font-medium text-muted-foreground">
-          <Filter className="h-3.5 w-3.5" /> Filter
-        </span>
-
-        {role !== "sales" && (
-          <Select value={owner} onValueChange={setOwner}>
-            <SelectTrigger className="h-8 w-[180px] text-xs">
-              <User2 className="h-3.5 w-3.5" />
-              <SelectValue placeholder="Owner" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Semua sales</SelectItem>
-              {salesTeam.map((m) => (
-                <SelectItem key={m.id} value={m.id}>
-                  {m.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
-
-        <Select value={status} onValueChange={setStatus}>
-          <SelectTrigger className="h-8 w-[170px] text-xs">
-            <SelectValue placeholder="Client status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Semua status</SelectItem>
-            <SelectItem value="Prospect">Prospect</SelectItem>
-            <SelectItem value="Active Customer">Active Customer</SelectItem>
-            <SelectItem value="Repeat Order">Repeat Order</SelectItem>
-            <SelectItem value="Dormant">Dormant</SelectItem>
-            <SelectItem value="Lost">Lost</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Select
-          value={nextWindow}
-          onValueChange={(v) => setNextWindow(v as NextWindow)}
-        >
-          <SelectTrigger className="h-8 w-[180px] text-xs">
-            <CalendarClock className="h-3.5 w-3.5" />
-            <SelectValue placeholder="Next action" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Semua next action</SelectItem>
-            <SelectItem value="overdue">Overdue</SelectItem>
-            <SelectItem value="today">Hari ini</SelectItem>
-            <SelectItem value="week">7 hari ke depan</SelectItem>
-            <SelectItem value="none">Tanpa next action</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      <PipelineFilterBar
+        role={role}
+        owner={owner}
+        onOwnerChange={setOwner}
+        status={status}
+        onStatusChange={setStatus}
+        nextWindow={nextWindow}
+        onNextWindowChange={setNextWindow}
+        salesTeam={salesTeam}
+      />
 
       {/* Analytics */}
       <PipelineAnalytics
@@ -492,357 +446,45 @@ function PipelineBoard({ role }: { role: Role }) {
       {/* Board -- more stage columns than fit most viewports; the edge
           fade hints at the horizontal scroll so it doesn't look like the
           board simply ends at "Commit". */}
-      <div className="relative">
-        <div className="flex gap-3 overflow-x-auto pb-3">
-          {STAGES.map((stage, stageIndex) => {
-            const query = stageQueries[stageIndex];
-            const col = (query.data?.rows ?? []).map(toCommercialItem);
-            const sum = col.reduce((s, it) => s + it.estimatedValue, 0);
-            const hasMore = query.data?.nextCursor !== null;
-            const isDropTarget = dragOverStage === stage && draggingId !== null;
-            return (
-              <div
-                key={stage}
-                data-testid="pipeline-column"
-                data-stage={stage}
-                onDragOver={(e) => {
-                  if (!canDrag || !draggingId) return;
-                  e.preventDefault();
-                  e.dataTransfer.dropEffect = "move";
-                  if (dragOverStage !== stage) setDragOverStage(stage);
-                }}
-                onDragLeave={(e) => {
-                  if (e.currentTarget.contains(e.relatedTarget as Node)) return;
-                  if (dragOverStage === stage) setDragOverStage(null);
-                }}
-                onDrop={(e) => {
-                  if (!canDrag) return;
-                  e.preventDefault();
-                  handleDrop(stage);
-                }}
-                className={cn(
-                  "flex w-[280px] shrink-0 flex-col rounded-lg border bg-muted/30 transition-colors",
-                  isDropTarget &&
-                    "border-primary bg-primary-soft/60 ring-2 ring-primary/30",
-                )}
-              >
-                <div className="flex items-center justify-between border-b bg-card px-3 py-2 rounded-t-lg">
-                  <div className="min-w-0">
-                    <p className="truncate text-xs font-semibold uppercase tracking-wide text-foreground">
-                      {stage}
-                    </p>
-                    <p className="text-[11px] text-muted-foreground tabular-nums">
-                      {col.length}
-                      {hasMore ? "+" : ""} · {formatRupiahShort(sum)}
-                    </p>
-                  </div>
-                  <span
-                    className={cn(
-                      "flex h-6 min-w-6 items-center justify-center rounded-full px-1.5 text-[11px] font-medium tabular-nums",
-                      stage === "Closed Lost"
-                        ? "bg-zinc-200 text-zinc-700"
-                        : "bg-primary-soft text-primary",
-                    )}
-                  >
-                    {col.length}
-                    {hasMore ? "+" : ""}
-                  </span>
-                </div>
+      <PipelineBoard
+        columns={stageColumns}
+        canDrag={canDrag}
+        canMoveItem={canMoveItem}
+        draggingId={draggingId}
+        dragOverStage={dragOverStage}
+        onDragOverStage={setDragOverStage}
+        onDraggingChange={setDraggingId}
+        clientById={clientById}
+        ownerById={ownerById}
+        nextByItem={nextByItem}
+        onDrop={(stage: CommercialStage) => handleDrop(stage)}
+        onLoadMore={(stage: CommercialStage) => loadMore(stage)}
+        onCardClick={setDrawerItemId}
+      />
 
-                <div className="flex flex-col gap-2 p-2 min-h-[80px]">
-                  {col.length === 0 ? (
-                    <div
-                      className={cn(
-                        "rounded-md border border-dashed py-6 text-center text-[11px] text-muted-foreground",
-                        isDropTarget && "border-primary text-primary",
-                      )}
-                    >
-                      {isDropTarget ? "Lepas di sini" : "Kosong"}
-                    </div>
-                  ) : (
-                    col.map((it) => {
-                      const client = clientById[it.clientId];
-                      const ownerName = ownerById[it.ownerId]?.name ?? "-";
-                      const next = nextByItem.get(it.id);
-                      const nextDays = next ? daysBetween(NOW, next) : null;
-                      const overdue = nextDays !== null && nextDays < 0;
-                      const today = nextDays === 0;
-                      const isDragging = draggingId === it.id;
-                      const canMoveThis = canMoveItem(it);
-                      return (
-                        <div
-                          key={it.id}
-                          data-testid="pipeline-card"
-                          data-commercial-document-id={it.id}
-                          draggable={canMoveThis}
-                          onDragStart={(e) => {
-                            if (!canMoveThis) return;
-                            setDraggingId(it.id);
-                            e.dataTransfer.effectAllowed = "move";
-                            e.dataTransfer.setData("text/plain", it.id);
-                          }}
-                          onDragEnd={() => {
-                            setDraggingId(null);
-                            setDragOverStage(null);
-                          }}
-                          onClick={() => setDrawerItemId(it.id)}
-                          role="button"
-                          tabIndex={0}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" || e.key === " ") {
-                              e.preventDefault();
-                              setDrawerItemId(it.id);
-                            }
-                          }}
-                          className={cn(
-                            "group relative flex flex-col gap-1.5 rounded-md border bg-card p-2.5 pl-6 shadow-sm transition-all hover:border-primary/50 hover:shadow-md",
-                            canMoveThis && "cursor-grab active:cursor-grabbing",
-                            !canMoveThis && "cursor-pointer",
-                            isDragging && "opacity-40",
-                          )}
-                        >
-                          {canMoveThis && (
-                            <GripVertical className="pointer-events-none absolute left-1 top-2.5 h-3.5 w-3.5 text-muted-foreground/50 group-hover:text-muted-foreground" />
-                          )}
-                          <div className="flex items-start justify-between gap-2">
-                            <p className="min-w-0 truncate text-[13px] font-medium text-foreground group-hover:text-primary">
-                              {client?.name ?? "-"}
-                            </p>
-                            <Badge
-                              variant="outline"
-                              className="shrink-0 px-1.5 py-0 text-[10px] font-normal"
-                            >
-                              {it.type}
-                            </Badge>
-                          </div>
-                          <p className="line-clamp-2 text-[11px] text-muted-foreground">
-                            {it.description}
-                          </p>
-                          <div className="flex items-center justify-between pt-0.5">
-                            <span className="text-[12px] font-semibold tabular-nums text-foreground">
-                              {formatRupiahShort(it.estimatedValue)}
-                            </span>
-                            {client && <StatusBadge status={client.status} />}
-                          </div>
-                          <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                            <span className="truncate">{ownerName}</span>
-                            {next ? (
-                              <span
-                                className={cn(
-                                  "tabular-nums",
-                                  overdue && "text-rose-600 font-medium",
-                                  today && "text-amber-700 font-medium",
-                                )}
-                              >
-                                {overdue
-                                  ? `overdue ${Math.abs(nextDays!)}h`
-                                  : today
-                                    ? "hari ini"
-                                    : formatDateShort(next)}
-                              </span>
-                            ) : (
-                              <span className="text-muted-foreground/70">
-                                no next action
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-
-                  {/* Load more button for stages with additional items */}
-                  {hasMore && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="mt-1 w-full text-xs text-muted-foreground"
-                      onClick={() => loadMore(stage)}
-                      disabled={query.isFetching}
-                    >
-                      <ChevronDown className="mr-1 h-3 w-3" />
-                      {query.isFetching ? "Memuat…" : "Muat lebih banyak"}
-                    </Button>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-        <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-background to-transparent" />
-      </div>
-
-      <Dialog
-        open={pendingMove !== null}
+      <PipelineStageMoveDialog
+        pendingMove={pendingMove}
+        pendingMoveItem={pendingMoveItem}
         onOpenChange={(v) => {
           if (!v) setPendingMove(null);
         }}
-      >
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Pindahkan pipeline stage</DialogTitle>
-            <DialogDescription>
-              Update stage dan next action untuk{" "}
-              <span className="font-medium text-foreground">
-                {pendingMove?.clientName}
-              </span>
-              .
-            </DialogDescription>
-          </DialogHeader>
-
-          {pendingMove && (
-            <div className="flex flex-col gap-4">
-              <div className="flex items-center gap-2 rounded-md border bg-muted/40 p-3 text-xs">
-                <span className="rounded-md border bg-background px-2 py-1 font-medium">
-                  {pendingMove.fromStage}
-                </span>
-                <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
-                <span className="rounded-md border border-primary/40 bg-primary-soft px-2 py-1 font-medium text-primary">
-                  {pendingMove.toStage}
-                </span>
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="next-action-text" className="text-xs">
-                  Next action
-                </Label>
-                <Input
-                  id="next-action-text"
-                  value={nextActionInput}
-                  onChange={(e) => setNextActionInput(e.target.value)}
-                  className="h-9 text-sm"
-                  placeholder="cth. Kirim revisi quotation"
-                />
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="next-action-date" className="text-xs">
-                  Next action date
-                </Label>
-                <Input
-                  id="next-action-date"
-                  type="date"
-                  value={nextDateInput}
-                  onChange={(e) => setNextDateInput(e.target.value)}
-                  className="h-9 text-sm"
-                />
-                <div className="flex flex-wrap gap-1.5 pt-1">
-                  {[
-                    { label: "Hari ini", days: 0 },
-                    { label: "+1 hari", days: 1 },
-                    { label: "+3 hari", days: 3 },
-                    { label: "+7 hari", days: 7 },
-                  ].map((p) => (
-                    <Button
-                      key={p.label}
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-7 px-2 text-[11px]"
-                      onClick={() => setNextDateInput(addDaysISO(NOW, p.days))}
-                    >
-                      {p.label}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-              {pendingMoveItem && (
-                <div className="grid gap-2 rounded-md border bg-muted/30 p-3">
-                  <Label className="text-xs">Task yang diprogress</Label>
-                  <Select
-                    value={taskMode}
-                    onValueChange={(value) =>
-                      setTaskMode(value as "existing_task" | "create_task")
-                    }
-                  >
-                    <SelectTrigger className="h-9">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="create_task">
-                        Buat Task baru
-                      </SelectItem>
-                      <SelectItem
-                        value="existing_task"
-                        disabled={
-                          activeCommercialTasks(tasks, pendingMoveItem.id)
-                            .length === 0
-                        }
-                      >
-                        Progress Task existing
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {taskMode === "existing_task" && (
-                    <Select value={taskIdInput} onValueChange={setTaskIdInput}>
-                      <SelectTrigger className="h-9">
-                        <SelectValue placeholder="Pilih Task aktif" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {activeCommercialTasks(tasks, pendingMoveItem.id).map(
-                          (task) => (
-                            <SelectItem key={task.id} value={task.id}>
-                              {task.title} · {task.dueDate}
-                            </SelectItem>
-                          ),
-                        )}
-                      </SelectContent>
-                    </Select>
-                  )}
-                </div>
-              )}
-              {collectsLostReason && (
-                <div className="grid gap-3 rounded-md border bg-muted/20 p-3">
-                  <div className="grid gap-1.5">
-                    <Label htmlFor="pipeline-lost-reason">
-                      Alasan closed lost
-                    </Label>
-                    <Select
-                      value={lostReason}
-                      onValueChange={(value) =>
-                        setLostReason(value as QuotationLostReason)
-                      }
-                    >
-                      <SelectTrigger id="pipeline-lost-reason">
-                        <SelectValue placeholder="Pilih alasan lost" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {QUOTATION_LOST_REASONS.map((reason) => (
-                          <SelectItem key={reason} value={reason}>
-                            {reason}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="grid gap-1.5">
-                    <Label htmlFor="pipeline-lost-reason-detail">
-                      Detail alasan
-                      {lostReason === "Lainnya" ? " (wajib)" : " (opsional)"}
-                    </Label>
-                    <Textarea
-                      id="pipeline-lost-reason-detail"
-                      value={lostReasonDetail}
-                      onChange={(event) =>
-                        setLostReasonDetail(event.target.value)
-                      }
-                      placeholder="Tambahkan konteks untuk analisis"
-                      className="min-h-20"
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setPendingMove(null)}>
-              Batal
-            </Button>
-            <Button onClick={() => void confirmMove()}>Konfirmasi</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        tasks={tasks}
+        nextActionInput={nextActionInput}
+        onNextActionInputChange={setNextActionInput}
+        nextDateInput={nextDateInput}
+        onNextDateInputChange={setNextDateInput}
+        taskMode={taskMode}
+        onTaskModeChange={setTaskMode}
+        taskIdInput={taskIdInput}
+        onTaskIdInputChange={setTaskIdInput}
+        collectsLostReason={collectsLostReason}
+        lostReason={lostReason}
+        onLostReasonChange={setLostReason}
+        lostReasonDetail={lostReasonDetail}
+        onLostReasonDetailChange={setLostReasonDetail}
+        onCancel={() => setPendingMove(null)}
+        onConfirm={() => void confirmMove()}
+      />
 
       <PipelineCardDrawer
         open={drawerItemId !== null}

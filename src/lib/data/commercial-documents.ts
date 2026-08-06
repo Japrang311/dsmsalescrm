@@ -199,7 +199,14 @@ export async function listCommercialDocumentsPage(input: {
 
   let query = supabase
     .from("commercial_documents")
-    .select("*, commercial_document_items(*)", { count: "exact" })
+    // clients!inner(status) is required for the .eq("clients.status", ...)
+    // filter below to work at all -- PostgREST 400s on a filter referencing
+    // an embedded resource that wasn't actually selected/joined. client_id
+    // is NOT NULL with an FK to clients, so the inner join never excludes a
+    // row that a plain select wouldn't have already included.
+    .select("*, commercial_document_items(*), clients!inner(status)", {
+      count: "exact",
+    })
     .neq("type", "RFQ")
     .is("deleted_at", null)
     // Bug fix: only current Quotation revisions on the Pipeline board

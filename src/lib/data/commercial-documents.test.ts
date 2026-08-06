@@ -346,4 +346,34 @@ describe("normalized commercial document adapter", () => {
 
     await supabase.auth.signOut();
   });
+
+  // Regression test: clientStatus filtered via .eq("clients.status", ...)
+  // on an embedded relation that was never actually selected -- PostgREST
+  // 400s on that, and the failed query silently degraded to an empty
+  // "has more" board column instead of surfacing an error. Fixed by
+  // embedding clients!inner(status) in the select.
+  test("listCommercialDocumentsPage() filters by client status without erroring", async () => {
+    const authClient = await signInAs(fixtures.manager);
+    const session = (await authClient.auth.getSession()).data.session!;
+    await supabase.auth.setSession({
+      access_token: session.access_token,
+      refresh_token: session.refresh_token,
+    });
+
+    const matching = await listCommercialDocumentsPage({
+      filters: { clientStatus: "Active Customer" },
+      page: { pageSize: 10 },
+    });
+    expect(matching.rows.length).toBeGreaterThan(0);
+
+    const nonMatching = await listCommercialDocumentsPage({
+      filters: { clientStatus: "Lost" },
+      page: { pageSize: 10, cursor: null },
+    });
+    expect(nonMatching.rows.some((row) => row.clientId === clientId)).toBe(
+      false,
+    );
+
+    await supabase.auth.signOut();
+  });
 });
