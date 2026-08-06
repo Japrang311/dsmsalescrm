@@ -2,7 +2,63 @@
 
 Context dump for continuing this work in another tool (Codex). Written 2026-07-18; Phase 11/12 status refreshed 2026-07-19; Phase 11 import-review reconciliation session added 2026-07-19; post-import UX/bugfix session added 2026-07-20; second 2026-07-20 session (pipeline permissions/FK bugfixes) added 2026-07-20; Client Detail/Client List real-data wiring session added 2026-07-21; remote-migration-push + data-restoration session added 2026-07-21; browser-verification + spending_ytd fix + SO edit audit trail session added 2026-07-21; unused-code cleanup + client database (company info/contacts) feature session added 2026-07-22; contact position + Client Detail product/description fixes + commercial item product-name migration reconciliation added 2026-07-22; dynamic per-month sales target UI/calculation update added 2026-07-22; soft-delete implementation, remote Supabase apply, and main/live push closeout added 2026-07-24; RFQ retirement and documentation refresh added 2026-07-25; Sales Task Control Loop spec approval and Phase 1-2 implementation (Tasks 46-52) added 2026-07-27; unified progress timeline Task 53/8 and Manager Team Exceptions Task 54/9 added 2026-07-27; visual design audit Phase 1 (critical usability/responsiveness fixes) added 2026-07-27; Executive exception detail and aggregate-only Task metrics Task 55/10 added 2026-07-27; Dashboard/TopBar consumer migration Task 56/11 added 2026-07-27; Reports consumer migration Task 57/12 added 2026-07-27; export migration Task 58/13 added 2026-07-27; Pipeline/Client Detail/commercial follow-up migration Task 59/14 added 2026-07-27; ownership/account lifecycle migration Task 60/15 added 2026-07-27; production deployment audit + RLS/security-advisor review + two security-hardening migrations added 2026-07-30; Stage 1/Stage 2 checklist closeout + Sentry source-map wiring + commercial Next FU fix (commit `7ae20aa`, pushed, CI green) + Stage 3 Pipeline-pagination brainstorming in progress added 2026-08-05.
 
-## HANDOFF — Stage 3 Activity Log pagination DONE and pushed (2026-08-06, read this first)
+## HANDOFF — Team Settings N+1 fixed + the deferred "Tim & Role" render bug SOLVED (2026-08-06, read this first)
+
+Latest state, ahead of everything below. Two Stage 3 checklist items done together: "Replace
+Team Settings N+1 with one set-returning RPC" and "Prove Team query count is constant as member
+count grows." Along the way, the previously-deferred production bug ("Settings → Tim & Role tab
+fails to render the member list, `e.from is not a function`", first observed 2026-08-05 during
+Pipeline pagination verification, owner said defer until Stage 1-4 all-green) got root-caused and
+fixed as a genuine side effect of this work — not chased separately.
+
+- **What was actually wrong** (two false starts before finding it — see below): Settings
+  (`src/routes/_app.settings.tsx`) passed `queryFn: listTeamMembers` and `queryFn:
+  getCurrentProfileId` directly to `useQuery`. Both functions have an optional first parameter
+  (`client: TeamSupabaseClient = realTeamClient`) used for test injection. React Query always
+  calls `queryFn` with a `QueryFunctionContext` argument — which silently overrode that default,
+  so `client` became the context object (no `.from`/`.rpc`/`.auth` methods) instead of the real
+  Supabase client. `getCurrentProfileId` had the identical bug, silently degrading
+  `currentProfileId` to `undefined` on **every** Settings page load for **every** role, not just
+  Team tab — it just never surfaced visibly because the fallback (`` `dev:${role}` ``) absorbed it.
+  Both call sites now wrap in an arrow function (`() => listTeamMembers()`).
+- **Two wrong hypotheses along the way, corrected in real time, worth remembering:** (1) First
+  guessed `admin_count_active_commercial_items`/`private.count_active_commercial_items` still
+  referenced the dropped `public.commercial_items` table — checked the *live* production function
+  definition via `pg_get_functiondef` and it was already correctly repointed to
+  `commercial_documents` back on 2026-07-19 (migration `20260719024024`). (2) Then reproduced
+  `listTeamMembers()` cleanly against local Supabase with zero errors, ruling out a data-shape
+  issue. The real cause only showed up by actually building and running the app (a throwaway
+  Playwright spec against a full `bun run build` + `vite preview`), which surfaced the exact
+  runtime error text. Lesson: for a UI-only render bug, reproduce it running the actual app before
+  trusting any migration-file archaeology.
+- `public.admin_team_summary()` (migration `20260806000000_add_admin_team_summary_rpc.sql`,
+  security definer, manager/executive/super_admin only): one query with LATERAL joins computing
+  every member's clients/tasks/active-commercial-items counts and latest admin `activity_log`
+  entry, replacing `listTeamMembers()`'s 1 + 4*N per-member round trips (was up to ~40 requests
+  for a small roster, unbounded growth beyond that).
+- **Also fixes a real, independent counting bug**: the active-commercial-items predicate (used to
+  decide a member's "active business" total) never picked up `deleted_at`/`is_current_revision`
+  filters after Quotation revisions and soft-delete existed on `commercial_documents` — so
+  superseded revisions and soft-deleted documents were counted as active. New integration test
+  (`supabase/tests/admin-team-summary.test.ts`) proves it: 1 active document counts, 3 siblings
+  (soft-deleted, superseded, terminal-stage) do not. **Deliberately not touched**: the
+  enforcement-side functions with the same stale predicate
+  (`private.transfer_active_ownership`, `private.account_reference_counts`/
+  `account_ownership_counts`, `private.delete_eligible_account`, all in
+  `20260718180929_add_account_lifecycle_functions.sql`, last redefined `20260719024024`) — those
+  gate actual deactivate/delete/transfer actions, a bigger and separate decision than fixing a
+  read-only summary display. Flag this to the owner as a follow-up if it matters.
+- Verification: typecheck clean, lint 0 errors, `bun run test` 552 pass / 0 fail (old
+  `team.test.ts` N+1-shape tests rewritten to match the single-RPC contract; new integration test
+  added), local `bun run test:e2e` 8/8 pass, plus a throwaway Playwright spec (deleted after use)
+  that reproduced the failure pre-fix and confirmed the Team tab renders all 7 local roster rows
+  with zero console errors post-fix.
+- Migration pushed to production `qhtfixgbcpcitokeryxb`; confirmed via `migration list --linked`
+  and a schema sanity query (RPC correctly rejects unauthenticated calls with
+  `ACTIVE_PRIVILEGED_ROLE_REQUIRED`, proving the RLS gate is live). Committed as `9d7e786`, CI run
+  `31057991392` — all 7 jobs pass.
+
+## HANDOFF — Stage 3 Activity Log pagination DONE and pushed (2026-08-06)
 
 Latest state, ahead of everything below. Stage 3 checklist item "Paginate Activity with server
 filters and stable order" — the last of the four data-pagination items (Clients, Pipeline, Sales
