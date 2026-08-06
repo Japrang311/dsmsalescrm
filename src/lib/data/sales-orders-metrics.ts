@@ -22,6 +22,7 @@ export type SalesOrdersMetrics = {
   prototypePaidValue: number;
   focCount: number;
   totalCount: number;
+  prototypePaidCount: number;
 };
 
 type SalesOrdersMetricsRow = {
@@ -32,6 +33,7 @@ type SalesOrdersMetricsRow = {
   prototype_paid_value: string;
   foc_count: string;
   total_count: string;
+  prototype_paid_count: string;
 };
 
 function isoDate(date: Date): string {
@@ -67,5 +69,6 @@ export async function getSalesOrdersMetrics(
     prototypePaidValue: Number(row?.prototype_paid_value ?? 0),
     focCount: Number(row?.foc_count ?? 0),
     totalCount: Number(row?.total_count ?? 0),
+    prototypePaidCount: Number(row?.prototype_paid_count ?? 0),
   };
 }
