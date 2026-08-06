@@ -106,17 +106,56 @@ describe("getPipelineMetrics", () => {
     );
   });
 
+  // A manager can legitimately filter by any owner (matches
+  // commercial_documents_select RLS: manager/executive/super_admin see
+  // every row). Re-authenticates as manager instead of reusing the sales
+  // session from beforeAll, since Sales is now forced to its own owner_id
+  // regardless of what it requests -- see the next test.
   test("filters by owner", async () => {
+    const managerClient = await signInAs(fixtures.manager);
+    const managerSession = (await managerClient.auth.getSession()).data
+      .session!;
+    await supabase.auth.setSession({
+      access_token: managerSession.access_token,
+      refresh_token: managerSession.refresh_token,
+    });
+
     const filtered = await getPipelineMetrics({ ownerId: fixtures.sales.id });
     const seeded = filtered.stages.find((s) => s.stage === "Quotes Sent");
     expect(seeded?.itemCount).toBeGreaterThanOrEqual(1);
 
     const otherOwner = await getPipelineMetrics({
-      ownerId: fixtures.manager.id,
+      ownerId: fixtures.executive.id,
     });
     const otherSeeded = otherOwner.stages.find(
       (s) => s.stage === "Quotes Sent",
     );
     expect(otherSeeded?.itemCount ?? 0).toBe(0);
+
+    // Restore the sales session the rest of the file's beforeAll/afterAll
+    // setup expects to still be active.
+    const salesClient = await signInAs(fixtures.sales);
+    const salesSession = (await salesClient.auth.getSession()).data.session!;
+    await supabase.auth.setSession({
+      access_token: salesSession.access_token,
+      refresh_token: salesSession.refresh_token,
+    });
+  });
+
+  // Security regression test: pipeline_metrics() is security definer and
+  // bypasses commercial_documents RLS, so it must replicate RLS's owner
+  // scoping itself instead of trusting the caller-supplied p_owner_id. A
+  // Sales-role caller passing someone else's ownerId must still only see
+  // their own book of business, not the requested owner's.
+  test("a Sales caller cannot see another owner's metrics by requesting a different ownerId", async () => {
+    const requestedAsSomeoneElse = await getPipelineMetrics({
+      ownerId: fixtures.manager.id,
+    });
+    const seeded = requestedAsSomeoneElse.stages.find(
+      (s) => s.stage === "Quotes Sent",
+    );
+    // Still sees their own seeded item (owner filter was forced back to
+    // themselves), not zero and not the manager's data.
+    expect(seeded?.itemCount).toBeGreaterThanOrEqual(1);
   });
 });

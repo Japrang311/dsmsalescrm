@@ -98,4 +98,37 @@ describe("getSalesOrdersMetrics", () => {
     expect(metrics.ppnValue).toBe(0);
     await supabase.auth.signOut();
   });
+
+  // Security regression test: sales_orders_metrics() is security definer and
+  // bypasses sales_orders RLS, so it must replicate RLS's owner scoping
+  // itself instead of trusting the caller-supplied p_owner_id/ownerId. Before
+  // this fix, a Sales caller omitting the owner filter (the default on the
+  // Sales Orders page's filter bar) got back company-wide totals.
+  test("a Sales caller omitting the owner filter still only sees their own totals, not company-wide", async () => {
+    await authenticateSales();
+    const noFilter = await getSalesOrdersMetrics({
+      from: new Date(2096, 3, 1),
+      to: new Date(2096, 3, 30),
+    });
+    const ownFilter = await getSalesOrdersMetrics({
+      from: new Date(2096, 3, 1),
+      to: new Date(2096, 3, 30),
+      ownerId: fixtures.sales.id,
+    });
+    expect(noFilter.totalCount).toBe(ownFilter.totalCount);
+    expect(noFilter.ppnValue).toBe(ownFilter.ppnValue);
+    await supabase.auth.signOut();
+  });
+
+  test("a Sales caller requesting another owner's id is still forced back to their own totals", async () => {
+    await authenticateSales();
+    const requestedAsSomeoneElse = await getSalesOrdersMetrics({
+      from: new Date(2096, 3, 1),
+      to: new Date(2096, 3, 30),
+      ownerId: fixtures.manager.id,
+    });
+    expect(requestedAsSomeoneElse.totalCount).toBeGreaterThanOrEqual(1);
+    expect(requestedAsSomeoneElse.ppnValue).toBeGreaterThanOrEqual(7_000);
+    await supabase.auth.signOut();
+  });
 });
