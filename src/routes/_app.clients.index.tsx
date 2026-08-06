@@ -155,13 +155,21 @@ function ClientListPage() {
 
   // Compute per-client PPN/Non-PPN/Spending YTD from real Sales Orders data
   // (client.spendingYtd is a raw stored column the Sheet import never
-  // populated — it's always 0/stale, so this recomputes it like ppn/nonPpn)
+  // populated — it's always 0/stale, so this recomputes it like ppn/nonPpn).
+  // Scoped to SOs whose owner_id matches the client's current owner, so a
+  // sum across one sales rep's client list matches their Dashboard/Reports
+  // revenue (which is attributed by SO owner, not by current client
+  // ownership) — a client that changed hands mid-year no longer drags a
+  // previous owner's closed deals into the new owner's total here.
   const enrichedRows = useMemo(() => {
     const rows = clientRowsPage.data?.rows ?? [];
     if (salesOrders.length === 0) return rows;
     return rows.map((row) => {
       const tax = revenueByTax(
-        salesOrders.filter((so) => so.clientId === row.client.id),
+        salesOrders.filter(
+          (so) =>
+            so.clientId === row.client.id && so.ownerId === row.client.ownerId,
+        ),
       );
       return {
         ...row,
