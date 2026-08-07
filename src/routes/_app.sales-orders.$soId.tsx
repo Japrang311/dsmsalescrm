@@ -181,6 +181,7 @@ function SalesOrderDetail() {
               clientId={so.clientId}
               ownerId={so.ownerId}
               customerPoNumber={so.customerPoNumber}
+              customerPoDate={so.customerPoDate}
               date={so.date}
               canEditOwner={role === "manager" || role === "super_admin"}
             />
@@ -229,6 +230,9 @@ function SalesOrderDetail() {
                 <span className="font-mono text-xs">
                   {so.customerPoNumber ?? "—"}
                 </span>
+              </Cell>
+              <Cell label="Tanggal PO Customer">
+                {so.customerPoDate ? formatDateShort(so.customerPoDate) : "—"}
               </Cell>
               <Cell label="Tipe SO">
                 {so.type}
@@ -377,6 +381,7 @@ function EditSalesOrderHeaderDialog({
   clientId,
   ownerId,
   customerPoNumber,
+  customerPoDate,
   date,
   canEditOwner,
 }: {
@@ -385,6 +390,7 @@ function EditSalesOrderHeaderDialog({
   clientId: string;
   ownerId: string;
   customerPoNumber: string | null;
+  customerPoDate: string | null;
   date: string;
   canEditOwner: boolean;
 }) {
@@ -395,6 +401,7 @@ function EditSalesOrderHeaderDialog({
   const [draftOwnerId, setDraftOwnerId] = useState(ownerId);
   const [draftSoNumber, setDraftSoNumber] = useState(soNumber);
   const [draftPo, setDraftPo] = useState(customerPoNumber ?? "");
+  const [draftPoDate, setDraftPoDate] = useState(customerPoDate ?? "");
   const [draftDate, setDraftDate] = useState(date);
   const [saving, setSaving] = useState(false);
 
@@ -413,6 +420,7 @@ function EditSalesOrderHeaderDialog({
     setDraftOwnerId(ownerId);
     setDraftSoNumber(soNumber);
     setDraftPo(customerPoNumber ?? "");
+    setDraftPoDate(customerPoDate ?? "");
     setDraftDate(date);
     setOpen(true);
   }
@@ -432,6 +440,7 @@ function EditSalesOrderHeaderDialog({
         clientId: draftClientId,
         ownerId: newOwnerId,
         customerPoNumber: draftPo,
+        customerPoDate: draftPoDate || null,
         date: draftDate,
       });
 
@@ -444,6 +453,8 @@ function EditSalesOrderHeaderDialog({
         if (newOwnerId !== ownerId) changes.push("Sales Owner diubah");
         if (draftPo !== (customerPoNumber ?? ""))
           changes.push("Customer PO diubah");
+        if (draftPoDate !== (customerPoDate ?? ""))
+          changes.push("Tanggal PO Customer diubah");
         if (draftDate !== date) changes.push(`Tanggal ${date} → ${draftDate}`);
         await logActivity({
           kind: "sales_order_header_change",
@@ -540,6 +551,17 @@ function EditSalesOrderHeaderDialog({
                 onChange={(e) => setDraftPo(e.target.value)}
                 placeholder="Nomor Customer PO"
               />
+            </div>
+            <div>
+              <Label>Tanggal PO Customer</Label>
+              <Input
+                type="date"
+                value={draftPoDate}
+                onChange={(e) => setDraftPoDate(e.target.value)}
+              />
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Opsional. Untuk analitik cycle-time Stage 4.
+              </p>
             </div>
             <div>
               <Label>Tanggal SO</Label>

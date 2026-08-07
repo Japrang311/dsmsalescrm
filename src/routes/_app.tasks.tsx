@@ -88,16 +88,19 @@ import {
   listOwners,
   listSalesTeamProfiles,
 } from "@/lib/data/clients";
-import {
-  listCommercialItems,
-  updateCommercialItem,
-  describeCommercialItemChanges,
-} from "@/lib/data/commercial-items";
+import { listCommercialItems } from "@/lib/data/commercial-items";
+import { transitionCommercialStage } from "@/lib/data/commercial-documents";
+import { buildExplicitFollowUpCommand } from "@/lib/follow-up-command";
+import { activeCommercialTasks } from "@/lib/data/task-relations";
 import { getCurrentActorId, logActivity } from "@/lib/data/activity-log";
 import { formatDateShort, formatRupiahShort } from "@/lib/format";
 import { TaskDetailDrawer } from "@/components/tasks/TaskDetailDrawer";
 import { CreateTaskDialog } from "@/components/tasks/CreateTaskDialog";
 import { CalendarIncompleteWarning } from "@/components/tasks/CalendarIncompleteWarning";
+import {
+  PipelineStageMoveDialog,
+  type PendingPipelineMove,
+} from "@/components/pipeline/PipelineStageMoveDialog";
 
 export const Route = createFileRoute("/_app/tasks")({
   head: () => ({
@@ -284,6 +287,20 @@ function TasksInboxPage() {
   );
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
+
+  // "Waiting PO" quick action -> Commit stage move. Stage 4 Task 4.3: this
+  // used to write stage + an unstructured activity_log row directly,
+  // bypassing transition_commercial_stage's structured event_data (broke
+  // Stage 4 funnel/dwell coverage for this path). Reuses the same
+  // confirmation dialog and RPC path Pipeline's drag-and-drop already uses.
+  const [waitingPoMove, setWaitingPoMove] =
+    useState<PendingPipelineMove | null>(null);
+  const [waitingPoNextAction, setWaitingPoNextAction] = useState("");
+  const [waitingPoNextDate, setWaitingPoNextDate] = useState("");
+  const [waitingPoTaskMode, setWaitingPoTaskMode] = useState<
+    "existing_task" | "create_task"
+  >("existing_task");
+  const [waitingPoTaskId, setWaitingPoTaskId] = useState("");
 
   // Completed/Archived are server-paginated in bounded pages, not a full
   // month's worth of history, so the month-grid Calendar view (which needs
@@ -688,7 +705,14 @@ function TasksInboxPage() {
     }
   };
 
-  const handleMoveWaitingPO = async (t: Task) => {
+  // "Waiting PO" isn't one of the 7 weighted stages (see
+  // commercial-stages.ts) — it's the old pre-refactor name for what's now
+  // "Commit", same mapping already applied to dashboard/report "waiting PO"
+  // figures elsewhere. Opens the same next-action confirmation dialog
+  // Pipeline's drag-and-drop uses, then moves through transition_commercial_
+  // stage so the structured stage-event gets written (see comment on
+  // waitingPoMove state above).
+  const handleMoveWaitingPO = (t: Task) => {
     if (!t.commercialItemId) {
       toast.error("Task ini belum terhubung ke commercial item");
       return;
@@ -698,35 +722,63 @@ function TasksInboxPage() {
       toast.error("Commercial item tidak ditemukan");
       return;
     }
+    const client = clientsById[ci.clientId];
+    setWaitingPoNextAction(`Follow-up stage Commit`);
+    setWaitingPoNextDate(toLocalIsoDate(NOW));
+    setWaitingPoTaskMode("existing_task");
+    setWaitingPoTaskId(t.id);
+    setWaitingPoMove({
+      itemId: ci.id,
+      fromStage: ci.stage,
+      toStage: "Commit",
+      clientName: client?.name ?? "-",
+      currentNext: t.dueDate,
+    });
+  };
+
+  async function confirmMoveWaitingPO() {
+    if (!waitingPoMove) return;
     try {
-      // "Waiting PO" isn't one of the 7 weighted stages (see
-      // commercial-stages.ts) — it's the old pre-refactor name for what's
-      // now "Commit", same mapping already applied to dashboard/report
-      // "waiting PO" figures elsewhere. Writing the old name here silently
-      // misrouted the card to the pipeline board's fallback column.
-      await updateCommercialItem(t.commercialItemId, { stage: "Commit" });
-      const changes = [{ field: "stage", from: ci.stage, to: "Commit" }];
-      const actorId = await getCurrentActorId();
-      if (actorId) {
-        await logActivity({
-          kind: "commercial_item_stage_change",
-          ownerId: ci.ownerId,
-          actorId,
-          clientId: ci.clientId,
-          commercialDocumentId: ci.id,
-          title: `${ci.description} diperbarui`,
-          detail: `${describeCommercialItemChanges(changes)} — dipindah dari task: ${t.title}`,
-        });
-      }
+      const command = buildExplicitFollowUpCommand(
+        waitingPoTaskMode === "existing_task"
+          ? { mode: "existing_task", taskId: waitingPoTaskId }
+          : {
+              mode: "create_task",
+              createTaskTitle: `Follow-up · ${waitingPoMove.clientName}`,
+              taskDueDate: waitingPoNextDate,
+            },
+        {
+          nextAction: waitingPoNextAction,
+          nextActionDate: waitingPoNextDate,
+          note: `Stage ${waitingPoMove.fromStage} → ${waitingPoMove.toStage} — dipindah dari Tasks Inbox`,
+          method: "Phone",
+          result: "Progress Update",
+          fuDate: toLocalIsoDate(NOW),
+        },
+      );
+      await transitionCommercialStage({
+        commercialDocumentId: waitingPoMove.itemId,
+        expectedFromStage: waitingPoMove.fromStage,
+        toStage: waitingPoMove.toStage,
+        ...command,
+      });
       await queryClient.invalidateQueries({ queryKey: ["commercial-items"] });
+      await queryClient.invalidateQueries({
+        queryKey: ["commercial-documents"],
+      });
+      await queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      await queryClient.invalidateQueries({ queryKey: ["follow-ups"] });
       await queryClient.invalidateQueries({ queryKey: ["activity-log"] });
-      toast.success("Commercial item → Commit", { description: t.title });
+      toast.success("Commercial item → Commit", {
+        description: waitingPoMove.clientName,
+      });
+      setWaitingPoMove(null);
     } catch (error) {
       toast.error("Gagal memindahkan commercial item", {
         description: error instanceof Error ? error.message : "Unknown error",
       });
     }
-  };
+  }
 
   // -------------------------- Bulk actions --------------------------
   // Looks up across activeTasks + whatever history pages are loaded, not
@@ -1250,6 +1302,29 @@ function TasksInboxPage() {
         task={openTask}
         open={openTaskId !== null}
         onOpenChange={(o) => !o && setOpenTaskId(null)}
+      />
+      <PipelineStageMoveDialog
+        pendingMove={waitingPoMove}
+        pendingMoveItem={
+          waitingPoMove ? commercialItemsById[waitingPoMove.itemId] : undefined
+        }
+        onOpenChange={(o) => !o && setWaitingPoMove(null)}
+        tasks={activeTasks}
+        nextActionInput={waitingPoNextAction}
+        onNextActionInputChange={setWaitingPoNextAction}
+        nextDateInput={waitingPoNextDate}
+        onNextDateInputChange={setWaitingPoNextDate}
+        taskMode={waitingPoTaskMode}
+        onTaskModeChange={setWaitingPoTaskMode}
+        taskIdInput={waitingPoTaskId}
+        onTaskIdInputChange={setWaitingPoTaskId}
+        collectsLostReason={false}
+        lostReason=""
+        onLostReasonChange={() => {}}
+        lostReasonDetail=""
+        onLostReasonDetailChange={() => {}}
+        onCancel={() => setWaitingPoMove(null)}
+        onConfirm={() => void confirmMoveWaitingPO()}
       />
 
       {selectedIdList.length > 0 && (

@@ -26,6 +26,29 @@ import {
   type SalesTeamMember,
 } from "@/lib/data/dashboard-selectors";
 import type { TaskControlLoopMetrics } from "@/lib/data/tasks";
+import type {
+  AnalyticsCoverage,
+  CycleTimeMetric,
+  LostReasonMetric,
+  StageDwellMetric,
+  StageFunnelMetric,
+  WinLossMetrics,
+} from "@/lib/data/stage4-analytics";
+
+// Stage 4 Task 4.6: optional so this context stays valid for Dashboard's
+// export (which never fetches these RPCs) -- exportExecutiveReportXlsx/Pdf
+// only add the new Stage 4 sheets/sections when this is present, so
+// Dashboard's export is byte-for-byte unaffected. Reports passes the exact
+// React Query results already rendered on screen, not a fresh fetch, so
+// the export always matches what the viewer just saw.
+export type Stage4ExportData = {
+  winLoss: WinLossMetrics;
+  lostReasons: LostReasonMetric[];
+  cycleTime: CycleTimeMetric[];
+  funnel: StageFunnelMetric[];
+  dwell: StageDwellMetric[];
+  coverage: AnalyticsCoverage[];
+};
 
 export type DashboardExportContext = {
   role: Role;
@@ -40,6 +63,7 @@ export type DashboardExportContext = {
   targetsByMember: TargetsByMember;
   companyTarget: MonthlyTarget[];
   taskMetrics?: TaskControlLoopMetrics;
+  stage4?: Stage4ExportData;
 };
 
 export function dashboardExportMonthlyTrend(context: DashboardExportContext) {

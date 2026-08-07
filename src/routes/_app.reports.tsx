@@ -35,6 +35,14 @@ import {
   getTopCustomers,
 } from "@/lib/data/sales-performance-metrics";
 import {
+  getAnalyticsCoverage,
+  getCycleTimeMetrics,
+  getLostReasonMetrics,
+  getStageDwellMetrics,
+  getStageFunnelMetrics,
+  getWinLossMetrics,
+} from "@/lib/data/stage4-analytics";
+import {
   ReportFilterBar,
   defaultReportFilters,
   type ReportFilters,
@@ -55,6 +63,9 @@ import { ReportsForecastSection } from "@/components/reports/ReportsForecastSect
 import { ReportsFunnelSection } from "@/components/reports/ReportsFunnelSection";
 import { ReportsPerformanceSection } from "@/components/reports/ReportsPerformanceSection";
 import { ReportsComplianceSection } from "@/components/reports/ReportsComplianceSection";
+import { Stage4WinLossSection } from "@/components/reports/Stage4WinLossSection";
+import { Stage4CycleTimeSection } from "@/components/reports/Stage4CycleTimeSection";
+import { Stage4FunnelDwellSection } from "@/components/reports/Stage4FunnelDwellSection";
 
 export const Route = createFileRoute("/_app/reports")({
   head: () => ({ meta: [{ title: "Executive Reports · DSM" }] }),
@@ -172,6 +183,54 @@ function ReportsPage() {
   const taskClientMetricsQuery = useQuery({
     queryKey: ["sales-task-client-metrics", "dashboard"],
     queryFn: () => getSalesTaskClientMetrics(),
+    enabled: authReady,
+  });
+
+  // Stage 4 Task 4.5 — Product intelligence. Same owner/date-range/client
+  // filter subset as the rest of Reports (metricsFilters), scoped server-
+  // side by the RPCs themselves (commercial_win_loss_metrics etc. force
+  // sales callers to their own owner_id). Dwell has no period filter (spec:
+  // dwell is about consecutive stage events, not bounded by a date range).
+  const stage4Filters = {
+    from: filters.range.from,
+    to: filters.range.to,
+    ownerId: filters.ownerId,
+    clientId: filters.clientId,
+  };
+  const winLossQuery = useQuery({
+    queryKey: ["stage4", "win-loss", "reports", stage4Filters],
+    queryFn: () => getWinLossMetrics(stage4Filters),
+    enabled: authReady,
+  });
+  const lostReasonQuery = useQuery({
+    queryKey: ["stage4", "lost-reason", "reports", stage4Filters],
+    queryFn: () => getLostReasonMetrics(stage4Filters),
+    enabled: authReady,
+  });
+  const cycleTimeQuery = useQuery({
+    queryKey: ["stage4", "cycle-time", "reports", stage4Filters],
+    queryFn: () => getCycleTimeMetrics(stage4Filters),
+    enabled: authReady,
+  });
+  const stageFunnelQuery = useQuery({
+    queryKey: ["stage4", "stage-funnel", "reports", stage4Filters],
+    queryFn: () => getStageFunnelMetrics(stage4Filters),
+    enabled: authReady,
+  });
+  const stageDwellQuery = useQuery({
+    queryKey: [
+      "stage4",
+      "stage-dwell",
+      "reports",
+      stage4Filters.ownerId,
+      stage4Filters.clientId,
+    ],
+    queryFn: () => getStageDwellMetrics(stage4Filters),
+    enabled: authReady,
+  });
+  const analyticsCoverageQuery = useQuery({
+    queryKey: ["stage4", "coverage", "reports", stage4Filters],
+    queryFn: () => getAnalyticsCoverage(stage4Filters),
     enabled: authReady,
   });
 
@@ -324,6 +383,40 @@ function ReportsPage() {
     [allTasks, allItems, clientList],
   );
 
+  // Stage 4 Task 4.6: reuses the exact React Query results already rendered
+  // in the Product Intelligence section above (same object, not a fresh
+  // fetch), so exported totals always match what's on screen. Only present
+  // once every underlying query has resolved -- exportContext otherwise
+  // omits `stage4` entirely, and the export functions treat that the same
+  // as "no Stage 4 data available" (skip those sheets/sections).
+  const stage4Export = useMemo(() => {
+    if (
+      !winLossQuery.data ||
+      !lostReasonQuery.data ||
+      !cycleTimeQuery.data ||
+      !stageFunnelQuery.data ||
+      !stageDwellQuery.data ||
+      !analyticsCoverageQuery.data
+    ) {
+      return undefined;
+    }
+    return {
+      winLoss: winLossQuery.data,
+      lostReasons: lostReasonQuery.data,
+      cycleTime: cycleTimeQuery.data,
+      funnel: stageFunnelQuery.data,
+      dwell: stageDwellQuery.data,
+      coverage: analyticsCoverageQuery.data,
+    };
+  }, [
+    winLossQuery.data,
+    lostReasonQuery.data,
+    cycleTimeQuery.data,
+    stageFunnelQuery.data,
+    stageDwellQuery.data,
+    analyticsCoverageQuery.data,
+  ]);
+
   const exportContext = useMemo<DashboardExportContext>(
     () => ({
       role,
@@ -338,6 +431,7 @@ function ReportsPage() {
       targetsByMember,
       companyTarget,
       taskMetrics,
+      stage4: stage4Export,
     }),
     [
       role,
@@ -351,6 +445,7 @@ function ReportsPage() {
       salesTeam,
       targetsByMember,
       companyTarget,
+      stage4Export,
       taskMetrics,
     ],
   );
@@ -403,7 +498,13 @@ function ReportsPage() {
     monthlyTrendQuery.isLoading ||
     ownerYtdQuery.isLoading ||
     topCustomersQuery.isLoading ||
-    taskClientMetricsQuery.isLoading
+    taskClientMetricsQuery.isLoading ||
+    winLossQuery.isLoading ||
+    lostReasonQuery.isLoading ||
+    cycleTimeQuery.isLoading ||
+    stageFunnelQuery.isLoading ||
+    stageDwellQuery.isLoading ||
+    analyticsCoverageQuery.isLoading
   ) {
     return (
       <div className="flex items-center justify-center rounded-lg border border-dashed py-16 text-sm text-muted-foreground">
@@ -501,6 +602,31 @@ function ReportsPage() {
         topCustomers={topCustomers}
         totalRevenue={totals.revenue}
         salesPerf={salesPerf}
+      />
+
+      {/* Stage 4: Product intelligence — win/loss, cycle-time, funnel, dwell */}
+      <div className="pt-1">
+        <h2 className="text-sm font-semibold tracking-tight text-foreground">
+          Product Intelligence
+        </h2>
+        <p className="text-[11px] text-muted-foreground">
+          Win/loss, cycle-time, dan stage funnel berbasis event terstruktur —
+          lihat catatan cakupan pada tiap kartu.
+        </p>
+      </div>
+      <Stage4WinLossSection
+        winLoss={winLossQuery.data}
+        lostReasons={lostReasonQuery.data ?? []}
+        coverage={analyticsCoverageQuery.data ?? []}
+      />
+      <Stage4CycleTimeSection
+        cycleTime={cycleTimeQuery.data ?? []}
+        coverage={analyticsCoverageQuery.data ?? []}
+      />
+      <Stage4FunnelDwellSection
+        funnel={stageFunnelQuery.data ?? []}
+        dwell={stageDwellQuery.data ?? []}
+        coverage={analyticsCoverageQuery.data ?? []}
       />
 
       {/* Compliance + Prototype + Alerts */}

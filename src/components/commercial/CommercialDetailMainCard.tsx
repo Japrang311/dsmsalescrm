@@ -25,7 +25,12 @@ import {
   type LineItemEdit,
 } from "@/components/commercial/CommercialDetailPrimitives";
 import { QUOTATION_LOST_REASONS } from "@/lib/data/quotation-lost-reasons";
-import type { Client, CommercialItem, QuotationLostReason } from "@/lib/domain";
+import type {
+  Client,
+  CommercialItem,
+  QuotationLostReason,
+  Task,
+} from "@/lib/domain";
 import type { OwnerLookup } from "@/lib/data/clients";
 
 export function CommercialDetailMainCard({
@@ -41,6 +46,16 @@ export function CommercialDetailMainCard({
   isClosedStage,
   stage,
   setStage,
+  stageChanged,
+  activeTasksForItem,
+  nextAction,
+  setNextAction,
+  nextActionDate,
+  setNextActionDate,
+  taskMode,
+  setTaskMode,
+  taskId,
+  setTaskId,
   lostReason,
   setLostReason,
   lostReasonDetail,
@@ -77,6 +92,16 @@ export function CommercialDetailMainCard({
   isClosedStage: boolean;
   stage: string;
   setStage: (value: string) => void;
+  stageChanged: boolean;
+  activeTasksForItem: Task[];
+  nextAction: string;
+  setNextAction: (value: string) => void;
+  nextActionDate: string;
+  setNextActionDate: (value: string) => void;
+  taskMode: "existing_task" | "create_task";
+  setTaskMode: (value: "existing_task" | "create_task") => void;
+  taskId: string;
+  setTaskId: (value: string) => void;
   lostReason: QuotationLostReason | "";
   setLostReason: (value: QuotationLostReason) => void;
   lostReasonDetail: string;
@@ -253,6 +278,77 @@ export function CommercialDetailMainCard({
             </span>
           </InfoCell>
         </div>
+
+        {canEdit && stageChanged && (
+          <div className="grid gap-3 rounded-md border border-primary/40 bg-primary-soft/40 p-3">
+            <p className="text-xs font-medium text-foreground">
+              Stage {item.stage} → {stage} akan dicatat sebagai transisi resmi —
+              isi next action untuk melanjutkan.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-1.5">
+                <Label htmlFor="detail-next-action" className="text-xs">
+                  Next action
+                </Label>
+                <Input
+                  id="detail-next-action"
+                  value={nextAction}
+                  onChange={(e) => setNextAction(e.target.value)}
+                  className="h-9 text-sm"
+                  placeholder="cth. Kirim revisi quotation"
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="detail-next-action-date" className="text-xs">
+                  Next action date
+                </Label>
+                <Input
+                  id="detail-next-action-date"
+                  type="date"
+                  value={nextActionDate}
+                  onChange={(e) => setNextActionDate(e.target.value)}
+                  className="h-9 text-sm"
+                />
+              </div>
+            </div>
+            <div className="grid gap-2">
+              <Label className="text-xs">Task yang diprogress</Label>
+              <Select
+                value={taskMode}
+                onValueChange={(value) =>
+                  setTaskMode(value as "existing_task" | "create_task")
+                }
+              >
+                <SelectTrigger className="h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="create_task">Buat Task baru</SelectItem>
+                  <SelectItem
+                    value="existing_task"
+                    disabled={activeTasksForItem.length === 0}
+                  >
+                    Progress Task existing
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              {taskMode === "existing_task" && (
+                <Select value={taskId} onValueChange={setTaskId}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder="Pilih Task aktif" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {activeTasksForItem.map((task) => (
+                      <SelectItem key={task.id} value={task.id}>
+                        {task.title} · {task.dueDate}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+          </div>
+        )}
 
         <Separator />
 

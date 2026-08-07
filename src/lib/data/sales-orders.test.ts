@@ -16,6 +16,7 @@ import {
   listSalesOrders,
   listSalesOrdersPage,
   restoreSalesOrder,
+  updateSalesOrderHeader,
 } from "./sales-orders";
 
 let fixtures: RoleFixtureUsers;
@@ -299,6 +300,54 @@ describe("normalized Sales Order adapter", () => {
       page: { pageSize: 50 },
     });
     expect(page.rows.some((row) => row.soNumber === soNumber)).toBe(true);
+    await supabase.auth.signOut();
+  });
+
+  // Stage 4 Task 4.2: customer_po_date is an optional, additive business
+  // milestone -- it must default to null (no inference from other dates)
+  // and be independently settable/clearable via the header patch.
+  test("customer_po_date defaults to null and can be set/cleared via header patch", async () => {
+    await authenticateSales();
+    const created = await createSalesOrder({
+      clientId,
+      date: "2096-06-01",
+      customerPoNumber: "PO-DATE-1",
+      type: "Regular",
+      taxType: "PPN",
+      source: "Existing / Repeat Order",
+      numberMode: "Manual",
+      manualSoNumber: "DSM-96SO951",
+      items: [
+        { productName: "PO date item", qty: 1, uom: "Pcs", unitPrice: 1_000 },
+      ],
+    });
+    expect(created.customerPoDate).toBeNull();
+
+    const withDate = await createSalesOrder({
+      clientId,
+      date: "2096-06-02",
+      customerPoNumber: "PO-DATE-2",
+      customerPoDate: "2096-05-20",
+      type: "Regular",
+      taxType: "PPN",
+      source: "Existing / Repeat Order",
+      numberMode: "Manual",
+      manualSoNumber: "DSM-96SO952",
+      items: [
+        { productName: "PO date item 2", qty: 1, uom: "Pcs", unitPrice: 1_000 },
+      ],
+    });
+    expect(withDate.customerPoDate).toBe("2096-05-20");
+
+    const updated = await updateSalesOrderHeader(created.id, {
+      customerPoDate: "2096-05-25",
+    });
+    expect(updated.customerPoDate).toBe("2096-05-25");
+
+    const cleared = await updateSalesOrderHeader(created.id, {
+      customerPoDate: null,
+    });
+    expect(cleared.customerPoDate).toBeNull();
     await supabase.auth.signOut();
   });
 });

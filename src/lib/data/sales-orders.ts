@@ -30,6 +30,7 @@ export type SalesOrderDocument = {
   id: string;
   soNumber: string;
   customerPoNumber: string | null;
+  customerPoDate: string | null;
   date: string;
   clientId: string;
   ownerId: string;
@@ -67,6 +68,7 @@ type SalesOrderRow = {
   id: string;
   so_number: string;
   customer_po_number: string | null;
+  customer_po_date: string | null;
   date: string;
   client_id: string;
   owner_id: string;
@@ -126,6 +128,7 @@ function toSalesOrder(row: SalesOrderRow): SalesOrderDocument {
     id: row.id,
     soNumber: row.so_number,
     customerPoNumber: row.customer_po_number,
+    customerPoDate: row.customer_po_date,
     date: row.date,
     clientId: row.client_id,
     ownerId: row.owner_id,
@@ -297,6 +300,7 @@ export type CreateSalesOrderInput = {
   clientId: string;
   date: string;
   customerPoNumber: string;
+  customerPoDate?: string;
   type: SoType;
   taxType?: TaxType;
   prototypeStatus?: PrototypeStatus;
@@ -327,6 +331,7 @@ export async function createSalesOrder(
     p_backdate_reason: backdateReason || null,
     p_items: input.items,
     p_source_commercial_document_id: input.sourceCommercialDocumentId ?? null,
+    p_customer_po_date: input.customerPoDate ?? null,
   });
   if (error) throw error;
   return toSalesOrder(data as SalesOrderRow);
@@ -351,6 +356,7 @@ export type UpdateSalesOrderHeaderInput = Partial<{
   clientId: string;
   ownerId: string;
   customerPoNumber: string;
+  customerPoDate: string | null;
   date: string;
 }>;
 
@@ -363,12 +369,14 @@ export async function updateSalesOrderHeader(
   id: string,
   patch: UpdateSalesOrderHeaderInput,
 ): Promise<SalesOrderDocument> {
-  const row: Record<string, string> = {};
+  const row: Record<string, string | null> = {};
   if (patch.soNumber !== undefined) row.so_number = patch.soNumber.trim();
   if (patch.clientId !== undefined) row.client_id = patch.clientId;
   if (patch.ownerId !== undefined) row.owner_id = patch.ownerId;
   if (patch.customerPoNumber !== undefined)
     row.customer_po_number = patch.customerPoNumber;
+  if (patch.customerPoDate !== undefined)
+    row.customer_po_date = patch.customerPoDate;
   if (patch.date !== undefined) row.date = patch.date;
 
   const { data, error } = await supabase

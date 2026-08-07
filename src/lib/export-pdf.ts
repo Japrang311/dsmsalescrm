@@ -278,6 +278,131 @@ function exportReportPdf(
     y = getLastY(doc) + 20;
   }
 
+  // ---- Stage 4: Product intelligence (new sections only when the caller
+  // supplies the RPC data; Dashboard's export never does, so this is a
+  // no-op there -- existing sections above are untouched either way) ----
+  if (context.stage4) {
+    const s4 = context.stage4;
+    y = section(doc, "Win/Loss & Lost Reasons", y);
+    autoTable(doc, {
+      ...tableDefaults(),
+      startY: y,
+      theme: "grid",
+      styles: { fontSize: 9, cellPadding: 5 },
+      head: [["Metric", "Count", "Value / Rate"]],
+      body: [
+        [
+          "Won",
+          String(s4.winLoss.wonCount),
+          formatRupiahShort(s4.winLoss.wonValue),
+        ],
+        [
+          "Lost",
+          String(s4.winLoss.lostCount),
+          formatRupiahShort(s4.winLoss.lostValue),
+        ],
+        [
+          "Win Rate",
+          String(s4.winLoss.terminalCount),
+          s4.winLoss.winRate === null
+            ? "n/a"
+            : formatPercent(s4.winLoss.winRate, 1),
+        ],
+      ],
+    });
+    y = getLastY(doc) + 12;
+    if (s4.lostReasons.length > 0) {
+      autoTable(doc, {
+        ...tableDefaults(),
+        startY: y,
+        theme: "striped",
+        styles: { fontSize: 8.5, cellPadding: 5 },
+        head: [["Lost Reason", "Count", "Value"]],
+        body: s4.lostReasons.map((r) => [
+          r.lostReason,
+          String(r.lostCount),
+          formatRupiahShort(r.lostValue),
+        ]),
+      });
+      y = getLastY(doc) + 20;
+    }
+
+    const legLabel: Record<string, string> = {
+      quote_to_po: "Quote -> Customer PO",
+      po_to_so: "Customer PO -> Sales Order",
+      quote_to_so: "Quote -> Sales Order (end-to-end)",
+    };
+    y = section(doc, "Cycle-Time Distribution", y);
+    autoTable(doc, {
+      ...tableDefaults(),
+      startY: y,
+      theme: "grid",
+      styles: { fontSize: 8.5, cellPadding: 5 },
+      head: [["Leg", "Median", "P75", "P90", "Included", "Excluded"]],
+      body: s4.cycleTime.map((c) => [
+        legLabel[c.leg] ?? c.leg,
+        c.medianDays === null ? "n/a" : `${c.medianDays.toFixed(1)}h`,
+        c.p75Days === null ? "n/a" : `${c.p75Days.toFixed(1)}h`,
+        c.p90Days === null ? "n/a" : `${c.p90Days.toFixed(1)}h`,
+        String(c.includedCount),
+        String(c.excludedCount),
+      ]),
+    });
+    y = getLastY(doc) + 20;
+
+    y = section(doc, "Stage-Entry Funnel & Dwell Time", y);
+    const dwellByStage = Object.fromEntries(s4.dwell.map((d) => [d.stage, d]));
+    autoTable(doc, {
+      ...tableDefaults(),
+      startY: y,
+      theme: "grid",
+      styles: { fontSize: 8.5, cellPadding: 5 },
+      head: [
+        ["Stage", "Entered", "Completed Dwell (median)", "Open Dwell (median)"],
+      ],
+      body: s4.funnel.map((f) => {
+        const d = dwellByStage[f.stage];
+        return [
+          f.stage,
+          String(f.enteredCount),
+          d?.completedMedianDays == null
+            ? "n/a"
+            : `${d.completedMedianDays.toFixed(1)}h (${d.completedCount})`,
+          d?.openMedianDays == null
+            ? "n/a"
+            : `${d.openMedianDays.toFixed(1)}h (${d.openCount})`,
+        ];
+      }),
+    });
+    y = getLastY(doc) + 20;
+
+    y = section(doc, "Data Quality / Coverage", y);
+    autoTable(doc, {
+      ...tableDefaults(),
+      startY: y,
+      theme: "striped",
+      styles: { fontSize: 8, cellPadding: 5, overflow: "linebreak" },
+      columnStyles: { 4: { cellWidth: 160 } },
+      head: [
+        [
+          "Metric",
+          "Effective From",
+          "Included",
+          "Excluded",
+          "Exclusion Reason",
+        ],
+      ],
+      body: s4.coverage.map((c) => [
+        c.metricName,
+        c.effectiveFrom ?? "n/a (semua histori)",
+        String(c.includedCount),
+        String(c.excludedCount),
+        c.exclusionReason ?? "-",
+      ]),
+    });
+    y = getLastY(doc) + 20;
+  }
+
   // Footer on every page
   const pageCount = doc.getNumberOfPages();
   for (let p = 1; p <= pageCount; p++) {

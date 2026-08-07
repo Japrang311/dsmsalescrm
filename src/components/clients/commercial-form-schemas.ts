@@ -59,6 +59,11 @@ export function buildSalesOrderSchema(isHariffClient: boolean) {
         .trim()
         .min(1, "Nomor PO Customer wajib diisi")
         .max(80),
+      // Optional business milestone date (Stage 4): when the Customer PO
+      // actually landed, separate from customerPoNumber and from the SO's
+      // own document date. Left empty, cycle-time analytics simply exclude
+      // this order rather than treating it as zero days.
+      customerPoDate: z.string().optional(),
       date: z.string().min(10, "Date wajib diisi"),
       type: z.enum(["Regular", "Prototype"]),
       taxType: z.enum(["PPN", "Non-PPN"]).optional(),

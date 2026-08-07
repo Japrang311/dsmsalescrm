@@ -6,7 +6,7 @@ import { formatRupiahFull, daysBetween } from "@/lib/format";
 import { stagesForFlow } from "@/lib/business-rules";
 import type { CommercialItem, QuotationLostReason } from "@/lib/domain";
 import { useRole } from "@/context/role-context";
-import { NOW } from "@/lib/domain";
+import { NOW, toLocalIsoDate } from "@/lib/domain";
 import { canManageSoftDeletedRecord } from "@/components/commercial/soft-delete-controls";
 import { CommercialDetailHeader } from "@/components/commercial/CommercialDetailHeader";
 import { CommercialDetailMainCard } from "@/components/commercial/CommercialDetailMainCard";
@@ -20,12 +20,17 @@ import {
 import {
   deleteCommercialDocument,
   updateCommercialDocumentLineItem,
+  transitionCommercialStage,
 } from "@/lib/data/commercial-documents";
+import { buildExplicitFollowUpCommand } from "@/lib/follow-up-command";
 import { documentNumberExample } from "@/lib/data/document-numbering";
 import { listClients, listOwners } from "@/lib/data/clients";
 import { listTasks } from "@/lib/data/tasks";
 import { listSalesOrders } from "@/lib/data/sales-orders";
-import { commercialRelatedTasks } from "@/lib/data/task-relations";
+import {
+  commercialRelatedTasks,
+  activeCommercialTasks,
+} from "@/lib/data/task-relations";
 import {
   getCurrentActorId,
   listCommercialItemHistory,
@@ -162,6 +167,18 @@ export function CommercialDetailPage({
   const [lostReasonDetail, setLostReasonDetail] = useState(
     item?.lostReasonDetail ?? "",
   );
+  // Stage 4 Task 4.3: a stage change made through this form must produce the
+  // same structured activity_log event transition_commercial_stage writes
+  // everywhere else (Pipeline drag-and-drop, Tasks quick action), not a
+  // plain field-diff log entry — otherwise Stage 4 funnel/dwell metrics
+  // silently miss it. Next action/task fields only matter when stage
+  // actually differs from item.stage; see handleStageChange below.
+  const [nextAction, setNextAction] = useState("");
+  const [nextActionDate, setNextActionDate] = useState("");
+  const [taskMode, setTaskMode] = useState<"existing_task" | "create_task">(
+    "create_task",
+  );
+  const [taskId, setTaskId] = useState("");
 
   useEffect(() => {
     if (!item) return;
@@ -186,6 +203,10 @@ export function CommercialDetailPage({
     setQtyReason("");
     setLostReason(item.lostReason ?? "");
     setLostReasonDetail(item.lostReasonDetail ?? "");
+    setNextAction("");
+    setNextActionDate("");
+    setTaskMode("create_task");
+    setTaskId("");
   }, [item]);
 
   if (!authReady) {
@@ -215,6 +236,26 @@ export function CommercialDetailPage({
   const signerProfile = currentUserId ? owners[currentUserId] : undefined;
   const stages = stagesForFlow(item.sourceFlow);
   const relatedTasks = commercialRelatedTasks(allTasks, item.id);
+  const activeTasksForItem = activeCommercialTasks(allTasks, item.id);
+  const stageChanged = stage !== item.stage;
+
+  // Prefills next-action defaults the moment the user actually picks a
+  // different stage, mirroring Pipeline's handleDrop — the panel only
+  // appears once stageChanged is true, so these values are moot otherwise.
+  const currentItemStage = item.stage;
+  function handleStageChange(next: string) {
+    setStage(next);
+    if (next === currentItemStage) return;
+    setNextAction(`Follow-up stage ${next}`);
+    setNextActionDate(toLocalIsoDate(NOW));
+    if (activeTasksForItem.length > 0) {
+      setTaskMode("existing_task");
+      setTaskId(activeTasksForItem[0].id);
+    } else {
+      setTaskMode("create_task");
+      setTaskId("");
+    }
+  }
   // Sales Orders don't exist yet (Phase 5) — shown as an honest "not
   // available yet" placeholder below rather than mock SALES_ORDERS data.
   const canEdit = canManageSoftDeletedRecord(role, item.ownerId, currentUserId);
@@ -307,16 +348,21 @@ export function CommercialDetailPage({
         from: item.note,
         to: normalizedNote || undefined,
       });
-    if (stage !== item.stage)
-      changes.push({ field: "stage", from: item.stage, to: stage });
-    if (reasonPatch.lostReason !== (item.lostReason ?? null)) {
+    // A real stage change goes through transitionCommercialStage below,
+    // which writes its own structured commercial_item_stage_change event
+    // (with lost reason on that same atomic call) — not folded into this
+    // plain field-diff log, to avoid a duplicate/conflicting entry.
+    if (!stageChanged && reasonPatch.lostReason !== (item.lostReason ?? null)) {
       changes.push({
         field: "lostReason",
         from: item.lostReason,
         to: reasonPatch.lostReason ?? undefined,
       });
     }
-    if (reasonPatch.lostReasonDetail !== (item.lostReasonDetail ?? null)) {
+    if (
+      !stageChanged &&
+      reasonPatch.lostReasonDetail !== (item.lostReasonDetail ?? null)
+    ) {
       changes.push({
         field: "lostReasonDetail",
         from: item.lostReasonDetail,
@@ -358,7 +404,7 @@ export function CommercialDetailPage({
       }
     }
 
-    if (changes.length === 0) {
+    if (!stageChanged && changes.length === 0) {
       toast.info("Tidak ada perubahan");
       return;
     }
@@ -402,6 +448,49 @@ export function CommercialDetailPage({
     }
 
     try {
+      if (stageChanged) {
+        const command = buildExplicitFollowUpCommand(
+          taskMode === "existing_task"
+            ? { mode: "existing_task", taskId }
+            : {
+                mode: "create_task",
+                createTaskTitle: `Follow-up · ${item.type} — ${client?.name ?? "Klien"}`,
+                taskDueDate: nextActionDate,
+              },
+          {
+            nextAction,
+            nextActionDate,
+            note: [
+              `Stage ${item.stage} → ${stage} — dikoreksi dari Detail ${item.type}`,
+              isLostReasonTracked(item.type, stage)
+                ? `Alasan lost: ${reasonPatch.lostReason}${
+                    reasonPatch.lostReasonDetail
+                      ? ` — ${reasonPatch.lostReasonDetail}`
+                      : ""
+                  }`
+                : null,
+            ]
+              .filter(Boolean)
+              .join("\n"),
+            method: "Phone",
+            result: "Progress Update",
+            fuDate: toLocalIsoDate(NOW),
+          },
+        );
+        await transitionCommercialStage({
+          commercialDocumentId: item.id,
+          expectedFromStage: item.stage,
+          toStage: stage,
+          lostReason: isLostReasonTracked(item.type, stage)
+            ? reasonPatch.lostReason
+            : null,
+          lostReasonDetail: isLostReasonTracked(item.type, stage)
+            ? reasonPatch.lostReasonDetail
+            : null,
+          ...command,
+        });
+      }
+
       for (const change of lineChanges) {
         await updateCommercialDocumentLineItem(change.line.id, {
           qty: change.qty,
@@ -409,7 +498,7 @@ export function CommercialDetailPage({
           lineTotal: isFoc ? null : change.qty * change.unitPrice,
         });
       }
-      const headerChanged =
+      const otherHeaderChanged =
         (item.type === "Quotation" &&
           normalizedQuotation !== (item.quotationNumber ?? "")) ||
         (item.type === "Quotation" &&
@@ -417,10 +506,10 @@ export function CommercialDetailPage({
         (item.type === "Quotation" &&
           normalizedExpiredDate !== (item.quotationExpiredDate ?? "")) ||
         (item.type === "Quotation" && normalizedNote !== (item.note ?? "")) ||
-        stage !== item.stage ||
-        reasonPatch.lostReason !== (item.lostReason ?? null) ||
-        reasonPatch.lostReasonDetail !== (item.lostReasonDetail ?? null);
-      if (headerChanged) {
+        (!stageChanged &&
+          (reasonPatch.lostReason !== (item.lostReason ?? null) ||
+            reasonPatch.lostReasonDetail !== (item.lostReasonDetail ?? null)));
+      if (otherHeaderChanged) {
         await updateCommercialItem(item.id, {
           quotationNumber:
             item.type === "Quotation" &&
@@ -447,46 +536,57 @@ export function CommercialDetailPage({
             item.type === "Quotation" && normalizedNote !== (item.note ?? "")
               ? normalizedNote
               : undefined,
-          stage: stage !== item.stage ? stage : undefined,
-          lostReason: reasonPatch.lostReason,
-          lostReasonDetail: reasonPatch.lostReasonDetail,
+          lostReason: stageChanged ? undefined : reasonPatch.lostReason,
+          lostReasonDetail: stageChanged
+            ? undefined
+            : reasonPatch.lostReasonDetail,
         });
       }
-      const actorId = await getCurrentActorId();
-      if (actorId) {
-        const reasonLines = [
-          hasPriceChanges
-            ? `Alasan harga: ${
-                priceReasonType === "Lainnya"
-                  ? priceReasonOther.trim()
-                  : priceReasonType
-              }`
-            : null,
-          hasQtyChanges ? `Alasan qty: ${qtyReason.trim()}` : null,
-          isLostReasonTracked(item.type, stage)
-            ? `Alasan lost: ${reasonPatch.lostReason}${
-                reasonPatch.lostReasonDetail
-                  ? ` — ${reasonPatch.lostReasonDetail}`
-                  : ""
-              }`
-            : null,
-        ].filter(Boolean);
-        await logActivity({
-          kind: "commercial_item_stage_change",
-          ownerId: item.ownerId,
-          actorId,
-          clientId: item.clientId,
-          commercialDocumentId: item.id,
-          title: `${item.description} diperbarui`,
-          detail: [describeCommercialItemChanges(changes), ...reasonLines].join(
-            "\n",
-          ),
-        });
+      if (changes.length > 0) {
+        const actorId = await getCurrentActorId();
+        if (actorId) {
+          const reasonLines = [
+            hasPriceChanges
+              ? `Alasan harga: ${
+                  priceReasonType === "Lainnya"
+                    ? priceReasonOther.trim()
+                    : priceReasonType
+                }`
+              : null,
+            hasQtyChanges ? `Alasan qty: ${qtyReason.trim()}` : null,
+            !stageChanged && isLostReasonTracked(item.type, stage)
+              ? `Alasan lost: ${reasonPatch.lostReason}${
+                  reasonPatch.lostReasonDetail
+                    ? ` — ${reasonPatch.lostReasonDetail}`
+                    : ""
+                }`
+              : null,
+          ].filter(Boolean);
+          await logActivity({
+            kind: "commercial_item_stage_change",
+            ownerId: item.ownerId,
+            actorId,
+            clientId: item.clientId,
+            commercialDocumentId: item.id,
+            title: `${item.description} diperbarui`,
+            detail: [
+              describeCommercialItemChanges(changes),
+              ...reasonLines,
+            ].join("\n"),
+          });
+        }
       }
       await queryClient.invalidateQueries({ queryKey: ["commercial-items"] });
+      await queryClient.invalidateQueries({
+        queryKey: ["commercial-documents"],
+      });
+      await queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      await queryClient.invalidateQueries({ queryKey: ["follow-ups"] });
       await queryClient.invalidateQueries({ queryKey: ["activity-log"] });
       toast.success("Perubahan tersimpan", {
-        description: `${changes.length} field diperbarui`,
+        description: stageChanged
+          ? `Stage → ${stage}${changes.length > 0 ? ` · ${changes.length} field lain` : ""}`
+          : `${changes.length} field diperbarui`,
       });
     } catch (error) {
       toast.error("Gagal menyimpan perubahan", {
@@ -546,7 +646,17 @@ export function CommercialDetailPage({
           canEditLineItems={canEditLineItems}
           isClosedStage={isClosedStage}
           stage={stage}
-          setStage={setStage}
+          setStage={handleStageChange}
+          stageChanged={stageChanged}
+          activeTasksForItem={activeTasksForItem}
+          nextAction={nextAction}
+          setNextAction={setNextAction}
+          nextActionDate={nextActionDate}
+          setNextActionDate={setNextActionDate}
+          taskMode={taskMode}
+          setTaskMode={setTaskMode}
+          taskId={taskId}
+          setTaskId={setTaskId}
           lostReason={lostReason}
           setLostReason={setLostReason}
           lostReasonDetail={lostReasonDetail}

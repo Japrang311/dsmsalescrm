@@ -450,6 +450,7 @@ export function CreateSalesOrderDialog(props: CreateSalesOrderDialogProps) {
     resolver: zodResolver(buildSalesOrderSchema(isHariffClient)),
     defaultValues: {
       customerPoNumber: "",
+      customerPoDate: "",
       type: "Regular",
       taxType: "PPN",
       prototypeStatus: undefined,
@@ -479,6 +480,7 @@ export function CreateSalesOrderDialog(props: CreateSalesOrderDialogProps) {
         clientId,
         date: v.date,
         customerPoNumber: v.customerPoNumber,
+        customerPoDate: v.customerPoDate || undefined,
         type: v.type,
         taxType: foc ? undefined : v.taxType,
         prototypeStatus: v.prototypeStatus,
@@ -581,6 +583,13 @@ export function CreateSalesOrderDialog(props: CreateSalesOrderDialogProps) {
                 label="Nomor PO Customer"
                 reg={form.register("customerPoNumber")}
                 error={msg(form.formState.errors, "customerPoNumber")}
+              />
+              <FieldText
+                label="Tanggal PO Customer"
+                description="Opsional. Tanggal PO diterima dari klien, untuk analitik cycle-time."
+                type="date"
+                reg={form.register("customerPoDate")}
+                error={msg(form.formState.errors, "customerPoDate")}
               />
               <FieldSelect
                 label="Tipe SO"
