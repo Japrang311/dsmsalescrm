@@ -1,7 +1,7 @@
 # Stage 3 — Data and Performance: Laporan Before/After
 
 **Tanggal:** 2026-08-07
-**Status:** Draft, nunggu review owner (checklist item "Review dated Stage 3 before/after report").
+**Status:** Direview dan dikonfirmasi owner 2026-08-07. Stage 3 selesai.
 **Cakupan:** semua yang ada di "Stage 3 — Data and performance" di `tasks/four-stage-stabilization-and-growth-todo.md`, 2026-08-05 sampai 2026-08-07.
 
 ## Masalah yang mau dibenerin Stage 3
@@ -71,14 +71,14 @@ Tooling baru khusus lokal (`scripts/seed-performance-fixture.ts`, `scripts/stage
 - Dashboard dan Reports baca dari RPC yang sama, jadi nunjukin angka yang sama buat fakta yang sama, by construction, bukan kebetulan.
 - Fixture scale-benchmark ngasih cara yang bisa diulang, lokal, non-production buat nangkep regresi ke unbounded fetch di masa depan sebelum nyampe ke volume data production yang bakal bikin diam-diam salah.
 - Sembilan migrasi diterapkan ke production (`qhtfixgbcpcitokeryxb`) sepanjang stage ini, masing-masing dengan approval eksplisit yang nyebutin target itu; tiap migrasi yang nambahin RPC punya test rekonsiliasi dan (kalau relevan) verifikasi browser langsung di production yang tercatat di entry todo bertanggal yang diringkas laporan ini.
+- Performance budget dari `2026-08-07-stage-3-performance-budgets-proposal.md` disetujui owner dan ditegakkan otomatis: job `performance_budget` baru di `.github/workflows/ci.yml` muat fixture sintetis (`bun run stage3:fixture`) lalu jalanin `bun run stage3:check-budgets` di tiap PR/push ke `main`, gagalin build kalau median/max/payload salah satu dari 9 kontrak kebobolan. Definisi query dipakai bareng sama `stage3-scale-benchmark.ts` lewat `scripts/lib/stage3-benchmark-queries.ts` biar dua-duanya gak melenceng satu sama lain.
 
 ## Yang belum dicakup Stage 3 (ditunda, dilacak terpisah)
 
-- Enforcement performance budget formal — lihat `2026-08-07-stage-3-performance-budgets-proposal.md`, dokumen approval terpisah yang masih nunggu keputusan.
 - Stage 4 (product intelligence: aggregate win/loss, metrik funnel/cycle-time) — belum dimulai.
 - Bug batas bulan UTC `monthlyRevenueTrendInRange` di route Reports yang ke-flag sesi ini (`task_e57ef088`) — di luar scope Stage 3, dilacak sebagai background task sendiri.
 
 ## Yang butuh review kamu
 
-- [ ] Konfirmasi ringkasan ini cocok sama pemahaman kamu soal apa yang udah jalan.
-- [ ] Konfirmasi gak butuh verifikasi before/after lagi sebelum Stage 3 dianggap selesai (nunggu keputusan performance-budget di atas).
+- [x] Konfirmasi ringkasan ini cocok sama pemahaman kamu soal apa yang udah jalan. **Dikonfirmasi 2026-08-07.**
+- [x] Konfirmasi Stage 3 dianggap selesai (semua item checklist tercentang, performance budget udah disetujui dan ditegakkan otomatis di CI). **Dikonfirmasi 2026-08-07.**
