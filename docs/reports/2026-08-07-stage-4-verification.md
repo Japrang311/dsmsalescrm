@@ -61,7 +61,8 @@ Diverifikasi live browser pakai data seed produksi asli (bukan sintetis): Win/Lo
 - Dua bug nyata (structured-event bypass) ketemu dan dibenerin sebagai bagian dari audit Task 4.3 — sebelumnya gak ada yang notice karena efeknya diam-diam (data hilang dari agregat, bukan error).
 - Setiap chart Stage 4 nunjukin cakupannya sendiri secara eksplisit — kalau datanya belum lengkap, itu kelihatan di layar, bukan disembunyikan di balik angka yang salah.
 - Typecheck dan lint bersih di setiap langkah. Test suite lokal 585/586 (kadang 583–585 tergantung run) — satu-satunya kegagalan konsisten adalah flake infra GoTrue lokal (500 di admin `deleteUser` pas cleanup test, gara-gara container lokal kebanyakan di-restart dalam sesi panjang ini) yang udah direproduksi dan didiagnosis berulang kali, sama sekali gak berhubungan sama perubahan Stage 4 manapun — dikonfirmasi dengan menjalankan ulang test yang gagal secara terisolasi (selalu hijau) dan dengan membuktikan root cause-nya (row fixture nyangkut dari cleanup yang gagal, bukan logic RPC/UI).
-- Migrasi lokal-only. **Belum ada yang di-push ke production** (`qhtfixgbcpcitokeryxb`) — beda dari Stage 3, migrasi Stage 4 belum diajukan buat approval remote.
+- Kedua migration (`add_sales_order_customer_po_date`, `add_stage4_analytics_rpcs`) diterapkan ke production Supabase (`qhtfixgbcpcitokeryxb`) 2026-08-07 dengan approval eksplisit owner. Diverifikasi lewat MCP: `list_migrations` nunjukin keduanya terdaftar, kolom `sales_orders.customer_po_date` (date, nullable) ada, keenam RPC ada dengan jumlah argumen yang sesuai. `get_advisors` (security + performance) dicek — cuma warning "signed-in dapat eksekusi SECURITY DEFINER" yang sama kayak semua RPC metrics Stage 3 lainnya (accepted class, bukan risiko baru), performance advisories semuanya pre-existing di tabel/kolom lama, gak nyentuh apapun yang baru ditambahkan.
+- **Kode aplikasi (frontend) belum di-push ke `main`.** Push ditahan sengaja sampai owner konfirmasi — begitu di-push, Vercel auto-deploy ke production. Urutan migration-dulu-baru-push ini sengaja dipilih supaya `create_sales_order` (yang signature-nya berubah) gak pernah dipanggil dari kode lama yang gak cocok sama database baru, atau sebaliknya.
 
 ## Yang belum dicakup / catatan
 
@@ -72,5 +73,6 @@ Diverifikasi live browser pakai data seed produksi asli (bukan sintetis): Win/Lo
 ## Yang butuh review kamu
 
 - [ ] Konfirmasi ringkasan ini cocok sama pemahaman kamu soal apa yang udah jalan.
-- [ ] Approve migrasi Stage 4 (`20260807040000`, `20260807060000`) buat diterapkan ke production `qhtfixgbcpcitokeryxb` — atau tahan dulu sampai program completion checkpoint.
+- [x] Approve migrasi Stage 4 (`20260807040000`/`add_sales_order_customer_po_date`, `20260807060000`/`add_stage4_analytics_rpcs`) buat diterapkan ke production `qhtfixgbcpcitokeryxb`. **Diterapkan 2026-08-07** — lihat "Hasil bersihnya" di atas.
+- [ ] Approve push commit `5960c14` ke `main` (auto-deploy Vercel production) — migration remote udah siap duluan, jadi aman kapan pun mau push.
 - [ ] Konfirmasi Stage 4 dianggap selesai secara lokal (semua item checklist tercentang) sebelum lanjut ke Program completion checklist.
