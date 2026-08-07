@@ -15,7 +15,7 @@ Berdasarkan angka scale-benchmark (2.000 klien / ~4.000 quotation / ~1.000 sales
 | --- | ---: | ---: | --- |
 | Paginated first-page read (route mana pun) | 50 ms | 150 ms | Terukur 2,7–29 ms di halaman Clients/Commercial Documents/Sales Orders pada skala 10x |
 | Aggregate RPC (`GROUP BY`/`SUM` sederhana) | 30 ms | 100 ms | Terukur 2–14 ms untuk `sales_orders_metrics`, `pipeline_metrics`, `sales_orders_monthly_trend`, `sales_orders_owner_ytd`, `sales_orders_top_customers` |
-| Aggregate RPC dengan function call per-baris (mis. `sales_task_client_metrics` yang pakai lateral join `compute_task_due_state`) | 150 ms | 300 ms | Terukur 92–105 ms di 4.000 task; margin lebih longgar karena ini scale sama jumlah baris, bukan cuma ukuran tabel |
+| Aggregate RPC dengan function call per-baris (mis. `sales_task_client_metrics` yang pakai lateral join `compute_task_due_state`) | 220 ms | 400 ms | Terukur 92–105 ms lokal di 4.000 task; **direvisi 2026-08-07** dari 150/300ms setelah CI run pertama di GitHub Actions (runner shared, lebih lambat/noisy dari mesin lokal) ngukur 159,96ms median — lewat budget awal padahal semua kontrak lain lolos jauh di bawah budget-nya di run yang sama |
 | Payload response, per query | 200 KB | 1 MB | Payload paginated/RPC terukur 200 B–65 KB; budget kasih ruang tanpa izinin balik ke payload full-table (yang terukur 500 KB–1,2 MB di skala ini) |
 | Jumlah baris yang dikembalikan per query | 200 baris | — | Cocok sama page size terbesar yang udah dipakai (Commercial Documents, 50/stage) plus margin aman; kalau butuh lebih dari ini harus pakai pagination atau aggregate, bukan fetch tunggal yang lebih besar |
 
