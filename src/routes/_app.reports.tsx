@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { BarChart3, Download, FileSpreadsheet, FileText } from "lucide-react";
 import { toast } from "sonner";
@@ -24,6 +25,15 @@ import {
 } from "@/lib/data/dashboard-selectors";
 import { forecastValue } from "@/lib/data/commercial-stages";
 import { useDashboardData } from "@/hooks/use-dashboard-data";
+import { getSalesOrdersMetrics } from "@/lib/data/sales-orders-metrics";
+import {
+  getSalesOrdersMonthlyTrend,
+  getSalesOrdersOwnerYtd,
+} from "@/lib/data/sales-orders-trend";
+import {
+  getSalesTaskClientMetrics,
+  getTopCustomers,
+} from "@/lib/data/sales-performance-metrics";
 import {
   ReportFilterBar,
   defaultReportFilters,
@@ -33,7 +43,7 @@ import {
   agingBucket,
   filterCommercialItems,
   filterSalesOrders,
-  reportSalesPerformance,
+  reportSalesPerformanceFromRpc,
 } from "@/lib/report-selectors";
 import { exportExecutiveReportXlsx } from "@/lib/export-xlsx";
 import { exportExecutiveReportPdf } from "@/lib/export-pdf";
@@ -91,38 +101,79 @@ function ReportsPage() {
   }, [clientList]);
   const owners = ownersById;
 
-  // Aggregates ------------------------------------------------------------
+  // Aggregates --------------------------------------------------------------
+  // Backed by the same aggregate RPCs the Dashboard uses (sales_orders_
+  // metrics/monthly_trend/owner_ytd/top_customers, sales_task_client_
+  // metrics), extended with the Reports filter bar's full client/tax/
+  // source/soType filter set, instead of reducing over the unbounded
+  // allOrders/allTasks/allItems arrays client-side. allOrders/allTasks stay
+  // in use below only for the row-level export and the smaller pipeline/
+  // task-inbox sections that have no equivalent aggregate yet.
+  const metricsFilters = {
+    from: filters.range.from,
+    to: filters.range.to,
+    ownerId: filters.ownerId,
+    clientId: filters.clientId,
+    taxType: filters.taxType,
+    soType: filters.soType,
+    source: filters.source,
+  };
+  const metricsQuery = useQuery({
+    queryKey: ["sales-orders", "metrics", "reports", metricsFilters],
+    queryFn: () => getSalesOrdersMetrics(metricsFilters),
+    enabled: authReady,
+  });
   const totals = useMemo(() => {
-    let ppn = 0;
-    let nonPpn = 0;
-    let newProduct = 0;
-    let existing = 0;
-    let protoPaid = 0;
-    let protoFocCount = 0;
-    let protoPaidCount = 0;
-    for (const s of rows) {
-      const v = s.value ?? 0;
-      if (s.taxType === "PPN") ppn += v;
-      else if (s.taxType === "Non-PPN") nonPpn += v;
-      if (s.source === "New Product") newProduct += v;
-      else if (s.source === "Existing / Repeat Order") existing += v;
-      else if (s.source === "Prototype Paid") protoPaid += v;
-      if (s.type === "Prototype" && s.prototypeStatus === "FOC")
-        protoFocCount += 1;
-      if (s.type === "Prototype" && s.prototypeStatus === "Paid")
-        protoPaidCount += 1;
-    }
+    const m = metricsQuery.data;
     return {
-      revenue: ppn + nonPpn,
-      ppn,
-      nonPpn,
-      newProduct,
-      existing,
-      protoPaid,
-      protoFocCount,
-      protoPaidCount,
+      revenue: (m?.ppnValue ?? 0) + (m?.nonPpnValue ?? 0),
+      ppn: m?.ppnValue ?? 0,
+      nonPpn: m?.nonPpnValue ?? 0,
+      newProduct: m?.newProductValue ?? 0,
+      existing: m?.existingValue ?? 0,
+      protoPaid: m?.prototypePaidValue ?? 0,
+      protoFocCount: m?.focCount ?? 0,
+      protoPaidCount: m?.prototypePaidCount ?? 0,
     };
-  }, [rows]);
+  }, [metricsQuery.data]);
+
+  // year_code is calendar-year-scoped (matches the trend charts' existing
+  // CURRENT_YEAR-only behavior below) — a custom sub-year range in the
+  // filter bar still narrows KPI totals above (date-range-aware), but the
+  // trend/top-customers RPCs use the range's end year as a whole.
+  const trendFilters = {
+    year: filters.range.to.getFullYear(),
+    ownerId: filters.ownerId,
+    clientId: filters.clientId,
+    taxType: filters.taxType,
+    soType: filters.soType,
+    source: filters.source,
+  };
+  const monthlyTrendQuery = useQuery({
+    queryKey: ["sales-orders", "monthly-trend", "reports", trendFilters],
+    queryFn: () => getSalesOrdersMonthlyTrend(trendFilters),
+    enabled: authReady,
+  });
+  const ownerYtdQuery = useQuery({
+    queryKey: ["sales-orders", "owner-ytd", "reports", trendFilters],
+    queryFn: () => getSalesOrdersOwnerYtd(trendFilters),
+    enabled: authReady,
+  });
+  const topCustomersQuery = useQuery({
+    queryKey: ["sales-orders", "top-customers", "reports", trendFilters],
+    queryFn: () => getTopCustomers({ ...trendFilters, limit: 5 }),
+    enabled: authReady,
+  });
+  // Task/client detail is never filtered by the Reports filter bar (matches
+  // the pre-RPC behavior, which always scanned the full allTasks/clientList
+  // regardless of filters) — same RPC + queryKey as the Dashboard's
+  // SalesPerformanceTable/ActivityComplianceCard, so this reuses their
+  // cache instead of firing a duplicate request.
+  const taskClientMetricsQuery = useQuery({
+    queryKey: ["sales-task-client-metrics", "dashboard"],
+    queryFn: () => getSalesTaskClientMetrics(),
+    enabled: authReady,
+  });
 
   // YTD achievement vs target (respects ownerId filter for scope) ----------
   const yearTargetTotal = useMemo(() => {
@@ -142,24 +193,25 @@ function ReportsPage() {
   const ytdAchievementPct =
     yearTargetTotal > 0 ? totals.revenue / yearTargetTotal : 0;
 
-  // Cumulative YTD trend within range -------------------------------------
+  // Cumulative YTD trend within range, backed by monthlyTrendQuery --------
+  const monthRevenueByIndex = useMemo(() => {
+    const arr = new Array(12).fill(0);
+    for (const point of monthlyTrendQuery.data ?? []) {
+      arr[point.month - 1] = point.revenue;
+    }
+    return arr;
+  }, [monthlyTrendQuery.data]);
+
   const cumulativeTrend = useMemo(() => {
-    const monthsInYear = 12;
     const targetsArr =
       filters.ownerId !== "all" &&
       targetsFor(targetsByMember, filters.ownerId).length > 0
         ? targetsFor(targetsByMember, filters.ownerId)
         : companyTarget;
-    const monthRev = new Array(monthsInYear).fill(0);
-    for (const s of rows) {
-      const d = new Date(s.date);
-      if (d.getFullYear() !== CURRENT_YEAR) continue;
-      monthRev[d.getMonth()] += s.value ?? 0;
-    }
     let cr = 0;
     let ct = 0;
     return Array.from({ length: CURRENT_MONTH }, (_, i) => {
-      cr += monthRev[i];
+      cr += monthRevenueByIndex[i];
       ct += targetForMonth(targetsArr, i + 1);
       return {
         month: new Date(CURRENT_YEAR, i, 1).toLocaleDateString("id-ID", {
@@ -169,7 +221,7 @@ function ReportsPage() {
         target: ct,
       };
     });
-  }, [rows, filters.ownerId, targetsByMember, companyTarget]);
+  }, [monthRevenueByIndex, filters.ownerId, targetsByMember, companyTarget]);
 
   const monthlyTrend = useMemo(() => {
     const targetsArr =
@@ -177,20 +229,14 @@ function ReportsPage() {
       targetsFor(targetsByMember, filters.ownerId).length > 0
         ? targetsFor(targetsByMember, filters.ownerId)
         : companyTarget;
-    const monthRev = new Array(12).fill(0);
-    for (const s of rows) {
-      const d = new Date(s.date);
-      if (d.getFullYear() !== CURRENT_YEAR) continue;
-      monthRev[d.getMonth()] += s.value ?? 0;
-    }
     return Array.from({ length: CURRENT_MONTH }, (_, i) => ({
       month: new Date(CURRENT_YEAR, i, 1).toLocaleDateString("id-ID", {
         month: "short",
       }),
-      revenue: monthRev[i],
+      revenue: monthRevenueByIndex[i],
       target: targetForMonth(targetsArr, i + 1),
     }));
-  }, [rows, filters.ownerId, targetsByMember, companyTarget]);
+  }, [monthRevenueByIndex, filters.ownerId, targetsByMember, companyTarget]);
 
   const sourceBreakdown = useMemo(
     () => [
@@ -240,31 +286,28 @@ function ReportsPage() {
   );
 
   const topCustomers = useMemo(() => {
-    const totalsByClient = new Map<string, number>();
-    for (const s of rows)
-      totalsByClient.set(
-        s.clientId,
-        (totalsByClient.get(s.clientId) ?? 0) + (s.value ?? 0),
-      );
-    return Array.from(totalsByClient.entries())
-      .map(([cid, revenue]) => ({ client: clients[cid], revenue }))
-      .filter((r) => r.client)
-      .sort((a, b) => b.revenue - a.revenue)
-      .slice(0, 5);
-  }, [rows, clients]);
+    return (topCustomersQuery.data ?? [])
+      .map((r) => ({ client: clients[r.clientId], revenue: r.revenue }))
+      .filter((r) => r.client);
+  }, [topCustomersQuery.data, clients]);
 
   const includeTaskDetail = role !== "executive";
   const salesPerf = useMemo(
     () =>
-      reportSalesPerformance(
-        rows,
-        allTasks,
-        clientList,
+      reportSalesPerformanceFromRpc(
+        ownerYtdQuery.data ?? [],
+        taskClientMetricsQuery.data ?? [],
         salesTeam,
         targetsByMember,
         { includeTaskDetail },
       ),
-    [rows, allTasks, clientList, salesTeam, targetsByMember, includeTaskDetail],
+    [
+      ownerYtdQuery.data,
+      taskClientMetricsQuery.data,
+      salesTeam,
+      targetsByMember,
+      includeTaskDetail,
+    ],
   );
 
   const taskSummary = useMemo(
@@ -353,7 +396,15 @@ function ReportsPage() {
     filters.soType !== "all" ? `Tipe: ${filters.soType}` : null,
   ].filter(Boolean);
 
-  if (!authReady || isLoading) {
+  if (
+    !authReady ||
+    isLoading ||
+    metricsQuery.isLoading ||
+    monthlyTrendQuery.isLoading ||
+    ownerYtdQuery.isLoading ||
+    topCustomersQuery.isLoading ||
+    taskClientMetricsQuery.isLoading
+  ) {
     return (
       <div className="flex items-center justify-center rounded-lg border border-dashed py-16 text-sm text-muted-foreground">
         Loading reports…

@@ -137,3 +137,54 @@ export function reportSalesPerformance(
     })
     .sort((a, b) => b.revenue - a.revenue);
 }
+
+// RPC-backed variant: revenue from getSalesOrdersOwnerYtd (full filter
+// parity with the Reports filter bar) and task/client detail from
+// getSalesTaskClientMetrics, instead of scanning the unbounded orders/
+// tasks/clients arrays directly. sales_task_client_metrics' overdue_tasks
+// is Overdue+Escalated combined (matches the Dashboard's existing badge);
+// Reports wants Overdue on its own, so it's recovered by subtracting the
+// RPC's separate escalated_tasks count.
+export function reportSalesPerformanceFromRpc(
+  ownerYtd: { ownerId: string; revenue: number }[],
+  taskClientMetrics: {
+    ownerId: string;
+    openTasks: number;
+    overdueTasks: number;
+    escalatedTasks: number;
+    completedTasks: number;
+    cancelledTasks: number;
+    activeClients: number;
+  }[],
+  salesTeam: SalesTeamMember[],
+  targetsByMember: TargetsByMember,
+  options: { includeTaskDetail?: boolean } = {},
+): ReportSalesPerformanceRow[] {
+  const includeTaskDetail = options.includeTaskDetail ?? true;
+  const revenueByOwner = new Map(ownerYtd.map((o) => [o.ownerId, o.revenue]));
+  const metricsByOwner = new Map(taskClientMetrics.map((m) => [m.ownerId, m]));
+
+  return salesTeam
+    .map((member) => {
+      const revenue = revenueByOwner.get(member.id) ?? 0;
+      const target = sumTargetsThroughMonth(
+        targetsFor(targetsByMember, member.id),
+      );
+      const m = metricsByOwner.get(member.id);
+      return {
+        member,
+        revenue,
+        target,
+        pct: target > 0 ? revenue / target : 0,
+        openTasks: includeTaskDetail ? (m?.openTasks ?? 0) : null,
+        overdueTasks: includeTaskDetail
+          ? (m?.overdueTasks ?? 0) - (m?.escalatedTasks ?? 0)
+          : null,
+        escalatedTasks: includeTaskDetail ? (m?.escalatedTasks ?? 0) : null,
+        completedTasks: includeTaskDetail ? (m?.completedTasks ?? 0) : null,
+        cancelledTasks: includeTaskDetail ? (m?.cancelledTasks ?? 0) : null,
+        activeClients: m?.activeClients ?? 0,
+      };
+    })
+    .sort((a, b) => b.revenue - a.revenue);
+}
