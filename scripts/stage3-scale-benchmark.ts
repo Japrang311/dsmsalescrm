@@ -7,9 +7,14 @@
 // Usage: bun scripts/seed-performance-fixture.ts && bun scripts/stage3-scale-benchmark.ts
 
 import { mkdir, writeFile } from "node:fs/promises";
-import { performance } from "node:perf_hooks";
-import { Buffer } from "node:buffer";
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { createClient } from "@supabase/supabase-js";
+import {
+  assertLoopback,
+  formatBytes,
+  measure,
+  queries,
+  type QueryMeasurement,
+} from "./lib/stage3-benchmark-queries";
 
 const DEFAULT_LOCAL_SUPABASE_URL = "http://127.0.0.1:54321";
 const DEFAULT_LOCAL_SUPABASE_ANON_KEY =
@@ -25,179 +30,6 @@ const managerEmail =
 const managerPassword =
   process.env.STAGE3_BASELINE_PASSWORD ?? "seed-local-only";
 const iterations = Number(process.env.STAGE3_BASELINE_ITERATIONS ?? "5");
-
-function assertLoopback(url: string): void {
-  const parsed = new URL(url);
-  const isLoopback =
-    parsed.hostname === "127.0.0.1" || parsed.hostname === "localhost";
-  if (!isLoopback) {
-    throw new Error(
-      `Stage 3 scale benchmark is local-only. Refusing non-loopback Supabase URL: ${parsed.origin}`,
-    );
-  }
-}
-
-type QueryResult = { data: unknown; count?: number | null; error?: unknown };
-type QueryDefinition = {
-  name: string;
-  group: "unbounded (before)" | "bounded (after)";
-  run: (client: SupabaseClient) => Promise<QueryResult>;
-};
-type QueryMeasurement = {
-  name: string;
-  group: string;
-  rowCount: number;
-  exactCount: number | null;
-  payloadBytes: number;
-  medianMs: number;
-  maxMs: number;
-};
-
-function payloadBytes(data: unknown): number {
-  return Buffer.byteLength(JSON.stringify(data ?? null), "utf8");
-}
-function rowCount(data: unknown): number {
-  return Array.isArray(data) ? data.length : data == null ? 0 : 1;
-}
-function median(values: number[]): number {
-  const sorted = [...values].sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 === 0
-    ? (sorted[mid - 1] + sorted[mid]) / 2
-    : sorted[mid];
-}
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
-}
-
-async function measure(
-  client: SupabaseClient,
-  def: QueryDefinition,
-): Promise<QueryMeasurement> {
-  const timings: number[] = [];
-  let last: QueryResult | undefined;
-  for (let i = 0; i < iterations; i += 1) {
-    const start = performance.now();
-    const result = await def.run(client);
-    timings.push(performance.now() - start);
-    if (result.error) {
-      throw new Error(`${def.name} failed: ${JSON.stringify(result.error)}`);
-    }
-    last = result;
-  }
-  const data = last?.data ?? null;
-  return {
-    name: def.name,
-    group: def.group,
-    rowCount: rowCount(data),
-    exactCount: last?.count ?? null,
-    payloadBytes: payloadBytes(data),
-    medianMs: Number(median(timings).toFixed(2)),
-    maxMs: Number(Math.max(...timings).toFixed(2)),
-  };
-}
-
-const queries: QueryDefinition[] = [
-  // --- Before: the original unbounded full-table reads ------------------
-  {
-    name: "clients_all (unbounded)",
-    group: "unbounded (before)",
-    run: (c) => c.from("clients").select("*", { count: "exact" }),
-  },
-  {
-    name: "commercial_documents_all_with_items (unbounded)",
-    group: "unbounded (before)",
-    run: (c) =>
-      c
-        .from("commercial_documents")
-        .select("*, commercial_document_items(*)", { count: "exact" })
-        .neq("type", "RFQ")
-        .is("deleted_at", null),
-  },
-  {
-    name: "sales_orders_all_with_items (unbounded)",
-    group: "unbounded (before)",
-    run: (c) =>
-      c
-        .from("sales_orders")
-        .select("*, sales_order_items(*)", { count: "exact" })
-        .is("deleted_at", null),
-  },
-  {
-    name: "tasks_all (unbounded)",
-    group: "unbounded (before)",
-    run: (c) => c.from("tasks").select("*", { count: "exact" }),
-  },
-  // --- After: the paginated/aggregate contracts that replaced them ------
-  {
-    name: "clients page 1 (pageSize 10)",
-    group: "bounded (after)",
-    run: (c) =>
-      c
-        .from("clients")
-        .select("*", { count: "exact" })
-        .order("created_at", { ascending: true })
-        .order("id", { ascending: true })
-        .limit(11),
-  },
-  {
-    name: "commercial_documents page 1 per stage (pageSize 50)",
-    group: "bounded (after)",
-    run: (c) =>
-      c
-        .from("commercial_documents")
-        .select("*, commercial_document_items(*)", { count: "exact" })
-        .eq("stage", "Quotes Sent")
-        .is("deleted_at", null)
-        .order("document_date", { ascending: false })
-        .order("id", { ascending: false })
-        .limit(51),
-  },
-  {
-    name: "sales_orders page 1 (pageSize 25)",
-    group: "bounded (after)",
-    run: (c) =>
-      c
-        .from("sales_orders")
-        .select("*, sales_order_items(*)", { count: "exact" })
-        .is("deleted_at", null)
-        .order("so_number", { ascending: false })
-        .order("id", { ascending: false })
-        .limit(26),
-  },
-  {
-    name: "sales_orders_metrics RPC",
-    group: "bounded (after)",
-    run: (c) => c.rpc("sales_orders_metrics", {}),
-  },
-  {
-    name: "pipeline_metrics RPC",
-    group: "bounded (after)",
-    run: (c) => c.rpc("pipeline_metrics", {}),
-  },
-  {
-    name: "sales_task_client_metrics RPC",
-    group: "bounded (after)",
-    run: (c) => c.rpc("sales_task_client_metrics", {}),
-  },
-  {
-    name: "sales_orders_monthly_trend RPC",
-    group: "bounded (after)",
-    run: (c) => c.rpc("sales_orders_monthly_trend", {}),
-  },
-  {
-    name: "sales_orders_owner_ytd RPC",
-    group: "bounded (after)",
-    run: (c) => c.rpc("sales_orders_owner_ytd", {}),
-  },
-  {
-    name: "sales_orders_top_customers RPC (limit 5)",
-    group: "bounded (after)",
-    run: (c) => c.rpc("sales_orders_top_customers", { p_limit: 5 }),
-  },
-];
 
 assertLoopback(supabaseUrl);
 const client = createClient(supabaseUrl, supabaseAnonKey, {
@@ -215,7 +47,7 @@ if (signIn.error) {
 
 const measurements: QueryMeasurement[] = [];
 for (const q of queries) {
-  measurements.push(await measure(client, q));
+  measurements.push(await measure(client, q, iterations));
   console.log(`  ${q.name}: done`);
 }
 
@@ -257,6 +89,7 @@ ${tableFor("bounded (after)")}
 - **A sharper finding than "slower": silent truncation.** At this fixture's scale, every unbounded contract's actual row count (\`exactCount\` above) already exceeds PostgREST's default 1,000-row response cap — \`rowCount\` in the table is capped at 1000 while \`exactCount\` shows the real total (e.g. \`sales_orders_all_with_items\`: 1000 rows returned out of 1052 real rows; \`commercial_documents_all_with_items\`: 1000 of 4101). Any route still relying on a full unbounded fetch at this data volume wouldn't just get slow — it would silently drop rows past the 1000th, with no error surfaced anywhere. Every route this repo migrated to a paginated/RPC contract is immune to this by construction; any route that hasn't yet (see the Reports export path, which intentionally still reads full filtered sets) needs to stay aware of this ceiling as data grows.
 - Every paginated first-page read and every aggregate RPC stays in the same low-payload, low-latency range regardless of how large the underlying table grows, because they're bounded by \`LIMIT\`/\`GROUP BY\` at the database, not by what the client happens to filter down to afterward. One exception worth flagging honestly: \`sales_task_client_metrics\` ran noticeably slower than its siblings (~90-105ms vs. single-digit-to-low-teens ms for everything else) at 4,000 synthetic tasks — it does a \`cross join lateral compute_task_due_state(...)\` per row rather than a plain aggregate, so its cost grows with task count specifically. Still well under any reasonable page-load budget today, but the first RPC in this set worth an index/rewrite pass if task volume grows an order of magnitude further.
 - This is the concrete "stays fast (and correct) at scale" evidence the anonymized fixture task asked for — none of it is real production data, and none of this was applied anywhere but the local Supabase instance.
+- See \`docs/reports/2026-08-07-stage-3-performance-budgets-proposal.md\` for the approved budget thresholds derived from these numbers, and \`scripts/stage3-check-budgets.ts\` (CI job \`performance_budget\`) for the automated enforcement.
 `;
 
 await mkdir("docs/reports", { recursive: true });

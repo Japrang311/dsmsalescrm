@@ -185,6 +185,33 @@ jobs:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: bun scripts/check-migration-parity.ts
 
+  performance_budget:
+    name: Stage 3 performance budgets
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Start local Supabase
+        run: bunx supabase@2.109.1 start
+
+      - name: Reset database
+        run: bunx supabase@2.109.1 db reset --local
+
+      - name: Load synthetic performance fixture
+        run: bun run stage3:fixture
+
+      - name: Check performance budgets
+        run: bun run stage3:check-budgets
+
   dependency_risk:
     name: Dependency risk report
     runs-on: ubuntu-latest
