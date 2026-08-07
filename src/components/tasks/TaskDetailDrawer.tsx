@@ -11,6 +11,7 @@ import {
   Undo2,
 } from "lucide-react";
 
+import { getErrorMessage } from "@/lib/utils";
 import {
   Sheet,
   SheetContent,
@@ -196,7 +197,7 @@ export function TaskDetailDrawer({
       toast.success("Perubahan tersimpan", { description: task.title });
     } catch (error) {
       toast.error("Gagal menyimpan perubahan", {
-        description: error instanceof Error ? error.message : "Unknown error",
+        description: getErrorMessage(error),
       });
     }
   };
@@ -240,7 +241,7 @@ export function TaskDetailDrawer({
       );
     } catch (error) {
       toast.error("Gagal menyimpan progress", {
-        description: error instanceof Error ? error.message : "Unknown error",
+        description: getErrorMessage(error),
       });
     } finally {
       setSavingProgress(false);
@@ -264,7 +265,7 @@ export function TaskDetailDrawer({
       toast.success("Task diselesaikan", { description: task.title });
     } catch (error) {
       toast.error("Gagal menyelesaikan task", {
-        description: error instanceof Error ? error.message : "Unknown error",
+        description: getErrorMessage(error),
       });
     }
   };
@@ -293,7 +294,7 @@ export function TaskDetailDrawer({
     } catch (error) {
       setDueDate(prev);
       toast.error("Gagal menunda task", {
-        description: error instanceof Error ? error.message : "Unknown error",
+        description: getErrorMessage(error),
       });
     }
   };

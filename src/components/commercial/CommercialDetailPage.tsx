@@ -3,6 +3,8 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { formatRupiahFull, daysBetween } from "@/lib/format";
+import { getErrorMessage } from "@/lib/utils";
+import { invalidateCommercialStageQueries } from "@/lib/query-invalidation";
 import { stagesForFlow } from "@/lib/business-rules";
 import type { CommercialItem, QuotationLostReason } from "@/lib/domain";
 import { useRole } from "@/context/role-context";
@@ -576,13 +578,7 @@ export function CommercialDetailPage({
           });
         }
       }
-      await queryClient.invalidateQueries({ queryKey: ["commercial-items"] });
-      await queryClient.invalidateQueries({
-        queryKey: ["commercial-documents"],
-      });
-      await queryClient.invalidateQueries({ queryKey: ["tasks"] });
-      await queryClient.invalidateQueries({ queryKey: ["follow-ups"] });
-      await queryClient.invalidateQueries({ queryKey: ["activity-log"] });
+      await invalidateCommercialStageQueries(queryClient);
       toast.success("Perubahan tersimpan", {
         description: stageChanged
           ? `Stage → ${stage}${changes.length > 0 ? ` · ${changes.length} field lain` : ""}`
@@ -590,7 +586,7 @@ export function CommercialDetailPage({
       });
     } catch (error) {
       toast.error("Gagal menyimpan perubahan", {
-        description: error instanceof Error ? error.message : "Unknown error",
+        description: getErrorMessage(error),
       });
     }
   }

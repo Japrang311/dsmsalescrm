@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Building2 } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 
+import { getErrorMessage } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -216,7 +217,7 @@ export function AddClientDialog({
       setOpen(false);
     } catch (error) {
       toast.error("Gagal menambahkan klien", {
-        description: error instanceof Error ? error.message : "Unknown error",
+        description: getErrorMessage(error),
       });
     }
   });

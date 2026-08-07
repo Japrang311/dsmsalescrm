@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { getErrorMessage } from "@/lib/utils";
 import {
   Table,
   TableBody,
@@ -474,7 +475,7 @@ function EditSalesOrderHeaderDialog({
       setOpen(false);
     } catch (error) {
       toast.error("Gagal menyimpan perubahan", {
-        description: error instanceof Error ? error.message : "Unknown error",
+        description: getErrorMessage(error),
       });
     } finally {
       setSaving(false);
@@ -741,8 +742,7 @@ function TaxCell({
                   setEditing(false);
                 } catch (error) {
                   toast.error("Gagal mengubah pajak SO", {
-                    description:
-                      error instanceof Error ? error.message : "Unknown error",
+                    description: getErrorMessage(error),
                   });
                 } finally {
                   setSaving(false);
@@ -920,7 +920,7 @@ function SalesOrderItemRow({
       setEditing(false);
     } catch (error) {
       toast.error("Gagal menyimpan item", {
-        description: error instanceof Error ? error.message : "Unknown error",
+        description: getErrorMessage(error),
       });
     } finally {
       setSaving(false);

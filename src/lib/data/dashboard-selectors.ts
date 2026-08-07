@@ -230,35 +230,11 @@ export function monthlyRevenueTrend(
   });
 }
 
-export function ytdCumulativeTrend(
-  orders: SalesOrder[],
-  role: Role,
-  salesUserId: string,
-  byMember: TargetsByMember,
-  companyTarget: MonthlyTarget[],
-) {
-  const targetArr = targetArrFor(role, salesUserId, byMember, companyTarget);
-  let cumRev = 0;
-  let cumTgt = 0;
-  return Array.from({ length: CURRENT_MONTH }, (_, i) => {
-    const m = i + 1;
-    cumRev += monthlyRevenue(orders, m);
-    cumTgt += targetForMonth(targetArr, m);
-    return {
-      month: new Date(CURRENT_YEAR, i, 1).toLocaleDateString("id-ID", {
-        month: "short",
-      }),
-      achievement: cumRev,
-      target: cumTgt,
-    };
-  });
-}
-
 // ---------------------------------------------------------------------------
 // Revenue trend — RPC-backed variants (sales_orders_monthly_trend /
 // sales_orders_owner_ytd, 20260806150000). Same shape/output as
-// monthlyRevenueTrend/ytdCumulativeTrend/targetPerSales above, but read
-// pre-aggregated rows instead of reducing a full unbounded orders fetch.
+// monthlyRevenueTrend/targetPerSales above, but read pre-aggregated rows
+// instead of reducing a full unbounded orders fetch.
 // ---------------------------------------------------------------------------
 
 export function monthlyRevenueTrendFromRpc(
@@ -657,28 +633,6 @@ export function clientCommercialMetrics(
 // Executive-specific
 // ---------------------------------------------------------------------------
 
-export function topCustomersYtd(
-  orders: SalesOrder[],
-  clients: Client[],
-  limit = 5,
-) {
-  const totals = new Map<string, number>();
-  for (const so of orders) {
-    if (new Date(so.date).getFullYear() !== CURRENT_YEAR) continue;
-    totals.set(so.clientId, (totals.get(so.clientId) ?? 0) + paidRevenue(so));
-  }
-  return Array.from(totals.entries())
-    .map(([clientId, revenue]) => ({
-      client: clients.find((c) => c.id === clientId),
-      revenue,
-    }))
-    .filter((row): row is { client: Client; revenue: number } =>
-      Boolean(row.client),
-    )
-    .sort((a, b) => b.revenue - a.revenue)
-    .slice(0, limit);
-}
-
 // Funnel progression through the Quotation stages, ending at
 // Closed Won — Closed Lost is the "we lost" branch, not a funnel step.
 const FUNNEL_STAGES: CommercialStage[] = [
@@ -700,23 +654,6 @@ export function quotationFunnel(items: CommercialItem[]) {
     }
   }
   return stages;
-}
-
-export function forecastVsAchievement(
-  orders: SalesOrder[],
-  items: CommercialItem[],
-  ytdTargetExecutive: number,
-) {
-  const achievement = ytdRevenue(orders);
-  // Closed Won is already realized revenue (counted in `achievement` via
-  // orders) and Closed Lost contributes nothing — only still-open stages
-  // count toward the pipeline forecast, weighted per PRD §7.
-  const pipeline = items.reduce((s, ci) => {
-    if (ci.stage === "Closed Won" || ci.stage === "Closed Lost") return s;
-    return s + (forecastValue(ci.estimatedValue, ci.stage) ?? 0);
-  }, 0);
-  const forecast = achievement + pipeline;
-  return { achievement, forecast, target: ytdTargetExecutive };
 }
 
 export function riskAlerts(

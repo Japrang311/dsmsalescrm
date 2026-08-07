@@ -5,6 +5,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { getErrorMessage } from "@/lib/utils";
 
 import { useRole } from "@/context/role-context";
 import {
@@ -255,8 +256,7 @@ function ClientProfilePage() {
                 });
               } catch (error) {
                 toast.error("Gagal mengubah status", {
-                  description:
-                    error instanceof Error ? error.message : "Unknown error",
+                  description: getErrorMessage(error),
                 });
               }
               setPendingStatus(null);
@@ -322,8 +322,7 @@ function ClientProfilePage() {
               });
             } catch (error) {
               toast.error("Gagal reassign klien", {
-                description:
-                  error instanceof Error ? error.message : "Unknown error",
+                description: getErrorMessage(error),
               });
             }
             setShowReassign(false);

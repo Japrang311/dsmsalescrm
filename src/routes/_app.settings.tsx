@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { getErrorMessage } from "@/lib/utils";
 import {
   Pencil,
   Plus,
@@ -901,8 +902,7 @@ function MemberDialog({
                     ? "Gagal memperbarui anggota"
                     : "Gagal menambahkan anggota",
                   {
-                    description:
-                      error instanceof Error ? error.message : "Unknown error",
+                    description: getErrorMessage(error),
                   },
                 );
               } finally {

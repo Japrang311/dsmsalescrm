@@ -5,6 +5,8 @@ import { z } from "zod";
 import { toast } from "sonner";
 import { PhoneCall } from "lucide-react";
 
+import { getErrorMessage } from "@/lib/utils";
+import { invalidateFollowUpQueries } from "@/lib/query-invalidation";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -169,16 +171,14 @@ export function LogCommercialFollowUpDialog({
         commercialDocumentId: item.id,
         ...command,
       });
-      await queryClient.invalidateQueries({ queryKey: ["follow-ups"] });
-      await queryClient.invalidateQueries({ queryKey: ["tasks"] });
-      await queryClient.invalidateQueries({ queryKey: ["activity-log"] });
+      await invalidateFollowUpQueries(queryClient);
       toast.success("Follow-up tercatat", {
         description: `${clientName} · ${item.type} · ${v.result} · Task diprogress`,
       });
       setOpen(false);
     } catch (error) {
       toast.error("Gagal menyimpan follow-up", {
-        description: error instanceof Error ? error.message : "Unknown error",
+        description: getErrorMessage(error),
       });
     }
   });

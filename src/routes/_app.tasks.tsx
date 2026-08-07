@@ -29,7 +29,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
+import { cn, getErrorMessage } from "@/lib/utils";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -570,7 +570,7 @@ function TasksInboxPage() {
       });
     } catch (error) {
       toast.error("Gagal menyelesaikan task", {
-        description: error instanceof Error ? error.message : "Unknown error",
+        description: getErrorMessage(error),
       });
     }
   };
@@ -598,8 +598,7 @@ function TasksInboxPage() {
                 await invalidateTasks();
               } catch (error) {
                 toast.error("Gagal membatalkan penundaan", {
-                  description:
-                    error instanceof Error ? error.message : "Unknown error",
+                  description: getErrorMessage(error),
                 });
               }
             })(),
@@ -607,7 +606,7 @@ function TasksInboxPage() {
       });
     } catch (error) {
       toast.error("Gagal menunda task", {
-        description: error instanceof Error ? error.message : "Unknown error",
+        description: getErrorMessage(error),
       });
     }
   };
@@ -636,8 +635,7 @@ function TasksInboxPage() {
                 await invalidateTasks();
               } catch (error) {
                 toast.error("Gagal mengembalikan task", {
-                  description:
-                    error instanceof Error ? error.message : "Unknown error",
+                  description: getErrorMessage(error),
                 });
               }
             })(),
@@ -645,7 +643,7 @@ function TasksInboxPage() {
       });
     } catch (error) {
       toast.error("Gagal mengarsipkan task", {
-        description: error instanceof Error ? error.message : "Unknown error",
+        description: getErrorMessage(error),
       });
     }
   };
@@ -658,7 +656,7 @@ function TasksInboxPage() {
       toast("Task dikembalikan ke inbox", { description: t.title });
     } catch (error) {
       toast.error("Gagal mengembalikan task", {
-        description: error instanceof Error ? error.message : "Unknown error",
+        description: getErrorMessage(error),
       });
     }
   };
@@ -700,7 +698,7 @@ function TasksInboxPage() {
       });
     } catch (error) {
       toast.error(`Gagal membuat task ${kind}`, {
-        description: error instanceof Error ? error.message : "Unknown error",
+        description: getErrorMessage(error),
       });
     }
   };
@@ -775,7 +773,7 @@ function TasksInboxPage() {
       setWaitingPoMove(null);
     } catch (error) {
       toast.error("Gagal memindahkan commercial item", {
-        description: error instanceof Error ? error.message : "Unknown error",
+        description: getErrorMessage(error),
       });
     }
   }
@@ -814,7 +812,7 @@ function TasksInboxPage() {
       toast.success(`${targets.length} task ditandai Done`);
     } catch (error) {
       toast.error("Gagal menandai task selesai", {
-        description: error instanceof Error ? error.message : "Unknown error",
+        description: getErrorMessage(error),
       });
     }
     clearSelection();
@@ -860,7 +858,7 @@ function TasksInboxPage() {
       });
     } catch (error) {
       toast.error("Gagal menunda task", {
-        description: error instanceof Error ? error.message : "Unknown error",
+        description: getErrorMessage(error),
       });
     }
     clearSelection();
@@ -902,7 +900,7 @@ function TasksInboxPage() {
       });
     } catch (error) {
       toast.error("Gagal mengubah owner", {
-        description: error instanceof Error ? error.message : "Unknown error",
+        description: getErrorMessage(error),
       });
     }
     clearSelection();

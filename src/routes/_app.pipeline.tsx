@@ -56,6 +56,7 @@ import {
   validateQuotationLostReason,
 } from "@/lib/data/quotation-lost-reasons";
 import { getErrorMessage } from "@/lib/utils";
+import { invalidateCommercialStageQueries } from "@/lib/query-invalidation";
 import { listQueryKey } from "@/lib/pagination-contracts";
 
 export const Route = createFileRoute("/_app/pipeline")({
@@ -421,13 +422,7 @@ function PipelineBoardPage({ role }: { role: Role }) {
           : null,
         ...command,
       });
-      // Invalidate all stage pages + aggregate + related queries
-      await queryClient.invalidateQueries({
-        queryKey: ["commercial-documents"],
-      });
-      await queryClient.invalidateQueries({ queryKey: ["tasks"] });
-      await queryClient.invalidateQueries({ queryKey: ["follow-ups"] });
-      await queryClient.invalidateQueries({ queryKey: ["activity-log"] });
+      await invalidateCommercialStageQueries(queryClient);
       toast.success(`${pendingMove.clientName} → ${pendingMove.toStage}`, {
         description: nextDateInput
           ? `Next action ${formatDateShort(nextDateInput)}`

@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Plus } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 
+import { getErrorMessage } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -174,7 +175,7 @@ export function CreateTaskDialog({
       await queryClient.invalidateQueries({ queryKey: ["activity-log"] });
     } catch (error) {
       toast.error("Gagal membuat task", {
-        description: error instanceof Error ? error.message : "Unknown error",
+        description: getErrorMessage(error),
       });
       return;
     }

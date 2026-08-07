@@ -133,30 +133,6 @@ export async function updateCommercialItem(
   );
 }
 
-export async function createCommercialItem(_input: {
-  clientId: string;
-  ownerId: string;
-  type: CommercialItem["type"];
-  sourceFlow: CommercialItem["sourceFlow"];
-  stage: string;
-  description: string;
-  estimatedValue: number;
-}): Promise<CommercialItem> {
-  throw new Error("NORMALIZED_DOCUMENT_INPUT_REQUIRED");
-}
-
-export async function createCommercialItemsBatch(_input: {
-  clientId: string;
-  ownerId: string;
-  type: CommercialItem["type"];
-  sourceFlow: CommercialItem["sourceFlow"];
-  stage: string;
-  quotationNumber?: string;
-  lineItems: { description: string; qty: number; unitPrice: number }[];
-}): Promise<CommercialItem[]> {
-  throw new Error("NORMALIZED_DOCUMENT_INPUT_REQUIRED");
-}
-
 export function describeCommercialItemChanges(
   changes: { field: string; from?: string; to?: string }[],
 ): string {

@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/select";
 import { StatusBadge } from "@/components/clients/StatusBadges";
 import { cn, getErrorMessage } from "@/lib/utils";
+import { invalidateCommercialStageQueries } from "@/lib/query-invalidation";
 import { formatRupiahShort, formatDateShort } from "@/lib/format";
 import { useRole } from "@/context/role-context";
 import {
@@ -362,10 +363,7 @@ export function PipelineCardDrawer({
           ...command,
         });
       }
-      await queryClient.invalidateQueries({ queryKey: ["tasks"] });
-      await queryClient.invalidateQueries({ queryKey: ["commercial-items"] });
-      await queryClient.invalidateQueries({ queryKey: ["follow-ups"] });
-      await queryClient.invalidateQueries({ queryKey: ["activity-log"] });
+      await invalidateCommercialStageQueries(queryClient);
       toast.success("Pipeline card diperbarui", {
         description: changes
           .map((c) => FIELD_LABEL[c.field] ?? c.field)

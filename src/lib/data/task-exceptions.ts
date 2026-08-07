@@ -1,6 +1,4 @@
 import type { Role, Task, TaskWorkflowStatus } from "@/lib/domain";
-import { listOwners, type OwnerLookup } from "./clients";
-import { listTasks } from "./tasks";
 
 const ACTIVE_WORKFLOW_STATUSES = new Set<TaskWorkflowStatus>([
   "Open",
@@ -9,11 +7,6 @@ const ACTIVE_WORKFLOW_STATUSES = new Set<TaskWorkflowStatus>([
 ]);
 
 type OwnerRoleLookup = Record<string, { role?: Role }>;
-
-export type ManagerTaskScopes = {
-  myTasks: Task[];
-  teamExceptions: Task[];
-};
 
 export function filterManagerMyTasks(
   tasks: readonly Task[],
@@ -45,17 +38,4 @@ export function filterExecutiveTaskExceptions(
     if (!ACTIVE_WORKFLOW_STATUSES.has(task.workflowStatus)) return false;
     return ownersById[task.ownerId]?.role === "manager";
   });
-}
-
-export async function listManagerTaskScopes(
-  managerId: string,
-): Promise<ManagerTaskScopes> {
-  const [tasks, ownersById] = await Promise.all([listTasks(), listOwners()]);
-  return {
-    myTasks: filterManagerMyTasks(tasks, managerId),
-    teamExceptions: filterManagerTeamExceptions(
-      tasks,
-      ownersById as OwnerLookup,
-    ),
-  };
 }

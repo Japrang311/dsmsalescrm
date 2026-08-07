@@ -402,12 +402,6 @@ export async function listTaskTimeline(
   return entries.sort((a, b) => (a.at < b.at ? 1 : -1));
 }
 
-export async function listTaskHistory(
-  taskId: string,
-): Promise<TaskHistoryEntry[]> {
-  return listTaskTimeline(taskId);
-}
-
 export type CommercialItemHistoryEntry = {
   id: string;
   actorName: string;

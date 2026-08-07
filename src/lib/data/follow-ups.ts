@@ -142,17 +142,6 @@ export async function listFollowUpsForCommercialDocument(
   return (data ?? []).map(toFollowUpLog);
 }
 
-// Powers the unified Activity Log feed (_app.activity.tsx) — every
-// follow-up the signed-in user can see, unfiltered by client.
-export async function listAllFollowUps(): Promise<FollowUpLog[]> {
-  const { data, error } = await supabase
-    .from("follow_up_logs")
-    .select("*")
-    .order("created_at", { ascending: false });
-  if (error) throw error;
-  return (data ?? []).map(toFollowUpLog);
-}
-
 export type RecordFollowUpCommandInput = {
   taskId?: string;
   createTaskTitle?: string;

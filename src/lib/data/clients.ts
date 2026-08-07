@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { getErrorMessage } from "@/lib/utils";
 import {
   toLocalIsoDate,
   type Client,
@@ -64,7 +65,7 @@ export function clientDataErrorMessage(error: unknown): string {
     return DUPLICATE_CLIENT_NAME_MESSAGE;
   }
 
-  return error instanceof Error ? error.message : "Unknown error";
+  return getErrorMessage(error);
 }
 
 function throwClientDataError(error: unknown): never {
@@ -355,11 +356,6 @@ function toClientListRow(client: Client, owners: OwnerLookup): ClientListRow {
     risk: "Unknown" as const,
     advisories: 0,
   };
-}
-
-export async function listClientRows(): Promise<ClientListRow[]> {
-  const [clients, owners] = await Promise.all([listClients(), listOwners()]);
-  return clients.map((client) => toClientListRow(client, owners));
 }
 
 export async function listClientRowsPage(input: {

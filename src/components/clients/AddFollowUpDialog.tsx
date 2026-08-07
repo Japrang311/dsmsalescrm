@@ -7,6 +7,8 @@ import { PhoneCall } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { toLocalIsoDate } from "@/lib/domain";
+import { getErrorMessage } from "@/lib/utils";
+import { invalidateFollowUpQueries } from "@/lib/query-invalidation";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -157,9 +159,7 @@ export function AddFollowUpDialog({
         clientId: resolvedClientId,
         ...command,
       });
-      await queryClient.invalidateQueries({ queryKey: ["follow-ups"] });
-      await queryClient.invalidateQueries({ queryKey: ["tasks"] });
-      await queryClient.invalidateQueries({ queryKey: ["activity-log"] });
+      await invalidateFollowUpQueries(queryClient);
       toast.success("Follow up tercatat", {
         description: `${resolvedClientName} · ${v.method} · ${v.result}`,
       });
@@ -168,7 +168,7 @@ export function AddFollowUpDialog({
       setOpen(false);
     } catch (error) {
       toast.error("Gagal menyimpan follow-up", {
-        description: error instanceof Error ? error.message : "Unknown error",
+        description: getErrorMessage(error),
       });
     }
   });
