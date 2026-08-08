@@ -13,8 +13,8 @@ import {
   listOwners,
   updateClientStatus,
   listSalesTeamProfiles,
+  reassignClientOwner,
 } from "@/lib/data/clients";
-import { supabase } from "@/lib/supabase";
 import { getCurrentActorId, logActivity } from "@/lib/data/activity-log";
 import { listFollowUpsForClient } from "@/lib/data/follow-ups";
 import { listSalesOrders } from "@/lib/data/sales-orders";
@@ -276,39 +276,13 @@ function ClientProfilePage() {
           actorName={currentActorName}
           onConfirm={async (newOwnerId, note) => {
             try {
-              const oldOwnerName = ownerName;
-              const { error: updateErr } = await supabase.rpc(
-                "reassign_client_owner",
-                {
-                  p_client_id: client.id,
-                  p_new_owner_id: newOwnerId,
-                },
-              );
-              if (updateErr) throw updateErr;
-
+              await reassignClientOwner({
+                clientId: client.id,
+                newOwnerId,
+                note,
+              });
               const newOwnerName =
                 teamMembers.find((m) => m.id === newOwnerId)?.name ?? "—";
-
-              try {
-                const actorId = await getCurrentActorId();
-                if (actorId) {
-                  const { error: logErr } = await supabase
-                    .from("activity_log")
-                    .insert({
-                      kind: "client_status_change",
-                      owner_id: newOwnerId,
-                      actor_id: actorId,
-                      client_id: client.id,
-                      title: `${client.name} direassign ke ${newOwnerName}`,
-                      detail: note
-                        ? `${oldOwnerName} → ${newOwnerName}\n${note}`
-                        : `${oldOwnerName} → ${newOwnerName}`,
-                    });
-                  if (logErr) console.error("Activity log failed:", logErr);
-                }
-              } catch {
-                // Non-blocking — activity log failure shouldn't block the reassign
-              }
 
               await queryClient.invalidateQueries({ queryKey: ["clients"] });
               await queryClient.invalidateQueries({

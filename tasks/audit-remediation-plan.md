@@ -1,6 +1,6 @@
 # Rencana Remediasi Audit Codebase
 
-> **Status:** APPROVED — D-01 sampai D-04 disetujui; Fase A selesai lokal
+> **Status:** APPROVED — D-01 sampai D-04 disetujui; Fase A dan B1-B3 selesai lokal
 > **Tanggal:** 2026-08-08
 > **Batas izin:** Belum ada izin commit, push, deployment, atau perubahan
 > Supabase remote.
@@ -47,6 +47,12 @@ semuanya justru berisiko menghapus akun yang masih menjadi bagian audit trail.
 **Catatan keputusan 2026-08-08:** User menyetujui rencana lokal D-01 sampai
 D-04 dan pelaksanaan Task A1-A3. Persetujuan ini tidak mencakup perubahan
 remote, commit, push, atau deployment.
+
+**Catatan eksekusi 2026-08-08:** B1-B3 diimplementasikan lokal dengan
+`client_owner_change`, RPC atomik `reassign_client_owner`, adapter client,
+reader activity/status yang kompatibel dengan row legacy, dan migration
+forward-only. Belum ada commit, push, deployment, atau apply migration ke
+Supabase remote `qhtfixgbcpcitokeryxb`.
 
 ## Dependency Graph
 

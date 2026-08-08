@@ -1,6 +1,6 @@
 # Checklist Remediasi Audit Codebase
 
-> **Status:** IN PROGRESS — Task 0 dan Fase A selesai lokal
+> **Status:** IN PROGRESS — Task 0, Fase A, dan B1-B3 selesai lokal
 > **Plan:** `tasks/audit-remediation-plan.md`
 > **Sumber:** `audit/00-REPORT.md`
 > **Batas izin:** Belum ada izin commit, push, deployment, atau perubahan
@@ -121,17 +121,17 @@ forward-only, dengan payload terstruktur dan validasi database.
 
 **Acceptance criteria:**
 
-- [ ] Migration baru menambah `client_owner_change` ke `activity_kind`.
-- [ ] Constraint `event_data` menerima schema versioned owner-change payload
+- [x] Migration baru menambah `client_owner_change` ke `activity_kind`.
+- [x] Constraint `event_data` menerima schema versioned owner-change payload
   tanpa melemahkan validasi stage-change.
-- [ ] Activity feed/view memetakan kind baru ke kategori dan label yang benar.
-- [ ] Row historis tidak di-update atau di-delete.
+- [x] Activity feed/view memetakan kind baru ke kategori dan label yang benar.
+- [x] Row historis tidak di-update atau di-delete.
 
 **Verification:**
 
-- [ ] Fresh `bunx supabase db reset` sukses.
-- [ ] Focused `supabase/tests/activity-log.test.ts` lolos untuk valid/invalid
-  payload serta append-only behavior.
+- [x] Fresh `bunx supabase@2.109.1 db reset --local` sukses.
+- [x] Focused ownership activity/feed/status parser tests lolos untuk event baru
+  dan compatibility row legacy tanpa mutasi historis.
 
 **Dependencies:** Checkpoint A, Task 0
 
@@ -149,16 +149,16 @@ dan audit event.
 
 **Acceptance criteria:**
 
-- [ ] RPC memverifikasi active manager/super-admin dan target owner valid.
-- [ ] Update owner dan insert `client_owner_change` terjadi dalam satu transaksi.
-- [ ] Actor berasal dari `auth.uid()`; old/new owner dan note tersimpan terstruktur.
-- [ ] Forced audit failure membatalkan perubahan owner.
+- [x] RPC memverifikasi active manager/super-admin dan target owner valid.
+- [x] Update owner dan insert `client_owner_change` terjadi dalam satu transaksi.
+- [x] Actor berasal dari `auth.uid()`; old/new owner dan note tersimpan terstruktur.
+- [x] Forced audit failure membatalkan perubahan owner.
 
 **Verification:**
 
-- [ ] Focused positive/negative RPC tests lolos.
-- [ ] Null/inactive/unauthorized role tests memastikan ownership tidak berubah.
-- [ ] Forced-failure rollback test membuktikan zero partial write.
+- [x] Focused positive/negative RPC tests lolos.
+- [x] Null/inactive/unauthorized role tests memastikan ownership tidak berubah.
+- [x] Forced-failure rollback test membuktikan zero partial write.
 
 **Dependencies:** Task B1
 
@@ -175,14 +175,14 @@ route Client Detail.
 
 **Acceptance criteria:**
 
-- [ ] Route memanggil satu typed data adapter untuk reassign.
-- [ ] `ActivityKind` dan label mendukung `client_owner_change`.
-- [ ] Status Audit Trail hanya merender nilai `ClientStatus` valid.
-- [ ] Legacy reassign tetap terlihat sebagai ownership event tanpa memutasi row.
+- [x] Route memanggil satu typed data adapter untuk reassign.
+- [x] `ActivityKind` dan label mendukung `client_owner_change`.
+- [x] Status Audit Trail hanya merender nilai `ClientStatus` valid.
+- [x] Legacy reassign tetap terlihat sebagai ownership event tanpa memutasi row.
 
 **Verification:**
 
-- [ ] Unit test parser untuk status asli, owner-change baru, dan legacy reassign.
+- [x] Unit test parser untuk status asli, owner-change baru, dan legacy reassign.
 - [ ] Browser local: reassign tampil sebagai owner change, bukan status badge.
 - [ ] Reload membuktikan owner dan event persist.
 
@@ -198,9 +198,9 @@ route Client Detail.
 
 ## Checkpoint B — Ownership Audit Integrity
 
-- [ ] All focused activity/RPC/RLS tests pass.
-- [ ] Owner tidak berubah ketika audit insert dipaksa gagal.
-- [ ] Activity feed dan Status Audit Trail menampilkan domain yang benar.
+- [x] All focused activity/RPC/RLS tests pass.
+- [x] Owner tidak berubah ketika audit insert dipaksa gagal.
+- [x] Activity feed dan Status Audit Trail menampilkan domain yang benar.
 - [ ] `bun run test:e2e` pass.
 
 ---

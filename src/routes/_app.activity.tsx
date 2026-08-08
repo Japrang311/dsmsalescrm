@@ -100,6 +100,11 @@ const KIND_META: Record<
     icon: ArrowRightLeft,
     color: "bg-amber-100 text-amber-700",
   },
+  ownership_change: {
+    label: "Perubahan Owner",
+    icon: Users,
+    color: "bg-sky-100 text-sky-700",
+  },
   commercial_history: {
     label: "Pipeline Update",
     icon: GitBranch,
@@ -558,7 +563,9 @@ function ActivityPage() {
                             <span>
                               {e.kind === "team_admin"
                                 ? `Aktor: ${e.actorName ?? "Tidak tersedia"} · Target: ${e.targetName ?? "Tidak tersedia"}`
-                                : (e.ownerName ?? "System")}{" "}
+                                : e.kind === "ownership_change"
+                                  ? `Aktor: ${e.ownerName ?? "Tidak tersedia"} · Owner baru: ${e.targetName ?? "Tidak tersedia"}`
+                                  : (e.ownerName ?? "System")}{" "}
                               {" · "}
                               {new Date(e.at).toLocaleTimeString("id-ID", {
                                 hour: "2-digit",
@@ -757,7 +764,9 @@ function ActivityPage() {
                                   <div className="mt-1 text-xs text-muted-foreground">
                                     {r.kind === "team_admin"
                                       ? `Aktor: ${r.actorName ?? "Tidak tersedia"} · Target: ${r.targetName ?? "Tidak tersedia"}`
-                                      : (r.ownerName ?? "System")}{" "}
+                                      : r.kind === "ownership_change"
+                                        ? `Aktor: ${r.ownerName ?? "Tidak tersedia"} · Owner baru: ${r.targetName ?? "Tidak tersedia"}`
+                                        : (r.ownerName ?? "System")}{" "}
                                     {" · "}
                                     {new Date(r.at).toLocaleString("id-ID", {
                                       day: "numeric",

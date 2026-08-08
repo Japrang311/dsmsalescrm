@@ -280,6 +280,13 @@ export function mapActivityFeedRow(
     case "task_created":
     case "task_history":
       return { ...base, kind: row.feedKind, link: TASK_INBOX_LINK };
+    case "ownership_change":
+      return {
+        ...base,
+        kind: "ownership_change",
+        ownerName: row.actorId ? owners[row.actorId]?.name : undefined,
+        targetName: ownerName,
+      };
     case "record_lifecycle":
       return {
         ...base,

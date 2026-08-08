@@ -8,7 +8,11 @@ import {
 } from "../../../supabase/tests/helpers";
 import { ROLE_FIXTURES } from "../../../tests/fixtures/roles";
 import { supabase } from "@/lib/supabase";
-import { listActivityLog, listTaskTimeline } from "./activity-log";
+import {
+  listActivityLog,
+  listClientStatusHistory,
+  listTaskTimeline,
+} from "./activity-log";
 import { recordTaskProgress } from "./task-progress";
 
 const ADMINISTRATIVE_LABELS = {
@@ -27,6 +31,7 @@ const SALES_FIXTURE_NAME = ROLE_FIXTURES.find(
 let fixtures: RoleFixtureUsers;
 let activityIds: string[] = [];
 let timelineClientId: string;
+const statusHistoryClientIds: string[] = [];
 const timelineTaskIds: string[] = [];
 const timelineFollowUpIds: string[] = [];
 
@@ -83,6 +88,9 @@ afterAll(async () => {
   if (activityIds.length > 0) {
     await adminClient.from("activity_log").delete().in("id", activityIds);
   }
+  if (statusHistoryClientIds.length > 0) {
+    await adminClient.from("clients").delete().in("id", statusHistoryClientIds);
+  }
   await deleteRoleFixtureUsers(fixtures);
 });
 
@@ -113,6 +121,65 @@ describe("activity log administrative event mapping", () => {
       });
       expect(entry?.administrativeReason).toBe(`Alasan ${kind}`);
     }
+  });
+});
+
+describe("client status history", () => {
+  test("keeps real status changes and excludes legacy owner reassign rows", async () => {
+    const fixtureClient = await signInAs(fixtures.manager);
+    const session = (await fixtureClient.auth.getSession()).data.session!;
+    await supabase.auth.setSession({
+      access_token: session.access_token,
+      refresh_token: session.refresh_token,
+    });
+
+    const { data: client, error: clientError } = await adminClient
+      .from("clients")
+      .insert({
+        name: `Status history ${crypto.randomUUID()}`,
+        status: "Prospect",
+        source: "Referral",
+        owner_id: fixtures.sales.id,
+      })
+      .select("id")
+      .single();
+    if (clientError) throw clientError;
+    statusHistoryClientIds.push(client.id);
+
+    const { data: inserted, error } = await adminClient
+      .from("activity_log")
+      .insert([
+        {
+          kind: "client_status_change",
+          owner_id: fixtures.sales.id,
+          actor_id: fixtures.manager.id,
+          client_id: client.id,
+          title: "Status changed",
+          detail: "Prospect → Active Customer\nQualified",
+        },
+        {
+          kind: "client_status_change",
+          owner_id: fixtures.manager.id,
+          actor_id: fixtures.manager.id,
+          client_id: client.id,
+          title: "Legacy owner reassign",
+          detail: "Sales User → Manager User\nTerritory handover",
+        },
+      ])
+      .select("id");
+    if (error) throw error;
+    activityIds.push(...(inserted ?? []).map((row) => row.id));
+
+    const history = await listClientStatusHistory(client.id);
+
+    expect(history).toHaveLength(1);
+    expect(history[0]).toMatchObject({
+      from: "Prospect",
+      to: "Active Customer",
+      note: "Qualified",
+    });
+
+    await supabase.auth.signOut();
   });
 });
 

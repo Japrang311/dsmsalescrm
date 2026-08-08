@@ -124,10 +124,13 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (fixtures) {
+    const fixtureIds = Object.values(users()).map((user) => user.id);
     await adminClient
       .from("activity_log")
       .delete()
-      .eq("owner_id", users().sales.id);
+      .or(
+        `owner_id.in.(${fixtureIds.join(",")}),actor_id.in.(${fixtureIds.join(",")})`,
+      );
     // create_quotation/revise_quotation now insert a linked follow-up Task
     // per call (spec: docs/superpowers/specs/2026-08-03-quotation-mandatory-followup-design.md)
     // -- clean these up before commercial_documents/clients, otherwise

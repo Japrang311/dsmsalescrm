@@ -17,6 +17,7 @@ import {
   listSalesTeamProfiles,
   clientDataErrorMessage,
   listClientRowsPage,
+  reassignClientOwner,
 } from "./clients";
 
 // This module reads a module-level Supabase client, so we point it at
@@ -172,6 +173,57 @@ describe("src/lib/data/clients.ts", () => {
     expect(salesTeam.some((m) => m.id === fixtures.super_admin.id)).toBe(false);
     expect(salesTeam.some((m) => m.id === fixtures.sales.id)).toBe(true);
 
+    await supabase.auth.signOut();
+  });
+
+  test("reassignClientOwner() delegates to the atomic owner-change RPC with note", async () => {
+    const fixtureClient = await signInAs(fixtures.manager);
+    const session = (await fixtureClient.auth.getSession()).data.session!;
+    await supabase.auth.setSession({
+      access_token: session.access_token,
+      refresh_token: session.refresh_token,
+    });
+
+    const { data: client, error: clientError } = await adminClient
+      .from("clients")
+      .insert({
+        name: `Adapter reassign ${crypto.randomUUID()}`,
+        status: "Active Customer",
+        source: "Referral",
+        owner_id: fixtures.sales.id,
+      })
+      .select("id")
+      .single();
+    if (clientError) throw clientError;
+
+    await reassignClientOwner({
+      clientId: client.id,
+      newOwnerId: fixtures.manager.id,
+      note: "Adapter handover",
+    });
+
+    const { data: updated } = await adminClient
+      .from("clients")
+      .select("owner_id")
+      .eq("id", client.id)
+      .single();
+    expect(updated?.owner_id).toBe(fixtures.manager.id);
+
+    const { data: auditRows } = await adminClient
+      .from("activity_log")
+      .select("id, kind, detail")
+      .eq("client_id", client.id)
+      .eq("kind", "client_owner_change");
+    expect(auditRows).toHaveLength(1);
+    expect(auditRows?.[0]).toMatchObject({
+      kind: "client_owner_change",
+      detail: "Adapter handover",
+    });
+
+    if (auditRows?.[0]?.id) {
+      await adminClient.from("activity_log").delete().eq("id", auditRows[0].id);
+    }
+    await adminClient.from("clients").delete().eq("id", client.id);
     await supabase.auth.signOut();
   });
 });

@@ -178,6 +178,80 @@ describe("listActivityFeedPage", () => {
     await supabase.auth.signOut();
   });
 
+  test("includes structured client owner-change rows from the SQL feed view", async () => {
+    const { data: inserted, error } = await adminClient
+      .from("activity_log")
+      .insert({
+        kind: "client_owner_change",
+        owner_id: fixtures.manager.id,
+        actor_id: fixtures.manager.id,
+        client_id: clientId,
+        title: "Owner changed through RPC",
+        detail: "Structured owner-change note",
+        event_data: {
+          schema_version: 1,
+          old_owner_id: fixtures.sales.id,
+          new_owner_id: fixtures.manager.id,
+          effective_at: "2096-06-01T13:00:00.000Z",
+        },
+        created_at: "2096-06-01T13:00:00Z",
+      })
+      .select("id")
+      .single();
+    if (error) throw error;
+    activityIds.push(inserted.id);
+
+    await authenticate(fixtures.manager);
+    const page = await listActivityFeedPage({
+      filters: {
+        from: new Date("2096-06-01T00:00:00Z"),
+        to: new Date("2096-06-01T23:59:59Z"),
+        feedKind: "ownership_change",
+      },
+      page: { pageSize: 25 },
+    });
+    expect(page.rows).toHaveLength(1);
+    expect(page.rows[0]).toMatchObject({
+      feedKind: "ownership_change",
+      dbKind: "client_owner_change",
+      title: "Owner changed through RPC",
+      detail: "Structured owner-change note",
+    });
+    await supabase.auth.signOut();
+  });
+
+  test("maps legacy owner reassign detail rows as ownership_change in the SQL feed view", async () => {
+    const { data: inserted, error } = await adminClient
+      .from("activity_log")
+      .insert({
+        kind: "client_status_change",
+        owner_id: fixtures.manager.id,
+        actor_id: fixtures.manager.id,
+        client_id: clientId,
+        title: "Legacy owner changed",
+        detail: "Sales User → Manager User\nLegacy owner note",
+        created_at: "2096-06-01T14:00:00Z",
+      })
+      .select("id")
+      .single();
+    if (error) throw error;
+    activityIds.push(inserted.id);
+
+    await authenticate(fixtures.manager);
+    const page = await listActivityFeedPage({
+      filters: {
+        from: new Date("2096-06-01T00:00:00Z"),
+        to: new Date("2096-06-01T23:59:59Z"),
+        feedKind: "ownership_change",
+      },
+      page: { pageSize: 25 },
+    });
+    expect(page.rows.some((row) => row.title === "Legacy owner changed")).toBe(
+      true,
+    );
+    await supabase.auth.signOut();
+  });
+
   test("filters by owner id", async () => {
     await authenticate(fixtures.manager);
     const page = await listActivityFeedPage({
@@ -188,8 +262,11 @@ describe("listActivityFeedPage", () => {
       },
       page: { pageSize: 25 },
     });
-    expect(page.rows).toHaveLength(1);
-    expect(page.rows[0].title).toBe("Client dibuat oleh Manager");
+    expect(page.rows.map((row) => row.title).sort()).toEqual([
+      "Client dibuat oleh Manager",
+      "Legacy owner changed",
+      "Owner changed through RPC",
+    ]);
     await supabase.auth.signOut();
   });
 

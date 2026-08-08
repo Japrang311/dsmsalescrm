@@ -163,6 +163,19 @@ export async function updateClientStatus(
   return toClient(data);
 }
 
+export async function reassignClientOwner(input: {
+  clientId: string;
+  newOwnerId: string;
+  note?: string;
+}): Promise<void> {
+  const { error } = await supabase.rpc("reassign_client_owner", {
+    p_client_id: input.clientId,
+    p_new_owner_id: input.newOwnerId,
+    p_note: input.note?.trim() || null,
+  });
+  if (error) throwClientDataError(error);
+}
+
 export type UpdateClientDetailsInput = {
   name: string;
   address?: string;
