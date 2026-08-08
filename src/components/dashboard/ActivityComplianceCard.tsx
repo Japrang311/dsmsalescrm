@@ -25,6 +25,7 @@ export function ActivityComplianceCard() {
   const perSales = salesTeam.map((member) => {
     const m = metricsByOwner.get(member.id);
     return {
+      id: member.id,
       name: member.name,
       initials: member.initials,
       overdue: m?.overdueTasks ?? 0,
@@ -78,7 +79,7 @@ export function ActivityComplianceCard() {
           </div>
           {perSales.map((s) => (
             <div
-              key={s.name}
+              key={s.id}
               className="flex items-center justify-between text-sm"
             >
               <span className="text-foreground">
