@@ -220,13 +220,13 @@ lifecycle.
 
 **Acceptance criteria:**
 
-- [ ] Test membedakan active transferable ownership dari historical references.
-- [ ] Soft-deleted, superseded, terminal, active, dan audit-linked fixtures ada.
-- [ ] Expected count/transfer/delete result eksplisit per fixture.
+- [x] Test membedakan active transferable ownership dari historical references.
+- [x] Soft-deleted, superseded, terminal, active, dan audit-linked fixtures ada.
+- [x] Expected count/transfer/delete result eksplisit per fixture.
 
 **Verification:**
 
-- [ ] Focused `supabase/tests/account-lifecycle.test.ts` menunjukkan baseline
+- [x] Focused `supabase/tests/account-lifecycle.test.ts` menunjukkan baseline
       lama pada kasus yang memang drift dan tetap melindungi historical delete.
 
 **Dependencies:** Checkpoint B, Task 0

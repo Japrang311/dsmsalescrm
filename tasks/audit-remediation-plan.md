@@ -65,6 +65,15 @@ client owner and see ownership audit after reload`, yang membuktikan owner
 persist setelah reload dan Activity Log menampilkan event sebagai Perubahan
 Owner, bukan Perubahan Status Client.
 
+**Catatan C1 2026-08-09:** Characterization test account lifecycle menambah
+fixture commercial active, terminal, soft-deleted, superseded, dan audit-linked.
+Test membedakan kontrak active-transferable dari historical references:
+reference count tetap menghitung semua history untuk delete blocker, sementara
+expected active-transferable hanya row aktif/current/non-terminal. Test juga
+mendokumentasikan drift lama: `admin_transfer_active_ownership` masih
+memindahkan soft-deleted dan superseded commercial documents sampai C2 membuat
+predicate active ownership terpisah.
+
 ## Dependency Graph
 
 ```text

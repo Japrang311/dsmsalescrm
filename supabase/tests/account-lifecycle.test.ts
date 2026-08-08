@@ -41,6 +41,8 @@ type CreatedRows = {
   commercialClosedLost: string;
   commercialRevenueRecorded: string;
   commercialClosed: string;
+  commercialSoftDeleted: string;
+  commercialSuperseded: string;
   salesOrder: string;
   followUp: string;
   target: string;
@@ -274,6 +276,29 @@ beforeAll(async () => {
       ...(stage === "Closed Lost" ? { lost_reason: "Tidak ada respons" } : {}),
     });
   }
+  const commercialSoftDeleted = await insertId("commercial_documents", {
+    client_id: clientOpen,
+    owner_id: users.sales.id,
+    type: "Quotation",
+    source_flow: "RFQ / New Product",
+    document_date: "2026-07-19",
+    stage: "Negotiation",
+    deleted_at: new Date().toISOString(),
+    deleted_by: users.super_admin.id,
+  });
+  const supersededBase = `TASK4-SUPERSEDED-${crypto.randomUUID()}`;
+  const commercialSuperseded = await insertId("commercial_documents", {
+    client_id: clientOpen,
+    owner_id: users.sales.id,
+    type: "Quotation",
+    source_flow: "RFQ / New Product",
+    document_date: "2026-07-19",
+    quotation_number: `${supersededBase}-REV0`,
+    quotation_base_number: supersededBase,
+    quotation_revision: 0,
+    is_current_revision: false,
+    stage: "Negotiation",
+  });
 
   const salesOrder = await insertId("sales_orders", {
     so_number: `SO-TASK-4-${crypto.randomUUID()}`,
@@ -348,6 +373,8 @@ beforeAll(async () => {
     commercialClosedLost: commercialRows.commercialClosedLost,
     commercialRevenueRecorded: commercialRows.commercialRevenueRecorded,
     commercialClosed: commercialRows.commercialClosed,
+    commercialSoftDeleted,
+    commercialSuperseded,
     salesOrder,
     followUp,
     target,
@@ -401,6 +428,8 @@ afterAll(async () => {
           created.commercialClosedLost,
           created.commercialRevenueRecorded,
           created.commercialClosed,
+          created.commercialSoftDeleted,
+          created.commercialSuperseded,
         ],
       ],
       ["targets", [created.target]],
@@ -466,7 +495,7 @@ describe("account lifecycle database primitives", () => {
     expect(data as ReferenceCounts).toEqual({
       clients: 2,
       tasks: 4,
-      commercial_items: 5,
+      commercial_items: 7,
       sales_orders: 1,
       follow_up_logs: 1,
       targets: 1,
@@ -474,9 +503,60 @@ describe("account lifecycle database primitives", () => {
       activity_log_actor: 1,
       activity_log_target: 1,
       profile_status_changes: 1,
-      total_blocking: 17,
-      total_all: 18,
+      total_blocking: 19,
+      total_all: 20,
     });
+  });
+
+  test("characterizes active-transferable ownership separately from historical references", async () => {
+    const created = requireRows();
+    const users = requireFixtures();
+    const activeTransferableCommercialIds = [created.commercialOpen];
+    const historicalCommercialIds = [
+      created.commercialClosedWon,
+      created.commercialClosedLost,
+      created.commercialRevenueRecorded,
+      created.commercialClosed,
+      created.commercialSoftDeleted,
+      created.commercialSuperseded,
+    ];
+
+    const { data: commercialRows, error: commercialError } = await adminClient
+      .from("commercial_documents")
+      .select("id, owner_id, stage, deleted_at, is_current_revision")
+      .in("id", [
+        ...activeTransferableCommercialIds,
+        ...historicalCommercialIds,
+      ])
+      .order("id", { ascending: true });
+    if (commercialError) throw commercialError;
+
+    const activeRows = (commercialRows ?? []).filter(
+      (row) =>
+        row.owner_id === users.sales.id &&
+        row.deleted_at === null &&
+        row.is_current_revision === true &&
+        !["Closed Won", "Closed Lost", "Revenue Recorded", "Closed"].includes(
+          row.stage,
+        ),
+    );
+    const historicalRows = (commercialRows ?? []).filter((row) =>
+      historicalCommercialIds.includes(row.id),
+    );
+
+    expect(activeRows.map((row) => row.id).sort()).toEqual(
+      [...activeTransferableCommercialIds].sort(),
+    );
+    expect(historicalRows.map((row) => row.id).sort()).toEqual(
+      [...historicalCommercialIds].sort(),
+    );
+
+    const { data: referenceCounts, error: referenceError } =
+      await adminClient.rpc("admin_account_reference_counts", {
+        p_target_id: users.sales.id,
+      });
+    expect(referenceError).toBeNull();
+    expect((referenceCounts as ReferenceCounts).commercial_items).toBe(7);
   });
 
   test("active Super Admin count excludes inactive profiles", async () => {
@@ -560,7 +640,7 @@ describe("account lifecycle database primitives", () => {
     }
   });
 
-  test("ownership transfer moves only documented active/open rows and preserves history", async () => {
+  test("ownership transfer documents current drift for soft-deleted and superseded commercial history", async () => {
     const users = requireFixtures();
     const created = requireRows();
     let auditId: string | undefined;
@@ -579,8 +659,8 @@ describe("account lifecycle database primitives", () => {
       expect(data as TransferCounts).toEqual({
         clients: 1,
         tasks: 1,
-        commercial_items: 1,
-        total: 3,
+        commercial_items: 3,
+        total: 5,
       });
 
       expect(await ownerId("clients", created.clientOpen)).toBe(
@@ -595,6 +675,12 @@ describe("account lifecycle database primitives", () => {
       expect(await ownerId("tasks", created.taskArchived)).toBe(users.sales.id);
       expect(
         await ownerId("commercial_documents", created.commercialOpen),
+      ).toBe(users.manager.id);
+      expect(
+        await ownerId("commercial_documents", created.commercialSoftDeleted),
+      ).toBe(users.manager.id);
+      expect(
+        await ownerId("commercial_documents", created.commercialSuperseded),
       ).toBe(users.manager.id);
       for (const historicalId of [
         created.commercialClosedWon,
@@ -657,8 +743,8 @@ describe("account lifecycle database primitives", () => {
         counts: {
           clients: 1,
           tasks: 1,
-          commercial_items: 1,
-          total: 3,
+          commercial_items: 3,
+          total: 5,
         },
       });
     } finally {
@@ -672,7 +758,14 @@ describe("account lifecycle database primitives", () => {
       for (const [table, ids] of [
         ["clients", [created.clientOpen]],
         ["tasks", [created.taskOpen]],
-        ["commercial_documents", [created.commercialOpen]],
+        [
+          "commercial_documents",
+          [
+            created.commercialOpen,
+            created.commercialSoftDeleted,
+            created.commercialSuperseded,
+          ],
+        ],
       ] as const) {
         const { error } = await adminClient
           .from(table)
@@ -1130,7 +1223,7 @@ describe("account lifecycle database primitives", () => {
         },
       );
       expect(referencedError?.message).toContain("ACCOUNT_HAS_REFERENCES");
-      expect(referencedError?.details).toContain('"total_blocking": 17');
+      expect(referencedError?.details).toContain('"total_blocking": 19');
 
       const { data, error } = await adminClient.rpc(
         "admin_delete_eligible_account",
