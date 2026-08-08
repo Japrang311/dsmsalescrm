@@ -1,10 +1,12 @@
 # Checklist Remediasi Audit Codebase
 
-> **Status:** IN PROGRESS — Task 0, Fase A, dan B1-B3 selesai lokal
+> **Status:** IN PROGRESS — Task 0, Fase A, dan B1-B3 selesai; Checkpoint B
+> sebagian besar terverifikasi
 > **Plan:** `tasks/audit-remediation-plan.md`
 > **Sumber:** `audit/00-REPORT.md`
-> **Batas izin:** Belum ada izin commit, push, deployment, atau perubahan
-> Supabase remote.
+> **Bukti rilis B:** Commit `f701816`, fix test `22e7612`, push `origin/main`,
+> Supabase production `qhtfixgbcpcitokeryxb` applied, Vercel production Ready,
+> GitHub Actions run `31266493103` success.
 
 ## Task 0 — Setujui kontrak bisnis dan security
 
@@ -14,10 +16,10 @@ sebelum implementasi dimulai.
 **Acceptance criteria:**
 
 - [x] Soft-deleted/superseded/terminal commercial document tidak ikut transfer
-  aktif tetapi tetap menjadi historical reference.
+      aktif tetapi tetap menjadi historical reference.
 - [x] Event baru bernama `client_owner_change`; activity row lama tidak diubah.
 - [x] Dependency Critical/High memblokir CI kecuali exception punya owner dan
-  expiry.
+      expiry.
 
 **Verification:**
 
@@ -66,9 +68,9 @@ sebelum implementasi dimulai.
 **Verification:**
 
 - [x] `bun --env-file=.env.local test supabase/tests/document-numbering.test.ts`
-  dijalankan dua kali berturut-turut dan keduanya exit 0.
+      dijalankan dua kali berturut-turut dan keduanya exit 0.
 - [x] `bun run test` dijalankan dua kali pada DB lokal yang sama: masing-masing
-  585 pass, 0 fail.
+      585 pass, 0 fail.
 
 **Dependencies:** Task A1
 
@@ -123,7 +125,7 @@ forward-only, dengan payload terstruktur dan validasi database.
 
 - [x] Migration baru menambah `client_owner_change` ke `activity_kind`.
 - [x] Constraint `event_data` menerima schema versioned owner-change payload
-  tanpa melemahkan validasi stage-change.
+      tanpa melemahkan validasi stage-change.
 - [x] Activity feed/view memetakan kind baru ke kategori dan label yang benar.
 - [x] Row historis tidak di-update atau di-delete.
 
@@ -131,7 +133,7 @@ forward-only, dengan payload terstruktur dan validasi database.
 
 - [x] Fresh `bunx supabase@2.109.1 db reset --local` sukses.
 - [x] Focused ownership activity/feed/status parser tests lolos untuk event baru
-  dan compatibility row legacy tanpa mutasi historis.
+      dan compatibility row legacy tanpa mutasi historis.
 
 **Dependencies:** Checkpoint A, Task 0
 
@@ -185,6 +187,7 @@ route Client Detail.
 - [x] Unit test parser untuk status asli, owner-change baru, dan legacy reassign.
 - [ ] Browser local: reassign tampil sebagai owner change, bukan status badge.
 - [ ] Reload membuktikan owner dan event persist.
+- [x] CI Browser E2E umum pass pada GitHub Actions run `31266493103`.
 
 **Dependencies:** Task B2
 
@@ -201,7 +204,10 @@ route Client Detail.
 - [x] All focused activity/RPC/RLS tests pass.
 - [x] Owner tidak berubah ketika audit insert dipaksa gagal.
 - [x] Activity feed dan Status Audit Trail menampilkan domain yang benar.
-- [ ] `bun run test:e2e` pass.
+- [x] `bun run test:e2e` pass via CI Browser E2E flows pada run
+      `31266493103`.
+- [ ] Browser/UAT spesifik reassign-owner: owner change tampil benar dan tetap
+      persist setelah reload.
 
 ---
 
@@ -219,7 +225,7 @@ lifecycle.
 **Verification:**
 
 - [ ] Focused `supabase/tests/account-lifecycle.test.ts` menunjukkan baseline
-  lama pada kasus yang memang drift dan tetap melindungi historical delete.
+      lama pada kasus yang memang drift dan tetap melindungi historical delete.
 
 **Dependencies:** Checkpoint B, Task 0
 
@@ -238,7 +244,7 @@ lifecycle.
 - [ ] Helper/predicate active commercial ownership didefinisikan satu kali.
 - [ ] Summary dan transfer memakai predicate aktif yang sama.
 - [ ] `account_reference_counts`/`delete_eligible_account` tetap menghitung
-  seluruh history.
+      seluruh history.
 - [ ] Tidak ada soft-deleted/superseded/terminal row yang di-reassign.
 
 **Verification:**
@@ -296,7 +302,7 @@ semua versi sekaligus.
 **Acceptance criteria:**
 
 - [ ] Setiap advisory punya parent dependency, runtime/build reachability, dan
-  keputusan upgrade/exception.
+      keputusan upgrade/exception.
 - [ ] Critical/High diselesaikan atau memiliki exception bertanggal.
 - [ ] PDF/CSV/XLSX export dan production build tetap berfungsi.
 
@@ -328,7 +334,7 @@ semua versi sekaligus.
 **Verification:**
 
 - [ ] Unit test fixture: clean exit 0, High exit non-zero, expired exception exit
-  non-zero.
+      non-zero.
 - [ ] Local workflow/script smoke pass.
 
 **Dependencies:** Task D1
@@ -406,7 +412,7 @@ baru, atau menandai sebagai resolved bila Task B/C sudah menghapus variabelnya.
 
 - [ ] Fresh DB reset.
 - [ ] `supabase db lint --local --level warning --fail-on none` tidak lagi
-  melaporkan tiga unused variable tersebut.
+      melaporkan tiga unused variable tersebut.
 
 **Dependencies:** Tasks B2, C2
 
@@ -490,11 +496,11 @@ hook/actions baru, focused tests
 ## Program Completion
 
 - [ ] Semua SEV diberi status `RESOLVED`, `ACCEPTED`, atau `DEFERRED` dengan
-  bukti.
+      bukti.
 - [ ] Full test pass dua kali berurutan.
 - [ ] Lint, typecheck, build, DB lint/advisors, dan E2E pass.
 - [ ] Local verification report direview user.
 - [ ] Approval exact-target diperoleh sebelum migration production.
 - [ ] Approval commit/branch diperoleh sebelum push `main`/deploy.
 - [ ] Supabase remote, Vercel deploy, dan browser production UAT dilaporkan
-  sebagai status terpisah.
+      sebagai status terpisah.

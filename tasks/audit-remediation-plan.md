@@ -1,9 +1,12 @@
 # Rencana Remediasi Audit Codebase
 
-> **Status:** APPROVED — D-01 sampai D-04 disetujui; Fase A dan B1-B3 selesai lokal
+> **Status:** APPROVED — D-01 sampai D-04 disetujui; Fase A dan B1-B3 selesai,
+> production migration parity hijau
 > **Tanggal:** 2026-08-08
-> **Batas izin:** Belum ada izin commit, push, deployment, atau perubahan
-> Supabase remote.
+> **Status release B:** Commit `f701816` dan `22e7612` sudah push ke
+> `origin/main`; migration B1-B3 sudah applied ke Supabase production
+> `qhtfixgbcpcitokeryxb`; Vercel production Ready; GitHub Actions run
+> `31266493103` success.
 > **Sumber:** `audit/00-REPORT.md`, `audit/03-security.md`,
 > `audit/04-maintainability.md`, `audit/05-readability.md`
 > **Checklist eksekusi:** `tasks/audit-remediation-todo.md`
@@ -35,24 +38,30 @@ semuanya justru berisiko menghapus akun yang masih menjadi bagian audit trail.
 
 ## Keputusan Arsitektur yang Disarankan
 
-| ID | Keputusan | Rekomendasi |
-| --- | --- | --- |
-| D-01 | History owner dokumen tidak aktif | Soft-deleted, superseded revision, dan stage terminal tetap menyimpan owner historis; jangan ikut transfer aktif. |
-| D-02 | Event reassign Client | Tambahkan `client_owner_change`; write baru memakai `event_data` terstruktur dan dilakukan di RPC yang sama dengan update owner. |
-| D-03 | Row audit lama | Jangan update/delete row `activity_log` lama. Reader mengenali legacy reassign secara kompatibel dan mengecualikannya dari Status Audit Trail. |
-| D-04 | Dependency policy | Critical/High tanpa exception memblokir CI; Moderate/Low menjadi laporan. Exception wajib punya alasan, owner, dan tanggal kedaluwarsa. |
-| D-05 | Refactor Task | Behavior-preserving, sesudah baseline hijau; ekstraksi kecil per boundary, bukan rewrite satu kali. |
-| D-06 | Migration | Jangan edit migration yang sudah ada. Semua perubahan schema/function memakai migration baru. |
+| ID   | Keputusan                         | Rekomendasi                                                                                                                                    |
+| ---- | --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| D-01 | History owner dokumen tidak aktif | Soft-deleted, superseded revision, dan stage terminal tetap menyimpan owner historis; jangan ikut transfer aktif.                              |
+| D-02 | Event reassign Client             | Tambahkan `client_owner_change`; write baru memakai `event_data` terstruktur dan dilakukan di RPC yang sama dengan update owner.               |
+| D-03 | Row audit lama                    | Jangan update/delete row `activity_log` lama. Reader mengenali legacy reassign secara kompatibel dan mengecualikannya dari Status Audit Trail. |
+| D-04 | Dependency policy                 | Critical/High tanpa exception memblokir CI; Moderate/Low menjadi laporan. Exception wajib punya alasan, owner, dan tanggal kedaluwarsa.        |
+| D-05 | Refactor Task                     | Behavior-preserving, sesudah baseline hijau; ekstraksi kecil per boundary, bukan rewrite satu kali.                                            |
+| D-06 | Migration                         | Jangan edit migration yang sudah ada. Semua perubahan schema/function memakai migration baru.                                                  |
 
 **Catatan keputusan 2026-08-08:** User menyetujui rencana lokal D-01 sampai
-D-04 dan pelaksanaan Task A1-A3. Persetujuan ini tidak mencakup perubahan
-remote, commit, push, atau deployment.
+D-04 dan pelaksanaan Task A1-A3. Persetujuan awal ini tidak mencakup perubahan
+remote, commit, push, atau deployment; tindakan tersebut kemudian dilakukan
+setelah instruksi terpisah dari user.
 
 **Catatan eksekusi 2026-08-08:** B1-B3 diimplementasikan lokal dengan
 `client_owner_change`, RPC atomik `reassign_client_owner`, adapter client,
 reader activity/status yang kompatibel dengan row legacy, dan migration
-forward-only. Belum ada commit, push, deployment, atau apply migration ke
-Supabase remote `qhtfixgbcpcitokeryxb`.
+forward-only. Implementasi dikomit pada `f701816`; koreksi assertion test
+dikirim pada `22e7612`. Migration production telah applied ke Supabase remote
+`qhtfixgbcpcitokeryxb`; warning cache `pg-delta` tidak muncul lagi pada dry-run
+ulang; CI run `31266493103` hijau termasuk Production migration parity,
+Application and RLS tests, dan Browser E2E flows. Bukti browser/UAT spesifik
+untuk reassign-owner di UI masih belum dicentang karena E2E yang ada bersifat
+umum, bukan skenario reassign-owner.
 
 ## Dependency Graph
 
@@ -188,14 +197,14 @@ orang mematikan gate lagi.
 
 ## Prioritas dan Estimasi
 
-| Paket kerja | Prioritas | Estimasi | Owner yang disarankan |
-| --- | --- | --- | --- |
-| Baseline engineering | P0 | 0,5-1 hari | QA/DevEx |
-| Atomic Client ownership audit | P0 | 1-1,5 hari | Supabase/backend + frontend |
-| Lifecycle dua-kontrak | P0 | 1-2 hari | Supabase/backend |
-| Dependency triage dan gate | P1 | 0,5-1 hari | DevEx/security |
-| Compatibility/cache/DB lint cleanup | P1 | 0,5-1 hari | Frontend/backend |
-| TasksInboxPage extraction | P2 | 2-3 hari | Frontend |
+| Paket kerja                         | Prioritas | Estimasi   | Owner yang disarankan       |
+| ----------------------------------- | --------- | ---------- | --------------------------- |
+| Baseline engineering                | P0        | 0,5-1 hari | QA/DevEx                    |
+| Atomic Client ownership audit       | P0        | 1-1,5 hari | Supabase/backend + frontend |
+| Lifecycle dua-kontrak               | P0        | 1-2 hari   | Supabase/backend            |
+| Dependency triage dan gate          | P1        | 0,5-1 hari | DevEx/security              |
+| Compatibility/cache/DB lint cleanup | P1        | 0,5-1 hari | Frontend/backend            |
+| TasksInboxPage extraction           | P2        | 2-3 hari   | Frontend                    |
 
 [Kemungkinan Besar] Total 5,5-9,5 hari kerja fokus untuk satu engineer,
 di luar waktu approval, remote migration, deployment, dan browser UAT
@@ -203,19 +212,22 @@ production.
 
 ## Risiko dan Mitigasi
 
-| Risiko | Dampak | Mitigasi |
-| --- | --- | --- |
-| Mengedit migration lama | Local dan production schema dapat berbeda | Selalu migration aditif baru; fresh `db reset` dan migration parity check. |
-| Audit row lama diubah untuk “merapikan” kind | Chain of custody/history rusak | Forward-only event kind; compatibility read untuk legacy row. |
-| Satu predicate dipakai untuk active transfer dan permanent delete | Akun dengan history dapat terhapus | Pisahkan active ownership dan historical reference contracts. |
-| Query key berubah saat refactor Task | UI stale atau cache shape salah | Freeze exact keys dalam test sebelum ekstraksi. |
-| Dependency upgrade besar sekaligus | Regression bundle/export/build | Upgrade per parent dependency, focused verification, lalu full gate. |
-| Push `main` langsung deploy production | Perubahan belum UAT masuk live | Review commit/push terpisah; jangan push tanpa approval eksplisit. |
+| Risiko                                                            | Dampak                                    | Mitigasi                                                                   |
+| ----------------------------------------------------------------- | ----------------------------------------- | -------------------------------------------------------------------------- |
+| Mengedit migration lama                                           | Local dan production schema dapat berbeda | Selalu migration aditif baru; fresh `db reset` dan migration parity check. |
+| Audit row lama diubah untuk “merapikan” kind                      | Chain of custody/history rusak            | Forward-only event kind; compatibility read untuk legacy row.              |
+| Satu predicate dipakai untuk active transfer dan permanent delete | Akun dengan history dapat terhapus        | Pisahkan active ownership dan historical reference contracts.              |
+| Query key berubah saat refactor Task                              | UI stale atau cache shape salah           | Freeze exact keys dalam test sebelum ekstraksi.                            |
+| Dependency upgrade besar sekaligus                                | Regression bundle/export/build            | Upgrade per parent dependency, focused verification, lalu full gate.       |
+| Push `main` langsung deploy production                            | Perubahan belum UAT masuk live            | Review commit/push terpisah; jangan push tanpa approval eksplisit.         |
 
 ## Gate Remote dan Release
 
 Rencana ini hanya mengizinkan implementasi dan verifikasi **lokal** setelah
-disetujui. Tindakan berikut tetap membutuhkan persetujuan terpisah dan eksplisit:
+disetujui. Untuk B1-B3, user kemudian memberi instruksi terpisah untuk
+commit/push, remote Supabase mutation, dan verifikasi production. Tindakan
+berikut tetap membutuhkan persetujuan terpisah dan eksplisit untuk fase
+berikutnya:
 
 - apply migration ke Supabase production `qhtfixgbcpcitokeryxb`;
 - push/merge ke `main` yang memicu Vercel production;
