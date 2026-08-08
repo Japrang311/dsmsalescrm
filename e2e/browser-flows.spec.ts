@@ -3,6 +3,7 @@ import { expect, test } from "@playwright/test";
 import {
   NUR_CLIENT_ID,
   USERS,
+  USER_IDS,
   authenticatedSupabaseClient,
   collectConsoleIssues,
   expectNoConsoleIssues,
@@ -88,6 +89,60 @@ test("sales can record a client follow-up that survives reload", async ({
 
   await page.reload();
   await expect(page.getByText(note)).toBeVisible();
+
+  expectNoConsoleIssues(consoleIssues);
+});
+
+test("manager can reassign client owner and see ownership audit after reload", async ({
+  page,
+}) => {
+  const consoleIssues = collectConsoleIssues(page);
+  const clientName = uniqueToken("E2E owner handover client");
+  const note = uniqueToken("E2E owner handover note");
+  const managerClient = await authenticatedSupabaseClient(USERS.manager);
+  const { data: client, error: clientError } = await managerClient
+    .from("clients")
+    .insert({
+      name: clientName,
+      source: "Referral",
+      status: "Prospect",
+      owner_id: USER_IDS.sales,
+    })
+    .select("id")
+    .single();
+
+  expect(clientError).toBeNull();
+  expect(client?.id).toBeTruthy();
+
+  await signIn(page, USERS.manager);
+  await page.goto(`/clients/${client!.id}`);
+  await expect(page.getByRole("heading", { name: clientName })).toBeVisible();
+  await expect(page.getByText("Sales: Nur Iman")).toBeVisible();
+
+  await page.getByRole("button", { name: "Reassign" }).click();
+  const reassignDialog = page.getByRole("alertdialog", {
+    name: "Reassign / Handover Klien",
+  });
+  await expect(reassignDialog).toBeVisible();
+  await reassignDialog.getByText("Pilih sales...").click();
+  await page.getByRole("option", { name: "Leli Al" }).click();
+  await reassignDialog.getByLabel("Alasan / catatan (opsional)").fill(note);
+  await reassignDialog
+    .getByRole("button", { name: "Konfirmasi reassign" })
+    .click();
+  await expect(page.getByText("Klien direassign ke Leli Al")).toBeVisible();
+
+  await page.reload();
+  await expect(page.getByRole("heading", { name: clientName })).toBeVisible();
+  await expect(page.getByText("Sales: Leli Al")).toBeVisible();
+
+  await page.goto("/activity");
+  await page.getByPlaceholder("Cari client / catatan / owner…").fill(note);
+  const ownershipRow = page.getByRole("button").filter({ hasText: note });
+  await expect(ownershipRow).toContainText(clientName);
+  await expect(ownershipRow).toContainText("Perubahan Owner");
+  await expect(ownershipRow).toContainText("Owner baru: Leli Al");
+  await expect(ownershipRow).not.toContainText("Perubahan Status Client");
 
   expectNoConsoleIssues(consoleIssues);
 });

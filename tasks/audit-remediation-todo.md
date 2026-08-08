@@ -1,12 +1,14 @@
 # Checklist Remediasi Audit Codebase
 
 > **Status:** IN PROGRESS — Task 0, Fase A, dan B1-B3 selesai; Checkpoint B
-> sebagian besar terverifikasi
+> terverifikasi
 > **Plan:** `tasks/audit-remediation-plan.md`
 > **Sumber:** `audit/00-REPORT.md`
 > **Bukti rilis B:** Commit `f701816`, fix test `22e7612`, push `origin/main`,
 > Supabase production `qhtfixgbcpcitokeryxb` applied, Vercel production Ready,
-> GitHub Actions run `31266493103` success.
+> GitHub Actions run `31266493103` success; browser/UAT reassign-owner
+> dilindungi E2E lokal `manager can reassign client owner and see ownership
+audit after reload`.
 
 ## Task 0 — Setujui kontrak bisnis dan security
 
@@ -185,8 +187,8 @@ route Client Detail.
 **Verification:**
 
 - [x] Unit test parser untuk status asli, owner-change baru, dan legacy reassign.
-- [ ] Browser local: reassign tampil sebagai owner change, bukan status badge.
-- [ ] Reload membuktikan owner dan event persist.
+- [x] Browser local: reassign tampil sebagai owner change, bukan status badge.
+- [x] Reload membuktikan owner dan event persist.
 - [x] CI Browser E2E umum pass pada GitHub Actions run `31266493103`.
 
 **Dependencies:** Task B2
@@ -206,7 +208,7 @@ route Client Detail.
 - [x] Activity feed dan Status Audit Trail menampilkan domain yang benar.
 - [x] `bun run test:e2e` pass via CI Browser E2E flows pada run
       `31266493103`.
-- [ ] Browser/UAT spesifik reassign-owner: owner change tampil benar dan tetap
+- [x] Browser/UAT spesifik reassign-owner: owner change tampil benar dan tetap
       persist setelah reload.
 
 ---

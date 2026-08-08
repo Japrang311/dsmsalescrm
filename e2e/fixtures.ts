@@ -9,6 +9,11 @@ export const USERS = {
   executive: "executive@local.dsm.test",
 } as const;
 
+export const USER_IDS = {
+  sales: "33333333-3333-3333-3333-333333333333",
+  manager: "55555555-5555-5555-5555-555555555555",
+} as const;
+
 export const NUR_CLIENT_ID = "a0000000-0000-4000-8000-000000000014";
 export const LOCAL_SUPABASE_URL =
   process.env.VITE_SUPABASE_URL ?? "http://127.0.0.1:54321";

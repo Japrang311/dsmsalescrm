@@ -1,7 +1,7 @@
 # Rencana Remediasi Audit Codebase
 
 > **Status:** APPROVED — D-01 sampai D-04 disetujui; Fase A dan B1-B3 selesai,
-> production migration parity hijau
+> Checkpoint B terverifikasi, production migration parity hijau
 > **Tanggal:** 2026-08-08
 > **Status release B:** Commit `f701816` dan `22e7612` sudah push ke
 > `origin/main`; migration B1-B3 sudah applied ke Supabase production
@@ -60,8 +60,10 @@ dikirim pada `22e7612`. Migration production telah applied ke Supabase remote
 `qhtfixgbcpcitokeryxb`; warning cache `pg-delta` tidak muncul lagi pada dry-run
 ulang; CI run `31266493103` hijau termasuk Production migration parity,
 Application and RLS tests, dan Browser E2E flows. Bukti browser/UAT spesifik
-untuk reassign-owner di UI masih belum dicentang karena E2E yang ada bersifat
-umum, bukan skenario reassign-owner.
+untuk reassign-owner di UI ditambahkan sebagai E2E lokal `manager can reassign
+client owner and see ownership audit after reload`, yang membuktikan owner
+persist setelah reload dan Activity Log menampilkan event sebagai Perubahan
+Owner, bukan Perubahan Status Client.
 
 ## Dependency Graph
 
