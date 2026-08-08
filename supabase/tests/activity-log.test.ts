@@ -489,7 +489,7 @@ describe("structured activity_log event_data", () => {
       });
 
       expect(error?.code).toBe("23514");
-      expect(error?.message).toContain("activity_log_stage_event_data_valid");
+      expect(error?.message).toContain("activity_log_event_data_valid");
     } finally {
       if (legacyActivityId) {
         await adminClient
