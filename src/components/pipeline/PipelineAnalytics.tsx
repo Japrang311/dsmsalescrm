@@ -6,13 +6,6 @@ import { COMMERCIAL_STAGES } from "@/lib/data/commercial-stages";
 import { EmptyState } from "@/components/ui/empty-state";
 import type { PipelineMetrics } from "@/lib/data/pipeline-metrics";
 
-type Item = {
-  id: string;
-  stage: string;
-  ownerId: string;
-  estimatedValue: number;
-};
-
 const ALL_STAGES = COMMERCIAL_STAGES;
 
 const WON_STAGES = new Set(["Closed Won"]);
@@ -26,11 +19,9 @@ function pct(part: number, whole: number): number {
 export function PipelineAnalytics({
   metrics,
   showOwners,
-  ownerById = {},
 }: {
   metrics: PipelineMetrics;
   showOwners: boolean;
-  ownerById?: Record<string, { name: string }>;
 }) {
   const totals = useMemo(() => {
     return {

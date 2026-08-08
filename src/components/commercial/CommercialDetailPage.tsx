@@ -614,7 +614,6 @@ export function CommercialDetailPage({
         canEdit={canEdit}
         isFoc={isFoc}
         deleteLabel={deleteLabel}
-        backHref={backHref}
         backLabel={backLabel}
         onBack={() => navigate({ to: backHref })}
         onDelete={() => deleteItem(item.id)}

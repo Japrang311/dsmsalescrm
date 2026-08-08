@@ -19,7 +19,6 @@ export function CommercialDetailHeader({
   canEdit,
   isFoc,
   deleteLabel,
-  backHref,
   backLabel,
   onBack,
   onDelete,
@@ -36,7 +35,6 @@ export function CommercialDetailHeader({
   canEdit: boolean;
   isFoc: boolean;
   deleteLabel: string;
-  backHref: string;
   backLabel: string;
   onBack: () => void;
   onDelete: () => Promise<void>;

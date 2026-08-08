@@ -1,7 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { ROLE_FIXTURES } from "../../tests/fixtures/roles";
 import {
-  adminClient,
   createRoleFixtureUsers,
   deleteRoleFixtureUsers,
   signInAs,

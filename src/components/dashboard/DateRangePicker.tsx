@@ -84,8 +84,8 @@ export function DateRangePicker({ value, onChange }: Props) {
               Preset
             </span>
             <span className="px-2 pb-1 text-[10px] leading-snug text-muted-foreground">
-              Mengatur rentang untuk Export saja, KPI di layar tetap YTD /
-              bulan berjalan.
+              Mengatur rentang untuk Export saja, KPI di layar tetap YTD / bulan
+              berjalan.
             </span>
             {PRESETS.map((p) => (
               <Button

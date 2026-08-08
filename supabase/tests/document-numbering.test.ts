@@ -9,8 +9,6 @@ import {
 } from "./helpers";
 
 const db = new SQL("postgresql://postgres:postgres@127.0.0.1:54322/postgres");
-const createdClients: string[] = [];
-const externalOwnerSalesOrderIds: string[] = [];
 let fixtures: RoleFixtureUsers | undefined;
 let ownedClientId: string | undefined;
 let hariffClientId: string | undefined;
@@ -30,7 +28,77 @@ function users(): RoleFixtureUsers {
   return fixtures;
 }
 
+async function cleanupNumberingFixtures(): Promise<void> {
+  await db.begin(async (tx) => {
+    await tx`
+      delete from public.activity_log
+      where client_id in (
+        select id from public.clients where name like 'Numbering Client %'
+      )
+        or task_id in (
+          select id from public.tasks
+          where client_id in (
+            select id from public.clients where name like 'Numbering Client %'
+          )
+        )
+        or commercial_document_id in (
+          select id from public.commercial_documents
+          where client_id in (
+            select id from public.clients where name like 'Numbering Client %'
+          )
+        )
+        or sales_order_id in (
+          select id from public.sales_orders
+          where client_id in (
+            select id from public.clients where name like 'Numbering Client %'
+          )
+            or so_number like 'DSM-22SO-%'
+        )
+    `;
+    await tx`
+      delete from public.follow_up_logs
+      where client_id in (
+        select id from public.clients where name like 'Numbering Client %'
+      )
+        or commercial_document_id in (
+          select id from public.commercial_documents
+          where client_id in (
+            select id from public.clients where name like 'Numbering Client %'
+          )
+        )
+    `;
+    await tx`
+      delete from public.tasks
+      where client_id in (
+        select id from public.clients where name like 'Numbering Client %'
+      )
+    `;
+    await tx`
+      delete from public.sales_orders
+      where client_id in (
+        select id from public.clients where name like 'Numbering Client %'
+      )
+        or so_number like 'DSM-22SO-%'
+    `;
+    await tx`
+      delete from public.commercial_documents
+      where client_id in (
+        select id from public.clients where name like 'Numbering Client %'
+      )
+    `;
+    await tx`
+      delete from public.clients
+      where name like 'Numbering Client %'
+    `;
+    await tx`
+      delete from private.document_number_counters
+      where year_code in (91, 92, 93, 94, 97)
+    `;
+  });
+}
+
 beforeAll(async () => {
+  await cleanupNumberingFixtures();
   fixtures = await createRoleFixtureUsers();
   const { data: ownedClient, error: ownedClientError } = await adminClient
     .from("clients")
@@ -43,7 +111,6 @@ beforeAll(async () => {
     .select("id")
     .single();
   if (ownedClientError) throw ownedClientError;
-  createdClients.push(ownedClient.id);
   ownedClientId = ownedClient.id;
 
   // The seed already contains the one canonical HARIFF client. Reuse it as a
@@ -59,44 +126,25 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  if (externalOwnerSalesOrderIds.length > 0) {
-    await adminClient
-      .from("activity_log")
-      .delete()
-      .in("sales_order_id", externalOwnerSalesOrderIds);
-    await adminClient
-      .from("sales_orders")
-      .delete()
-      .in("id", externalOwnerSalesOrderIds);
+  const failures: unknown[] = [];
+  try {
+    await cleanupNumberingFixtures();
+  } catch (error) {
+    failures.push(error);
   }
-  if (fixtures) {
-    await adminClient
-      .from("activity_log")
-      .delete()
-      .eq("owner_id", fixtures.sales.id);
-    // create_quotation/revise_quotation now insert a linked follow-up Task
-    // per call (spec: docs/superpowers/specs/2026-08-03-quotation-mandatory-followup-design.md)
-    // -- clean these up before commercial_documents/clients, otherwise
-    // tasks.client_id's FK blocks the clients delete below.
-    await adminClient.from("tasks").delete().eq("owner_id", fixtures.sales.id);
-    await adminClient
-      .from("commercial_documents")
-      .delete()
-      .eq("owner_id", fixtures.sales.id);
-    await adminClient
-      .from("sales_orders")
-      .delete()
-      .eq("owner_id", fixtures.sales.id);
+  try {
+    await deleteRoleFixtureUsers(fixtures);
+  } catch (error) {
+    failures.push(error);
   }
-  if (createdClients.length > 0) {
-    await adminClient.from("clients").delete().in("id", createdClients);
+  try {
+    await db.end();
+  } catch (error) {
+    failures.push(error);
   }
-  await db`
-    delete from private.document_number_counters
-    where year_code in (91, 92, 93, 94, 97)
-  `;
-  await deleteRoleFixtureUsers(fixtures);
-  await db.end();
+  if (failures.length > 0) {
+    throw new AggregateError(failures, "Numbering fixture cleanup failed");
+  }
 });
 
 describe("Phase 11 atomic document numbering", () => {
@@ -418,7 +466,6 @@ describe("Phase 11 atomic document numbering", () => {
     const first = await managerClient.rpc("create_sales_order", args);
     expect(first.error).toBeNull();
     expect(first.data.so_number).toBe(manual);
-    externalOwnerSalesOrderIds.push(first.data.id);
 
     const duplicate = await managerClient.rpc("create_sales_order", {
       ...args,

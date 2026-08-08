@@ -24,10 +24,7 @@ import {
   type QuotationLostReason,
   type Role,
 } from "@/lib/domain";
-import {
-  listCommercialItems,
-  toCommercialItem,
-} from "@/lib/data/commercial-items";
+import { toCommercialItem } from "@/lib/data/commercial-items";
 import {
   listCommercialDocumentsPage,
   transitionCommercialStage,
@@ -503,11 +500,7 @@ function PipelineBoardPage({ role }: { role: Role }) {
       />
 
       {/* Analytics */}
-      <PipelineAnalytics
-        metrics={metrics}
-        showOwners={role !== "sales"}
-        ownerById={ownerById}
-      />
+      <PipelineAnalytics metrics={metrics} showOwners={role !== "sales"} />
 
       {/* Board -- more stage columns than fit most viewports; the edge
           fade hints at the horizontal scroll so it doesn't look like the
