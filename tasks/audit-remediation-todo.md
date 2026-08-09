@@ -1,7 +1,7 @@
 # Checklist Remediasi Audit Codebase
 
-> **Status:** IN PROGRESS — Task 0, Fase A, dan B1-B3 selesai; Checkpoint B
-> terverifikasi
+> **Status:** IN PROGRESS — Task 0, Fase A, B1-B3, C1, dan C2 lokal selesai;
+> Checkpoint B terverifikasi
 > **Plan:** `tasks/audit-remediation-plan.md`
 > **Sumber:** `audit/00-REPORT.md`
 > **Bukti rilis B:** Commit `f701816`, fix test `22e7612`, push `origin/main`,
@@ -243,17 +243,17 @@ lifecycle.
 
 **Acceptance criteria:**
 
-- [ ] Helper/predicate active commercial ownership didefinisikan satu kali.
-- [ ] Summary dan transfer memakai predicate aktif yang sama.
-- [ ] `account_reference_counts`/`delete_eligible_account` tetap menghitung
+- [x] Helper/predicate active commercial ownership didefinisikan satu kali.
+- [x] Summary dan transfer memakai predicate aktif yang sama.
+- [x] `account_reference_counts`/`delete_eligible_account` tetap menghitung
       seluruh history.
-- [ ] Tidak ada soft-deleted/superseded/terminal row yang di-reassign.
+- [x] Tidak ada soft-deleted/superseded/terminal row yang di-reassign.
 
 **Verification:**
 
-- [ ] Fresh DB reset dan focused lifecycle suite pass.
-- [ ] Transfer count sama dengan row yang benar-benar berubah.
-- [ ] Permanent delete tetap gagal jika hanya historical reference yang tersisa.
+- [x] Fresh DB reset dan focused lifecycle suite pass.
+- [x] Transfer count sama dengan row yang benar-benar berubah.
+- [x] Permanent delete tetap gagal jika hanya historical reference yang tersisa.
 
 **Dependencies:** Task C1
 

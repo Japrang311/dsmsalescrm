@@ -138,6 +138,15 @@ yang sudah merah karena residue fixture atau formatting.
 4. Pastikan delete eligibility tetap diblokir oleh seluruh referensi historis.
 5. Uji soft-delete, superseded revision, terminal stage, dan row audit lama.
 
+Catatan C2 lokal: migration
+`20260809000551_add_active_transferable_commercial_predicate.sql` menambahkan
+`private.is_active_transfer_commercial_document()` sebagai predicate tunggal.
+`private.count_active_commercial_items()`, `public.admin_team_summary()`, dan
+`private.transfer_active_ownership()` memakai predicate tersebut. Historical
+delete blocker tetap lewat `private.account_reference_counts()`, sehingga
+soft-deleted/superseded/terminal commercial documents tidak dipindah saat
+transfer aktif tetapi tetap memblokir permanent delete.
+
 ### Fase D — Tutup Risiko Dependency
 
 1. Triage 17 advisory berdasarkan dependency graph dan reachability.

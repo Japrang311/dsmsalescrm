@@ -559,6 +559,31 @@ describe("account lifecycle database primitives", () => {
     expect((referenceCounts as ReferenceCounts).commercial_items).toBe(7);
   });
 
+  test("active workload summaries share the active commercial ownership predicate", async () => {
+    const users = requireFixtures();
+    const managerClient = await signInAs(users.manager);
+
+    const { data: activeCommercialCount, error: countError } =
+      await managerClient.rpc("admin_count_active_commercial_items", {
+        p_owner_id: users.sales.id,
+      });
+    expect(countError).toBeNull();
+    expect(Number(activeCommercialCount)).toBe(1);
+
+    const { data: teamSummary, error: summaryError } = await managerClient.rpc(
+      "admin_team_summary",
+      {},
+    );
+    expect(summaryError).toBeNull();
+    const salesSummary = (teamSummary ?? []).find(
+      (row: { id: string }) => row.id === users.sales.id,
+    );
+
+    expect(Number(salesSummary?.clients_count)).toBe(1);
+    expect(Number(salesSummary?.tasks_count)).toBe(1);
+    expect(Number(salesSummary?.commercial_items_count)).toBe(1);
+  });
+
   test("active Super Admin count excludes inactive profiles", async () => {
     if (baselineActiveSuperAdminCount === undefined) {
       throw new Error("Baseline active Super Admin count is unavailable");
@@ -640,7 +665,7 @@ describe("account lifecycle database primitives", () => {
     }
   });
 
-  test("ownership transfer documents current drift for soft-deleted and superseded commercial history", async () => {
+  test("ownership transfer moves only active current open rows and preserves commercial history", async () => {
     const users = requireFixtures();
     const created = requireRows();
     let auditId: string | undefined;
@@ -659,8 +684,8 @@ describe("account lifecycle database primitives", () => {
       expect(data as TransferCounts).toEqual({
         clients: 1,
         tasks: 1,
-        commercial_items: 3,
-        total: 5,
+        commercial_items: 1,
+        total: 3,
       });
 
       expect(await ownerId("clients", created.clientOpen)).toBe(
@@ -678,10 +703,10 @@ describe("account lifecycle database primitives", () => {
       ).toBe(users.manager.id);
       expect(
         await ownerId("commercial_documents", created.commercialSoftDeleted),
-      ).toBe(users.manager.id);
+      ).toBe(users.sales.id);
       expect(
         await ownerId("commercial_documents", created.commercialSuperseded),
-      ).toBe(users.manager.id);
+      ).toBe(users.sales.id);
       for (const historicalId of [
         created.commercialClosedWon,
         created.commercialClosedLost,
@@ -743,8 +768,8 @@ describe("account lifecycle database primitives", () => {
         counts: {
           clients: 1,
           tasks: 1,
-          commercial_items: 3,
-          total: 5,
+          commercial_items: 1,
+          total: 3,
         },
       });
     } finally {
@@ -758,14 +783,7 @@ describe("account lifecycle database primitives", () => {
       for (const [table, ids] of [
         ["clients", [created.clientOpen]],
         ["tasks", [created.taskOpen]],
-        [
-          "commercial_documents",
-          [
-            created.commercialOpen,
-            created.commercialSoftDeleted,
-            created.commercialSuperseded,
-          ],
-        ],
+        ["commercial_documents", [created.commercialOpen]],
       ] as const) {
         const { error } = await adminClient
           .from(table)
@@ -1183,6 +1201,58 @@ describe("account lifecycle database primitives", () => {
       ).toBe(true);
     } finally {
       await deleteAuditIds(auditIds);
+      await deleteDisposableAuth(target.id);
+    }
+  });
+
+  test("eligible delete stays blocked when only a historical commercial reference remains", async () => {
+    const users = requireFixtures();
+    const target = await createDisposableProfile("historical-delete-blocker");
+    let clientId: string | undefined;
+    let commercialId: string | undefined;
+
+    try {
+      clientId = await insertId("clients", {
+        name: "Task 4 historical-only client",
+        status: "Active Customer",
+        source: "Referral",
+        owner_id: users.manager.id,
+      });
+      commercialId = await insertId("commercial_documents", {
+        client_id: clientId,
+        owner_id: target.id,
+        type: "Quotation",
+        source_flow: "RFQ / New Product",
+        document_date: "2026-07-19",
+        stage: "Closed Won",
+      });
+
+      const { error } = await adminClient.rpc("admin_delete_eligible_account", {
+        p_actor_id: users.super_admin.id,
+        p_target_id: target.id,
+        p_reason: "Historical commercial reference remains",
+      });
+      expect(error?.message).toContain("ACCOUNT_HAS_REFERENCES");
+      expect(error?.details).toContain('"commercial_items": 1');
+      expect(error?.details).toContain('"total_blocking": 1');
+      expect(await ownerId("commercial_documents", commercialId)).toBe(
+        target.id,
+      );
+    } finally {
+      if (commercialId) {
+        const { error } = await adminClient
+          .from("commercial_documents")
+          .delete()
+          .eq("id", commercialId);
+        expect(error).toBeNull();
+      }
+      if (clientId) {
+        const { error } = await adminClient
+          .from("clients")
+          .delete()
+          .eq("id", clientId);
+        expect(error).toBeNull();
+      }
       await deleteDisposableAuth(target.id);
     }
   });
