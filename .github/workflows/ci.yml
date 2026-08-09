@@ -213,7 +213,7 @@ jobs:
         run: bun run stage3:check-budgets
 
   dependency_risk:
-    name: Dependency risk report
+    name: Dependency risk gate
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -227,10 +227,10 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Generate dependency risk report
+      - name: Generate dependency risk gate report
         run: bun run audit:deps:report
 
-      - name: Upload dependency risk report
+      - name: Upload dependency risk gate report
         uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -73,11 +73,9 @@ function queryFor(table: string) {
     },
     then<TResult1 = QueryResult, TResult2 = never>(
       onfulfilled?:
-        | ((value: QueryResult) => TResult1 | PromiseLike<TResult1>)
-        | null,
+        ((value: QueryResult) => TResult1 | PromiseLike<TResult1>) | null,
       onrejected?:
-        | ((reason: unknown) => TResult2 | PromiseLike<TResult2>)
-        | null,
+        ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
     ) {
       return Promise.resolve(
         resultForCall?.(call) ??

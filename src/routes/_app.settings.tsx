@@ -419,11 +419,7 @@ const TEAM_ROLE_LABELS: Record<AppRole, string> = {
 };
 
 type TeamAction =
-  | "change_role"
-  | "deactivate"
-  | "reactivate"
-  | "transfer"
-  | "delete";
+  "change_role" | "deactivate" | "reactivate" | "transfer" | "delete";
 
 function TeamTab({
   canManage,

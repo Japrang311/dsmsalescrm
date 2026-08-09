@@ -384,9 +384,7 @@ function TasksInboxPage() {
   }, [query, clientList]);
 
   const historyCommercialItemIds = useMemo(():
-    | string[]
-    | "none"
-    | undefined => {
+    string[] | "none" | undefined => {
     if (commercialType === "all") return undefined;
     if (commercialType === "none") return "none";
     return commercialItems

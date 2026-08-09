@@ -16,11 +16,7 @@
 import { supabase } from "@/lib/supabase";
 
 export type TaskWorkflowStatus =
-  | "Open"
-  | "In Progress"
-  | "Waiting External"
-  | "Done"
-  | "Cancelled";
+  "Open" | "In Progress" | "Waiting External" | "Done" | "Cancelled";
 
 export type DueState = "Upcoming" | "Today" | "Overdue" | "Escalated" | null;
 

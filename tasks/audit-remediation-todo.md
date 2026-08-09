@@ -335,16 +335,16 @@ semua versi sekaligus.
 
 **Acceptance criteria:**
 
-- [ ] Script membaca exit/result dan menerapkan threshold policy.
-- [ ] Critical/High tanpa exception menghasilkan exit non-zero.
-- [ ] Artifact report selalu dibuat/upload, termasuk ketika gate gagal.
-- [ ] Exception expired otomatis dianggap gagal.
+- [x] Script membaca exit/result dan menerapkan threshold policy.
+- [x] Critical/High tanpa exception menghasilkan exit non-zero.
+- [x] Artifact report selalu dibuat/upload, termasuk ketika gate gagal.
+- [x] Exception expired otomatis dianggap gagal.
 
 **Verification:**
 
-- [ ] Unit test fixture: clean exit 0, High exit non-zero, expired exception exit
+- [x] Unit test fixture: clean exit 0, High exit non-zero, expired exception exit
       non-zero.
-- [ ] Local workflow/script smoke pass.
+- [x] Local workflow/script smoke pass.
 
 **Dependencies:** Task D1
 

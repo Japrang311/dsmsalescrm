@@ -146,8 +146,7 @@ function PipelineBoardPage({ role }: { role: Role }) {
       getPipelineMetrics({
         ownerId: filters.ownerId,
         clientStatus: filters.clientStatus as
-          | import("@/lib/domain").ClientStatus
-          | undefined,
+          import("@/lib/domain").ClientStatus | undefined,
       }),
     enabled: authReady,
   });

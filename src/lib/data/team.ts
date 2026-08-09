@@ -21,8 +21,7 @@ export type TeamQueryBuilder = {
   range(from: number, to: number): TeamQueryBuilder;
   then<TResult1 = TeamQueryResult, TResult2 = never>(
     onfulfilled?:
-      | ((value: TeamQueryResult) => TResult1 | PromiseLike<TResult1>)
-      | null,
+      ((value: TeamQueryResult) => TResult1 | PromiseLike<TResult1>) | null,
     onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
   ): PromiseLike<TResult1 | TResult2>;
 };

@@ -78,8 +78,7 @@ export function compareCommercialItemsByNewestQuotationNumber(
  * Each result is now one normalized document header, never one line row.
  */
 type CommercialItemsQueryInput =
-  | CommercialDocumentQuery
-  | { queryKey: readonly unknown[] };
+  CommercialDocumentQuery | { queryKey: readonly unknown[] };
 
 export async function listCommercialItems(
   input: CommercialItemsQueryInput = {},

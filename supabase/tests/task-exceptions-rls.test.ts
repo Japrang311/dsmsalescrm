@@ -17,11 +17,7 @@ async function insertTask(input: {
   title: string;
   dueDate?: string;
   workflowStatus?:
-    | "Open"
-    | "In Progress"
-    | "Waiting External"
-    | "Done"
-    | "Cancelled";
+    "Open" | "In Progress" | "Waiting External" | "Done" | "Cancelled";
   archived?: boolean;
 }) {
   const { data, error } = await adminClient
