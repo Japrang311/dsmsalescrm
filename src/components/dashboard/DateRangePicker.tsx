@@ -71,9 +71,10 @@ export function DateRangePicker({ value, onChange }: Props) {
           variant="outline"
           size="sm"
           className={cn("h-8 gap-1.5 font-normal text-xs")}
+          title="Periode ini hanya mengatur rentang data untuk Export PDF/CSV/Excel, tidak mengubah angka KPI di layar"
         >
           <CalendarIcon className="h-3.5 w-3.5" />
-          <span className="tabular-nums">{label}</span>
+          <span className="tabular-nums">Periode Export: {label}</span>
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0 pointer-events-auto" align="end">
@@ -81,6 +82,10 @@ export function DateRangePicker({ value, onChange }: Props) {
           <div className="flex flex-col gap-1 border-b border-border p-2 sm:border-b-0 sm:border-r sm:min-w-[140px]">
             <span className="px-2 pb-1 pt-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
               Preset
+            </span>
+            <span className="px-2 pb-1 text-[10px] leading-snug text-muted-foreground">
+              Mengatur rentang untuk Export saja, KPI di layar tetap YTD / bulan
+              berjalan.
             </span>
             {PRESETS.map((p) => (
               <Button

@@ -5,7 +5,7 @@ import {
   dashboardExportTopCustomers,
   type DashboardExportContext,
 } from "@/lib/dashboard-export-data";
-import type { DateRange } from "@/lib/domain";
+import { toLocalIsoDate, type DateRange } from "@/lib/domain";
 
 // CSV cell escaping per RFC 4180. Prefix formula-like values with a single
 // quote to prevent CSV injection when opened in spreadsheet apps.
@@ -34,7 +34,7 @@ function download(filename: string, csv: string) {
   URL.revokeObjectURL(url);
 }
 
-const iso = (d: Date) => d.toISOString().slice(0, 10);
+const iso = (d: Date) => toLocalIsoDate(d);
 const stamp = (range: DateRange) => `${iso(range.from)}_${iso(range.to)}`;
 
 // Thrown when a report has zero rows for the selected period. Callers show

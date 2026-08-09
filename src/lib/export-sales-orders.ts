@@ -3,7 +3,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
 import { ROLE_LABEL } from "@/context/role-context";
-import type { DateRange, Role } from "@/lib/domain";
+import { toLocalIsoDate, type DateRange, type Role } from "@/lib/domain";
 import type { SalesOrderDocument } from "@/lib/data/sales-orders";
 import { EmptyExportError } from "@/lib/export-csv";
 import {
@@ -37,7 +37,7 @@ export type SalesOrdersExportContext = {
 
 const IDR_FMT = '"Rp" #,##0;[Red]-"Rp" #,##0;"-"';
 const DATE_FMT = "yyyy-mm-dd";
-const iso = (d: Date) => d.toISOString().slice(0, 10);
+const iso = (d: Date) => toLocalIsoDate(d);
 const stamp = (range: DateRange) => `${iso(range.from)}_${iso(range.to)}`;
 
 function assertRows(rows: SalesOrderDocument[]) {

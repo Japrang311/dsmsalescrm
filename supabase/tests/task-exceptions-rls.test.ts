@@ -3,6 +3,7 @@ import {
   adminClient,
   createRoleFixtureUsers,
   deleteRoleFixtureUsers,
+  jakartaDateDaysFromToday,
   signInAs,
   type RoleFixtureUsers,
 } from "./helpers";
@@ -16,11 +17,7 @@ async function insertTask(input: {
   title: string;
   dueDate?: string;
   workflowStatus?:
-    | "Open"
-    | "In Progress"
-    | "Waiting External"
-    | "Done"
-    | "Cancelled";
+    "Open" | "In Progress" | "Waiting External" | "Done" | "Cancelled";
   archived?: boolean;
 }) {
   const { data, error } = await adminClient
@@ -29,7 +26,7 @@ async function insertTask(input: {
       client_id: clientId,
       owner_id: input.ownerId,
       title: input.title,
-      due_date: input.dueDate ?? "2026-07-20",
+      due_date: input.dueDate ?? jakartaDateDaysFromToday(-10),
       method: "Phone",
       workflow_status: input.workflowStatus ?? "Open",
       archived: input.archived ?? false,
@@ -104,7 +101,7 @@ describe("Executive task exception RLS", () => {
     const managerPreThreshold = await insertTask({
       ownerId: fixtures.manager.id,
       title: "manager overdue hidden",
-      dueDate: "2026-07-26",
+      dueDate: jakartaDateDaysFromToday(-1),
     });
     const salesEscalated = await insertTask({
       ownerId: fixtures.sales.id,
@@ -176,7 +173,7 @@ describe("Executive task exception RLS", () => {
       client_id: clientId,
       owner_id: fixtures.manager.id,
       title: "executive create forbidden",
-      due_date: "2026-07-20",
+      due_date: jakartaDateDaysFromToday(-10),
       method: "Phone",
     });
     expect(createAttempt.error).not.toBeNull();

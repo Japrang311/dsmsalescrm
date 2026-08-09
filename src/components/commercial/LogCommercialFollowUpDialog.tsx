@@ -5,6 +5,8 @@ import { z } from "zod";
 import { toast } from "sonner";
 import { PhoneCall } from "lucide-react";
 
+import { getErrorMessage } from "@/lib/utils";
+import { invalidateFollowUpQueries } from "@/lib/query-invalidation";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -25,13 +27,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
-import type { CommercialItem } from "@/lib/domain";
-import { useQueryClient } from "@tanstack/react-query";
-import { createTask } from "@/lib/data/tasks";
-import { getCurrentActorId, logActivity } from "@/lib/data/activity-log";
-import { logFollowUp, type FollowUpResult } from "@/lib/data/follow-ups";
+import { toLocalIsoDate, type CommercialItem } from "@/lib/domain";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { listTasks } from "@/lib/data/tasks";
+import { activeCommercialTasks } from "@/lib/data/task-relations";
+import {
+  recordCommercialFollowUp,
+  type FollowUpResult,
+} from "@/lib/data/follow-ups";
+import { buildExplicitFollowUpCommand } from "@/lib/follow-up-command";
 
 const METHODS = ["Phone", "Email", "WhatsApp", "Visit", "Meeting"] as const;
 const RESULTS: FollowUpResult[] = [
@@ -58,16 +63,16 @@ const schema = z
       .trim()
       .min(4, { message: "Catatan minimal 4 karakter" })
       .max(600),
-    createNextTask: z.boolean(),
-    updateItemNextDate: z.boolean(),
+    taskMode: z.enum(["existing_task", "create_task"]),
+    taskId: z.string().optional(),
   })
-  .refine((v) => !v.createNextTask || Boolean(v.nextFuDate), {
-    path: ["nextFuDate"],
-    message: "Wajib jika membuat task follow-up berikutnya",
+  .refine((v) => Boolean(v.nextAction?.trim()), {
+    path: ["nextAction"],
+    message: "Next action wajib",
   })
-  .refine((v) => !v.updateItemNextDate || Boolean(v.nextFuDate), {
+  .refine((v) => Boolean(v.nextFuDate), {
     path: ["nextFuDate"],
-    message: "Wajib jika memperbarui next follow-up item",
+    message: "Tanggal next action wajib",
   });
 
 type FormValues = z.infer<typeof schema>;
@@ -92,14 +97,13 @@ export function LogCommercialFollowUpDialog({
     else setUncontrolled(o);
   };
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = toLocalIsoDate(new Date());
 
   const {
     register,
     handleSubmit,
     control,
     watch,
-    setValue,
     reset,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
@@ -111,8 +115,8 @@ export function LogCommercialFollowUpDialog({
       nextAction: "",
       nextFuDate: "",
       notes: "",
-      createNextTask: false,
-      updateItemNextDate: true,
+      taskMode: "create_task",
+      taskId: "",
     },
   });
 
@@ -125,86 +129,58 @@ export function LogCommercialFollowUpDialog({
         nextAction: "",
         nextFuDate: "",
         notes: "",
-        createNextTask: false,
-        updateItemNextDate: true,
+        taskMode: "create_task",
+        taskId: "",
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, item.id]);
 
-  const createNextTask = watch("createNextTask");
-  const updateItemNextDate = watch("updateItemNextDate");
+  const taskMode = watch("taskMode");
 
   const queryClient = useQueryClient();
+  const { data: tasks = [] } = useQuery({
+    queryKey: ["tasks", "all"],
+    queryFn: listTasks,
+    enabled: open,
+  });
+  const activeTasks = activeCommercialTasks(tasks, item.id);
 
   const onSubmit = handleSubmit(async (v) => {
     try {
-      await logFollowUp({
-        clientId: item.clientId,
+      const command = buildExplicitFollowUpCommand(
+        v.taskMode === "existing_task"
+          ? { mode: "existing_task", taskId: v.taskId ?? "" }
+          : {
+              mode: "create_task",
+              createTaskTitle:
+                v.nextAction?.trim() ||
+                `Follow-up · ${item.type} — ${clientName}`,
+              taskDueDate: v.nextFuDate ?? "",
+            },
+        {
+          nextAction: v.nextAction ?? "",
+          nextActionDate: v.nextFuDate ?? "",
+          note: v.notes,
+          method: v.method,
+          result: v.result,
+          fuDate: v.fuDate,
+        },
+      );
+      await recordCommercialFollowUp({
         commercialDocumentId: item.id,
-        ownerId: item.ownerId,
-        fuDate: v.fuDate,
-        method: v.method,
-        result: v.result,
-        nextAction: v.nextAction || undefined,
-        nextFuDate: v.nextFuDate || undefined,
-        notes: v.notes,
+        ...command,
       });
-      await queryClient.invalidateQueries({ queryKey: ["follow-ups"] });
+      await invalidateFollowUpQueries(queryClient);
+      toast.success("Follow-up tercatat", {
+        description: `${clientName} · ${item.type} · ${v.result} · Task diprogress`,
+      });
+      setOpen(false);
     } catch (error) {
       toast.error("Gagal menyimpan follow-up", {
-        description: error instanceof Error ? error.message : "Unknown error",
+        description: getErrorMessage(error),
       });
-      return;
     }
-
-    // commercial_documents has no next_action_date column post-Phase-11
-    // normalization, so "Perbarui Next follow-up" and "Buat task follow-up
-    // berikutnya" both resolve to the same action now: scheduling a task.
-    // Only one task is created even if both boxes are checked.
-    const scheduleNextFollowUp = v.updateItemNextDate || v.createNextTask;
-    if (scheduleNextFollowUp && v.nextFuDate) {
-      try {
-        const nextTask = await createTask({
-          clientId: item.clientId,
-          ownerId: item.ownerId,
-          commercialDocumentId: item.id,
-          title:
-            v.nextAction?.trim() || `Follow-up · ${item.type} — ${clientName}`,
-          dueDate: v.nextFuDate,
-          method: v.method,
-          priority: "Normal",
-          category: "Follow-Up",
-        });
-        const actorId = await getCurrentActorId();
-        if (actorId) {
-          await logActivity({
-            kind: "task_created",
-            ownerId: item.ownerId,
-            actorId,
-            clientId: item.clientId,
-            commercialDocumentId: item.id,
-            taskId: nextTask.id,
-            title: "Task follow-up lanjutan dibuat",
-            detail: nextTask.title,
-          });
-        }
-        await queryClient.invalidateQueries({ queryKey: ["tasks"] });
-        await queryClient.invalidateQueries({ queryKey: ["activity-log"] });
-      } catch (error) {
-        toast.error("Gagal membuat task follow-up", {
-          description: error instanceof Error ? error.message : "Unknown error",
-        });
-        return;
-      }
-    }
-
-    toast.success("Follow-up tercatat", {
-      description: `${clientName} · ${item.type} · ${v.result}${
-        scheduleNextFollowUp ? " · next follow-up dijadwalkan" : ""
-      }`,
-    });
-    setOpen(false);
   });
 
   return (
@@ -299,6 +275,11 @@ export function LogCommercialFollowUpDialog({
               placeholder="cth. Kirim revisi drawing, siapkan sample…"
               {...register("nextAction")}
             />
+            {errors.nextAction && (
+              <p className="text-xs text-destructive">
+                {errors.nextAction.message}
+              </p>
+            )}
           </div>
 
           <div className="space-y-1.5">
@@ -335,50 +316,52 @@ export function LogCommercialFollowUpDialog({
 
           <Separator />
 
-          <div className="flex flex-col gap-2">
-            <label className="flex items-start gap-2 text-xs text-foreground">
+          <div className="grid gap-2 rounded-md border bg-muted/30 p-3">
+            <Label className="text-xs">Task yang diprogress</Label>
+            <Controller
+              control={control}
+              name="taskMode"
+              render={({ field }) => (
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="create_task">Buat Task baru</SelectItem>
+                    <SelectItem
+                      value="existing_task"
+                      disabled={activeTasks.length === 0}
+                    >
+                      Progress Task existing
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+            />
+            {taskMode === "existing_task" && (
               <Controller
                 control={control}
-                name="updateItemNextDate"
+                name="taskId"
                 render={({ field }) => (
-                  <Checkbox
-                    checked={field.value}
-                    onCheckedChange={(v) => field.onChange(v === true)}
-                  />
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="Pilih Task aktif" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {activeTasks.map((task) => (
+                        <SelectItem key={task.id} value={task.id}>
+                          {task.title} · {task.dueDate}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 )}
               />
-              <span>
-                Perbarui <b>Next follow-up</b> pada {item.type} ini ke tanggal
-                di atas.
-              </span>
-            </label>
-            <label className="flex items-start gap-2 text-xs text-foreground">
-              <Controller
-                control={control}
-                name="createNextTask"
-                render={({ field }) => (
-                  <Checkbox
-                    checked={field.value}
-                    onCheckedChange={(v) => {
-                      field.onChange(v === true);
-                      if (v === true && !watch("nextFuDate")) {
-                        const d = new Date();
-                        d.setDate(d.getDate() + 3);
-                        setValue("nextFuDate", d.toISOString().slice(0, 10));
-                      }
-                    }}
-                  />
-                )}
-              />
-              <span>
-                Buat task follow-up berikutnya (muncul di Tasks Inbox).
-              </span>
-            </label>
-            {(createNextTask || updateItemNextDate) && !watch("nextFuDate") && (
-              <p className="text-xs text-destructive">
-                Isi <b>Tanggal next FU</b> terlebih dahulu.
-              </p>
             )}
+            <p className="text-xs text-muted-foreground">
+              Follow-up, progress Task, dan activity audit disimpan lewat satu
+              transaksi atomic.
+            </p>
           </div>
 
           <DialogFooter>

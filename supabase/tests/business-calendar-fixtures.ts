@@ -9,11 +9,7 @@
 // `date` CLI, not hand-computed, to rule out arithmetic mistakes.
 
 export type WorkflowStatus =
-  | "Open"
-  | "In Progress"
-  | "Waiting External"
-  | "Done"
-  | "Cancelled";
+  "Open" | "In Progress" | "Waiting External" | "Done" | "Cancelled";
 
 export type DueStateFixture = {
   label: string;

@@ -1,6 +1,52 @@
 import { FunctionsHttpError } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 
+type TeamQueryResult<T = unknown> = {
+  data: T | null;
+  error: unknown;
+  count?: number | null;
+};
+
+export type TeamQueryBuilder = {
+  select(
+    columns: string,
+    options?: { count?: string; head?: boolean },
+  ): TeamQueryBuilder;
+  eq(column: string, value: unknown): TeamQueryBuilder;
+  neq(column: string, value: unknown): TeamQueryBuilder;
+  not(column: string, operator: string, value: unknown): TeamQueryBuilder;
+  in(column: string, values: unknown[]): TeamQueryBuilder;
+  order(column: string, options?: unknown): TeamQueryBuilder;
+  limit(value: number): TeamQueryBuilder;
+  range(from: number, to: number): TeamQueryBuilder;
+  then<TResult1 = TeamQueryResult, TResult2 = never>(
+    onfulfilled?:
+      ((value: TeamQueryResult) => TResult1 | PromiseLike<TResult1>) | null,
+    onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
+  ): PromiseLike<TResult1 | TResult2>;
+};
+
+export type TeamSupabaseClient = {
+  from(table: string): TeamQueryBuilder;
+  rpc(
+    name: string,
+    params: Record<string, unknown>,
+  ): PromiseLike<TeamQueryResult>;
+  auth: {
+    getUser(): PromiseLike<{
+      data: { user?: { id: string } | null };
+    }>;
+  };
+  functions: {
+    invoke(
+      name: string,
+      options: { body: Record<string, unknown> },
+    ): PromiseLike<TeamQueryResult>;
+  };
+};
+
+const realTeamClient = supabase as unknown as TeamSupabaseClient;
+
 // Task 6 will make this the canonical application-wide Role union. Keeping the
 // explicit four-role contract local here prevents Team management from
 // weakening its server contract while the older role context is migrated.
@@ -12,6 +58,21 @@ export type OwnedActiveCounts = {
   tasks: number;
   commercialItems: number;
   total: number;
+};
+
+export type BlockingReferenceCounts = {
+  clients?: number;
+  tasks?: number;
+  commercial_items?: number;
+  sales_orders?: number;
+  follow_up_logs?: number;
+  targets?: number;
+  activity_log_owner?: number;
+  activity_log_actor?: number;
+  activity_log_target?: number;
+  profile_status_changes?: number;
+  total_blocking?: number;
+  total_all?: number;
 };
 
 export type TeamAdministrativeChange = {
@@ -35,7 +96,11 @@ export type TeamMember = {
   lastAdministrativeChange?: TeamAdministrativeChange;
 };
 
-type ProfileRow = {
+function throwQueryError(error: unknown): void {
+  if (error) throw error;
+}
+
+type AdminTeamSummaryRow = {
   id: string;
   name: string;
   initials: string;
@@ -45,159 +110,84 @@ type ProfileRow = {
   status_changed_at: string | null;
   status_changed_by: string | null;
   status_change_reason: string | null;
+  clients_count: number;
+  tasks_count: number;
+  commercial_items_count: number;
+  last_change_kind: string | null;
+  last_change_title: string | null;
+  last_change_reason: string | null;
+  last_change_at: string | null;
 };
 
-type AdminActivityRow = {
-  target_profile_id: string | null;
-  kind: string;
-  title: string;
-  administrative_reason: string | null;
-  created_at: string;
-};
+function toTeamMember(row: AdminTeamSummaryRow): TeamMember {
+  const clients = row.clients_count;
+  const tasks = row.tasks_count;
+  const commercialItems = row.commercial_items_count;
 
-const ADMIN_ACTIVITY_KINDS = [
-  "team_member_created",
-  "team_member_profile_updated",
-  "team_member_role_changed",
-  "team_member_deactivated",
-  "team_member_reactivated",
-  "team_member_ownership_transferred",
-  "team_member_deleted",
-] as const;
-
-const TEAM_SUMMARY_BATCH_SIZE = 8;
-const ACTIVE_TRANSFER_WORKFLOW_STATUSES = [
-  "Open",
-  "In Progress",
-  "Waiting External",
-] as const;
-
-function throwQueryError(error: unknown): void {
-  if (error) throw error;
-}
-
-function exactCount(result: { count: number | null; error: unknown }): number {
-  throwQueryError(result.error);
-  if (result.count === null) {
-    throw new Error("Server tidak mengembalikan exact count.");
-  }
-  return result.count;
-}
-
-async function countActiveCommercialItems(ownerId: string): Promise<number> {
-  // Call server-side RPC that computes the exact count using the Task 4 transfer
-  // predicate: lower(btrim(stage)) not in ('closed won', 'closed lost', 'revenue recorded', 'closed').
-  // This ensures client and server use identical normalization.
-  const result = await supabase.rpc("admin_count_active_commercial_items", {
-    p_owner_id: ownerId,
-  });
-  throwQueryError(result.error);
-
-  const count = result.data;
-  if (typeof count !== "number") {
-    throw new Error("Server tidak mengembalikan count komersial.");
-  }
-  return count;
-}
-
-async function mapInBatches<T, R>(
-  items: T[],
-  batchSize: number,
-  mapper: (item: T) => Promise<R>,
-): Promise<R[]> {
-  const mapped: R[] = [];
-  for (let index = 0; index < items.length; index += batchSize) {
-    mapped.push(
-      ...(await Promise.all(items.slice(index, index + batchSize).map(mapper))),
-    );
-  }
-  return mapped;
+  return {
+    id: row.id,
+    name: row.name,
+    initials: row.initials,
+    role: row.role,
+    email: row.email,
+    accountStatus: row.account_status,
+    ...(row.status_changed_at
+      ? { statusChangedAt: row.status_changed_at }
+      : {}),
+    ...(row.status_changed_by
+      ? { statusChangedBy: row.status_changed_by }
+      : {}),
+    ...(row.status_change_reason
+      ? { statusChangeReason: row.status_change_reason }
+      : {}),
+    ownedActiveCounts: {
+      clients,
+      tasks,
+      commercialItems,
+      total: clients + tasks + commercialItems,
+    },
+    ...(row.last_change_kind && row.last_change_title && row.last_change_at
+      ? {
+          lastAdministrativeChange: {
+            kind: row.last_change_kind,
+            title: row.last_change_title,
+            ...(row.last_change_reason
+              ? { reason: row.last_change_reason }
+              : {}),
+            createdAt: row.last_change_at,
+          },
+        }
+      : {}),
+  };
 }
 
 // Privileged RLS readers receive every profile row, including inactive
 // accounts. Ownership totals mirror the server transfer scope: non-Lost
-// clients, workflow-active/unarchived tasks, and non-terminal commercial items.
-export async function listTeamMembers(): Promise<TeamMember[]> {
-  const profilesResult = await supabase
-    .from("profiles")
-    .select(
-      "id, name, initials, role, email, account_status, status_changed_at, status_changed_by, status_change_reason",
-    );
-  throwQueryError(profilesResult.error);
-
-  const profiles = (profilesResult.data ?? []) as ProfileRow[];
-  return mapInBatches(profiles, TEAM_SUMMARY_BATCH_SIZE, async (row) => {
-    const [clientsResult, tasksResult, commercialResult, logResult] =
-      await Promise.all([
-        supabase
-          .from("clients")
-          .select("id", { count: "exact", head: true })
-          .eq("owner_id", row.id)
-          .neq("status", "Lost"),
-        supabase
-          .from("tasks")
-          .select("id", { count: "exact", head: true })
-          .eq("owner_id", row.id)
-          .in("workflow_status", [...ACTIVE_TRANSFER_WORKFLOW_STATUSES])
-          .eq("archived", false),
-        countActiveCommercialItems(row.id),
-        supabase
-          .from("activity_log")
-          .select(
-            "target_profile_id, kind, title, administrative_reason, created_at",
-          )
-          .eq("target_profile_id", row.id)
-          .in("kind", [...ADMIN_ACTIVITY_KINDS])
-          .order("created_at", { ascending: false })
-          .limit(1),
-      ]);
-
-    const clients = exactCount(clientsResult);
-    const tasks = exactCount(tasksResult);
-    const commercialItems = commercialResult;
-    throwQueryError(logResult.error);
-    const lastChange = (logResult.data?.[0] ?? null) as AdminActivityRow | null;
-
-    return {
-      id: row.id,
-      name: row.name,
-      initials: row.initials,
-      role: row.role,
-      email: row.email,
-      accountStatus: row.account_status,
-      ...(row.status_changed_at
-        ? { statusChangedAt: row.status_changed_at }
-        : {}),
-      ...(row.status_changed_by
-        ? { statusChangedBy: row.status_changed_by }
-        : {}),
-      ...(row.status_change_reason
-        ? { statusChangeReason: row.status_change_reason }
-        : {}),
-      ownedActiveCounts: {
-        clients,
-        tasks,
-        commercialItems,
-        total: clients + tasks + commercialItems,
-      },
-      ...(lastChange
-        ? {
-            lastAdministrativeChange: {
-              kind: lastChange.kind,
-              title: lastChange.title,
-              ...(lastChange.administrative_reason
-                ? { reason: lastChange.administrative_reason }
-                : {}),
-              createdAt: lastChange.created_at,
-            },
-          }
-        : {}),
-    };
-  });
+// clients, workflow-active/unarchived tasks, and non-terminal commercial
+// items (soft-deleted documents and superseded Quotation revisions
+// excluded). One RPC call computes every member's row server-side
+// (public.admin_team_summary) instead of 1 + 4*N round trips.
+export function listTeamMembers(): Promise<TeamMember[]>;
+export function listTeamMembers(
+  client: TeamSupabaseClient,
+): Promise<TeamMember[]>;
+export async function listTeamMembers(
+  client: TeamSupabaseClient = realTeamClient,
+): Promise<TeamMember[]> {
+  const result = await client.rpc("admin_team_summary", {});
+  throwQueryError(result.error);
+  const rows = (result.data ?? []) as AdminTeamSummaryRow[];
+  return rows.map(toTeamMember);
 }
 
-export async function getCurrentProfileId(): Promise<string | undefined> {
-  const { data } = await supabase.auth.getUser();
+export function getCurrentProfileId(): Promise<string | undefined>;
+export function getCurrentProfileId(
+  client: TeamSupabaseClient,
+): Promise<string | undefined>;
+export async function getCurrentProfileId(
+  client: TeamSupabaseClient = realTeamClient,
+): Promise<string | undefined> {
+  const { data } = await client.auth.getUser();
   return data.user?.id;
 }
 
@@ -281,11 +271,11 @@ async function mapInvokeError(error: unknown): Promise<TeamAdminError> {
 
 async function invokeManageTeamMember<T>(
   body: Record<string, unknown>,
+  client: TeamSupabaseClient,
 ): Promise<T> {
-  const { data, error } = await supabase.functions.invoke<T | ErrorPayload>(
-    "manage-team-member",
-    { body },
-  );
+  const { data, error } = await client.functions.invoke("manage-team-member", {
+    body,
+  });
   if (error) throw await mapInvokeError(error);
   if (data && typeof data === "object" && "error" in data) {
     throw errorFromPayload(data as ErrorPayload);
@@ -306,79 +296,166 @@ function administrativeReason(reason: string): string {
 }
 
 type ActionResult = { id: string; action?: string };
+type ReferenceCountsResult = {
+  id: string;
+  action?: string;
+  referenceCounts?: BlockingReferenceCounts;
+};
 
-export async function createTeamMember(input: {
-  name: string;
-  email: string;
-  initials: string;
-  role: AppRole;
-  password: string;
-}): Promise<ActionResult> {
-  return invokeManageTeamMember({ action: "create", ...input });
+const BLOCKING_REFERENCE_LABELS: Record<
+  Exclude<keyof BlockingReferenceCounts, "total_blocking" | "total_all">,
+  string
+> = {
+  clients: "client historis",
+  tasks: "task historis",
+  commercial_items: "commercial historis",
+  sales_orders: "sales order historis",
+  follow_up_logs: "follow-up historis",
+  targets: "target",
+  activity_log_owner: "activity owner",
+  activity_log_actor: "activity actor",
+  activity_log_target: "activity target",
+  profile_status_changes: "status profile",
+};
+
+export function formatOwnedActiveCounts(counts: OwnedActiveCounts): string {
+  return [
+    `${counts.total} ownership aktif`,
+    `${counts.clients} client aktif`,
+    `${counts.tasks} task aktif`,
+    `${counts.commercialItems} commercial aktif`,
+  ].join(" · ");
+}
+
+export function formatBlockingReferenceCounts(
+  counts: BlockingReferenceCounts | undefined,
+): string {
+  if (!counts) return "Referensi historis belum dimuat.";
+  const details = Object.entries(BLOCKING_REFERENCE_LABELS)
+    .map(([key, label]) => {
+      const value = counts[key as keyof typeof BLOCKING_REFERENCE_LABELS] ?? 0;
+      return value > 0 ? `${value} ${label}` : undefined;
+    })
+    .filter(Boolean);
+  const totalBlocking = counts.total_blocking ?? 0;
+  return [`${totalBlocking} referensi historis blocking`, ...details].join(
+    " · ",
+  );
+}
+
+export async function createTeamMember(
+  input: {
+    name: string;
+    email: string;
+    initials: string;
+    role: AppRole;
+    password: string;
+  },
+  client: TeamSupabaseClient = realTeamClient,
+): Promise<ActionResult> {
+  return invokeManageTeamMember({ action: "create", ...input }, client);
 }
 
 export async function updateTeamMemberProfile(
   id: string,
   profile: { name: string; initials: string },
+  client: TeamSupabaseClient = realTeamClient,
 ): Promise<ActionResult> {
-  return invokeManageTeamMember({ action: "update_profile", id, ...profile });
+  return invokeManageTeamMember(
+    { action: "update_profile", id, ...profile },
+    client,
+  );
 }
 
 export async function changeTeamMemberRole(
   id: string,
   role: AppRole,
   reason: string,
+  client: TeamSupabaseClient = realTeamClient,
 ): Promise<ActionResult> {
-  return invokeManageTeamMember({
-    action: "change_role",
-    id,
-    role,
-    reason: administrativeReason(reason),
-  });
+  return invokeManageTeamMember(
+    {
+      action: "change_role",
+      id,
+      role,
+      reason: administrativeReason(reason),
+    },
+    client,
+  );
 }
 
 export async function deactivateTeamMember(
   id: string,
   reason: string,
+  client: TeamSupabaseClient = realTeamClient,
 ): Promise<ActionResult> {
-  return invokeManageTeamMember({
-    action: "deactivate",
-    id,
-    reason: administrativeReason(reason),
-  });
+  return invokeManageTeamMember(
+    {
+      action: "deactivate",
+      id,
+      reason: administrativeReason(reason),
+    },
+    client,
+  );
 }
 
 export async function reactivateTeamMember(
   id: string,
   reason: string,
+  client: TeamSupabaseClient = realTeamClient,
 ): Promise<ActionResult> {
-  return invokeManageTeamMember({
-    action: "reactivate",
-    id,
-    reason: administrativeReason(reason),
-  });
+  return invokeManageTeamMember(
+    {
+      action: "reactivate",
+      id,
+      reason: administrativeReason(reason),
+    },
+    client,
+  );
 }
 
 export async function transferTeamOwnership(
   fromId: string,
   toId: string,
   reason: string,
+  client: TeamSupabaseClient = realTeamClient,
 ): Promise<ActionResult> {
-  return invokeManageTeamMember({
-    action: "transfer_ownership",
-    fromId,
-    toId,
-    reason: administrativeReason(reason),
-  });
+  return invokeManageTeamMember(
+    {
+      action: "transfer_ownership",
+      fromId,
+      toId,
+      reason: administrativeReason(reason),
+    },
+    client,
+  );
 }
 
 export async function deleteEligibleTeamMember(
   id: string,
   reason: string,
+  client: TeamSupabaseClient = realTeamClient,
 ): Promise<ActionResult> {
-  return invokeManageTeamMember({
-    action: "delete_eligible_account",
-    id,
-    reason: administrativeReason(reason),
-  });
+  return invokeManageTeamMember(
+    {
+      action: "delete_eligible_account",
+      id,
+      reason: administrativeReason(reason),
+    },
+    client,
+  );
+}
+
+export async function getTeamMemberReferenceCounts(
+  id: string,
+  client: TeamSupabaseClient = realTeamClient,
+): Promise<BlockingReferenceCounts> {
+  const result = await invokeManageTeamMember<ReferenceCountsResult>(
+    {
+      action: "account_reference_counts",
+      id,
+    },
+    client,
+  );
+  return result.referenceCounts ?? {};
 }

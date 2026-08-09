@@ -3,17 +3,10 @@ export type Role = "sales" | "manager" | "executive" | "super_admin";
 export type DateRange = { from: Date; to: Date };
 
 export type ClientStatus =
-  | "Prospect"
-  | "Active Customer"
-  | "Dormant"
-  | "Lost"
-  | "Repeat Order";
+  "Prospect" | "Active Customer" | "Dormant" | "Lost" | "Repeat Order";
 
 export type ClientSource =
-  | "Referral"
-  | "Website Inquiry"
-  | "Business Relationship"
-  | "Repeat";
+  "Referral" | "Website Inquiry" | "Business Relationship" | "Repeat";
 
 export type ClientContact = {
   name?: string;
@@ -42,16 +35,10 @@ export type Client = {
 };
 
 export type CommercialType =
-  | "Quotation"
-  | "Direct Order"
-  | "Prototype"
-  | "Customer PO"
-  | "Sales Order";
+  "Quotation" | "Direct Order" | "Prototype" | "Customer PO" | "Sales Order";
 
 export type SourceFlow =
-  | "New Product"
-  | "Existing / Repeat Order"
-  | "Prototype";
+  "New Product" | "Existing / Repeat Order" | "Prototype";
 
 // The seven exact weighted stages (PRD §7) — see
 // src/lib/data/commercial-stages.ts's COMMERCIAL_STAGE_WEIGHTS, the actual
@@ -138,9 +125,7 @@ export type SoType = "Regular" | "Prototype";
 export type TaxType = "PPN" | "Non-PPN";
 export type PrototypeStatus = "Paid" | "FOC";
 export type RevenueSource =
-  | "New Product"
-  | "Existing / Repeat Order"
-  | "Prototype Paid";
+  "New Product" | "Existing / Repeat Order" | "Prototype Paid";
 
 export type SalesOrder = {
   id: string;
@@ -162,11 +147,7 @@ export type MonthlyTarget = { month: number; target: number };
 // Workflow status the user chooses (Sales Task Control Loop spec §2.1) --
 // never derived from a date, unlike TaskDueState below.
 export type TaskWorkflowStatus =
-  | "Open"
-  | "In Progress"
-  | "Waiting External"
-  | "Done"
-  | "Cancelled";
+  "Open" | "In Progress" | "Waiting External" | "Done" | "Cancelled";
 
 // Derived, not stored (spec §2.2): computed by
 // public.compute_task_due_state / src/lib/data/business-calendar.ts's
@@ -174,11 +155,7 @@ export type TaskWorkflowStatus =
 // written directly. null for Done/Cancelled Tasks, which have no active
 // due state.
 export type TaskDueState =
-  | "Upcoming"
-  | "Today"
-  | "Overdue"
-  | "Escalated"
-  | null;
+  "Upcoming" | "Today" | "Overdue" | "Escalated" | null;
 
 export type TaskCategory =
   | "Project/Opportunity Planning"
@@ -214,4 +191,10 @@ export type Task = {
   archived?: boolean;
 };
 
-export { CURRENT_MONTH, CURRENT_YEAR, NOW, PINNED_TODAY } from "@/lib/app-time";
+export {
+  CURRENT_MONTH,
+  CURRENT_YEAR,
+  NOW,
+  PINNED_TODAY,
+  toLocalIsoDate,
+} from "@/lib/app-time";

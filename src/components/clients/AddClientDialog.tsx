@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Building2 } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 
+import { getErrorMessage } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -31,7 +32,6 @@ import {
   listSalesTeamProfiles,
   listOwners,
   createClient,
-  type ClientListRow,
 } from "@/lib/data/clients";
 import { getCurrentActorId, logActivity } from "@/lib/data/activity-log";
 import { CLIENT_STATUSES } from "@/lib/business-rules";
@@ -176,28 +176,6 @@ export function AddClientDialog({
         name: created.name,
         ownerId: created.ownerId,
       });
-      queryClient.setQueriesData<ClientListRow[]>(
-        { queryKey: ["clients", "rows"], exact: true },
-        (rows) =>
-          rows
-            ? [
-                {
-                  client: created,
-                  ownerName,
-                  spendingYtd: created.spendingYtd,
-                  lastFu: created.lastFu,
-                  nextFu: created.nextFu,
-                  ppn: 0,
-                  nonPpn: 0,
-                  activeCommercialCount: 0,
-                  activeCommercialTypes: [],
-                  risk: "Unknown",
-                  advisories: 0,
-                },
-                ...rows.filter((row) => row.client.id !== created.id),
-              ]
-            : rows,
-      );
       await queryClient.invalidateQueries({ queryKey: ["clients"] });
       await queryClient.invalidateQueries({ queryKey: ["activity-log"] });
       toast.success("Klien berhasil ditambahkan", {
@@ -216,7 +194,7 @@ export function AddClientDialog({
       setOpen(false);
     } catch (error) {
       toast.error("Gagal menambahkan klien", {
-        description: error instanceof Error ? error.message : "Unknown error",
+        description: getErrorMessage(error),
       });
     }
   });

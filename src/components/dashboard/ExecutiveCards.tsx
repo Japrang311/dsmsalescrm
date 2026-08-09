@@ -1,24 +1,47 @@
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { AlertTriangle, TrendingUp, Trophy } from "lucide-react";
 
 import {
-  forecastVsAchievement,
-  topCustomersYtd,
-  quotationFunnel,
-  riskAlerts,
+  forecastVsAchievementFromPipeline,
+  quotationFunnelFromPipeline,
+  riskAlertsFromCounts,
   ytdTargetValue,
 } from "@/lib/data/dashboard-selectors";
+import { getPipelineMetrics } from "@/lib/data/pipeline-metrics";
+import { getSalesOrdersMetrics } from "@/lib/data/sales-orders-metrics";
+import {
+  getRiskAlertCounts,
+  getTopCustomers,
+} from "@/lib/data/sales-performance-metrics";
 import { useDashboardData } from "@/hooks/use-dashboard-data";
+import { useRole } from "@/context/role-context";
+import { CURRENT_YEAR, NOW } from "@/lib/domain";
 import { formatPercent, formatRupiahShort } from "@/lib/format";
 import { KpiCard, KpiProgress } from "./KpiCard";
 import { cn } from "@/lib/utils";
 
 export function ForecastVsAchievementCard() {
-  const { orders, items, targetsByMember, companyTarget } = useDashboardData();
-  const { achievement, forecast, target } = forecastVsAchievement(
-    orders,
-    items,
+  const { authReady } = useRole();
+  const { targetsByMember, companyTarget } = useDashboardData();
+  const ytdMetricsQuery = useQuery({
+    queryKey: ["sales-orders", "metrics", "dashboard-ytd"],
+    queryFn: () =>
+      getSalesOrdersMetrics({ from: new Date(CURRENT_YEAR, 0, 1), to: NOW }),
+    enabled: authReady,
+  });
+  const pipelineMetricsQuery = useQuery({
+    queryKey: ["pipeline", "metrics", "dashboard"],
+    queryFn: () => getPipelineMetrics(),
+    enabled: authReady,
+  });
+  const achievement =
+    (ytdMetricsQuery.data?.ppnValue ?? 0) +
+    (ytdMetricsQuery.data?.nonPpnValue ?? 0);
+  const { forecast, target } = forecastVsAchievementFromPipeline(
+    pipelineMetricsQuery.data?.stages ?? [],
+    achievement,
     ytdTargetValue("executive", "", targetsByMember, companyTarget),
   );
   const pct = target > 0 ? forecast / target : 0;
@@ -49,8 +72,13 @@ export function ForecastVsAchievementCard() {
 }
 
 export function TopCustomersCard() {
-  const { orders, clients } = useDashboardData();
-  const rows = topCustomersYtd(orders, clients, 5);
+  const { authReady } = useRole();
+  const topCustomersQuery = useQuery({
+    queryKey: ["sales-orders", "top-customers", "dashboard"],
+    queryFn: () => getTopCustomers({ limit: 5 }),
+    enabled: authReady,
+  });
+  const rows = topCustomersQuery.data ?? [];
   return (
     <Card className="border-border shadow-none">
       <CardHeader className="pb-3">
@@ -63,7 +91,7 @@ export function TopCustomersCard() {
         <ul className="divide-y divide-border">
           {rows.map((r, i) => (
             <li
-              key={r.client.id}
+              key={r.clientId}
               className="flex items-center justify-between px-4 py-2.5"
             >
               <div className="flex items-center gap-3 min-w-0">
@@ -72,10 +100,10 @@ export function TopCustomersCard() {
                 </span>
                 <div className="min-w-0">
                   <div className="truncate text-sm font-medium text-foreground">
-                    {r.client.name}
+                    {r.clientName}
                   </div>
                   <div className="text-[11px] text-muted-foreground">
-                    {r.client.status}
+                    {r.clientStatus}
                   </div>
                 </div>
               </div>
@@ -91,8 +119,15 @@ export function TopCustomersCard() {
 }
 
 export function QuotationFunnelCard() {
-  const { items } = useDashboardData();
-  const stages = quotationFunnel(items);
+  const { authReady } = useRole();
+  const pipelineMetricsQuery = useQuery({
+    queryKey: ["pipeline", "metrics", "dashboard"],
+    queryFn: () => getPipelineMetrics(),
+    enabled: authReady,
+  });
+  const stages = quotationFunnelFromPipeline(
+    pipelineMetricsQuery.data?.stages ?? [],
+  );
   const max = Math.max(...stages.map((s) => s.value), 1);
   return (
     <Card className="border-border shadow-none">
@@ -124,8 +159,20 @@ export function QuotationFunnelCard() {
 }
 
 export function RiskAlertsCard() {
-  const { tasks, items, clients } = useDashboardData();
-  const alerts = riskAlerts(tasks, items, clients);
+  const { authReady } = useRole();
+  const riskCountsQuery = useQuery({
+    queryKey: ["dashboard-risk-alert-counts", "dashboard"],
+    queryFn: () => getRiskAlertCounts(),
+    enabled: authReady,
+  });
+  const alerts = riskAlertsFromCounts(
+    riskCountsQuery.data ?? {
+      overdueTaskCount: 0,
+      bigPendingCommitCount: 0,
+      bigPendingCommitValue: 0,
+      dormantHighValueClientCount: 0,
+    },
+  );
   return (
     <Card className="border-border shadow-none">
       <CardHeader className="pb-3">

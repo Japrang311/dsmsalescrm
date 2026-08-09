@@ -1,28 +1,37 @@
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  activityCompliance,
-  salesPerformance,
-} from "@/lib/data/dashboard-selectors";
+import { activityCompliance } from "@/lib/data/dashboard-selectors";
+import { getSalesTaskClientMetrics } from "@/lib/data/sales-performance-metrics";
 import { useDashboardData } from "@/hooks/use-dashboard-data";
+import { useRole } from "@/context/role-context";
 import { formatPercent } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 export function ActivityComplianceCard() {
-  const { orders, tasks, clients, salesTeam, targetsByMember } =
-    useDashboardData();
+  const { authReady } = useRole();
+  const { clients, salesTeam } = useDashboardData();
   const compliance = activityCompliance(clients);
-  const perSales = salesPerformance(
-    orders,
-    tasks,
-    clients,
-    salesTeam,
-    targetsByMember,
-  ).map((r) => ({
-    name: r.member.name,
-    initials: r.member.initials,
-    overdue: r.overdue,
-    open: r.openTasks,
-  }));
+  // Same RPC + queryKey as SalesPerformanceTable — cache-shared, and avoids
+  // this card pulling the full unbounded orders/tasks arrays just to derive
+  // per-sales overdue counts.
+  const taskClientQuery = useQuery({
+    queryKey: ["sales-task-client-metrics", "dashboard"],
+    queryFn: () => getSalesTaskClientMetrics(),
+    enabled: authReady,
+  });
+  const metricsByOwner = new Map(
+    (taskClientQuery.data ?? []).map((m) => [m.ownerId, m]),
+  );
+  const perSales = salesTeam.map((member) => {
+    const m = metricsByOwner.get(member.id);
+    return {
+      id: member.id,
+      name: member.name,
+      initials: member.initials,
+      overdue: m?.overdueTasks ?? 0,
+      open: m?.openTasks ?? 0,
+    };
+  });
 
   return (
     <Card className="border-border shadow-none">
@@ -70,7 +79,7 @@ export function ActivityComplianceCard() {
           </div>
           {perSales.map((s) => (
             <div
-              key={s.name}
+              key={s.id}
               className="flex items-center justify-between text-sm"
             >
               <span className="text-foreground">

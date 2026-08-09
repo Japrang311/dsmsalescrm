@@ -4,13 +4,31 @@ import {
   Link,
   createRootRouteWithContext,
   useRouter,
+  useRouterState,
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
+import { SpeedInsights } from "@vercel/speed-insights/react";
 import { useEffect, type ReactNode } from "react";
 
+import "@fontsource-variable/inter";
 import appCss from "../styles.css?url";
 import { Toaster } from "@/components/ui/sonner";
+import {
+  captureBrowserException,
+  initBrowserMonitoring,
+} from "@/lib/browser-monitoring";
+
+void initBrowserMonitoring();
+
+function isLoopbackBrowserHost(): boolean {
+  if (typeof window === "undefined") return true;
+  return (
+    window.location.hostname === "127.0.0.1" ||
+    window.location.hostname === "localhost" ||
+    window.location.hostname === "::1"
+  );
+}
 
 function NotFoundComponent() {
   return (
@@ -39,6 +57,10 @@ function NotFoundComponent() {
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   console.error(error);
   const router = useRouter();
+
+  useEffect(() => {
+    captureBrowserException(error);
+  }, [error]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -99,16 +121,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       links: [
         { rel: "stylesheet", href: appCss },
         { rel: "icon", href: "/favicon.png", type: "image/png" },
-        { rel: "preconnect", href: "https://fonts.googleapis.com" },
-        {
-          rel: "preconnect",
-          href: "https://fonts.gstatic.com",
-          crossOrigin: "anonymous",
-        },
-        {
-          rel: "stylesheet",
-          href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap",
-        },
       ],
     }),
     shellComponent: RootShell,
@@ -120,7 +132,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="id">
       <head>
         <HeadContent />
       </head>
@@ -134,12 +146,18 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  // Report the route pattern (/clients/$clientId), not the resolved URL, so
+  // Speed Insights groups datapoints instead of creating one entry per record.
+  const routeId = useRouterState({
+    select: (state) => state.matches.at(-1)?.routeId ?? null,
+  });
 
   return (
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <Outlet />
       <Toaster richColors closeButton position="top-right" />
+      {!isLoopbackBrowserHost() ? <SpeedInsights route={routeId} /> : null}
     </QueryClientProvider>
   );
 }

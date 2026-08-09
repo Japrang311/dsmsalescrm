@@ -16,11 +16,7 @@
 import { supabase } from "@/lib/supabase";
 
 export type TaskWorkflowStatus =
-  | "Open"
-  | "In Progress"
-  | "Waiting External"
-  | "Done"
-  | "Cancelled";
+  "Open" | "In Progress" | "Waiting External" | "Done" | "Cancelled";
 
 export type DueState = "Upcoming" | "Today" | "Overdue" | "Escalated" | null;
 
@@ -28,6 +24,84 @@ export type DueStateResult = {
   dueState: DueState;
   calendarIncomplete: boolean;
 };
+
+export type BusinessCalendarHoliday = {
+  id: string;
+  holidayDate: string;
+  label: string;
+  source: string;
+  syncedAt: string;
+  enteredBy?: string;
+};
+
+export type BusinessCalendarHolidayInput = {
+  holidayDate: string;
+  label: string;
+  source?: string;
+};
+
+export type BusinessCalendarImportPreview = {
+  validRows: BusinessCalendarHolidayInput[];
+  errors: string[];
+  duplicateDates: string[];
+  affectedYears: number[];
+};
+
+export type BusinessCalendarImportResult = {
+  importedCount: number;
+  minDate?: string;
+  maxDate?: string;
+  affectedYears: number[];
+};
+
+const MISSING_IMPORT_RPC_MESSAGE =
+  "RPC import_business_calendar_holidays belum tersedia di database. Apply migration 20260805091908_import_business_calendar_holidays.sql ke Supabase target, lalu coba import ulang.";
+
+type BusinessCalendarHolidayRow = {
+  id: string;
+  holiday_date: string;
+  label: string;
+  source: string;
+  synced_at: string;
+  entered_by: string | null;
+};
+
+type BusinessCalendarImportResultRow = {
+  imported_count: number;
+  min_date: string | null;
+  max_date: string | null;
+  affected_years: number[] | null;
+};
+
+export function businessCalendarDataErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error !== "object" || error === null) return "Unknown error";
+
+  const message =
+    "message" in error && typeof error.message === "string"
+      ? error.message
+      : "";
+  const code =
+    "code" in error && typeof error.code === "string" ? error.code : "";
+  const details =
+    "details" in error && typeof error.details === "string"
+      ? error.details
+      : "";
+  const hint =
+    "hint" in error && typeof error.hint === "string" ? error.hint : "";
+  const combined = [code, message, details, hint].join(" ");
+
+  if (
+    code === "PGRST202" ||
+    combined.includes("import_business_calendar_holidays")
+  ) {
+    return MISSING_IMPORT_RPC_MESSAGE;
+  }
+
+  return (
+    [message, details, hint].filter(Boolean).join(" · ") || "Unknown error"
+  );
+}
 
 function isoDayOfWeek(iso: string): number {
   // 1 = Monday .. 7 = Sunday, matching Postgres extract(isodow from date).
@@ -145,4 +219,184 @@ export async function listBusinessCalendarHolidays(): Promise<Set<string>> {
     .select("holiday_date");
   if (error) throw error;
   return new Set((data ?? []).map((row) => row.holiday_date as string));
+}
+
+function toBusinessCalendarHoliday(
+  row: BusinessCalendarHolidayRow,
+): BusinessCalendarHoliday {
+  return {
+    id: row.id,
+    holidayDate: row.holiday_date,
+    label: row.label,
+    source: row.source,
+    syncedAt: row.synced_at,
+    enteredBy: row.entered_by ?? undefined,
+  };
+}
+
+export async function listBusinessCalendarHolidayRows(): Promise<
+  BusinessCalendarHoliday[]
+> {
+  const { data, error } = await supabase
+    .from("business_calendar_holidays")
+    .select("id, holiday_date, label, source, synced_at, entered_by")
+    .order("holiday_date", { ascending: true });
+  if (error) throw error;
+  return ((data ?? []) as BusinessCalendarHolidayRow[]).map(
+    toBusinessCalendarHoliday,
+  );
+}
+
+export async function deleteBusinessCalendarHoliday(id: string): Promise<void> {
+  const { error } = await supabase
+    .from("business_calendar_holidays")
+    .delete()
+    .eq("id", id);
+  if (error) throw error;
+}
+
+function isIsoDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  if (Number.isNaN(date.getTime())) return false;
+  return date.toISOString().slice(0, 10) === value;
+}
+
+function parseCsvLine(line: string): string[] {
+  const cells: string[] = [];
+  let current = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i += 1) {
+    const char = line[i];
+    const next = line[i + 1];
+
+    if (char === '"' && next === '"') {
+      current += '"';
+      i += 1;
+      continue;
+    }
+    if (char === '"') {
+      inQuotes = !inQuotes;
+      continue;
+    }
+    if (char === "," && !inQuotes) {
+      cells.push(current.trim());
+      current = "";
+      continue;
+    }
+    current += char;
+  }
+
+  cells.push(current.trim());
+  return cells;
+}
+
+export function previewBusinessCalendarCsv(
+  csv: string,
+): BusinessCalendarImportPreview {
+  const errors: string[] = [];
+  const rows = csv
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (rows.length === 0) {
+    return {
+      validRows: [],
+      errors: ["CSV kosong."],
+      duplicateDates: [],
+      affectedYears: [],
+    };
+  }
+
+  const first = parseCsvLine(rows[0]).map((cell) => cell.toLowerCase());
+  const hasHeader =
+    first.includes("holiday_date") ||
+    first.includes("date") ||
+    first.includes("tanggal");
+  const dataRows = hasHeader ? rows.slice(1) : rows;
+  const header = hasHeader ? first : ["holiday_date", "label", "source"];
+  const dateIndex = Math.max(
+    header.indexOf("holiday_date"),
+    header.indexOf("date"),
+    header.indexOf("tanggal"),
+  );
+  const labelIndex = Math.max(header.indexOf("label"), header.indexOf("nama"));
+  const sourceIndex = header.indexOf("source");
+
+  if (dateIndex < 0 || labelIndex < 0) {
+    errors.push(
+      "Header CSV harus punya kolom holiday_date/date/tanggal dan label/nama.",
+    );
+  }
+
+  const validRows: BusinessCalendarHolidayInput[] = [];
+  const seenDates = new Map<string, number>();
+
+  dataRows.forEach((line, index) => {
+    const lineNumber = hasHeader ? index + 2 : index + 1;
+    const cells = parseCsvLine(line);
+    const holidayDate = (cells[dateIndex] ?? "").trim();
+    const label = (cells[labelIndex] ?? "").trim();
+    const source = (sourceIndex >= 0 ? cells[sourceIndex] : undefined)?.trim();
+
+    if (!isIsoDate(holidayDate)) {
+      errors.push(`Baris ${lineNumber}: tanggal harus format YYYY-MM-DD.`);
+      return;
+    }
+    if (!label) {
+      errors.push(`Baris ${lineNumber}: label wajib diisi.`);
+      return;
+    }
+
+    seenDates.set(holidayDate, (seenDates.get(holidayDate) ?? 0) + 1);
+    validRows.push({
+      holidayDate,
+      label,
+      source: source || "manual-import",
+    });
+  });
+
+  const duplicateDates = [...seenDates.entries()]
+    .filter(([, count]) => count > 1)
+    .map(([date]) => date)
+    .sort();
+  if (duplicateDates.length > 0) {
+    errors.push(`Tanggal duplikat: ${duplicateDates.join(", ")}.`);
+  }
+
+  const affectedYears = [
+    ...new Set(validRows.map((row) => Number(row.holidayDate.slice(0, 4)))),
+  ].sort((a, b) => a - b);
+
+  return {
+    validRows,
+    errors,
+    duplicateDates,
+    affectedYears,
+  };
+}
+
+export async function importBusinessCalendarHolidays(
+  rows: BusinessCalendarHolidayInput[],
+): Promise<BusinessCalendarImportResult> {
+  const { data, error } = await supabase.rpc(
+    "import_business_calendar_holidays",
+    {
+      p_rows: rows.map((row) => ({
+        holiday_date: row.holidayDate,
+        label: row.label,
+        source: row.source ?? "manual-import",
+      })),
+    },
+  );
+  if (error) throw new Error(businessCalendarDataErrorMessage(error));
+
+  const [result] = (data ?? []) as BusinessCalendarImportResultRow[];
+  return {
+    importedCount: result?.imported_count ?? 0,
+    minDate: result?.min_date ?? undefined,
+    maxDate: result?.max_date ?? undefined,
+    affectedYears: result?.affected_years ?? [],
+  };
 }

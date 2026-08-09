@@ -36,6 +36,10 @@ export type AdminAction =
       action: "delete_eligible_account";
       id: string;
       reason: string;
+    }
+  | {
+      action: "account_reference_counts";
+      id: string;
     };
 
 export type ErrorBody = {
@@ -288,6 +292,13 @@ export function parseAdminAction(rawBody: string): AdminAction {
         action: "delete_eligible_account",
         id: requireUuid(decoded.id, "ID anggota tim"),
         reason: requireReason(decoded.reason),
+      };
+
+    case "account_reference_counts":
+      requireExactKeys(decoded, ["action", "id"]);
+      return {
+        action: "account_reference_counts",
+        id: requireUuid(decoded.id, "ID anggota tim"),
       };
 
     default:

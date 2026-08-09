@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import {
   Activity,
   AlertTriangle,
@@ -39,18 +40,13 @@ import {
 import { useRole, ROLE_LABEL } from "@/context/role-context";
 import { CURRENT_MONTH } from "@/lib/domain";
 import {
-  activeCommercialCount,
-  monthlyRevenue,
   monthlyTargetValue,
-  prototypeSummary,
-  revenueBySource,
-  revenueByTax,
   taskCounts,
-  waitingPoValue,
-  ytdRevenue,
   ytdTargetValue,
 } from "@/lib/data/dashboard-selectors";
 import { useDashboardData } from "@/hooks/use-dashboard-data";
+import { getSalesOrdersMetrics } from "@/lib/data/sales-orders-metrics";
+import { getPipelineMetrics } from "@/lib/data/pipeline-metrics";
 import { formatPercent, formatRupiahShort } from "@/lib/format";
 
 import { KpiCard, KpiProgress } from "@/components/dashboard/KpiCard";
@@ -75,6 +71,7 @@ import {
   DateRangePicker,
   type PeriodRange,
 } from "@/components/dashboard/DateRangePicker";
+import { CalendarIncompleteWarning } from "@/components/tasks/CalendarIncompleteWarning";
 import { useState } from "react";
 import { NOW, CURRENT_YEAR } from "@/lib/domain";
 import { toast } from "sonner";
@@ -94,7 +91,7 @@ export const Route = createFileRoute("/_app/dashboard")({
 });
 
 function DashboardPage() {
-  const { role } = useRole();
+  const { role, authReady } = useRole();
   const {
     orders,
     tasks: allTasks,
@@ -112,6 +109,34 @@ function DashboardPage() {
     "id-ID",
     { month: "long" },
   );
+
+  // Server-aggregated KPI totals, replacing client-side reduce() over the
+  // unbounded orders/items arrays from useDashboardData (still fetched
+  // above for the other Dashboard widgets — charts, tables, executive
+  // cards — that need row-level data).
+  const ytdMetricsQuery = useQuery({
+    queryKey: ["sales-orders", "metrics", "dashboard-ytd"],
+    queryFn: () =>
+      getSalesOrdersMetrics({ from: new Date(CURRENT_YEAR, 0, 1), to: NOW }),
+    enabled: authReady,
+  });
+  const monthMetricsQuery = useQuery({
+    queryKey: ["sales-orders", "metrics", "dashboard-month"],
+    queryFn: () =>
+      getSalesOrdersMetrics({
+        from: new Date(CURRENT_YEAR, CURRENT_MONTH - 1, 1),
+        to: NOW,
+      }),
+    enabled: authReady,
+  });
+  const pipelineMetricsQuery = useQuery({
+    queryKey: ["pipeline", "metrics", "dashboard"],
+    queryFn: () => getPipelineMetrics(),
+    enabled: authReady,
+  });
+  const ytdMetrics = ytdMetricsQuery.data;
+  const monthMetrics = monthMetricsQuery.data;
+  const pipelineMetrics = pipelineMetricsQuery.data;
 
   // Reporting period (drives the PDF export). Default: Year to date.
   const [period, setPeriod] = useState<PeriodRange>({
@@ -187,7 +212,7 @@ function DashboardPage() {
     }
   }
 
-  const ytd = ytdRevenue(orders);
+  const ytd = (ytdMetrics?.ppnValue ?? 0) + (ytdMetrics?.nonPpnValue ?? 0);
   const yearlyTgt = ytdTargetValue(
     role,
     currentUserId ?? "",
@@ -197,7 +222,8 @@ function DashboardPage() {
   );
   const ytdPct = yearlyTgt > 0 ? ytd / yearlyTgt : 0;
 
-  const monthRev = monthlyRevenue(orders);
+  const monthRev =
+    (monthMetrics?.ppnValue ?? 0) + (monthMetrics?.nonPpnValue ?? 0);
   const monthTgt = monthlyTargetValue(
     role,
     currentUserId ?? "",
@@ -206,18 +232,36 @@ function DashboardPage() {
   );
   const monthPct = monthTgt > 0 ? monthRev / monthTgt : 0;
 
-  const tax = revenueByTax(orders);
-  const src = revenueBySource(orders);
-  const proto = prototypeSummary(orders);
+  const tax = {
+    ppn: ytdMetrics?.ppnValue ?? 0,
+    nonPpn: ytdMetrics?.nonPpnValue ?? 0,
+    total: ytd,
+  };
+  const src = {
+    newProduct: ytdMetrics?.newProductValue ?? 0,
+    existing: ytdMetrics?.existingValue ?? 0,
+    prototypePaid: ytdMetrics?.prototypePaidValue ?? 0,
+  };
+  const proto = {
+    paidValue: ytdMetrics?.prototypePaidValue ?? 0,
+    focCount: ytdMetrics?.focCount ?? 0,
+    paidCount: ytdMetrics?.prototypePaidCount ?? 0,
+  };
   const tasks = taskCounts(
     allTasks,
     role === "sales" ? undefined : taskMetrics,
   );
   const overdueAttention = tasks.overdue + tasks.escalated;
-  const waitingPo = waitingPoValue(items);
-  const activeCi = activeCommercialCount(items);
+  const waitingPo =
+    pipelineMetrics?.stages.find((s) => s.stage === "Commit")?.totalValue ?? 0;
+  const activeCi = pipelineMetrics?.totals.itemCount ?? 0;
 
-  if (isLoading) {
+  if (
+    isLoading ||
+    ytdMetricsQuery.isLoading ||
+    monthMetricsQuery.isLoading ||
+    pipelineMetricsQuery.isLoading
+  ) {
     return (
       <div className="flex items-center justify-center rounded-lg border border-dashed py-16 text-sm text-muted-foreground">
         Loading dashboard…
@@ -372,6 +416,8 @@ function DashboardPage() {
           </DropdownMenu>
         </div>
       </div>
+
+      <CalendarIncompleteWarning tasks={allTasks} metrics={taskMetrics} />
 
       {/* KPI row */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">

@@ -41,6 +41,8 @@ type CreatedRows = {
   commercialClosedLost: string;
   commercialRevenueRecorded: string;
   commercialClosed: string;
+  commercialSoftDeleted: string;
+  commercialSuperseded: string;
   salesOrder: string;
   followUp: string;
   target: string;
@@ -274,6 +276,29 @@ beforeAll(async () => {
       ...(stage === "Closed Lost" ? { lost_reason: "Tidak ada respons" } : {}),
     });
   }
+  const commercialSoftDeleted = await insertId("commercial_documents", {
+    client_id: clientOpen,
+    owner_id: users.sales.id,
+    type: "Quotation",
+    source_flow: "RFQ / New Product",
+    document_date: "2026-07-19",
+    stage: "Negotiation",
+    deleted_at: new Date().toISOString(),
+    deleted_by: users.super_admin.id,
+  });
+  const supersededBase = `TASK4-SUPERSEDED-${crypto.randomUUID()}`;
+  const commercialSuperseded = await insertId("commercial_documents", {
+    client_id: clientOpen,
+    owner_id: users.sales.id,
+    type: "Quotation",
+    source_flow: "RFQ / New Product",
+    document_date: "2026-07-19",
+    quotation_number: `${supersededBase}-REV0`,
+    quotation_base_number: supersededBase,
+    quotation_revision: 0,
+    is_current_revision: false,
+    stage: "Negotiation",
+  });
 
   const salesOrder = await insertId("sales_orders", {
     so_number: `SO-TASK-4-${crypto.randomUUID()}`,
@@ -348,6 +373,8 @@ beforeAll(async () => {
     commercialClosedLost: commercialRows.commercialClosedLost,
     commercialRevenueRecorded: commercialRows.commercialRevenueRecorded,
     commercialClosed: commercialRows.commercialClosed,
+    commercialSoftDeleted,
+    commercialSuperseded,
     salesOrder,
     followUp,
     target,
@@ -401,6 +428,8 @@ afterAll(async () => {
           created.commercialClosedLost,
           created.commercialRevenueRecorded,
           created.commercialClosed,
+          created.commercialSoftDeleted,
+          created.commercialSuperseded,
         ],
       ],
       ["targets", [created.target]],
@@ -466,7 +495,7 @@ describe("account lifecycle database primitives", () => {
     expect(data as ReferenceCounts).toEqual({
       clients: 2,
       tasks: 4,
-      commercial_items: 5,
+      commercial_items: 7,
       sales_orders: 1,
       follow_up_logs: 1,
       targets: 1,
@@ -474,9 +503,85 @@ describe("account lifecycle database primitives", () => {
       activity_log_actor: 1,
       activity_log_target: 1,
       profile_status_changes: 1,
-      total_blocking: 17,
-      total_all: 18,
+      total_blocking: 19,
+      total_all: 20,
     });
+  });
+
+  test("characterizes active-transferable ownership separately from historical references", async () => {
+    const created = requireRows();
+    const users = requireFixtures();
+    const activeTransferableCommercialIds = [created.commercialOpen];
+    const historicalCommercialIds = [
+      created.commercialClosedWon,
+      created.commercialClosedLost,
+      created.commercialRevenueRecorded,
+      created.commercialClosed,
+      created.commercialSoftDeleted,
+      created.commercialSuperseded,
+    ];
+
+    const { data: commercialRows, error: commercialError } = await adminClient
+      .from("commercial_documents")
+      .select("id, owner_id, stage, deleted_at, is_current_revision")
+      .in("id", [
+        ...activeTransferableCommercialIds,
+        ...historicalCommercialIds,
+      ])
+      .order("id", { ascending: true });
+    if (commercialError) throw commercialError;
+
+    const activeRows = (commercialRows ?? []).filter(
+      (row) =>
+        row.owner_id === users.sales.id &&
+        row.deleted_at === null &&
+        row.is_current_revision === true &&
+        !["Closed Won", "Closed Lost", "Revenue Recorded", "Closed"].includes(
+          row.stage,
+        ),
+    );
+    const historicalRows = (commercialRows ?? []).filter((row) =>
+      historicalCommercialIds.includes(row.id),
+    );
+
+    expect(activeRows.map((row) => row.id).sort()).toEqual(
+      [...activeTransferableCommercialIds].sort(),
+    );
+    expect(historicalRows.map((row) => row.id).sort()).toEqual(
+      [...historicalCommercialIds].sort(),
+    );
+
+    const { data: referenceCounts, error: referenceError } =
+      await adminClient.rpc("admin_account_reference_counts", {
+        p_target_id: users.sales.id,
+      });
+    expect(referenceError).toBeNull();
+    expect((referenceCounts as ReferenceCounts).commercial_items).toBe(7);
+  });
+
+  test("active workload summaries share the active commercial ownership predicate", async () => {
+    const users = requireFixtures();
+    const managerClient = await signInAs(users.manager);
+
+    const { data: activeCommercialCount, error: countError } =
+      await managerClient.rpc("admin_count_active_commercial_items", {
+        p_owner_id: users.sales.id,
+      });
+    expect(countError).toBeNull();
+    expect(Number(activeCommercialCount)).toBe(1);
+
+    const { data: teamSummary, error: summaryError } = await managerClient.rpc(
+      "admin_team_summary",
+      {},
+    );
+    expect(summaryError).toBeNull();
+    const salesSummary = (teamSummary ?? []).find(
+      (row: { id: string }) => row.id === users.sales.id,
+    );
+
+    expect(Number(salesSummary?.clients_count)).toBe(1);
+    expect(Number(salesSummary?.tasks_count)).toBe(1);
+    expect(Number(salesSummary?.commercial_items_count)).toBe(1);
   });
 
   test("active Super Admin count excludes inactive profiles", async () => {
@@ -560,7 +665,7 @@ describe("account lifecycle database primitives", () => {
     }
   });
 
-  test("ownership transfer moves only documented active/open rows and preserves history", async () => {
+  test("ownership transfer moves only active current open rows and preserves commercial history", async () => {
     const users = requireFixtures();
     const created = requireRows();
     let auditId: string | undefined;
@@ -596,6 +701,12 @@ describe("account lifecycle database primitives", () => {
       expect(
         await ownerId("commercial_documents", created.commercialOpen),
       ).toBe(users.manager.id);
+      expect(
+        await ownerId("commercial_documents", created.commercialSoftDeleted),
+      ).toBe(users.sales.id);
+      expect(
+        await ownerId("commercial_documents", created.commercialSuperseded),
+      ).toBe(users.sales.id);
       for (const historicalId of [
         created.commercialClosedWon,
         created.commercialClosedLost,
@@ -1094,6 +1205,58 @@ describe("account lifecycle database primitives", () => {
     }
   });
 
+  test("eligible delete stays blocked when only a historical commercial reference remains", async () => {
+    const users = requireFixtures();
+    const target = await createDisposableProfile("historical-delete-blocker");
+    let clientId: string | undefined;
+    let commercialId: string | undefined;
+
+    try {
+      clientId = await insertId("clients", {
+        name: "Task 4 historical-only client",
+        status: "Active Customer",
+        source: "Referral",
+        owner_id: users.manager.id,
+      });
+      commercialId = await insertId("commercial_documents", {
+        client_id: clientId,
+        owner_id: target.id,
+        type: "Quotation",
+        source_flow: "RFQ / New Product",
+        document_date: "2026-07-19",
+        stage: "Closed Won",
+      });
+
+      const { error } = await adminClient.rpc("admin_delete_eligible_account", {
+        p_actor_id: users.super_admin.id,
+        p_target_id: target.id,
+        p_reason: "Historical commercial reference remains",
+      });
+      expect(error?.message).toContain("ACCOUNT_HAS_REFERENCES");
+      expect(error?.details).toContain('"commercial_items": 1');
+      expect(error?.details).toContain('"total_blocking": 1');
+      expect(await ownerId("commercial_documents", commercialId)).toBe(
+        target.id,
+      );
+    } finally {
+      if (commercialId) {
+        const { error } = await adminClient
+          .from("commercial_documents")
+          .delete()
+          .eq("id", commercialId);
+        expect(error).toBeNull();
+      }
+      if (clientId) {
+        const { error } = await adminClient
+          .from("clients")
+          .delete()
+          .eq("id", clientId);
+        expect(error).toBeNull();
+      }
+      await deleteDisposableAuth(target.id);
+    }
+  });
+
   test("eligible delete uses fresh blockers, preserves target-only audit snapshots, and deletes only the profile", async () => {
     const users = requireFixtures();
     const target = await createDisposableProfile("eligible-delete");
@@ -1130,7 +1293,7 @@ describe("account lifecycle database primitives", () => {
         },
       );
       expect(referencedError?.message).toContain("ACCOUNT_HAS_REFERENCES");
-      expect(referencedError?.details).toContain('"total_blocking": 17');
+      expect(referencedError?.details).toContain('"total_blocking": 19');
 
       const { data, error } = await adminClient.rpc(
         "admin_delete_eligible_account",

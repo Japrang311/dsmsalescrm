@@ -8,8 +8,6 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -33,14 +31,10 @@ import {
 } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 
 import { ROLE_LABEL, useRole } from "@/context/role-context";
-import type { Role } from "@/lib/domain";
-import { listOwners } from "@/lib/data/clients";
-import { getCurrentActorId } from "@/lib/data/activity-log";
 import { useDashboardData } from "@/hooks/use-dashboard-data";
 import {
   hasTaskDueState,
@@ -378,37 +372,9 @@ function NotificationsMenu() {
 }
 
 export function TopBar() {
-  const { role, setRole, authSource, authReady, realProfile, signOut } =
-    useRole();
+  const { role, authReady, realProfile, signOut } = useRole();
   const [quickCreate, setQuickCreate] = useState<QuickCreateKind | null>(null);
-  const { data: owners = {} } = useQuery({
-    queryKey: ["profiles", "owners"],
-    queryFn: listOwners,
-    enabled: authReady && authSource === "dev",
-  });
-  // Looked up by the real signed-in user's id, not guessed by role — the
-  // dev switcher signs into a specific seed account per role (see
-  // role-context.tsx's ROLE_LOGIN), and a hardcoded id or an "any manager"
-  // heuristic previously showed the wrong person's name/avatar whenever
-  // that specific seed account wasn't the one actually running.
-  const { data: currentUserId } = useQuery({
-    queryKey: ["current-user-id"],
-    queryFn: async () => {
-      try {
-        return (await getCurrentActorId()) ?? null;
-      } catch {
-        return null;
-      }
-    },
-    enabled: authReady && authSource === "dev",
-  });
-  const devUser = currentUserId ? owners[currentUserId] : undefined;
-  const currentUser =
-    authSource === "real" && realProfile
-      ? realProfile
-      : role === "executive"
-        ? { name: "Direktur Utama", initials: "DU", email: "exec@dsm.co.id" }
-        : (devUser ?? { name: "—", initials: "—", email: "—" });
+  const currentUser = realProfile ?? { name: "—", initials: "—", email: "—" };
 
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-border bg-background/95 px-3 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:px-4">
@@ -497,38 +463,10 @@ export function TopBar() {
               <div className="text-sm">{currentUser.name}</div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            {authSource === "dev" ? (
-              <>
-                <DropdownMenuLabel className="flex items-center justify-between">
-                  Prototype Role
-                  <Badge variant="outline" className="text-[10px]">
-                    demo
-                  </Badge>
-                </DropdownMenuLabel>
-                <DropdownMenuRadioGroup
-                  value={role}
-                  onValueChange={(v) => setRole(v as Role)}
-                >
-                  <DropdownMenuRadioItem value="sales">
-                    Sales
-                  </DropdownMenuRadioItem>
-                  <DropdownMenuRadioItem value="manager">
-                    Sales Manager
-                  </DropdownMenuRadioItem>
-                  <DropdownMenuRadioItem value="executive">
-                    Top Executive
-                  </DropdownMenuRadioItem>
-                </DropdownMenuRadioGroup>
-                <DropdownMenuSeparator />
-              </>
-            ) : (
-              <>
-                <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
-                  {ROLE_LABEL[role]}
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-              </>
-            )}
+            <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+              {ROLE_LABEL[role]}
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
             <DropdownMenuItem>Profile</DropdownMenuItem>
             <DropdownMenuItem>Preferences</DropdownMenuItem>
             <DropdownMenuItem onClick={() => void signOut()}>

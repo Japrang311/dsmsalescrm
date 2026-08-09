@@ -31,6 +31,20 @@ type RoleFixtureCreationOptions = {
   roleFixtures?: readonly RoleFixture[];
 };
 
+export function jakartaDateDaysFromToday(offsetDays: number): string {
+  const jakartaToday = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jakarta",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+  const [year, month, day] = jakartaToday.split("-").map(Number);
+
+  return new Date(Date.UTC(year, month - 1, day + offsetDays))
+    .toISOString()
+    .slice(0, 10);
+}
+
 async function collectAuthDeletionFailures(
   ids: readonly string[],
   client: SupabaseClient,

@@ -230,19 +230,48 @@ export function monthlyRevenueTrend(
   });
 }
 
-export function ytdCumulativeTrend(
-  orders: SalesOrder[],
+// ---------------------------------------------------------------------------
+// Revenue trend — RPC-backed variants (sales_orders_monthly_trend /
+// sales_orders_owner_ytd, 20260806150000). Same shape/output as
+// monthlyRevenueTrend/targetPerSales above, but read pre-aggregated rows
+// instead of reducing a full unbounded orders fetch.
+// ---------------------------------------------------------------------------
+
+export function monthlyRevenueTrendFromRpc(
+  trend: { month: number; revenue: number }[],
   role: Role,
   salesUserId: string,
   byMember: TargetsByMember,
   companyTarget: MonthlyTarget[],
 ) {
   const targetArr = targetArrFor(role, salesUserId, byMember, companyTarget);
+  const byMonth = new Map(trend.map((t) => [t.month, t.revenue]));
+  return Array.from({ length: CURRENT_MONTH }, (_, i) => {
+    const m = i + 1;
+    return {
+      month: new Date(CURRENT_YEAR, i, 1).toLocaleDateString("id-ID", {
+        month: "short",
+      }),
+      revenue: byMonth.get(m) ?? 0,
+      target: targetForMonth(targetArr, m),
+    };
+  });
+}
+
+export function ytdCumulativeTrendFromRpc(
+  trend: { month: number; revenue: number }[],
+  role: Role,
+  salesUserId: string,
+  byMember: TargetsByMember,
+  companyTarget: MonthlyTarget[],
+) {
+  const targetArr = targetArrFor(role, salesUserId, byMember, companyTarget);
+  const byMonth = new Map(trend.map((t) => [t.month, t.revenue]));
   let cumRev = 0;
   let cumTgt = 0;
   return Array.from({ length: CURRENT_MONTH }, (_, i) => {
     const m = i + 1;
-    cumRev += monthlyRevenue(orders, m);
+    cumRev += byMonth.get(m) ?? 0;
     cumTgt += targetForMonth(targetArr, m);
     return {
       month: new Date(CURRENT_YEAR, i, 1).toLocaleDateString("id-ID", {
@@ -250,6 +279,28 @@ export function ytdCumulativeTrend(
       }),
       achievement: cumRev,
       target: cumTgt,
+    };
+  });
+}
+
+export function sumTrendRevenue(trend: { month: number; revenue: number }[]) {
+  return trend.reduce((s, t) => s + t.revenue, 0);
+}
+
+export function targetPerSalesFromRpc(
+  ownerYtd: { ownerId: string; revenue: number }[],
+  salesTeam: SalesTeamMember[],
+  byMember: TargetsByMember,
+) {
+  const byOwner = new Map(ownerYtd.map((o) => [o.ownerId, o.revenue]));
+  return salesTeam.map((member) => {
+    const achievement = byOwner.get(member.id) ?? 0;
+    const target = sumTargetsThroughMonth(targetsFor(byMember, member.id));
+    return {
+      name: member.name.split(" ")[0],
+      fullName: member.name,
+      target,
+      achievement,
     };
   });
 }
@@ -530,44 +581,6 @@ export function todaysFollowUps(
 // Manager-specific
 // ---------------------------------------------------------------------------
 
-export function salesPerformance(
-  orders: SalesOrder[],
-  tasks: Task[],
-  clients: Client[],
-  salesTeam: SalesTeamMember[],
-  byMember: TargetsByMember,
-) {
-  return salesTeam
-    .map((member) => {
-      const memberOrders = orders.filter(
-        (s) =>
-          s.ownerId === member.id &&
-          new Date(s.date).getFullYear() === CURRENT_YEAR,
-      );
-      const revenue = memberOrders.reduce((s, o) => s + paidRevenue(o), 0);
-      const target = sumTargetsThroughMonth(targetsFor(byMember, member.id));
-      const overdue = tasks.filter(
-        (t) => t.ownerId === member.id && isTaskOverdueLike(t),
-      ).length;
-      const openTasks = tasks.filter(
-        (t) => t.ownerId === member.id && isActiveTask(t),
-      ).length;
-      const activeClients = clients.filter(
-        (c) => c.ownerId === member.id && c.status !== "Lost",
-      ).length;
-      return {
-        member,
-        revenue,
-        target,
-        pct: target > 0 ? revenue / target : 0,
-        overdue,
-        openTasks,
-        activeClients,
-      };
-    })
-    .sort((a, b) => b.revenue - a.revenue);
-}
-
 export function activityCompliance(clients: Client[]) {
   const active = clients.filter((c) => c.status !== "Lost");
   const withNext = active.filter((c) => Boolean(c.nextFu)).length;
@@ -620,28 +633,6 @@ export function clientCommercialMetrics(
 // Executive-specific
 // ---------------------------------------------------------------------------
 
-export function topCustomersYtd(
-  orders: SalesOrder[],
-  clients: Client[],
-  limit = 5,
-) {
-  const totals = new Map<string, number>();
-  for (const so of orders) {
-    if (new Date(so.date).getFullYear() !== CURRENT_YEAR) continue;
-    totals.set(so.clientId, (totals.get(so.clientId) ?? 0) + paidRevenue(so));
-  }
-  return Array.from(totals.entries())
-    .map(([clientId, revenue]) => ({
-      client: clients.find((c) => c.id === clientId),
-      revenue,
-    }))
-    .filter((row): row is { client: Client; revenue: number } =>
-      Boolean(row.client),
-    )
-    .sort((a, b) => b.revenue - a.revenue)
-    .slice(0, limit);
-}
-
 // Funnel progression through the Quotation stages, ending at
 // Closed Won — Closed Lost is the "we lost" branch, not a funnel step.
 const FUNNEL_STAGES: CommercialStage[] = [
@@ -663,23 +654,6 @@ export function quotationFunnel(items: CommercialItem[]) {
     }
   }
   return stages;
-}
-
-export function forecastVsAchievement(
-  orders: SalesOrder[],
-  items: CommercialItem[],
-  ytdTargetExecutive: number,
-) {
-  const achievement = ytdRevenue(orders);
-  // Closed Won is already realized revenue (counted in `achievement` via
-  // orders) and Closed Lost contributes nothing — only still-open stages
-  // count toward the pipeline forecast, weighted per PRD §7.
-  const pipeline = items.reduce((s, ci) => {
-    if (ci.stage === "Closed Won" || ci.stage === "Closed Lost") return s;
-    return s + (forecastValue(ci.estimatedValue, ci.stage) ?? 0);
-  }, 0);
-  const forecast = achievement + pipeline;
-  return { achievement, forecast, target: ytdTargetExecutive };
 }
 
 export function riskAlerts(
@@ -721,6 +695,109 @@ export function riskAlerts(
       id: "r3",
       severity: "medium",
       title: `${dormantHigh.length} client high-value dormant`,
+      detail: "Prioritaskan re-engagement bulan ini.",
+    });
+  }
+  return alerts;
+}
+
+// ---------------------------------------------------------------------------
+// RPC-backed variants — sales_task_client_metrics / sales_orders_top_customers
+// / dashboard_risk_alert_counts (20260806160000) and the already-existing
+// pipeline_metrics/sales_orders_owner_ytd. Same output shape as the
+// full-array selectors above, read from pre-aggregated RPC rows instead.
+// ---------------------------------------------------------------------------
+
+export function quotationFunnelFromPipeline(
+  stages: { stage: string; itemCount: number; totalValue: number }[],
+) {
+  return FUNNEL_STAGES.map((stage) => {
+    const found = stages.find((s) => s.stage === stage);
+    return {
+      stage,
+      count: found?.itemCount ?? 0,
+      value: found?.totalValue ?? 0,
+    };
+  });
+}
+
+export function forecastVsAchievementFromPipeline(
+  stages: { stage: string; totalValue: number }[],
+  achievement: number,
+  ytdTargetExecutive: number,
+) {
+  const pipeline = stages.reduce((s, st) => {
+    if (st.stage === "Closed Won" || st.stage === "Closed Lost") return s;
+    return s + (forecastValue(st.totalValue, st.stage) ?? 0);
+  }, 0);
+  const forecast = achievement + pipeline;
+  return { achievement, forecast, target: ytdTargetExecutive };
+}
+
+export function salesPerformanceFromRpc(
+  ownerYtd: { ownerId: string; revenue: number }[],
+  taskClientMetrics: {
+    ownerId: string;
+    openTasks: number;
+    overdueTasks: number;
+    activeClients: number;
+  }[],
+  salesTeam: SalesTeamMember[],
+  byMember: TargetsByMember,
+) {
+  const revenueByOwner = new Map(ownerYtd.map((o) => [o.ownerId, o.revenue]));
+  const metricsByOwner = new Map(taskClientMetrics.map((m) => [m.ownerId, m]));
+  return salesTeam
+    .map((member) => {
+      const revenue = revenueByOwner.get(member.id) ?? 0;
+      const target = sumTargetsThroughMonth(targetsFor(byMember, member.id));
+      const m = metricsByOwner.get(member.id);
+      return {
+        member,
+        revenue,
+        target,
+        pct: target > 0 ? revenue / target : 0,
+        overdue: m?.overdueTasks ?? 0,
+        openTasks: m?.openTasks ?? 0,
+        activeClients: m?.activeClients ?? 0,
+      };
+    })
+    .sort((a, b) => b.revenue - a.revenue);
+}
+
+export function riskAlertsFromCounts(counts: {
+  overdueTaskCount: number;
+  bigPendingCommitCount: number;
+  bigPendingCommitValue: number;
+  dormantHighValueClientCount: number;
+}) {
+  const alerts: Array<{
+    id: string;
+    severity: "high" | "medium";
+    title: string;
+    detail: string;
+  }> = [];
+  if (counts.overdueTaskCount > 0) {
+    alerts.push({
+      id: "r1",
+      severity: "high",
+      title: `${counts.overdueTaskCount} follow-up overdue`,
+      detail: "Tersebar di beberapa sales; segera dijadwalkan ulang.",
+    });
+  }
+  if (counts.bigPendingCommitCount > 0) {
+    alerts.push({
+      id: "r2",
+      severity: "medium",
+      title: `${counts.bigPendingCommitCount} PO besar tertahan`,
+      detail: `Total nilai menunggu konfirmasi: ${counts.bigPendingCommitValue.toLocaleString("id-ID")} rupiah.`,
+    });
+  }
+  if (counts.dormantHighValueClientCount > 0) {
+    alerts.push({
+      id: "r3",
+      severity: "medium",
+      title: `${counts.dormantHighValueClientCount} client high-value dormant`,
       detail: "Prioritaskan re-engagement bulan ini.",
     });
   }

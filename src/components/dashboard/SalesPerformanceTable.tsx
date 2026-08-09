@@ -1,3 +1,4 @@
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -9,18 +10,30 @@ import {
 } from "@/components/ui/table";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { salesPerformance } from "@/lib/data/dashboard-selectors";
+import { salesPerformanceFromRpc } from "@/lib/data/dashboard-selectors";
+import { getSalesOrdersOwnerYtd } from "@/lib/data/sales-orders-trend";
+import { getSalesTaskClientMetrics } from "@/lib/data/sales-performance-metrics";
 import { useDashboardData } from "@/hooks/use-dashboard-data";
+import { useRole } from "@/context/role-context";
 import { formatRupiahShort, formatPercent } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 export function SalesPerformanceTable() {
-  const { orders, tasks, clients, salesTeam, ownersById, targetsByMember } =
-    useDashboardData();
-  const rows = salesPerformance(
-    orders,
-    tasks,
-    clients,
+  const { authReady } = useRole();
+  const { salesTeam, targetsByMember } = useDashboardData();
+  const ownerYtdQuery = useQuery({
+    queryKey: ["sales-orders", "owner-ytd", "dashboard"],
+    queryFn: () => getSalesOrdersOwnerYtd(),
+    enabled: authReady,
+  });
+  const taskClientQuery = useQuery({
+    queryKey: ["sales-task-client-metrics", "dashboard"],
+    queryFn: () => getSalesTaskClientMetrics(),
+    enabled: authReady,
+  });
+  const rows = salesPerformanceFromRpc(
+    ownerYtdQuery.data ?? [],
+    taskClientQuery.data ?? [],
     salesTeam,
     targetsByMember,
   );

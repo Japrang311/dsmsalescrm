@@ -9,8 +9,6 @@ import {
 } from "./helpers";
 
 const db = new SQL("postgresql://postgres:postgres@127.0.0.1:54322/postgres");
-const createdClients: string[] = [];
-const externalOwnerSalesOrderIds: string[] = [];
 let fixtures: RoleFixtureUsers | undefined;
 let ownedClientId: string | undefined;
 let hariffClientId: string | undefined;
@@ -30,7 +28,77 @@ function users(): RoleFixtureUsers {
   return fixtures;
 }
 
+async function cleanupNumberingFixtures(): Promise<void> {
+  await db.begin(async (tx) => {
+    await tx`
+      delete from public.activity_log
+      where client_id in (
+        select id from public.clients where name like 'Numbering Client %'
+      )
+        or task_id in (
+          select id from public.tasks
+          where client_id in (
+            select id from public.clients where name like 'Numbering Client %'
+          )
+        )
+        or commercial_document_id in (
+          select id from public.commercial_documents
+          where client_id in (
+            select id from public.clients where name like 'Numbering Client %'
+          )
+        )
+        or sales_order_id in (
+          select id from public.sales_orders
+          where client_id in (
+            select id from public.clients where name like 'Numbering Client %'
+          )
+            or so_number like 'DSM-22SO-%'
+        )
+    `;
+    await tx`
+      delete from public.follow_up_logs
+      where client_id in (
+        select id from public.clients where name like 'Numbering Client %'
+      )
+        or commercial_document_id in (
+          select id from public.commercial_documents
+          where client_id in (
+            select id from public.clients where name like 'Numbering Client %'
+          )
+        )
+    `;
+    await tx`
+      delete from public.tasks
+      where client_id in (
+        select id from public.clients where name like 'Numbering Client %'
+      )
+    `;
+    await tx`
+      delete from public.sales_orders
+      where client_id in (
+        select id from public.clients where name like 'Numbering Client %'
+      )
+        or so_number like 'DSM-22SO-%'
+    `;
+    await tx`
+      delete from public.commercial_documents
+      where client_id in (
+        select id from public.clients where name like 'Numbering Client %'
+      )
+    `;
+    await tx`
+      delete from public.clients
+      where name like 'Numbering Client %'
+    `;
+    await tx`
+      delete from private.document_number_counters
+      where year_code in (91, 92, 93, 94, 97)
+    `;
+  });
+}
+
 beforeAll(async () => {
+  await cleanupNumberingFixtures();
   fixtures = await createRoleFixtureUsers();
   const { data: ownedClient, error: ownedClientError } = await adminClient
     .from("clients")
@@ -43,7 +111,6 @@ beforeAll(async () => {
     .select("id")
     .single();
   if (ownedClientError) throw ownedClientError;
-  createdClients.push(ownedClient.id);
   ownedClientId = ownedClient.id;
 
   // The seed already contains the one canonical HARIFF client. Reuse it as a
@@ -59,39 +126,25 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  if (externalOwnerSalesOrderIds.length > 0) {
-    await adminClient
-      .from("activity_log")
-      .delete()
-      .in("sales_order_id", externalOwnerSalesOrderIds);
-    await adminClient
-      .from("sales_orders")
-      .delete()
-      .in("id", externalOwnerSalesOrderIds);
+  const failures: unknown[] = [];
+  try {
+    await cleanupNumberingFixtures();
+  } catch (error) {
+    failures.push(error);
   }
-  if (fixtures) {
-    await adminClient
-      .from("activity_log")
-      .delete()
-      .eq("owner_id", fixtures.sales.id);
-    await adminClient
-      .from("commercial_documents")
-      .delete()
-      .eq("owner_id", fixtures.sales.id);
-    await adminClient
-      .from("sales_orders")
-      .delete()
-      .eq("owner_id", fixtures.sales.id);
+  try {
+    await deleteRoleFixtureUsers(fixtures);
+  } catch (error) {
+    failures.push(error);
   }
-  if (createdClients.length > 0) {
-    await adminClient.from("clients").delete().in("id", createdClients);
+  try {
+    await db.end();
+  } catch (error) {
+    failures.push(error);
   }
-  await db`
-    delete from private.document_number_counters
-    where year_code in (91, 92, 93, 94)
-  `;
-  await deleteRoleFixtureUsers(fixtures);
-  await db.end();
+  if (failures.length > 0) {
+    throw new AggregateError(failures, "Numbering fixture cleanup failed");
+  }
 });
 
 describe("Phase 11 atomic document numbering", () => {
@@ -166,6 +219,8 @@ describe("Phase 11 atomic document numbering", () => {
       p_so_number: null,
       p_note: null,
       p_items: [{ ...paidItems[0], productName: "" }],
+      p_next_action: "Follow up",
+      p_next_action_date: "2094-07-26",
     });
     expect(error?.message).toContain("PRODUCT_NAME_REQUIRED");
 
@@ -179,6 +234,8 @@ describe("Phase 11 atomic document numbering", () => {
         p_so_number: null,
         p_note: null,
         p_items: paidItems,
+        p_next_action: "Follow up",
+        p_next_action_date: "2094-07-26",
       },
     );
     expect(validError).toBeNull();
@@ -197,6 +254,8 @@ describe("Phase 11 atomic document numbering", () => {
         p_so_number: null,
         p_note: "Base",
         p_items: paidItems,
+        p_next_action: "Follow up",
+        p_next_action_date: "2094-07-26",
       },
     );
     expect(baseError).toBeNull();
@@ -210,6 +269,8 @@ describe("Phase 11 atomic document numbering", () => {
         p_so_number: null,
         p_note: "Revision 1",
         p_items: [{ ...paidItems[0], unitPrice: 130_000 }],
+        p_next_action: "Follow up",
+        p_next_action_date: "2094-07-27",
       },
     );
     expect(rev1Error).toBeNull();
@@ -224,6 +285,8 @@ describe("Phase 11 atomic document numbering", () => {
         p_so_number: null,
         p_note: "Revision 2",
         p_items: paidItems,
+        p_next_action: "Follow up",
+        p_next_action_date: "2094-07-28",
       },
     );
     expect(rev2Error).toBeNull();
@@ -241,6 +304,92 @@ describe("Phase 11 atomic document numbering", () => {
       ),
     ).toEqual([false, false, true]);
     expect(chain[2]?.supersedes_document_id).toBe(rev1.id);
+  });
+
+  test("links a Sales Order to its source Quotation, rejects a second SO on the same Quotation, and blocks further revision", async () => {
+    // Isolated year_code (97), untouched by sibling numbering tests in this
+    // file, so this test's numbering has no ordering dependency on them.
+    // Also defensively clears any row orphaned by an interrupted prior run
+    // (this file's afterAll only cleans up by the current run's fixture
+    // owner_id, so a run that dies before reaching cleanup can leak a row
+    // tied to a stale owner_id that a later run never matches).
+    await db`
+      delete from private.document_number_counters
+      where series = 'QUO' and year_code = 97
+    `;
+    await db`
+      delete from public.commercial_documents
+      where quotation_number = 'DSM-97QUO-0001'
+    `;
+    const salesClient = await signInAs(users().sales);
+    const { data: quotation, error: quotationError } = await salesClient.rpc(
+      "create_quotation",
+      {
+        p_client_id: ownedClientId,
+        p_document_date: "2097-07-19",
+        p_client_address: null,
+        p_stage: "Closed Won",
+        p_so_number: null,
+        p_note: null,
+        p_items: paidItems,
+        p_next_action: "Follow up",
+        p_next_action_date: "2097-07-26",
+      },
+    );
+    expect(quotationError).toBeNull();
+
+    const { data: so, error: soError } = await salesClient.rpc(
+      "create_sales_order",
+      {
+        p_client_id: ownedClientId,
+        p_date: "2097-07-19",
+        p_customer_po_number: `PO-${crypto.randomUUID()}`,
+        p_type: "Regular",
+        p_tax_type: "PPN",
+        p_prototype_status: null,
+        p_source: "Existing / Repeat Order",
+        p_number_mode: "Manual",
+        p_manual_so_number: `DSM-97SO-${crypto.randomUUID().slice(0, 8)}`,
+        p_backdate_reason: null,
+        p_items: paidItems,
+        p_source_commercial_document_id: quotation.id,
+      },
+    );
+    expect(soError).toBeNull();
+    expect(so.source_commercial_document_id).toBe(quotation.id);
+
+    const { error: duplicateError } = await salesClient.rpc(
+      "create_sales_order",
+      {
+        p_client_id: ownedClientId,
+        p_date: "2097-07-20",
+        p_customer_po_number: `PO-${crypto.randomUUID()}`,
+        p_type: "Regular",
+        p_tax_type: "PPN",
+        p_prototype_status: null,
+        p_source: "Existing / Repeat Order",
+        p_number_mode: "Manual",
+        p_manual_so_number: `DSM-97SO-${crypto.randomUUID().slice(0, 8)}`,
+        p_backdate_reason: null,
+        p_items: paidItems,
+        p_source_commercial_document_id: quotation.id,
+      },
+    );
+    expect(duplicateError?.message).toContain(
+      "QUOTATION_ALREADY_HAS_SALES_ORDER",
+    );
+
+    const { error: reviseError } = await salesClient.rpc("revise_quotation", {
+      p_document_id: quotation.id,
+      p_document_date: "2097-07-21",
+      p_client_address: null,
+      p_so_number: null,
+      p_note: "Attempted post-SO revision",
+      p_items: paidItems,
+      p_next_action: "Follow up",
+      p_next_action_date: "2097-07-28",
+    });
+    expect(reviseError?.message).toContain("QUOTATION_ALREADY_HAS_SALES_ORDER");
   });
 
   test("accepts manually assigned SO, NP, and PROTY numbers", async () => {
@@ -317,7 +466,6 @@ describe("Phase 11 atomic document numbering", () => {
     const first = await managerClient.rpc("create_sales_order", args);
     expect(first.error).toBeNull();
     expect(first.data.so_number).toBe(manual);
-    externalOwnerSalesOrderIds.push(first.data.id);
 
     const duplicate = await managerClient.rpc("create_sales_order", {
       ...args,

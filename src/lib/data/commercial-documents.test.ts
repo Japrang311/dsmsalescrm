@@ -11,8 +11,11 @@ import { supabase } from "@/lib/supabase";
 import {
   createQuotation,
   deleteCommercialDocument,
+  getCommercialDocument,
   listCommercialDocuments,
+  listCommercialDocumentsPage,
   reviseQuotation,
+  transitionCommercialStage,
   updateCommercialDocument,
 } from "./commercial-documents";
 
@@ -81,9 +84,18 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await adminClient
+    .from("follow_up_logs")
+    .delete()
+    .eq("owner_id", fixtures.sales.id);
+  await adminClient
     .from("activity_log")
     .delete()
     .eq("owner_id", fixtures.sales.id);
+  // create_quotation/revise_quotation now insert a linked follow-up Task
+  // per call (spec: docs/superpowers/specs/2026-08-03-quotation-mandatory-followup-design.md)
+  // -- clean these up before commercial_documents/clients, otherwise
+  // tasks.client_id's FK blocks the clients delete below.
+  await adminClient.from("tasks").delete().eq("owner_id", fixtures.sales.id);
   await adminClient
     .from("commercial_documents")
     .delete()
@@ -135,6 +147,8 @@ describe("normalized commercial document adapter", () => {
           unitPrice: 5000,
         },
       ],
+      nextAction: "Telepon PIC untuk konfirmasi harga",
+      nextActionDate: "2095-01-22",
     });
     expect(created.quotationNumber).toMatch(/^DSM-95QUO-\d{4}$/);
     expect(created.items[0]?.lineTotal).toBe(10000);
@@ -151,6 +165,8 @@ describe("normalized commercial document adapter", () => {
           unitPrice: 12000,
         },
       ],
+      nextAction: "Kirim ulang penawaran revisi",
+      nextActionDate: "2095-01-23",
     });
     expect(revised.quotationNumber).toBe(`${created.quotationNumber}_REV.1`);
     expect(revised.supersedesDocumentId).toBe(created.id);
@@ -179,6 +195,8 @@ describe("normalized commercial document adapter", () => {
           unitPrice: 50_000,
         },
       ],
+      nextAction: "Follow up status keputusan client",
+      nextActionDate: "2095-02-08",
     });
 
     await expect(
@@ -222,6 +240,8 @@ describe("normalized commercial document adapter", () => {
           unitPrice: 1000,
         },
       ],
+      nextAction: "Follow up koreksi nomor Quotation",
+      nextActionDate: "2095-03-08",
     });
 
     const corrected = await updateCommercialDocument(created.id, {
@@ -234,6 +254,126 @@ describe("normalized commercial document adapter", () => {
     );
     expect(corrected.documentDate).toBe("2095-03-02");
     expect(corrected.quotationExpiredDate).toBe("2095-04-01");
+    await supabase.auth.signOut();
+  });
+
+  test("transitionCommercialStage() maps stage movement through the atomic RPC", async () => {
+    const authClient = await signInAs(fixtures.sales);
+    const session = (await authClient.auth.getSession()).data.session!;
+    await supabase.auth.setSession({
+      access_token: session.access_token,
+      refresh_token: session.refresh_token,
+    });
+
+    const created = await createQuotation({
+      clientId,
+      documentDate: "2095-04-01",
+      stage: "Negotiation",
+      items: [
+        {
+          productName: "Stage transition adapter item",
+          qty: 1,
+          uom: "Unit",
+          unitPrice: 25_000,
+        },
+      ],
+      nextAction: "Initial quotation follow-up",
+      nextActionDate: "2095-04-08",
+    });
+
+    const { data: task, error: taskError } = await adminClient
+      .from("tasks")
+      .insert({
+        client_id: clientId,
+        commercial_document_id: created.id,
+        owner_id: fixtures.sales.id,
+        title: "Commercial stage adapter Task",
+        due_date: "2095-04-09",
+        method: "Phone",
+        category: "Quotation",
+      })
+      .select("id")
+      .single();
+    if (taskError) throw taskError;
+
+    const result = await transitionCommercialStage({
+      commercialDocumentId: created.id,
+      expectedFromStage: "Negotiation",
+      toStage: "Hot Prospect",
+      taskId: task.id,
+      nextAction: "Confirm decision maker",
+      nextActionDate: "2095-04-10",
+      note: "Adapter stage transition",
+      workflowStatusTarget: "In Progress",
+    });
+
+    expect(result.commercialDocumentId).toBe(created.id);
+    expect(result.fromStage).toBe("Negotiation");
+    expect(result.toStage).toBe("Hot Prospect");
+    expect(result.taskId).toBe(task.id);
+    expect(result.stageActivityLogId).toBeTruthy();
+
+    const updated = await getCommercialDocument(created.id);
+    expect(updated?.stage).toBe("Hot Prospect");
+    await supabase.auth.signOut();
+  });
+
+  test("listCommercialDocumentsPage() pages a stage with a stable cursor and no overlap", async () => {
+    const authClient = await signInAs(fixtures.manager);
+    const session = (await authClient.auth.getSession()).data.session!;
+    await supabase.auth.setSession({
+      access_token: session.access_token,
+      refresh_token: session.refresh_token,
+    });
+
+    const firstPage = await listCommercialDocumentsPage({
+      filters: { stage: "Quotes Sent" },
+      page: { pageSize: 2 },
+    });
+    expect(firstPage.rows.length).toBe(2);
+    expect(firstPage.totalCount).toBeGreaterThan(2);
+    expect(firstPage.nextCursor).not.toBeNull();
+
+    const secondPage = await listCommercialDocumentsPage({
+      filters: { stage: "Quotes Sent" },
+      page: { pageSize: 2, cursor: firstPage.nextCursor },
+    });
+    const firstIds = new Set(firstPage.rows.map((row) => row.id));
+    expect(secondPage.rows.every((row) => !firstIds.has(row.id))).toBe(true);
+    expect(secondPage.rows.every((row) => row.stage === "Quotes Sent")).toBe(
+      true,
+    );
+
+    await supabase.auth.signOut();
+  });
+
+  // Regression test: clientStatus filtered via .eq("clients.status", ...)
+  // on an embedded relation that was never actually selected -- PostgREST
+  // 400s on that, and the failed query silently degraded to an empty
+  // "has more" board column instead of surfacing an error. Fixed by
+  // embedding clients!inner(status) in the select.
+  test("listCommercialDocumentsPage() filters by client status without erroring", async () => {
+    const authClient = await signInAs(fixtures.manager);
+    const session = (await authClient.auth.getSession()).data.session!;
+    await supabase.auth.setSession({
+      access_token: session.access_token,
+      refresh_token: session.refresh_token,
+    });
+
+    const matching = await listCommercialDocumentsPage({
+      filters: { clientStatus: "Active Customer" },
+      page: { pageSize: 10 },
+    });
+    expect(matching.rows.length).toBeGreaterThan(0);
+
+    const nonMatching = await listCommercialDocumentsPage({
+      filters: { clientStatus: "Lost" },
+      page: { pageSize: 10, cursor: null },
+    });
+    expect(nonMatching.rows.some((row) => row.clientId === clientId)).toBe(
+      false,
+    );
+
     await supabase.auth.signOut();
   });
 });

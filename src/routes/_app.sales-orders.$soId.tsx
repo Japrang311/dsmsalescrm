@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { getErrorMessage } from "@/lib/utils";
 import {
   Table,
   TableBody,
@@ -96,9 +97,12 @@ function SalesOrderDetail() {
     ? items.filter(
         (ci) =>
           ci.soNumber === so.soNumber ||
-          (ci.customerPoNumber && ci.clientId === so.clientId),
+          ci.id === so.sourceCommercialDocumentId,
       )
     : [];
+  const sourceQuotation = so?.sourceCommercialDocumentId
+    ? items.find((ci) => ci.id === so.sourceCommercialDocumentId)
+    : undefined;
 
   if (!authReady || isLoading) {
     return (
@@ -178,6 +182,7 @@ function SalesOrderDetail() {
               clientId={so.clientId}
               ownerId={so.ownerId}
               customerPoNumber={so.customerPoNumber}
+              customerPoDate={so.customerPoDate}
               date={so.date}
               canEditOwner={role === "manager" || role === "super_admin"}
             />
@@ -227,11 +232,29 @@ function SalesOrderDetail() {
                   {so.customerPoNumber ?? "—"}
                 </span>
               </Cell>
+              <Cell label="Tanggal PO Customer">
+                {so.customerPoDate ? formatDateShort(so.customerPoDate) : "—"}
+              </Cell>
               <Cell label="Tipe SO">
                 {so.type}
                 {so.prototypeStatus ? ` · ${so.prototypeStatus}` : ""}
               </Cell>
               <Cell label="Jumlah item">{so.items.length}</Cell>
+              {so.sourceCommercialDocumentId && (
+                <Cell label="Dari Quotation">
+                  {sourceQuotation ? (
+                    <Link
+                      to="/quotations/$id"
+                      params={{ id: sourceQuotation.id }}
+                      className="font-mono text-xs hover:text-primary"
+                    >
+                      {sourceQuotation.quotationNumber}
+                    </Link>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">—</span>
+                  )}
+                </Cell>
+              )}
               {so.backdateReason && (
                 <Cell label="Alasan Backdate">{so.backdateReason}</Cell>
               )}
@@ -359,6 +382,7 @@ function EditSalesOrderHeaderDialog({
   clientId,
   ownerId,
   customerPoNumber,
+  customerPoDate,
   date,
   canEditOwner,
 }: {
@@ -367,6 +391,7 @@ function EditSalesOrderHeaderDialog({
   clientId: string;
   ownerId: string;
   customerPoNumber: string | null;
+  customerPoDate: string | null;
   date: string;
   canEditOwner: boolean;
 }) {
@@ -377,6 +402,7 @@ function EditSalesOrderHeaderDialog({
   const [draftOwnerId, setDraftOwnerId] = useState(ownerId);
   const [draftSoNumber, setDraftSoNumber] = useState(soNumber);
   const [draftPo, setDraftPo] = useState(customerPoNumber ?? "");
+  const [draftPoDate, setDraftPoDate] = useState(customerPoDate ?? "");
   const [draftDate, setDraftDate] = useState(date);
   const [saving, setSaving] = useState(false);
 
@@ -395,6 +421,7 @@ function EditSalesOrderHeaderDialog({
     setDraftOwnerId(ownerId);
     setDraftSoNumber(soNumber);
     setDraftPo(customerPoNumber ?? "");
+    setDraftPoDate(customerPoDate ?? "");
     setDraftDate(date);
     setOpen(true);
   }
@@ -414,6 +441,7 @@ function EditSalesOrderHeaderDialog({
         clientId: draftClientId,
         ownerId: newOwnerId,
         customerPoNumber: draftPo,
+        customerPoDate: draftPoDate || null,
         date: draftDate,
       });
 
@@ -426,6 +454,8 @@ function EditSalesOrderHeaderDialog({
         if (newOwnerId !== ownerId) changes.push("Sales Owner diubah");
         if (draftPo !== (customerPoNumber ?? ""))
           changes.push("Customer PO diubah");
+        if (draftPoDate !== (customerPoDate ?? ""))
+          changes.push("Tanggal PO Customer diubah");
         if (draftDate !== date) changes.push(`Tanggal ${date} → ${draftDate}`);
         await logActivity({
           kind: "sales_order_header_change",
@@ -445,7 +475,7 @@ function EditSalesOrderHeaderDialog({
       setOpen(false);
     } catch (error) {
       toast.error("Gagal menyimpan perubahan", {
-        description: error instanceof Error ? error.message : "Unknown error",
+        description: getErrorMessage(error),
       });
     } finally {
       setSaving(false);
@@ -522,6 +552,17 @@ function EditSalesOrderHeaderDialog({
                 onChange={(e) => setDraftPo(e.target.value)}
                 placeholder="Nomor Customer PO"
               />
+            </div>
+            <div>
+              <Label>Tanggal PO Customer</Label>
+              <Input
+                type="date"
+                value={draftPoDate}
+                onChange={(e) => setDraftPoDate(e.target.value)}
+              />
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Opsional. Untuk analitik cycle-time Stage 4.
+              </p>
             </div>
             <div>
               <Label>Tanggal SO</Label>
@@ -701,8 +742,7 @@ function TaxCell({
                   setEditing(false);
                 } catch (error) {
                   toast.error("Gagal mengubah pajak SO", {
-                    description:
-                      error instanceof Error ? error.message : "Unknown error",
+                    description: getErrorMessage(error),
                   });
                 } finally {
                   setSaving(false);
@@ -880,7 +920,7 @@ function SalesOrderItemRow({
       setEditing(false);
     } catch (error) {
       toast.error("Gagal menyimpan item", {
-        description: error instanceof Error ? error.message : "Unknown error",
+        description: getErrorMessage(error),
       });
     } finally {
       setSaving(false);

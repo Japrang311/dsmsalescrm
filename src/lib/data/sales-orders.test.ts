@@ -8,12 +8,15 @@ import {
   type RoleFixtureUsers,
 } from "../../../supabase/tests/helpers";
 import { supabase } from "@/lib/supabase";
+import { NOW, toLocalIsoDate } from "@/lib/domain";
 import {
   createSalesOrder,
   deleteSalesOrder,
   getSalesOrder,
   listSalesOrders,
+  listSalesOrdersPage,
   restoreSalesOrder,
+  updateSalesOrderHeader,
 } from "./sales-orders";
 
 let fixtures: RoleFixtureUsers;
@@ -166,6 +169,185 @@ describe("normalized Sales Order adapter", () => {
       unitPrice: null,
       lineTotal: null,
     });
+    await supabase.auth.signOut();
+  });
+
+  test("pages active rows with server filters and no duplicate cursor rows", async () => {
+    await authenticateSales();
+    const created = [];
+    const taxTypes = ["PPN", "Non-PPN", "PPN"] as const;
+    for (let index = 0; index < taxTypes.length; index += 1) {
+      const taxType = taxTypes[index];
+      created.push(
+        await createSalesOrder({
+          clientId,
+          date: `2096-03-0${index + 1}`,
+          customerPoNumber: `PO-PAGE-${index + 1}`,
+          type: "Regular",
+          taxType,
+          source: "Existing / Repeat Order",
+          numberMode: "Manual",
+          manualSoNumber: `DSM-96SO92${index + 1}`,
+          items: [
+            {
+              productName: `Pagination item ${index + 1}`,
+              qty: 1,
+              uom: "Pcs",
+              unitPrice: 1_000 + index,
+            },
+          ],
+        }),
+      );
+    }
+
+    const firstPage = await listSalesOrdersPage({
+      filters: {
+        from: new Date(2096, 2, 1),
+        to: new Date(2096, 2, 31),
+        taxType: "PPN",
+      },
+      page: { pageSize: 1 },
+    });
+    expect(firstPage.rows).toHaveLength(1);
+    expect(firstPage.totalCount).toBe(2);
+    expect(firstPage.nextCursor).not.toBeNull();
+
+    const secondPage = await listSalesOrdersPage({
+      filters: {
+        from: new Date(2096, 2, 1),
+        to: new Date(2096, 2, 31),
+        taxType: "PPN",
+      },
+      page: { pageSize: 1, cursor: firstPage.nextCursor },
+    });
+    expect(secondPage.rows).toHaveLength(1);
+    expect(secondPage.nextCursor).toBeNull();
+    expect(secondPage.rows[0].id).not.toBe(firstPage.rows[0].id);
+    expect([firstPage.rows[0].id, secondPage.rows[0].id].sort()).toEqual(
+      [created[0].id, created[2].id].sort(),
+    );
+    await supabase.auth.signOut();
+  });
+
+  test("pages by SO number descending regardless of insert order", async () => {
+    await authenticateSales();
+    // Inserted out of order on purpose: creation order is 941, 943, 942, so a
+    // created_at-based sort would return 942 first. Imported production rows
+    // share only a handful of created_at values, so SO number is the only
+    // meaningful newest-first key.
+    for (const soNumber of ["DSM-96SO941", "DSM-96SO943", "DSM-96SO942"]) {
+      await createSalesOrder({
+        clientId,
+        date: "2096-05-01",
+        customerPoNumber: `PO-ORDER-${soNumber}`,
+        type: "Regular",
+        taxType: "PPN",
+        source: "Existing / Repeat Order",
+        numberMode: "Manual",
+        manualSoNumber: soNumber,
+        items: [
+          { productName: soNumber, qty: 1, uom: "Pcs", unitPrice: 1_000 },
+        ],
+      });
+    }
+
+    const filters = {
+      from: new Date(2096, 4, 1),
+      to: new Date(2096, 4, 31),
+    };
+    const firstPage = await listSalesOrdersPage({
+      filters,
+      page: { pageSize: 2 },
+    });
+    expect(firstPage.rows.map((row) => row.soNumber)).toEqual([
+      "DSM-96SO943",
+      "DSM-96SO942",
+    ]);
+
+    const secondPage = await listSalesOrdersPage({
+      filters,
+      page: { pageSize: 2, cursor: firstPage.nextCursor },
+    });
+    expect(secondPage.rows.map((row) => row.soNumber)).toEqual(["DSM-96SO941"]);
+    expect(secondPage.nextCursor).toBeNull();
+    await supabase.auth.signOut();
+  });
+
+  // Regression test for the reported bug: a Sales Order created today did
+  // not appear on the list. Root cause was isoDate() converting NOW (local
+  // midnight) through .toISOString(), which rolls back to the previous
+  // calendar day in any timezone ahead of UTC (this test suite runs in
+  // GMT+7) -- so `to: NOW` excluded every row dated "today".
+  test("a Sales Order dated today is included when filtering to: NOW", async () => {
+    await authenticateSales();
+    const soNumber = `DSM-96SO${crypto.randomUUID().slice(0, 4)}`;
+    await createSalesOrder({
+      clientId,
+      date: toLocalIsoDate(NOW),
+      customerPoNumber: "PO-TODAY-BUG",
+      type: "Regular",
+      taxType: "PPN",
+      source: "Existing / Repeat Order",
+      numberMode: "Manual",
+      manualSoNumber: soNumber,
+      items: [
+        { productName: "Today item", qty: 1, uom: "Pcs", unitPrice: 1_000 },
+      ],
+    });
+
+    const page = await listSalesOrdersPage({
+      filters: { from: new Date(NOW.getFullYear(), 0, 1), to: NOW },
+      page: { pageSize: 50 },
+    });
+    expect(page.rows.some((row) => row.soNumber === soNumber)).toBe(true);
+    await supabase.auth.signOut();
+  });
+
+  // Stage 4 Task 4.2: customer_po_date is an optional, additive business
+  // milestone -- it must default to null (no inference from other dates)
+  // and be independently settable/clearable via the header patch.
+  test("customer_po_date defaults to null and can be set/cleared via header patch", async () => {
+    await authenticateSales();
+    const created = await createSalesOrder({
+      clientId,
+      date: "2096-06-01",
+      customerPoNumber: "PO-DATE-1",
+      type: "Regular",
+      taxType: "PPN",
+      source: "Existing / Repeat Order",
+      numberMode: "Manual",
+      manualSoNumber: "DSM-96SO951",
+      items: [
+        { productName: "PO date item", qty: 1, uom: "Pcs", unitPrice: 1_000 },
+      ],
+    });
+    expect(created.customerPoDate).toBeNull();
+
+    const withDate = await createSalesOrder({
+      clientId,
+      date: "2096-06-02",
+      customerPoNumber: "PO-DATE-2",
+      customerPoDate: "2096-05-20",
+      type: "Regular",
+      taxType: "PPN",
+      source: "Existing / Repeat Order",
+      numberMode: "Manual",
+      manualSoNumber: "DSM-96SO952",
+      items: [
+        { productName: "PO date item 2", qty: 1, uom: "Pcs", unitPrice: 1_000 },
+      ],
+    });
+    expect(withDate.customerPoDate).toBe("2096-05-20");
+
+    const updated = await updateSalesOrderHeader(created.id, {
+      customerPoDate: "2096-05-25",
+    });
+    expect(updated.customerPoDate).toBe("2096-05-25");
+
+    const cleared = await updateSalesOrderHeader(created.id, {
+      customerPoDate: null,
+    });
+    expect(cleared.customerPoDate).toBeNull();
     await supabase.auth.signOut();
   });
 });

@@ -11,6 +11,7 @@ import {
   Undo2,
 } from "lucide-react";
 
+import { getErrorMessage } from "@/lib/utils";
 import {
   Sheet,
   SheetContent,
@@ -32,7 +33,12 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRole } from "@/context/role-context";
-import type { Task, TaskCategory, TaskWorkflowStatus } from "@/lib/domain";
+import {
+  toLocalIsoDate,
+  type Task,
+  type TaskCategory,
+  type TaskWorkflowStatus,
+} from "@/lib/domain";
 import { listClients, listOwners } from "@/lib/data/clients";
 import { listCommercialItems } from "@/lib/data/commercial-items";
 import { updateTask } from "@/lib/data/tasks";
@@ -191,7 +197,7 @@ export function TaskDetailDrawer({
       toast.success("Perubahan tersimpan", { description: task.title });
     } catch (error) {
       toast.error("Gagal menyimpan perubahan", {
-        description: error instanceof Error ? error.message : "Unknown error",
+        description: getErrorMessage(error),
       });
     }
   };
@@ -235,7 +241,7 @@ export function TaskDetailDrawer({
       );
     } catch (error) {
       toast.error("Gagal menyimpan progress", {
-        description: error instanceof Error ? error.message : "Unknown error",
+        description: getErrorMessage(error),
       });
     } finally {
       setSavingProgress(false);
@@ -259,7 +265,7 @@ export function TaskDetailDrawer({
       toast.success("Task diselesaikan", { description: task.title });
     } catch (error) {
       toast.error("Gagal menyelesaikan task", {
-        description: error instanceof Error ? error.message : "Unknown error",
+        description: getErrorMessage(error),
       });
     }
   };
@@ -267,7 +273,7 @@ export function TaskDetailDrawer({
   const quickSnooze = async (days: number) => {
     const next = new Date(task.dueDate);
     next.setDate(next.getDate() + days);
-    const iso = next.toISOString().slice(0, 10);
+    const iso = toLocalIsoDate(next);
     const prev = dueDate;
     setDueDate(iso);
     try {
@@ -288,7 +294,7 @@ export function TaskDetailDrawer({
     } catch (error) {
       setDueDate(prev);
       toast.error("Gagal menunda task", {
-        description: error instanceof Error ? error.message : "Unknown error",
+        description: getErrorMessage(error),
       });
     }
   };

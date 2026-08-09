@@ -112,6 +112,8 @@ beforeAll(async () => {
     p_so_number: null,
     p_note: null,
     p_items: items,
+    p_next_action: "Follow up",
+    p_next_action_date: "2095-08-04",
   });
   if (quotation.error) throw quotation.error;
   quotationId = quotation.data.id;
@@ -122,10 +124,18 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (fixtures) {
+    const fixtureIds = Object.values(users()).map((user) => user.id);
     await adminClient
       .from("activity_log")
       .delete()
-      .eq("owner_id", users().sales.id);
+      .or(
+        `owner_id.in.(${fixtureIds.join(",")}),actor_id.in.(${fixtureIds.join(",")})`,
+      );
+    // create_quotation/revise_quotation now insert a linked follow-up Task
+    // per call (spec: docs/superpowers/specs/2026-08-03-quotation-mandatory-followup-design.md)
+    // -- clean these up before commercial_documents/clients, otherwise
+    // tasks.client_id's FK blocks the clients delete below.
+    await adminClient.from("tasks").delete().eq("owner_id", users().sales.id);
     await adminClient
       .from("commercial_documents")
       .delete()
@@ -165,6 +175,8 @@ describe("NULL-role callers are rejected by SECURITY DEFINER RPC gates", () => {
           p_so_number: null,
           p_note: null,
           p_items: items,
+          p_next_action: "Follow up",
+          p_next_action_date: "2095-08-04",
         });
         expect(error).toBeDefined();
         expect(error?.message).toContain("ACTIVE_MUTATING_ROLE_REQUIRED");
@@ -184,6 +196,8 @@ describe("NULL-role callers are rejected by SECURITY DEFINER RPC gates", () => {
           p_so_number: null,
           p_note: null,
           p_items: items,
+          p_next_action: "Follow up",
+          p_next_action_date: "2095-08-04",
         });
         expect(error).toBeDefined();
         expect(error?.message).toContain("ACTIVE_MUTATING_ROLE_REQUIRED");
@@ -260,6 +274,8 @@ describe("active roles still work after the null guard", () => {
       p_so_number: null,
       p_note: null,
       p_items: items,
+      p_next_action: "Follow up",
+      p_next_action_date: "2095-08-06",
     });
     expect(error).toBeNull();
     expect(data?.quotation_number).toBeTruthy();

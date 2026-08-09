@@ -20,6 +20,8 @@ describe("Phase 11 commercial form schemas", () => {
       stage: "Quotes Sent",
       note: "",
       lineItems: [paidItem],
+      nextAction: "Follow up",
+      nextActionDate: "2026-07-26",
     });
     expect(parsed.success).toBe(true);
     expect(
@@ -27,6 +29,29 @@ describe("Phase 11 commercial form schemas", () => {
         documentDate: "2026-07-19",
         stage: "Client Request for Quotes",
         lineItems: [paidItem],
+        nextAction: "Follow up",
+        nextActionDate: "2026-07-26",
+      }).success,
+    ).toBe(false);
+  });
+
+  test("Quotation requires Next Action and Tanggal Follow-up", () => {
+    expect(
+      quotationSchema.safeParse({
+        documentDate: "2026-07-19",
+        stage: "Quotes Sent",
+        lineItems: [paidItem],
+        nextAction: "",
+        nextActionDate: "2026-07-26",
+      }).success,
+    ).toBe(false);
+    expect(
+      quotationSchema.safeParse({
+        documentDate: "2026-07-19",
+        stage: "Quotes Sent",
+        lineItems: [paidItem],
+        nextAction: "Follow up",
+        nextActionDate: "",
       }).success,
     ).toBe(false);
   });

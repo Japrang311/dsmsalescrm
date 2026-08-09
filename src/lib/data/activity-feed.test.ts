@@ -100,4 +100,82 @@ describe("buildActivityFeed", () => {
       "record_lifecycle",
     ]);
   });
+
+  test("maps client owner-change audit separately from status changes", () => {
+    const activity: ActivityLogEntry[] = [
+      {
+        id: "owner-change-1",
+        kind: "client_owner_change" as unknown as ActivityLogEntry["kind"],
+        kindLabel: "Perubahan Owner Client",
+        ownerId: "new-owner",
+        actorId: "manager-1",
+        clientId: "client-1",
+        title: "PT Example direassign ke Leli Al",
+        detail: "Territory handover",
+        createdAt: "2026-08-08T08:00:00.000Z",
+      },
+    ];
+
+    expect(
+      buildActivityFeed({
+        activity,
+        followUps: [],
+        owners: {
+          "manager-1": { name: "Manager" },
+          "new-owner": { name: "Leli Al" },
+        },
+        commercialItems: [],
+      }),
+    ).toEqual([
+      {
+        id: "activity-owner-change-1",
+        at: "2026-08-08T08:00:00.000Z",
+        kind: "ownership_change",
+        clientId: "client-1",
+        ownerName: "Manager",
+        targetName: "Leli Al",
+        title: "PT Example direassign ke Leli Al",
+        detail: "Territory handover",
+      },
+    ]);
+  });
+
+  test("maps legacy owner reassign rows away from status_change without mutating them", () => {
+    const activity: ActivityLogEntry[] = [
+      {
+        id: "legacy-owner-change",
+        kind: "client_status_change",
+        kindLabel: "Perubahan Status Client",
+        ownerId: "new-owner",
+        actorId: "manager-1",
+        clientId: "client-1",
+        title: "PT Example direassign ke Leli Al",
+        detail: "Sales User → Leli Al\nLegacy note",
+        createdAt: "2026-08-08T09:00:00.000Z",
+      },
+    ];
+
+    expect(
+      buildActivityFeed({
+        activity,
+        followUps: [],
+        owners: {
+          "manager-1": { name: "Manager" },
+          "new-owner": { name: "Leli Al" },
+        },
+        commercialItems: [],
+      }),
+    ).toEqual([
+      {
+        id: "activity-legacy-owner-change",
+        at: "2026-08-08T09:00:00.000Z",
+        kind: "ownership_change",
+        clientId: "client-1",
+        ownerName: "Manager",
+        targetName: "Leli Al",
+        title: "PT Example direassign ke Leli Al",
+        detail: "Sales User → Leli Al\nLegacy note",
+      },
+    ]);
+  });
 });

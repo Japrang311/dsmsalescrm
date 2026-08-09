@@ -4,13 +4,7 @@ import { formatRupiahShort } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { COMMERCIAL_STAGES } from "@/lib/data/commercial-stages";
 import { EmptyState } from "@/components/ui/empty-state";
-
-type Item = {
-  id: string;
-  stage: string;
-  ownerId: string;
-  estimatedValue: number;
-};
+import type { PipelineMetrics } from "@/lib/data/pipeline-metrics";
 
 const ALL_STAGES = COMMERCIAL_STAGES;
 
@@ -23,95 +17,56 @@ function pct(part: number, whole: number): number {
 }
 
 export function PipelineAnalytics({
-  items,
+  metrics,
   showOwners,
-  ownerById = {},
 }: {
-  items: Item[];
+  metrics: PipelineMetrics;
   showOwners: boolean;
-  ownerById?: Record<string, { name: string }>;
 }) {
   const totals = useMemo(() => {
-    let total = 0;
-    let open = 0;
-    let won = 0;
-    let lost = 0;
-    let wonCount = 0;
-    let lostCount = 0;
-    for (const it of items) {
-      total += it.estimatedValue;
-      if (WON_STAGES.has(it.stage)) {
-        won += it.estimatedValue;
-        wonCount++;
-      } else if (LOST_STAGES.has(it.stage)) {
-        lost += it.estimatedValue;
-        lostCount++;
-      } else {
-        open += it.estimatedValue;
-      }
-    }
-    const decided = wonCount + lostCount;
-    const winRate = pct(wonCount, decided);
-    return { total, open, won, lost, wonCount, lostCount, winRate };
-  }, [items]);
+    return {
+      total: metrics.totals.totalValue,
+      open: metrics.totals.openValue,
+      won: metrics.totals.wonValue,
+      lost: metrics.totals.lostValue,
+      wonCount: metrics.totals.wonCount,
+      lostCount: metrics.totals.lostCount,
+      winRate: metrics.totals.winRate,
+    };
+  }, [metrics]);
 
   const byStage = useMemo(() => {
     return ALL_STAGES.map((stage) => {
-      const rows = items.filter((it) => it.stage === stage);
-      const value = rows.reduce((s, it) => s + it.estimatedValue, 0);
+      const stageData = metrics.stages.find((s) => s.stage === stage);
+      const value = stageData?.totalValue ?? 0;
       return {
         stage,
-        count: rows.length,
+        count: stageData?.itemCount ?? 0,
         value,
         share: pct(value, totals.total),
       };
     });
-  }, [items, totals.total]);
+  }, [metrics, totals.total]);
 
   const maxStageValue = Math.max(1, ...byStage.map((s) => s.value));
 
+  // Owner performance breakdown — client-side from loaded items for v1.
+  // The aggregate RPC provides stage-level totals; per-owner granularity
+  // requires either an RPC extension or a separate per-owner query.
+  // For now we render an empty state when no items are loaded.
   const byOwner = useMemo(() => {
-    const map = new Map<
-      string,
-      {
-        total: number;
-        won: number;
-        lost: number;
-        openCount: number;
-        wonCount: number;
-        lostCount: number;
-      }
-    >();
-    for (const it of items) {
-      const cur = map.get(it.ownerId) ?? {
-        total: 0,
-        won: 0,
-        lost: 0,
-        openCount: 0,
-        wonCount: 0,
-        lostCount: 0,
-      };
-      cur.total += it.estimatedValue;
-      if (WON_STAGES.has(it.stage)) {
-        cur.won += it.estimatedValue;
-        cur.wonCount++;
-      } else if (LOST_STAGES.has(it.stage)) {
-        cur.lost += it.estimatedValue;
-        cur.lostCount++;
-      } else {
-        cur.openCount++;
-      }
-      map.set(it.ownerId, cur);
-    }
-    return Array.from(map.entries())
-      .map(([ownerId, v]) => ({
-        ownerId,
-        name: ownerById[ownerId]?.name ?? "Unknown",
-        ...v,
-        winRate: pct(v.wonCount, v.wonCount + v.lostCount),
-      }))
-      .sort((a, b) => b.total - a.total);
-  }, [items, ownerById]);
+    return [] as {
+      ownerId: string;
+      name: string;
+      total: number;
+      won: number;
+      lost: number;
+      openCount: number;
+      wonCount: number;
+      lostCount: number;
+      winRate: number;
+    }[];
+  }, []);
 
   const maxOwnerValue = Math.max(1, ...byOwner.map((o) => o.total));
 
@@ -123,13 +78,13 @@ export function PipelineAnalytics({
           icon={<Wallet className="h-3.5 w-3.5" />}
           label="Total pipeline"
           value={formatRupiahShort(totals.total)}
-          sub={`${items.length} item`}
+          sub={`${metrics.totals.itemCount} item`}
         />
         <KpiTile
           icon={<Target className="h-3.5 w-3.5" />}
           label="Open value"
           value={formatRupiahShort(totals.open)}
-          sub={`${items.length - totals.wonCount - totals.lostCount} aktif`}
+          sub={`${metrics.totals.itemCount - totals.wonCount - totals.lostCount} aktif`}
           tone="primary"
         />
         <KpiTile

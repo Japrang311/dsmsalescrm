@@ -1,10 +1,17 @@
 import { supabase } from "@/lib/supabase";
-import type {
-  Client,
-  ClientContact,
-  ClientSource,
-  ClientStatus,
+import { getErrorMessage } from "@/lib/utils";
+import {
+  toLocalIsoDate,
+  type Client,
+  type ClientContact,
+  type ClientSource,
+  type ClientStatus,
 } from "@/lib/domain";
+import {
+  encodePageCursor,
+  normalizeListPageInput,
+  type ListPageInput,
+} from "@/lib/pagination-contracts";
 
 type ClientRow = {
   id: string;
@@ -36,6 +43,7 @@ type ClientRow = {
   cp3_email: string | null;
   cp3_phone: string | null;
   cp3_mobile: string | null;
+  created_at: string;
 };
 
 const DUPLICATE_CLIENT_NAME_MESSAGE =
@@ -57,7 +65,7 @@ export function clientDataErrorMessage(error: unknown): string {
     return DUPLICATE_CLIENT_NAME_MESSAGE;
   }
 
-  return error instanceof Error ? error.message : "Unknown error";
+  return getErrorMessage(error);
 }
 
 function throwClientDataError(error: unknown): never {
@@ -153,6 +161,19 @@ export async function updateClientStatus(
     .single();
   if (error) throwClientDataError(error);
   return toClient(data);
+}
+
+export async function reassignClientOwner(input: {
+  clientId: string;
+  newOwnerId: string;
+  note?: string;
+}): Promise<void> {
+  const { error } = await supabase.rpc("reassign_client_owner", {
+    p_client_id: input.clientId,
+    p_new_owner_id: input.newOwnerId,
+    p_note: input.note?.trim() || null,
+  });
+  if (error) throwClientDataError(error);
 }
 
 export type UpdateClientDetailsInput = {
@@ -317,9 +338,25 @@ export type ClientListRow = {
   advisories: number;
 };
 
-export async function listClientRows(): Promise<ClientListRow[]> {
-  const [clients, owners] = await Promise.all([listClients(), listOwners()]);
-  return clients.map((client) => ({
+export type ClientNextFollowUpWindow = "all" | "today" | "7d" | "30d";
+
+export type ClientListFilters = {
+  search?: string;
+  statuses?: ClientStatus[];
+  sources?: ClientSource[];
+  ownerId?: string;
+  overdueOnly?: boolean;
+  nextFuWindow?: ClientNextFollowUpWindow;
+};
+
+export type ClientRowsPage = {
+  rows: ClientListRow[];
+  totalCount: number;
+  nextCursor: string | null;
+};
+
+function toClientListRow(client: Client, owners: OwnerLookup): ClientListRow {
+  return {
     client,
     ownerName: owners[client.ownerId]?.name ?? "—",
     spendingYtd: client.spendingYtd,
@@ -331,5 +368,70 @@ export async function listClientRows(): Promise<ClientListRow[]> {
     activeCommercialTypes: [],
     risk: "Unknown" as const,
     advisories: 0,
-  }));
+  };
+}
+
+export async function listClientRowsPage(input: {
+  filters?: ClientListFilters;
+  page?: ListPageInput;
+}): Promise<ClientRowsPage> {
+  const filters = input.filters ?? {};
+  const page = normalizeListPageInput(input.page);
+  const today = toLocalIsoDate(new Date());
+  let query = supabase
+    .from("clients")
+    .select("*", { count: "exact" })
+    .order("created_at", { ascending: true })
+    .order("id", { ascending: true })
+    .limit(page.pageSize + 1);
+
+  const search = filters.search?.trim();
+  if (search) {
+    query = query.ilike("name", `%${search}%`);
+  }
+  if (filters.statuses?.length) {
+    query = query.in("status", filters.statuses);
+  }
+  if (filters.sources?.length) {
+    query = query.in("source", filters.sources);
+  }
+  if (filters.ownerId && filters.ownerId !== "all") {
+    query = query.eq("owner_id", filters.ownerId);
+  }
+  if (filters.overdueOnly) {
+    query = query.not("next_fu", "is", null).lt("next_fu", today);
+  } else if (filters.nextFuWindow && filters.nextFuWindow !== "all") {
+    query = query.not("next_fu", "is", null);
+    if (filters.nextFuWindow === "today") {
+      query = query.eq("next_fu", today);
+    } else {
+      const days = filters.nextFuWindow === "7d" ? 7 : 30;
+      const end = new Date();
+      end.setDate(end.getDate() + days);
+      query = query.gte("next_fu", today).lte("next_fu", toLocalIsoDate(end));
+    }
+  }
+
+  if (page.cursor) {
+    query = query.or(
+      `created_at.gt.${page.cursor.sortValue},and(created_at.eq.${page.cursor.sortValue},id.gt.${page.cursor.id})`,
+    );
+  }
+
+  const { data, error, count } = await query;
+  if (error) throw error;
+
+  const rawRows = (data ?? []) as ClientRow[];
+  const pageRows = rawRows.slice(0, page.pageSize);
+  const lastRow = pageRows.at(-1);
+  const [owners] = await Promise.all([listOwners()]);
+
+  return {
+    rows: pageRows.map((row) => toClientListRow(toClient(row), owners)),
+    totalCount: count ?? pageRows.length,
+    nextCursor:
+      rawRows.length > page.pageSize && lastRow
+        ? encodePageCursor({ sortValue: lastRow.created_at, id: lastRow.id })
+        : null,
+  };
 }

@@ -1,53 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
-import {
-  ArrowLeft,
-  Building2,
-  User2,
-  Calendar,
-  FileText,
-  Layers,
-  Save,
-} from "lucide-react";
 import { toast } from "sonner";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Separator } from "@/components/ui/separator";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  formatRupiahFull,
-  formatRupiahShort,
-  formatDateShort,
-  daysBetween,
-} from "@/lib/format";
+import { formatRupiahFull, daysBetween } from "@/lib/format";
+import { getErrorMessage } from "@/lib/utils";
+import { invalidateCommercialStageQueries } from "@/lib/query-invalidation";
 import { stagesForFlow } from "@/lib/business-rules";
 import type { CommercialItem, QuotationLostReason } from "@/lib/domain";
-import { useRole, ROLE_LABEL } from "@/context/role-context";
-import { NOW } from "@/lib/domain";
-import { StatusBadge } from "@/components/clients/StatusBadges";
-import { LogCommercialFollowUpDialog } from "@/components/commercial/LogCommercialFollowUpDialog";
-import { SoftDeleteAction } from "@/components/commercial/SoftDeleteAction";
+import { useRole } from "@/context/role-context";
+import { NOW, toLocalIsoDate } from "@/lib/domain";
 import { canManageSoftDeletedRecord } from "@/components/commercial/soft-delete-controls";
-import { ReviseQuotationDialog } from "@/components/clients/CreateRecordDialogs";
-import { QuotationPreviewDialog } from "@/components/commercial/QuotationPreviewDialog";
+import { CommercialDetailHeader } from "@/components/commercial/CommercialDetailHeader";
+import { CommercialDetailMainCard } from "@/components/commercial/CommercialDetailMainCard";
+import { CommercialDetailSidebar } from "@/components/commercial/CommercialDetailSidebar";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   listCommercialItems,
@@ -57,27 +22,29 @@ import {
 import {
   deleteCommercialDocument,
   updateCommercialDocumentLineItem,
+  transitionCommercialStage,
 } from "@/lib/data/commercial-documents";
+import { buildExplicitFollowUpCommand } from "@/lib/follow-up-command";
 import { documentNumberExample } from "@/lib/data/document-numbering";
 import { listClients, listOwners } from "@/lib/data/clients";
 import { listTasks } from "@/lib/data/tasks";
-import { commercialRelatedTasks } from "@/lib/data/task-relations";
+import { listSalesOrders } from "@/lib/data/sales-orders";
+import {
+  commercialRelatedTasks,
+  activeCommercialTasks,
+} from "@/lib/data/task-relations";
 import {
   getCurrentActorId,
   listCommercialItemHistory,
   logActivity,
 } from "@/lib/data/activity-log";
+import { listFollowUpsForCommercialDocument } from "@/lib/data/follow-ups";
 import {
   activeLostReasonPatch,
   isLostReasonTracked,
-  QUOTATION_LOST_REASONS,
   validateQuotationLostReason,
 } from "@/lib/data/quotation-lost-reasons";
-
-type LineItemEdit = {
-  qty: string;
-  unitPrice: string;
-};
+import type { LineItemEdit } from "@/components/commercial/CommercialDetailPrimitives";
 
 type LineItemChange = {
   line: NonNullable<CommercialItem["lineItems"]>[number];
@@ -164,11 +131,24 @@ export function CommercialDetailPage({
     queryFn: () => listCommercialItemHistory(itemId),
     enabled: authReady,
   });
+  const { data: followUps = [] } = useQuery({
+    queryKey: ["follow-ups", "commercial-document", itemId],
+    queryFn: () => listFollowUpsForCommercialDocument(itemId),
+    enabled: authReady,
+  });
   const { data: currentUserId } = useQuery({
     queryKey: ["current-user-id"],
     queryFn: getCurrentActorId,
     enabled: authReady,
   });
+  const { data: allSalesOrders = [] } = useQuery({
+    queryKey: ["sales-orders", "all"],
+    queryFn: () => listSalesOrders(),
+    enabled: authReady,
+  });
+  const linkedSalesOrder = allSalesOrders.find(
+    (so) => so.sourceCommercialDocumentId === itemId,
+  );
 
   const [stage, setStage] = useState(item?.stage ?? "");
   const [quotationNumber, setQuotationNumber] = useState(
@@ -189,6 +169,18 @@ export function CommercialDetailPage({
   const [lostReasonDetail, setLostReasonDetail] = useState(
     item?.lostReasonDetail ?? "",
   );
+  // Stage 4 Task 4.3: a stage change made through this form must produce the
+  // same structured activity_log event transition_commercial_stage writes
+  // everywhere else (Pipeline drag-and-drop, Tasks quick action), not a
+  // plain field-diff log entry — otherwise Stage 4 funnel/dwell metrics
+  // silently miss it. Next action/task fields only matter when stage
+  // actually differs from item.stage; see handleStageChange below.
+  const [nextAction, setNextAction] = useState("");
+  const [nextActionDate, setNextActionDate] = useState("");
+  const [taskMode, setTaskMode] = useState<"existing_task" | "create_task">(
+    "create_task",
+  );
+  const [taskId, setTaskId] = useState("");
 
   useEffect(() => {
     if (!item) return;
@@ -213,6 +205,10 @@ export function CommercialDetailPage({
     setQtyReason("");
     setLostReason(item.lostReason ?? "");
     setLostReasonDetail(item.lostReasonDetail ?? "");
+    setNextAction("");
+    setNextActionDate("");
+    setTaskMode("create_task");
+    setTaskId("");
   }, [item]);
 
   if (!authReady) {
@@ -242,6 +238,26 @@ export function CommercialDetailPage({
   const signerProfile = currentUserId ? owners[currentUserId] : undefined;
   const stages = stagesForFlow(item.sourceFlow);
   const relatedTasks = commercialRelatedTasks(allTasks, item.id);
+  const activeTasksForItem = activeCommercialTasks(allTasks, item.id);
+  const stageChanged = stage !== item.stage;
+
+  // Prefills next-action defaults the moment the user actually picks a
+  // different stage, mirroring Pipeline's handleDrop — the panel only
+  // appears once stageChanged is true, so these values are moot otherwise.
+  const currentItemStage = item.stage;
+  function handleStageChange(next: string) {
+    setStage(next);
+    if (next === currentItemStage) return;
+    setNextAction(`Follow-up stage ${next}`);
+    setNextActionDate(toLocalIsoDate(NOW));
+    if (activeTasksForItem.length > 0) {
+      setTaskMode("existing_task");
+      setTaskId(activeTasksForItem[0].id);
+    } else {
+      setTaskMode("create_task");
+      setTaskId("");
+    }
+  }
   // Sales Orders don't exist yet (Phase 5) — shown as an honest "not
   // available yet" placeholder below rather than mock SALES_ORDERS data.
   const canEdit = canManageSoftDeletedRecord(role, item.ownerId, currentUserId);
@@ -334,16 +350,21 @@ export function CommercialDetailPage({
         from: item.note,
         to: normalizedNote || undefined,
       });
-    if (stage !== item.stage)
-      changes.push({ field: "stage", from: item.stage, to: stage });
-    if (reasonPatch.lostReason !== (item.lostReason ?? null)) {
+    // A real stage change goes through transitionCommercialStage below,
+    // which writes its own structured commercial_item_stage_change event
+    // (with lost reason on that same atomic call) — not folded into this
+    // plain field-diff log, to avoid a duplicate/conflicting entry.
+    if (!stageChanged && reasonPatch.lostReason !== (item.lostReason ?? null)) {
       changes.push({
         field: "lostReason",
         from: item.lostReason,
         to: reasonPatch.lostReason ?? undefined,
       });
     }
-    if (reasonPatch.lostReasonDetail !== (item.lostReasonDetail ?? null)) {
+    if (
+      !stageChanged &&
+      reasonPatch.lostReasonDetail !== (item.lostReasonDetail ?? null)
+    ) {
       changes.push({
         field: "lostReasonDetail",
         from: item.lostReasonDetail,
@@ -385,7 +406,7 @@ export function CommercialDetailPage({
       }
     }
 
-    if (changes.length === 0) {
+    if (!stageChanged && changes.length === 0) {
       toast.info("Tidak ada perubahan");
       return;
     }
@@ -429,6 +450,49 @@ export function CommercialDetailPage({
     }
 
     try {
+      if (stageChanged) {
+        const command = buildExplicitFollowUpCommand(
+          taskMode === "existing_task"
+            ? { mode: "existing_task", taskId }
+            : {
+                mode: "create_task",
+                createTaskTitle: `Follow-up · ${item.type} — ${client?.name ?? "Klien"}`,
+                taskDueDate: nextActionDate,
+              },
+          {
+            nextAction,
+            nextActionDate,
+            note: [
+              `Stage ${item.stage} → ${stage} — dikoreksi dari Detail ${item.type}`,
+              isLostReasonTracked(item.type, stage)
+                ? `Alasan lost: ${reasonPatch.lostReason}${
+                    reasonPatch.lostReasonDetail
+                      ? ` — ${reasonPatch.lostReasonDetail}`
+                      : ""
+                  }`
+                : null,
+            ]
+              .filter(Boolean)
+              .join("\n"),
+            method: "Phone",
+            result: "Progress Update",
+            fuDate: toLocalIsoDate(NOW),
+          },
+        );
+        await transitionCommercialStage({
+          commercialDocumentId: item.id,
+          expectedFromStage: item.stage,
+          toStage: stage,
+          lostReason: isLostReasonTracked(item.type, stage)
+            ? reasonPatch.lostReason
+            : null,
+          lostReasonDetail: isLostReasonTracked(item.type, stage)
+            ? reasonPatch.lostReasonDetail
+            : null,
+          ...command,
+        });
+      }
+
       for (const change of lineChanges) {
         await updateCommercialDocumentLineItem(change.line.id, {
           qty: change.qty,
@@ -436,7 +500,7 @@ export function CommercialDetailPage({
           lineTotal: isFoc ? null : change.qty * change.unitPrice,
         });
       }
-      const headerChanged =
+      const otherHeaderChanged =
         (item.type === "Quotation" &&
           normalizedQuotation !== (item.quotationNumber ?? "")) ||
         (item.type === "Quotation" &&
@@ -444,10 +508,10 @@ export function CommercialDetailPage({
         (item.type === "Quotation" &&
           normalizedExpiredDate !== (item.quotationExpiredDate ?? "")) ||
         (item.type === "Quotation" && normalizedNote !== (item.note ?? "")) ||
-        stage !== item.stage ||
-        reasonPatch.lostReason !== (item.lostReason ?? null) ||
-        reasonPatch.lostReasonDetail !== (item.lostReasonDetail ?? null);
-      if (headerChanged) {
+        (!stageChanged &&
+          (reasonPatch.lostReason !== (item.lostReason ?? null) ||
+            reasonPatch.lostReasonDetail !== (item.lostReasonDetail ?? null)));
+      if (otherHeaderChanged) {
         await updateCommercialItem(item.id, {
           quotationNumber:
             item.type === "Quotation" &&
@@ -474,50 +538,55 @@ export function CommercialDetailPage({
             item.type === "Quotation" && normalizedNote !== (item.note ?? "")
               ? normalizedNote
               : undefined,
-          stage: stage !== item.stage ? stage : undefined,
-          lostReason: reasonPatch.lostReason,
-          lostReasonDetail: reasonPatch.lostReasonDetail,
+          lostReason: stageChanged ? undefined : reasonPatch.lostReason,
+          lostReasonDetail: stageChanged
+            ? undefined
+            : reasonPatch.lostReasonDetail,
         });
       }
-      const actorId = await getCurrentActorId();
-      if (actorId) {
-        const reasonLines = [
-          hasPriceChanges
-            ? `Alasan harga: ${
-                priceReasonType === "Lainnya"
-                  ? priceReasonOther.trim()
-                  : priceReasonType
-              }`
-            : null,
-          hasQtyChanges ? `Alasan qty: ${qtyReason.trim()}` : null,
-          isLostReasonTracked(item.type, stage)
-            ? `Alasan lost: ${reasonPatch.lostReason}${
-                reasonPatch.lostReasonDetail
-                  ? ` — ${reasonPatch.lostReasonDetail}`
-                  : ""
-              }`
-            : null,
-        ].filter(Boolean);
-        await logActivity({
-          kind: "commercial_item_stage_change",
-          ownerId: item.ownerId,
-          actorId,
-          clientId: item.clientId,
-          commercialDocumentId: item.id,
-          title: `${item.description} diperbarui`,
-          detail: [describeCommercialItemChanges(changes), ...reasonLines].join(
-            "\n",
-          ),
-        });
+      if (changes.length > 0) {
+        const actorId = await getCurrentActorId();
+        if (actorId) {
+          const reasonLines = [
+            hasPriceChanges
+              ? `Alasan harga: ${
+                  priceReasonType === "Lainnya"
+                    ? priceReasonOther.trim()
+                    : priceReasonType
+                }`
+              : null,
+            hasQtyChanges ? `Alasan qty: ${qtyReason.trim()}` : null,
+            !stageChanged && isLostReasonTracked(item.type, stage)
+              ? `Alasan lost: ${reasonPatch.lostReason}${
+                  reasonPatch.lostReasonDetail
+                    ? ` — ${reasonPatch.lostReasonDetail}`
+                    : ""
+                }`
+              : null,
+          ].filter(Boolean);
+          await logActivity({
+            kind: "commercial_item_stage_change",
+            ownerId: item.ownerId,
+            actorId,
+            clientId: item.clientId,
+            commercialDocumentId: item.id,
+            title: `${item.description} diperbarui`,
+            detail: [
+              describeCommercialItemChanges(changes),
+              ...reasonLines,
+            ].join("\n"),
+          });
+        }
       }
-      await queryClient.invalidateQueries({ queryKey: ["commercial-items"] });
-      await queryClient.invalidateQueries({ queryKey: ["activity-log"] });
+      await invalidateCommercialStageQueries(queryClient);
       toast.success("Perubahan tersimpan", {
-        description: `${changes.length} field diperbarui`,
+        description: stageChanged
+          ? `Stage → ${stage}${changes.length > 0 ? ` · ${changes.length} field lain` : ""}`
+          : `${changes.length} field diperbarui`,
       });
     } catch (error) {
       toast.error("Gagal menyimpan perubahan", {
-        description: error instanceof Error ? error.message : "Unknown error",
+        description: getErrorMessage(error),
       });
     }
   }
@@ -536,621 +605,96 @@ export function CommercialDetailPage({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-        <div className="flex items-start gap-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate({ to: backHref })}
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-semibold tracking-tight">
-                {item.projectName ?? item.description}
-              </h1>
-              <Badge variant="outline">{item.type}</Badge>
-              {isFoc && (
-                <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">
-                  FOC
-                </Badge>
-              )}
-            </div>
-            <p className="text-sm text-muted-foreground">
-              {backLabel} ·{" "}
-              <Link
-                to="/clients/$clientId"
-                params={{ clientId: item.clientId }}
-                className="hover:text-primary"
-              >
-                {client?.name ?? "-"}
-              </Link>
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {canEdit && item.type === "Quotation" && (
-            <SoftDeleteAction
-              label={deleteLabel}
-              onDelete={() => deleteItem(item.id)}
-              onDeleted={() => {
-                toast.success(`${item.type} dihapus`);
-                navigate({ to: backHref });
-              }}
-            />
-          )}
-          {canEdit && item.type === "Quotation" && item.isCurrentRevision && (
-            <ReviseQuotationDialog
-              document={item}
-              onRevised={(documentId) =>
-                navigate({
-                  to: `${backHref}/${documentId}` as never,
-                })
-              }
-              trigger={<Button variant="outline">Buat Revisi</Button>}
-            />
-          )}
-          {canEdit && (
-            <LogCommercialFollowUpDialog
-              item={item}
-              clientName={client?.name ?? "-"}
-            />
-          )}
-          {/* Export is read-only, so it is not gated on canEdit — anyone who
-              can see the quotation can send it. */}
-          {item.type === "Quotation" && client && (
-            <QuotationPreviewDialog
-              item={item}
-              client={client}
-              owner={{ name: owner?.name ?? "", email: owner?.email ?? "" }}
-              signer={{
-                name: signerProfile?.name ?? "",
-                title: ROLE_LABEL[signerProfile?.role ?? role],
-              }}
-            />
-          )}
-          {canEdit && (
-            <Button onClick={() => void persist()} className="gap-1.5">
-              <Save className="h-4 w-4" /> Simpan perubahan
-            </Button>
-          )}
-        </div>
-      </div>
+      <CommercialDetailHeader
+        item={item}
+        client={client}
+        owner={owner}
+        signerProfile={signerProfile}
+        role={role}
+        canEdit={canEdit}
+        isFoc={isFoc}
+        deleteLabel={deleteLabel}
+        backLabel={backLabel}
+        onBack={() => navigate({ to: backHref })}
+        onDelete={() => deleteItem(item.id)}
+        onDeleted={() => {
+          toast.success(`${item.type} dihapus`);
+          navigate({ to: backHref });
+        }}
+        onRevised={(documentId) =>
+          navigate({ to: `${backHref}/${documentId}` as never })
+        }
+        onSave={() => void persist()}
+        hasLinkedSalesOrder={Boolean(linkedSalesOrder)}
+      />
 
       <div className="grid gap-4 md:grid-cols-3">
-        <Card className="md:col-span-2">
-          <CardContent className="grid gap-4 p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-foreground/70">
-              Detail Klien
-            </p>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <InfoCell
-                icon={<Building2 className="h-3.5 w-3.5" />}
-                label="Klien"
-              >
-                <Link
-                  to="/clients/$clientId"
-                  params={{ clientId: item.clientId }}
-                  className="text-sm font-medium hover:text-primary"
-                >
-                  {client?.name ?? "-"}
-                </Link>
-                {client && (
-                  <div className="mt-1">
-                    <StatusBadge status={client.status} />
-                  </div>
-                )}
-              </InfoCell>
-              <InfoCell
-                icon={<User2 className="h-3.5 w-3.5" />}
-                label="Sales owner"
-              >
-                {/* Quotation ownership is read-only here. */}
-                <span className="text-sm">{owner?.name ?? "-"}</span>
-              </InfoCell>
-              <InfoCell
-                icon={<Layers className="h-3.5 w-3.5" />}
-                label="Source flow"
-              >
-                <Badge variant="outline" className="text-[11px]">
-                  {item.sourceFlow}
-                </Badge>
-              </InfoCell>
-              <InfoCell icon={<Layers className="h-3.5 w-3.5" />} label="Stage">
-                {canEdit ? (
-                  <Select value={stage} onValueChange={setStage}>
-                    <SelectTrigger className="h-8 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {stages.map((s) => (
-                        <SelectItem key={s} value={s}>
-                          {s}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <Badge variant="secondary">{item.stage}</Badge>
-                )}
-              </InfoCell>
-              {isLostReasonTracked(item.type, stage) && (
-                <>
-                  <InfoCell label="Lost reason">
-                    {canEdit ? (
-                      <Select
-                        value={lostReason}
-                        onValueChange={(value) =>
-                          setLostReason(value as QuotationLostReason)
-                        }
-                      >
-                        <SelectTrigger className="h-8 text-xs">
-                          <SelectValue placeholder="Pilih alasan lost" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {QUOTATION_LOST_REASONS.map((reason) => (
-                            <SelectItem key={reason} value={reason}>
-                              {reason}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <span className="text-sm">
-                        {item.lostReason ?? "Belum diklasifikasi"}
-                      </span>
-                    )}
-                  </InfoCell>
-                  <InfoCell label="Detail alasan">
-                    {canEdit ? (
-                      <Textarea
-                        value={lostReasonDetail}
-                        onChange={(event) =>
-                          setLostReasonDetail(event.target.value)
-                        }
-                        placeholder={
-                          lostReason === "Lainnya"
-                            ? "Wajib jelaskan alasan lainnya"
-                            : "Tambahkan konteks bila diperlukan"
-                        }
-                        className="min-h-20 text-sm"
-                      />
-                    ) : (
-                      <span className="text-sm">
-                        {item.lostReasonDetail ?? "—"}
-                      </span>
-                    )}
-                  </InfoCell>
-                </>
-              )}
-              <InfoCell
-                icon={<Calendar className="h-3.5 w-3.5" />}
-                label={item.type === "Quotation" ? "Quotation Date" : "Date"}
-              >
-                {canEdit && item.type === "Quotation" ? (
-                  <Input
-                    type="date"
-                    value={quotationDate}
-                    onChange={(event) => setQuotationDate(event.target.value)}
-                    className="h-8 text-xs"
-                  />
-                ) : (
-                  <span className="text-sm">
-                    {item.documentDate
-                      ? formatDateShort(item.documentDate)
-                      : "—"}
-                  </span>
-                )}
-              </InfoCell>
-              {item.type === "Quotation" && (
-                <InfoCell
-                  icon={<Calendar className="h-3.5 w-3.5" />}
-                  label="Expired Date"
-                >
-                  {canEdit ? (
-                    <Input
-                      type="date"
-                      value={quotationExpiredDate}
-                      onChange={(event) =>
-                        setQuotationExpiredDate(event.target.value)
-                      }
-                      className="h-8 text-xs"
-                    />
-                  ) : (
-                    <span className="text-sm">
-                      {item.quotationExpiredDate
-                        ? formatDateShort(item.quotationExpiredDate)
-                        : "—"}
-                    </span>
-                  )}
-                </InfoCell>
-              )}
-              <InfoCell
-                icon={<Calendar className="h-3.5 w-3.5" />}
-                label="Aging (sejak update terakhir)"
-              >
-                <span className="text-sm tabular-nums">
-                  {aging} hari · update {formatDateShort(item.updatedAt)}
-                </span>
-              </InfoCell>
-            </div>
+        <CommercialDetailMainCard
+          item={item}
+          client={client}
+          owner={owner}
+          stages={stages}
+          aging={aging}
+          isFoc={isFoc}
+          quotationNumberGuide={quotationNumberGuide}
+          canEdit={canEdit}
+          canEditLineItems={canEditLineItems}
+          isClosedStage={isClosedStage}
+          stage={stage}
+          setStage={handleStageChange}
+          stageChanged={stageChanged}
+          activeTasksForItem={activeTasksForItem}
+          nextAction={nextAction}
+          setNextAction={setNextAction}
+          nextActionDate={nextActionDate}
+          setNextActionDate={setNextActionDate}
+          taskMode={taskMode}
+          setTaskMode={setTaskMode}
+          taskId={taskId}
+          setTaskId={setTaskId}
+          lostReason={lostReason}
+          setLostReason={setLostReason}
+          lostReasonDetail={lostReasonDetail}
+          setLostReasonDetail={setLostReasonDetail}
+          quotationDate={quotationDate}
+          setQuotationDate={setQuotationDate}
+          quotationExpiredDate={quotationExpiredDate}
+          setQuotationExpiredDate={setQuotationExpiredDate}
+          quotationNumber={quotationNumber}
+          setQuotationNumber={setQuotationNumber}
+          note={note}
+          setNote={setNote}
+          lineEdits={lineEdits}
+          onLineEdit={(lineId, patch) =>
+            setLineEdits((current) => ({
+              ...current,
+              [lineId]: { ...current[lineId], ...patch },
+            }))
+          }
+          hasPriceChanges={hasPriceChanges}
+          hasQtyChanges={hasQtyChanges}
+          priceReasonType={priceReasonType}
+          setPriceReasonType={setPriceReasonType}
+          priceReasonOther={priceReasonOther}
+          setPriceReasonOther={setPriceReasonOther}
+          qtyReason={qtyReason}
+          setQtyReason={setQtyReason}
+          isLostReasonTracked={isLostReasonTracked(item.type, stage)}
+        />
 
-            <Separator />
-
-            <p className="text-xs font-semibold uppercase tracking-wide text-foreground/70">
-              Nilai &amp; Nomor Dokumen
-            </p>
-            <div className="grid gap-3 sm:grid-cols-3">
-              <InfoCell label="Total">
-                <span className="text-2xl font-bold tabular-nums">
-                  {isFoc ? "FOC · Rp0" : formatRupiahFull(item.estimatedValue)}
-                </span>
-                {!isFoc && item.estimatedValue >= 1_000_000 && (
-                  <span className="ml-1 text-xs text-muted-foreground">
-                    ({formatRupiahShort(item.estimatedValue)})
-                  </span>
-                )}
-              </InfoCell>
-              <InfoCell label="Jumlah item">
-                <span className="text-lg font-semibold tabular-nums">
-                  {item.itemCount ?? item.lineItems?.length ?? 0}
-                </span>
-              </InfoCell>
-              <InfoCell label="Forecast">
-                <span className="text-lg font-semibold tabular-nums">
-                  {item.forecastValue === null ||
-                  item.forecastValue === undefined
-                    ? "—"
-                    : formatRupiahFull(item.forecastValue)}
-                </span>
-              </InfoCell>
-              {item.type === "Quotation" && (
-                <InfoCell label="No. Quotation">
-                  {canEdit ? (
-                    <>
-                      <Input
-                        value={quotationNumber}
-                        onChange={(e) => setQuotationNumber(e.target.value)}
-                        placeholder={quotationNumberGuide}
-                        className="h-8 font-mono text-xs"
-                      />
-                      <p className="mt-1 text-[11px] text-muted-foreground">
-                        Panduan format: {quotationNumberGuide}. Tidak mengikat.
-                      </p>
-                    </>
-                  ) : (
-                    <span className="font-mono text-xs">
-                      {item.quotationNumber ?? "—"}
-                    </span>
-                  )}
-                </InfoCell>
-              )}
-              <InfoCell label="Note">
-                {canEdit && item.type === "Quotation" ? (
-                  <Textarea
-                    value={note}
-                    onChange={(event) => setNote(event.target.value)}
-                    placeholder="Catatan quotation"
-                    className="min-h-20 text-sm"
-                  />
-                ) : (
-                  <span className="text-sm">{item.note ?? "—"}</span>
-                )}
-              </InfoCell>
-            </div>
-
-            <Separator />
-
-            {canEdit && isClosedStage && (
-              <p className="text-xs text-muted-foreground">
-                Item terkunci — quotation sudah berstatus {item.stage}.
-              </p>
-            )}
-            <DocumentItemsTable
-              items={item.lineItems ?? []}
-              showMoney={!isFoc}
-              canEdit={canEditLineItems}
-              lineEdits={lineEdits}
-              onLineEdit={(lineId, patch) =>
-                setLineEdits((current) => ({
-                  ...current,
-                  [lineId]: { ...current[lineId], ...patch },
-                }))
-              }
-            />
-            {canEdit && (hasPriceChanges || hasQtyChanges) && (
-              <div className="grid gap-3 rounded-md border bg-muted/20 p-3">
-                {hasPriceChanges && (
-                  <div className="grid gap-2">
-                    <Label>Alasan perubahan harga</Label>
-                    <Select
-                      value={priceReasonType}
-                      onValueChange={setPriceReasonType}
-                    >
-                      <SelectTrigger className="h-8 text-xs">
-                        <SelectValue placeholder="Pilih alasan" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Discount">Discount</SelectItem>
-                        <SelectItem value="Lainnya">Lainnya</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {priceReasonType === "Lainnya" && (
-                      <Textarea
-                        value={priceReasonOther}
-                        onChange={(event) =>
-                          setPriceReasonOther(event.target.value)
-                        }
-                        placeholder="Tulis alasan perubahan harga"
-                        className="min-h-20 text-sm"
-                      />
-                    )}
-                  </div>
-                )}
-                {hasQtyChanges && (
-                  <div className="grid gap-2">
-                    <Label>Alasan perubahan qty</Label>
-                    <Textarea
-                      value={qtyReason}
-                      onChange={(event) => setQtyReason(event.target.value)}
-                      placeholder="Jelaskan kenapa qty diubah"
-                      className="min-h-20 text-sm"
-                    />
-                  </div>
-                )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <div className="flex flex-col gap-4">
-          {quotationHistory.length > 0 && (
-            <Card>
-              <CardContent className="p-4">
-                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Riwayat Revisi
-                </p>
-                <ul className="flex flex-col gap-1.5">
-                  {quotationHistory.map((version) => (
-                    <li key={version.id}>
-                      <Link
-                        to={`${backHref}/${version.id}` as never}
-                        className="flex items-center justify-between rounded-md border bg-muted/30 p-2 text-xs hover:border-primary/40"
-                      >
-                        <span className="font-mono">
-                          {version.quotationNumber}
-                        </span>
-                        <Badge
-                          variant={
-                            version.isCurrentRevision ? "default" : "outline"
-                          }
-                        >
-                          {version.isCurrentRevision ? "Current" : "Riwayat"}
-                        </Badge>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
-          )}
-
-          <Card>
-            <CardContent className="p-4">
-              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Tasks / Follow-Up
-              </p>
-              {relatedTasks.length === 0 ? (
-                <p className="text-xs text-muted-foreground">
-                  Belum ada task terkait.
-                </p>
-              ) : (
-                <ul className="flex flex-col gap-1.5">
-                  {relatedTasks.slice(0, 6).map((t) => (
-                    <li
-                      key={t.id}
-                      className="rounded-md border bg-muted/30 p-2 text-xs"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium">{t.title}</span>
-                        <span className="tabular-nums text-muted-foreground">
-                          {formatDateShort(t.dueDate)}
-                        </span>
-                      </div>
-                      <div className="mt-1 flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                        <Badge
-                          variant="outline"
-                          className="px-1.5 py-0 text-[10px]"
-                        >
-                          {t.method}
-                        </Badge>
-                        <span>{t.workflowStatus}</span>
-                        <span>{t.dueState ?? "-"}</span>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                History
-              </p>
-              {history.length === 0 ? (
-                <p className="text-xs text-muted-foreground">
-                  Belum ada perubahan.
-                </p>
-              ) : (
-                <ul className="flex flex-col gap-2">
-                  {history.slice(0, 8).map((h) => (
-                    <li
-                      key={h.id}
-                      className="rounded-md border bg-muted/30 p-2 text-xs"
-                    >
-                      <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                        <span>
-                          {h.actorName} · {ROLE_LABEL[h.actorRole]}
-                        </span>
-                        <span className="tabular-nums">
-                          {new Date(h.at).toLocaleString("id-ID", {
-                            dateStyle: "short",
-                            timeStyle: "short",
-                          })}
-                        </span>
-                      </div>
-                      <div className="mt-1 flex items-start gap-1 text-[11px]">
-                        <FileText className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground" />
-                        <span className="text-muted-foreground">
-                          {formatHistoryDetail(h.detail, items) ?? h.title}
-                        </span>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function InfoCell({
-  icon,
-  label,
-  children,
-}: {
-  icon?: React.ReactNode;
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div>
-      <div className="flex items-center gap-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-        {icon}
-        {label}
-      </div>
-      <div className="mt-1">{children}</div>
-    </div>
-  );
-}
-
-function DocumentItemsTable({
-  items,
-  showMoney,
-  canEdit,
-  lineEdits,
-  onLineEdit,
-}: {
-  items: NonNullable<CommercialItem["lineItems"]>;
-  showMoney: boolean;
-  canEdit: boolean;
-  lineEdits: Record<string, LineItemEdit>;
-  onLineEdit: (lineId: string, patch: Partial<LineItemEdit>) => void;
-}) {
-  return (
-    <div>
-      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        Line Items
-      </p>
-      <div className="overflow-x-auto rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Nama Product</TableHead>
-              <TableHead>Description</TableHead>
-              <TableHead className="text-right">Qty</TableHead>
-              <TableHead>UOM</TableHead>
-              {showMoney && (
-                <>
-                  <TableHead className="text-right">Unit Price</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
-                </>
-              )}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {items.map((line) => (
-              <TableRow key={line.id} className="odd:bg-muted/20">
-                <TableCell className="font-medium">
-                  {line.productName ?? "Nama Product belum diisi"}
-                </TableCell>
-                {/* Description carries the multi-line spec block that the
-                    Quotation PDF renders — pre-wrap keeps both the line breaks
-                    and the leading spaces that mark indented sub-items. */}
-                <TableCell className="whitespace-pre-wrap align-top">
-                  {line.description ?? "—"}
-                </TableCell>
-                <TableCell className="text-right tabular-nums">
-                  {canEdit ? (
-                    <Input
-                      type="number"
-                      min={0}
-                      value={lineEdits[line.id]?.qty ?? ""}
-                      onChange={(event) =>
-                        onLineEdit(line.id, { qty: event.target.value })
-                      }
-                      className="ml-auto h-8 w-24 text-right text-xs"
-                      aria-label={`Qty ${line.productName ?? "item"}`}
-                    />
-                  ) : (
-                    (line.qty ?? "—")
-                  )}
-                </TableCell>
-                <TableCell>{line.uom ?? "—"}</TableCell>
-                {showMoney && (
-                  <>
-                    <TableCell className="text-right tabular-nums">
-                      {canEdit ? (
-                        <Input
-                          type="number"
-                          min={0}
-                          value={lineEdits[line.id]?.unitPrice ?? ""}
-                          onChange={(event) =>
-                            onLineEdit(line.id, {
-                              unitPrice: event.target.value,
-                            })
-                          }
-                          className="ml-auto h-8 w-32 text-right text-xs"
-                          aria-label={`Unit price ${line.productName ?? "item"}`}
-                        />
-                      ) : line.unitPrice === null ? (
-                        "—"
-                      ) : (
-                        formatRupiahFull(line.unitPrice)
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right font-medium tabular-nums">
-                      {canEdit
-                        ? formatRupiahFull(
-                            (Number(lineEdits[line.id]?.qty) || 0) *
-                              (Number(lineEdits[line.id]?.unitPrice) || 0),
-                          )
-                        : line.lineTotal === null
-                          ? "—"
-                          : formatRupiahFull(line.lineTotal)}
-                    </TableCell>
-                  </>
-                )}
-              </TableRow>
-            ))}
-            {items.length === 0 && (
-              <TableRow>
-                <TableCell
-                  colSpan={showMoney ? 6 : 4}
-                  className="text-center text-muted-foreground"
-                >
-                  Belum ada line item.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
+        <CommercialDetailSidebar
+          backHref={backHref}
+          quotationHistory={quotationHistory}
+          linkedSalesOrder={
+            linkedSalesOrder
+              ? { id: linkedSalesOrder.id, soNumber: linkedSalesOrder.soNumber }
+              : undefined
+          }
+          relatedTasks={relatedTasks}
+          followUps={followUps}
+          history={history}
+          formatHistoryDetail={(detail) => formatHistoryDetail(detail, items)}
+        />
       </div>
     </div>
   );

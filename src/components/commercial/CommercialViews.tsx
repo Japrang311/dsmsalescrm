@@ -49,6 +49,8 @@ import {
   listOwners,
   listSalesTeamProfiles,
 } from "@/lib/data/clients";
+import { listTasks } from "@/lib/data/tasks";
+import { activeCommercialTasks } from "@/lib/data/task-relations";
 
 // Quotation is the remaining CommercialViews consumer.
 export type CommercialViewFilter = {
@@ -113,6 +115,11 @@ export function CommercialViews(props: CommercialViewsProps) {
     queryFn: listSalesTeamProfiles,
     enabled: authReady && role !== "sales",
   });
+  const { data: tasks = [] } = useQuery({
+    queryKey: ["tasks", "all"],
+    queryFn: listTasks,
+    enabled: authReady,
+  });
   const clients = useMemo(() => {
     const map: Record<string, (typeof clientList)[number]> = {};
     for (const c of clientList) map[c.id] = c;
@@ -147,7 +154,6 @@ export function CommercialViews(props: CommercialViewsProps) {
           it.description,
           it.projectName,
           it.quotationNumber,
-          it.customerPoNumber,
         ]
           .filter(Boolean)
           .join(" ")
@@ -157,6 +163,19 @@ export function CommercialViews(props: CommercialViewsProps) {
       return true;
     });
   }, [scoped, ownerFilter, stageFilter, q, clients]);
+
+  // Next follow-up state is owned by Tasks, not the normalized commercial
+  // document compatibility facade.
+  const nextByItem = useMemo(() => {
+    const map = new Map<string, string | undefined>();
+    for (const it of filtered) {
+      const related = activeCommercialTasks(tasks, it.id)
+        .map((t) => t.dueDate)
+        .sort();
+      map.set(it.id, related[0]);
+    }
+    return map;
+  }, [filtered, tasks]);
 
   const totalValue = filtered.reduce((s, it) => s + it.estimatedValue, 0);
 
@@ -345,7 +364,6 @@ export function CommercialViews(props: CommercialViewsProps) {
                     <TableHead>Owner</TableHead>
                     <TableHead>Source flow</TableHead>
                     <TableHead>Stage</TableHead>
-                    <TableHead>No. Customer PO</TableHead>
                     <TableHead>Next FU</TableHead>
                     <TableHead>Aging</TableHead>
                     <TableHead />
@@ -355,7 +373,7 @@ export function CommercialViews(props: CommercialViewsProps) {
                   {filtered.map((it) => {
                     const client = clients[it.clientId];
                     const owner = owners[it.ownerId];
-                    const next = it.nextActionDate;
+                    const next = nextByItem.get(it.id);
                     const nextDays = next ? daysBetween(NOW, next) : null;
                     const aging = daysBetween(new Date(it.updatedAt), NOW);
                     const overdue = nextDays !== null && nextDays < 0;
@@ -423,13 +441,7 @@ export function CommercialViews(props: CommercialViewsProps) {
                           {it.itemCount ?? 0}
                         </TableCell>
                         <TableCell className="whitespace-nowrap text-right font-medium tabular-nums">
-                          {it.prototypeStatus === "FOC" ? (
-                            <span className="text-muted-foreground">
-                              FOC · Rp0
-                            </span>
-                          ) : (
-                            formatRupiahShort(it.estimatedValue)
-                          )}
+                          {formatRupiahShort(it.estimatedValue)}
                         </TableCell>
                         <TableCell className="whitespace-nowrap text-right text-xs tabular-nums">
                           {it.type === "Quotation"
@@ -451,9 +463,6 @@ export function CommercialViews(props: CommercialViewsProps) {
                           <Badge variant="secondary" className="text-[10px]">
                             {it.stage}
                           </Badge>
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap font-mono text-[11px]">
-                          {it.customerPoNumber ?? "—"}
                         </TableCell>
                         <TableCell className="whitespace-nowrap text-xs">
                           {next ? (
@@ -547,7 +556,7 @@ export function CommercialViews(props: CommercialViewsProps) {
                     col.map((it) => {
                       const client = clients[it.clientId];
                       const owner = owners[it.ownerId];
-                      const next = it.nextActionDate;
+                      const next = nextByItem.get(it.id);
                       const nextDays = next ? daysBetween(NOW, next) : null;
                       return (
                         <Link
@@ -571,9 +580,7 @@ export function CommercialViews(props: CommercialViewsProps) {
                           </p>
                           <div className="flex items-center justify-between pt-0.5">
                             <span className="text-[12px] font-semibold tabular-nums text-foreground">
-                              {it.prototypeStatus === "FOC"
-                                ? "FOC · Rp0"
-                                : formatRupiahShort(it.estimatedValue)}
+                              {formatRupiahShort(it.estimatedValue)}
                             </span>
                             {client && <StatusBadge status={client.status} />}
                           </div>

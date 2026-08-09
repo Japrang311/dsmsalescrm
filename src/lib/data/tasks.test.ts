@@ -11,6 +11,8 @@ import {
 } from "../../../supabase/tests/helpers";
 import {
   listTasks,
+  listActiveTasks,
+  listTasksPage,
   getTaskControlLoopMetrics,
   updateTask,
   createTask,
@@ -339,6 +341,183 @@ describe("src/lib/data/tasks.ts", () => {
         .from("commercial_documents")
         .delete()
         .eq("id", fixtureDocument.id);
+      await supabase.auth.signOut();
+    }
+  });
+
+  // Stage 3 pagination — Completed/Archived history views on the Tasks Inbox
+  // page are the only ones that grow unbounded, so they're server-paginated
+  // via listTasksPage(); listActiveTasks() backs the still-bounded
+  // Today/Upcoming/Overdue working set.
+  test("listActiveTasks() excludes archived and Done/Cancelled tasks", async () => {
+    const fixtureClient = await signInAs(fixtures.sales);
+    const session = (await fixtureClient.auth.getSession()).data.session!;
+    await supabase.auth.setSession({
+      access_token: session.access_token,
+      refresh_token: session.refresh_token,
+    });
+
+    const { data: anyClient } = await adminClient
+      .from("clients")
+      .select("id")
+      .limit(1)
+      .single();
+
+    const { data: openRow, error: openError } = await adminClient
+      .from("tasks")
+      .insert({
+        client_id: anyClient!.id,
+        owner_id: fixtures.sales.id,
+        title: "listActiveTasks fixture: open",
+        due_date: "2026-07-20",
+        method: "Phone",
+      })
+      .select("id")
+      .single();
+    if (openError) throw openError;
+
+    const { data: doneRow, error: doneError } = await adminClient
+      .from("tasks")
+      .insert({
+        client_id: anyClient!.id,
+        owner_id: fixtures.sales.id,
+        title: "listActiveTasks fixture: done",
+        due_date: "2026-07-20",
+        method: "Phone",
+        workflow_status: "Done",
+      })
+      .select("id")
+      .single();
+    if (doneError) throw doneError;
+
+    const { data: archivedRow, error: archivedError } = await adminClient
+      .from("tasks")
+      .insert({
+        client_id: anyClient!.id,
+        owner_id: fixtures.sales.id,
+        title: "listActiveTasks fixture: archived",
+        due_date: "2026-07-20",
+        method: "Phone",
+        archived: true,
+      })
+      .select("id")
+      .single();
+    if (archivedError) throw archivedError;
+
+    try {
+      const active = await listActiveTasks();
+      const ids = new Set(active.map((t) => t.id));
+      expect(ids.has(openRow.id)).toBe(true);
+      expect(ids.has(doneRow.id)).toBe(false);
+      expect(ids.has(archivedRow.id)).toBe(false);
+    } finally {
+      await adminClient
+        .from("tasks")
+        .delete()
+        .in("id", [openRow.id, doneRow.id, archivedRow.id]);
+      await supabase.auth.signOut();
+    }
+  });
+
+  test("listTasksPage() pages the Completed view with a stable cursor and no overlap", async () => {
+    const fixtureClient = await signInAs(fixtures.manager);
+    const session = (await fixtureClient.auth.getSession()).data.session!;
+    await supabase.auth.setSession({
+      access_token: session.access_token,
+      refresh_token: session.refresh_token,
+    });
+
+    const { data: anyClient } = await adminClient
+      .from("clients")
+      .select("id")
+      .limit(1)
+      .single();
+
+    const insertedIds: string[] = [];
+    for (const due of ["2020-01-01", "2020-01-02", "2020-01-03"]) {
+      const { data, error } = await adminClient
+        .from("tasks")
+        .insert({
+          client_id: anyClient!.id,
+          owner_id: fixtures.sales.id,
+          title: `listTasksPage completed fixture ${due}`,
+          due_date: due,
+          method: "Phone",
+          workflow_status: "Done",
+        })
+        .select("id")
+        .single();
+      if (error) throw error;
+      insertedIds.push(data.id);
+    }
+
+    try {
+      const firstPage = await listTasksPage({
+        view: "completed",
+        page: { pageSize: 2 },
+      });
+      expect(firstPage.rows.length).toBeGreaterThanOrEqual(2);
+      expect(
+        firstPage.rows.every(
+          (r) =>
+            r.workflowStatus === "Done" || r.workflowStatus === "Cancelled",
+        ),
+      ).toBe(true);
+      expect(firstPage.rows.every((r) => !r.archived)).toBe(true);
+
+      if (firstPage.nextCursor) {
+        const secondPage = await listTasksPage({
+          view: "completed",
+          page: { pageSize: 2, cursor: firstPage.nextCursor },
+        });
+        const firstIds = new Set(firstPage.rows.map((r) => r.id));
+        expect(secondPage.rows.every((r) => !firstIds.has(r.id))).toBe(true);
+      }
+    } finally {
+      await adminClient.from("tasks").delete().in("id", insertedIds);
+      await supabase.auth.signOut();
+    }
+  });
+
+  test("listTasksPage() view 'archived' returns only archived tasks and respects the search filter", async () => {
+    const fixtureClient = await signInAs(fixtures.manager);
+    const session = (await fixtureClient.auth.getSession()).data.session!;
+    await supabase.auth.setSession({
+      access_token: session.access_token,
+      refresh_token: session.refresh_token,
+    });
+
+    const { data: anyClient } = await adminClient
+      .from("clients")
+      .select("id")
+      .limit(1)
+      .single();
+
+    const { data: archivedOpenRow, error: archivedOpenError } =
+      await adminClient
+        .from("tasks")
+        .insert({
+          client_id: anyClient!.id,
+          owner_id: fixtures.sales.id,
+          title: "listTasksPage archived-open fixture",
+          due_date: "2020-02-01",
+          method: "Phone",
+          archived: true,
+        })
+        .select("id")
+        .single();
+    if (archivedOpenError) throw archivedOpenError;
+
+    try {
+      const page = await listTasksPage({
+        view: "archived",
+        filters: { search: "listTasksPage archived-open fixture" },
+        page: { pageSize: 10 },
+      });
+      expect(page.rows.some((r) => r.id === archivedOpenRow.id)).toBe(true);
+      expect(page.rows.every((r) => r.archived)).toBe(true);
+    } finally {
+      await adminClient.from("tasks").delete().eq("id", archivedOpenRow.id);
       await supabase.auth.signOut();
     }
   });

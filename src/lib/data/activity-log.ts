@@ -5,6 +5,7 @@ import type { Role } from "@/lib/domain";
 export type ActivityKind =
   | "client_created"
   | "client_status_change"
+  | "client_owner_change"
   | "client_details_change"
   | "task_created"
   | "task_status_change"
@@ -30,6 +31,7 @@ export type ActivityKind =
 export const ACTIVITY_KIND_LABELS: Record<ActivityKind, string> = {
   client_created: "Client Baru",
   client_status_change: "Perubahan Status Client",
+  client_owner_change: "Perubahan Owner Client",
   client_details_change: "Perubahan Info Klien",
   task_created: "Task Baru",
   task_status_change: "Perubahan Status Task",
@@ -93,6 +95,7 @@ type ActivityLogRow = {
   sales_order_id: string | null;
   title: string;
   detail: string | null;
+  event_data?: unknown;
   created_at: string;
 };
 
@@ -148,6 +151,18 @@ export type ClientStatusAuditEntry = {
   note?: string;
 };
 
+const CLIENT_STATUSES = new Set<ClientStatus>([
+  "Prospect",
+  "Active Customer",
+  "Dormant",
+  "Lost",
+  "Repeat Order",
+]);
+
+function isClientStatus(value: string): value is ClientStatus {
+  return CLIENT_STATUSES.has(value as ClientStatus);
+}
+
 // Powers StatusAuditTrail.tsx (Client Detail page). Reads the same
 // activity_log rows the general /activity feed shows, filtered to one
 // client's `client_status_change` events, and parses the "from → to"
@@ -177,6 +192,7 @@ export async function listClientStatusHistory(
     const [statusLine, note] = (row.detail ?? "").split("\n");
     const [from, to] = statusLine.split(" → ").map((s: string) => s.trim());
     if (!from || !to) return [];
+    if (!isClientStatus(from) || !isClientStatus(to)) return [];
     const actor = actorsById.get(row.actor_id);
     return [
       {
@@ -400,12 +416,6 @@ export async function listTaskTimeline(
   }
 
   return entries.sort((a, b) => (a.at < b.at ? 1 : -1));
-}
-
-export async function listTaskHistory(
-  taskId: string,
-): Promise<TaskHistoryEntry[]> {
-  return listTaskTimeline(taskId);
 }
 
 export type CommercialItemHistoryEntry = {

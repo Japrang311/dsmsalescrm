@@ -11,18 +11,24 @@ import {
   YAxis,
 } from "recharts";
 import { Info } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CURRENT_MONTH } from "@/lib/domain";
 import type { Role } from "@/lib/domain";
 import {
-  monthlyRevenueTrend,
-  targetPerSales,
-  ytdCumulativeTrend,
-  ytdRevenue,
+  monthlyRevenueTrendFromRpc,
+  sumTrendRevenue,
+  targetPerSalesFromRpc,
+  ytdCumulativeTrendFromRpc,
   ytdTargetValue,
 } from "@/lib/data/dashboard-selectors";
+import {
+  getSalesOrdersMonthlyTrend,
+  getSalesOrdersOwnerYtd,
+} from "@/lib/data/sales-orders-trend";
 import { useDashboardData } from "@/hooks/use-dashboard-data";
+import { useRole } from "@/context/role-context";
 import { formatPercent, formatRupiahShort } from "@/lib/format";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -152,16 +158,21 @@ const chartCardContent = "px-1 pb-4 pt-2 sm:px-4 sm:pb-6";
 // ---------------------------------------------------------------------------
 export function YtdAchievementVsTargetChart({ role }: { role: Role }) {
   const cfg = useChartConfig();
-  const { orders, targetsByMember, companyTarget, currentUserId } =
-    useDashboardData();
-  const data = ytdCumulativeTrend(
-    orders,
+  const { authReady } = useRole();
+  const { targetsByMember, companyTarget, currentUserId } = useDashboardData();
+  const trendQuery = useQuery({
+    queryKey: ["sales-orders", "monthly-trend", "dashboard"],
+    queryFn: () => getSalesOrdersMonthlyTrend(),
+    enabled: authReady,
+  });
+  const data = ytdCumulativeTrendFromRpc(
+    trendQuery.data ?? [],
     role,
     currentUserId ?? "",
     targetsByMember,
     companyTarget,
   );
-  const ach = ytdRevenue(orders);
+  const ach = sumTrendRevenue(trendQuery.data ?? []);
   const tgt = ytdTargetValue(
     role,
     currentUserId ?? "",
@@ -267,10 +278,15 @@ export function YtdAchievementVsTargetChart({ role }: { role: Role }) {
 // ---------------------------------------------------------------------------
 export function MonthlyAchievementVsTargetChart({ role }: { role: Role }) {
   const cfg = useChartConfig();
-  const { orders, targetsByMember, companyTarget, currentUserId } =
-    useDashboardData();
-  const data = monthlyRevenueTrend(
-    orders,
+  const { authReady } = useRole();
+  const { targetsByMember, companyTarget, currentUserId } = useDashboardData();
+  const trendQuery = useQuery({
+    queryKey: ["sales-orders", "monthly-trend", "dashboard"],
+    queryFn: () => getSalesOrdersMonthlyTrend(),
+    enabled: authReady,
+  });
+  const data = monthlyRevenueTrendFromRpc(
+    trendQuery.data ?? [],
     role,
     currentUserId ?? "",
     targetsByMember,
@@ -365,19 +381,25 @@ export function MonthlyAchievementVsTargetChart({ role }: { role: Role }) {
 // ---------------------------------------------------------------------------
 export function SingleSalesTargetChart() {
   const cfg = useChartConfig();
-  const { orders, ownersById, targetsByMember, companyTarget, currentUserId } =
+  const { authReady } = useRole();
+  const { ownersById, targetsByMember, companyTarget, currentUserId } =
     useDashboardData();
+  const trendQuery = useQuery({
+    queryKey: ["sales-orders", "monthly-trend", "dashboard"],
+    queryFn: () => getSalesOrdersMonthlyTrend(),
+    enabled: authReady,
+  });
   const memberName = currentUserId
     ? (ownersById[currentUserId]?.name ?? "Sales")
     : "Sales";
-  const data = monthlyRevenueTrend(
-    orders,
+  const data = monthlyRevenueTrendFromRpc(
+    trendQuery.data ?? [],
     "sales",
     currentUserId ?? "",
     targetsByMember,
     companyTarget,
   );
-  const ach = ytdRevenue(orders);
+  const ach = sumTrendRevenue(trendQuery.data ?? []);
   const tgt = ytdTargetValue(
     "sales",
     currentUserId ?? "",
@@ -482,9 +504,19 @@ export function SingleSalesTargetChart() {
 // ---------------------------------------------------------------------------
 export function TargetAllSalesChart() {
   const cfg = useChartConfig();
-  const { orders, salesTeam, targetsByMember } = useDashboardData();
+  const { authReady } = useRole();
+  const { salesTeam, targetsByMember } = useDashboardData();
+  const ownerYtdQuery = useQuery({
+    queryKey: ["sales-orders", "owner-ytd", "dashboard"],
+    queryFn: () => getSalesOrdersOwnerYtd(),
+    enabled: authReady,
+  });
   // On mobile, use first-name-only labels so grouped bars stay legible.
-  const data = targetPerSales(orders, salesTeam, targetsByMember).map((r) => ({
+  const data = targetPerSalesFromRpc(
+    ownerYtdQuery.data ?? [],
+    salesTeam,
+    targetsByMember,
+  ).map((r) => ({
     ...r,
     label: cfg.isMobile ? r.name.split(" ")[0] : r.name,
   }));

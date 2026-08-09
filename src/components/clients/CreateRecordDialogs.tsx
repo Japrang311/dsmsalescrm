@@ -31,7 +31,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { CommercialItem, TaxType, PrototypeStatus } from "@/lib/domain";
+import {
+  toLocalIsoDate,
+  type CommercialItem,
+  type TaxType,
+  type PrototypeStatus,
+} from "@/lib/domain";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   createPrototypeRequest,
@@ -52,7 +57,7 @@ import {
   type SalesOrderValues,
 } from "./commercial-form-schemas";
 
-const todayIso = () => new Date().toISOString().slice(0, 10);
+const todayIso = () => toLocalIsoDate(new Date());
 
 // clientId/clientName/ownerId are optional: when a dialog is opened from a
 // client's own page these are already known and passed in directly: no
@@ -128,6 +133,8 @@ export function CreateQuotationDialog(props: SharedProps) {
       stage: "Quotes Sent",
       note: "",
       lineItems: [emptyLineItem],
+      nextAction: "",
+      nextActionDate: "",
     },
   });
   const { fields, append, remove } = useFieldArray({
@@ -145,6 +152,8 @@ export function CreateQuotationDialog(props: SharedProps) {
         stage: v.stage,
         note: v.note,
         items: v.lineItems,
+        nextAction: v.nextAction,
+        nextActionDate: v.nextActionDate,
       });
       cacheListRecord(
         queryClient,
@@ -213,6 +222,20 @@ export function CreateQuotationDialog(props: SharedProps) {
                 options={[...WEIGHTED_STAGES]}
               />
             </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <FieldText
+                label="Next Action"
+                placeholder="mis. Telepon PIC untuk konfirmasi harga"
+                reg={form.register("nextAction")}
+                error={msg(form.formState.errors, "nextAction")}
+              />
+              <FieldText
+                label="Tanggal Follow-up"
+                type="date"
+                reg={form.register("nextActionDate")}
+                error={msg(form.formState.errors, "nextActionDate")}
+              />
+            </div>
             <FieldText
               label="Note"
               reg={form.register("note")}
@@ -244,10 +267,18 @@ export function ReviseQuotationDialog({
   document,
   trigger,
   onRevised,
+  // A Quotation that already has a linked Sales Order can never be revised
+  // again — price/discount changes must happen before the SO exists (user
+  // decision, 2026-08-06). The server (revise_quotation RPC) enforces this
+  // too; this is the friendlier front door so the user sees why instead of
+  // hitting a raw QUOTATION_ALREADY_HAS_SALES_ORDER error after filling the
+  // whole form.
+  hasLinkedSalesOrder = false,
 }: {
   document: CommercialItem;
   trigger: ReactNode;
   onRevised?: (documentId: string) => void;
+  hasLinkedSalesOrder?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const queryClient = useQueryClient();
@@ -267,6 +298,8 @@ export function ReviseQuotationDialog({
               unitPrice: item.unitPrice ?? 0,
             }))
           : [emptyLineItem],
+      nextAction: "",
+      nextActionDate: "",
     },
   });
   const { fields, append, remove } = useFieldArray({
@@ -280,6 +313,8 @@ export function ReviseQuotationDialog({
         documentDate: value.documentDate,
         note: value.note,
         items: value.lineItems,
+        nextAction: value.nextAction,
+        nextActionDate: value.nextActionDate,
       });
       cacheListRecord(
         queryClient,
@@ -310,40 +345,63 @@ export function ReviseQuotationDialog({
             {document.quotationNumber} akan dipertahankan sebagai riwayat.
           </DialogDescription>
         </DialogHeader>
-        <form
-          onSubmit={onSubmit}
-          className="flex flex-1 flex-col gap-3 overflow-hidden"
-        >
-          <div className="grid gap-3 overflow-y-auto pr-1">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <FieldText
-                label="Date"
-                type="date"
-                reg={form.register("documentDate")}
-                error={msg(form.formState.errors, "documentDate")}
-              />
-              <FieldText
-                label="Note"
-                reg={form.register("note")}
-                error={msg(form.formState.errors, "note")}
+        {hasLinkedSalesOrder ? (
+          <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
+            Quotation ini sudah punya Sales Order — revisi harga harus dilakukan
+            sebelum SO dibuat.
+          </div>
+        ) : (
+          <form
+            onSubmit={onSubmit}
+            className="flex flex-1 flex-col gap-3 overflow-hidden"
+          >
+            <div className="grid gap-3 overflow-y-auto pr-1">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <FieldText
+                  label="Date"
+                  type="date"
+                  reg={form.register("documentDate")}
+                  error={msg(form.formState.errors, "documentDate")}
+                />
+                <FieldText
+                  label="Note"
+                  reg={form.register("note")}
+                  error={msg(form.formState.errors, "note")}
+                />
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <FieldText
+                  label="Next Action"
+                  placeholder="mis. Telepon PIC untuk konfirmasi harga"
+                  reg={form.register("nextAction")}
+                  error={msg(form.formState.errors, "nextAction")}
+                />
+                <FieldText
+                  label="Tanggal Follow-up"
+                  type="date"
+                  reg={form.register("nextActionDate")}
+                  error={msg(form.formState.errors, "nextActionDate")}
+                />
+              </div>
+              <LineItemsSection
+                fields={fields}
+                append={() => append(emptyLineItem)}
+                remove={remove}
+                register={form.register}
+                lineItems={lineItems}
+                errorMessage={
+                  form.formState.errors.lineItems?.message as string
+                }
+                showMoney
               />
             </div>
-            <LineItemsSection
-              fields={fields}
-              append={() => append(emptyLineItem)}
-              remove={remove}
-              register={form.register}
-              lineItems={lineItems}
-              errorMessage={form.formState.errors.lineItems?.message as string}
-              showMoney
+            <Footer
+              onCancel={() => setOpen(false)}
+              submitting={form.formState.isSubmitting}
+              label="Buat Revisi"
             />
-          </div>
-          <Footer
-            onCancel={() => setOpen(false)}
-            submitting={form.formState.isSubmitting}
-            label="Buat Revisi"
-          />
-        </form>
+          </form>
+        )}
       </DialogContent>
     </Dialog>
   );
@@ -362,7 +420,19 @@ const emptySoLineItem = {
 };
 type SoValues = SalesOrderValues;
 
-export function CreateSalesOrderDialog(props: SharedProps) {
+type CreateSalesOrderDialogProps = SharedProps & {
+  // Pipeline "Closed Won" hand-off: when present, this Sales Order is being
+  // created as the direct outcome of that Quotation winning. The link is
+  // read-only here — a Quotation can be linked to at most one Sales Order
+  // (enforced server-side), so the source is locked, not just defaulted.
+  sourceCommercialDocument?: {
+    id: string;
+    quotationNumber?: string;
+    projectName?: string;
+  };
+};
+
+export function CreateSalesOrderDialog(props: CreateSalesOrderDialogProps) {
   const { open, setOpen, controlled } = useDialogState(props);
   const queryClient = useQueryClient();
   const {
@@ -380,6 +450,7 @@ export function CreateSalesOrderDialog(props: SharedProps) {
     resolver: zodResolver(buildSalesOrderSchema(isHariffClient)),
     defaultValues: {
       customerPoNumber: "",
+      customerPoDate: "",
       type: "Regular",
       taxType: "PPN",
       prototypeStatus: undefined,
@@ -409,6 +480,7 @@ export function CreateSalesOrderDialog(props: SharedProps) {
         clientId,
         date: v.date,
         customerPoNumber: v.customerPoNumber,
+        customerPoDate: v.customerPoDate || undefined,
         type: v.type,
         taxType: foc ? undefined : v.taxType,
         prototypeStatus: v.prototypeStatus,
@@ -420,6 +492,7 @@ export function CreateSalesOrderDialog(props: SharedProps) {
           ...item,
           unitPrice: foc ? undefined : item.unitPrice,
         })),
+        sourceCommercialDocumentId: props.sourceCommercialDocument?.id,
       });
       cacheListRecord(queryClient, ["sales-orders", "all"], created);
       await queryClient.invalidateQueries({ queryKey: ["sales-orders"] });
@@ -472,6 +545,17 @@ export function CreateSalesOrderDialog(props: SharedProps) {
           className="flex flex-1 flex-col gap-3 overflow-hidden"
         >
           <div className="grid gap-3 overflow-y-auto pr-1">
+            {props.sourceCommercialDocument && (
+              <div className="rounded-md border border-primary/40 bg-primary/5 p-3">
+                <Label>Dari Quotation</Label>
+                <p className="text-sm text-muted-foreground">
+                  {props.sourceCommercialDocument.quotationNumber ?? "—"}
+                  {props.sourceCommercialDocument.projectName
+                    ? ` · ${props.sourceCommercialDocument.projectName}`
+                    : ""}
+                </p>
+              </div>
+            )}
             {needsPicker && (
               <ClientPickerField
                 clients={clients}
@@ -499,6 +583,13 @@ export function CreateSalesOrderDialog(props: SharedProps) {
                 label="Nomor PO Customer"
                 reg={form.register("customerPoNumber")}
                 error={msg(form.formState.errors, "customerPoNumber")}
+              />
+              <FieldText
+                label="Tanggal PO Customer"
+                description="Opsional. Tanggal PO diterima dari klien, untuk analitik cycle-time."
+                type="date"
+                reg={form.register("customerPoDate")}
+                error={msg(form.formState.errors, "customerPoDate")}
               />
               <FieldSelect
                 label="Tipe SO"
@@ -822,7 +913,12 @@ function FieldText({
   return (
     <div>
       <Label>{label}</Label>
-      <Input type={type} placeholder={placeholder} {...reg} />
+      <Input
+        type={type}
+        aria-label={label}
+        placeholder={placeholder}
+        {...reg}
+      />
       {description && (
         <p className="mt-1 text-[11px] text-muted-foreground">{description}</p>
       )}

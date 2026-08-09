@@ -1,43 +1,24 @@
 import { useEffect, useMemo, useState } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import {
-  Phone,
-  Mail,
-  MessageSquare,
-  MapPin,
-  Users,
   Search,
   CheckCircle2,
   Clock,
-  Undo2,
-  ExternalLink,
   Inbox,
   CalendarDays,
   List,
-  ChevronLeft,
-  ChevronRight,
-  Info,
   X,
   UserCog,
-  MoreHorizontal,
   Archive,
-  ArchiveRestore,
-  FileText,
-  Wrench,
-  PackageCheck,
-  PhoneCall,
   AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { EmptyState } from "@/components/ui/empty-state";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -50,26 +31,11 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRole } from "@/context/role-context";
-import { NOW } from "@/lib/domain";
-import type { Role, Task, CommercialItem } from "@/lib/domain";
-import {
-  listTasks,
-  updateTask,
-  createTask,
-  describeTaskChanges,
-} from "@/lib/data/tasks";
-import { recordTaskProgress } from "@/lib/data/task-progress";
+import { NOW, toLocalIsoDate } from "@/lib/domain";
+import type { Task } from "@/lib/domain";
+import { listActiveTasks, type TaskListFilters } from "@/lib/data/tasks";
 import {
   filterExecutiveTaskExceptions,
   filterManagerMyTasks,
@@ -80,15 +46,47 @@ import {
   listOwners,
   listSalesTeamProfiles,
 } from "@/lib/data/clients";
+import { listCommercialItems } from "@/lib/data/commercial-items";
+import { getCurrentActorId } from "@/lib/data/activity-log";
 import {
-  listCommercialItems,
-  updateCommercialItem,
-  describeCommercialItemChanges,
-} from "@/lib/data/commercial-items";
-import { getCurrentActorId, logActivity } from "@/lib/data/activity-log";
-import { formatDateShort, formatRupiahShort } from "@/lib/format";
+  archiveTasksInboxTask,
+  bulkChangeTasksInboxOwner,
+  bulkMarkTasksInboxDone,
+  bulkSnoozeTasksInbox,
+  confirmTasksInboxWaitingPoMove,
+  createTasksInboxChildTask,
+  markTasksInboxTaskDone,
+  snoozeTasksInboxTask,
+  unarchiveTasksInboxTask,
+} from "@/lib/tasks-inbox-actions";
+import { useTasksInboxHistory } from "@/lib/tasks-inbox-queries";
+import {
+  TASKS_INBOX_QUERY_KEYS,
+  buildTaskHistoryFilters,
+  countTasksInboxViews,
+  filterTasksInboxRows,
+  groupTasksInboxAgenda,
+  indexTasksInboxClients,
+  indexTasksInboxCommercialItems,
+  indexTasksInboxTasks,
+  isTaskHistoryBlocked,
+  selectedTasksFromIds,
+  viewForTask,
+  type TasksInboxManagerMode as ManagerTaskMode,
+  type TasksInboxViewKey as ViewKey,
+} from "@/lib/tasks-inbox-controller";
 import { TaskDetailDrawer } from "@/components/tasks/TaskDetailDrawer";
 import { CreateTaskDialog } from "@/components/tasks/CreateTaskDialog";
+import { CalendarIncompleteWarning } from "@/components/tasks/CalendarIncompleteWarning";
+import {
+  TaskHistorySection,
+  TasksAgendaView,
+  TasksCalendarView,
+} from "@/components/tasks/TasksInboxViews";
+import {
+  PipelineStageMoveDialog,
+  type PendingPipelineMove,
+} from "@/components/pipeline/PipelineStageMoveDialog";
 
 export const Route = createFileRoute("/_app/tasks")({
   head: () => ({
@@ -103,14 +101,6 @@ export const Route = createFileRoute("/_app/tasks")({
   }),
   component: TasksInboxPage,
 });
-
-const METHOD_ICON = {
-  Phone,
-  Email: Mail,
-  WhatsApp: MessageSquare,
-  Visit: MapPin,
-  Meeting: Users,
-} as const;
 
 const METHOD_OPTIONS = [
   "all",
@@ -131,9 +121,6 @@ const COMMERCIAL_OPTIONS = [
   "none",
 ] as const;
 
-type ViewKey = "today" | "upcoming" | "overdue" | "completed" | "archived";
-type ManagerTaskMode = "my-tasks" | "team-exceptions";
-
 const VIEW_META: Record<
   ViewKey,
   { title: string; tone: string; icon: typeof Clock }
@@ -145,115 +132,48 @@ const VIEW_META: Record<
   archived: { title: "Archived", tone: "text-muted-foreground", icon: Archive },
 };
 
-const BUCKET_META: Record<Bucket, { title: string; tone: string }> = {
-  overdue: { title: "Overdue", tone: "text-destructive" },
-  today: { title: "Hari ini", tone: "text-primary" },
-  week: { title: "Minggu ini", tone: "text-foreground" },
-  later: { title: "Nanti", tone: "text-muted-foreground" },
-  done: { title: "Selesai", tone: "text-success" },
-};
-
-function startOfDay(d: Date) {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-}
-
-// Bucketize by due-date proximity relative to NOW. "week" & "later" both fold
-// into the "upcoming" view; "done" folds into "completed".
-type Bucket = "overdue" | "today" | "week" | "later" | "done";
-function bucketFor(task: Task): Bucket {
-  if (
-    task.workflowStatus === "Done" ||
-    task.workflowStatus === "Cancelled" ||
-    task.dueState === null
-  ) {
-    return "done";
-  }
-  if (task.dueState === "Overdue" || task.dueState === "Escalated") {
-    return "overdue";
-  }
-  if (task.dueState === "Today") return "today";
-  if (task.dueState === "Upcoming") {
-    const today = startOfDay(NOW);
-    const due = startOfDay(new Date(task.dueDate));
-    const weekEnd = today + 7 * 86_400_000;
-    return due <= weekEnd ? "week" : "later";
-  }
-  const today = startOfDay(NOW);
-  const due = startOfDay(new Date(task.dueDate));
-  if (due < today) return "overdue";
-  if (due === today) return "today";
-  const weekEnd = today + 7 * 86_400_000;
-  if (due <= weekEnd) return "week";
-  return "later";
-}
-
-function viewForTask(task: Task, archived: boolean): ViewKey {
-  if (archived) return "archived";
-  const b = bucketFor(task);
-  if (b === "done") return "completed";
-  if (b === "overdue") return "overdue";
-  if (b === "today") return "today";
-  return "upcoming";
-}
-
-// Advisory aging: how many days since the task became overdue, or until due.
-function agingDays(task: Task) {
-  const today = startOfDay(NOW);
-  const due = startOfDay(new Date(task.dueDate));
-  return Math.round((today - due) / 86_400_000);
-}
-
-type ClientLookup = Record<string, { id: string; name: string }>;
-type ProfileLookup = Record<
-  string,
-  { name: string; initials: string; role?: Role }
->;
-type CommercialLookup = Record<string, CommercialItem>;
-
 function TasksInboxPage() {
   const { role, authReady } = useRole();
   const queryClient = useQueryClient();
 
-  const { data: tasks = [], isLoading: tasksLoading } = useQuery({
-    queryKey: ["tasks", "all"],
-    queryFn: listTasks,
+  const { data: activeTasks = [], isLoading: tasksLoading } = useQuery({
+    queryKey: TASKS_INBOX_QUERY_KEYS.activeTasks,
+    queryFn: listActiveTasks,
     enabled: authReady,
   });
   const { data: currentActorId } = useQuery({
-    queryKey: ["profiles", "current-actor-id"],
+    queryKey: TASKS_INBOX_QUERY_KEYS.currentActorId,
     queryFn: getCurrentActorId,
     enabled: authReady,
   });
   const { data: clientList = [] } = useQuery({
-    queryKey: ["clients", "all"],
+    queryKey: TASKS_INBOX_QUERY_KEYS.clientsAll,
     queryFn: listClients,
     enabled: authReady,
   });
   const { data: profilesById = {} } = useQuery({
-    queryKey: ["profiles", "owners"],
+    queryKey: TASKS_INBOX_QUERY_KEYS.owners,
     queryFn: listOwners,
     enabled: authReady,
   });
   const { data: salesTeam = [] } = useQuery({
-    queryKey: ["profiles", "sales-team"],
+    queryKey: TASKS_INBOX_QUERY_KEYS.salesTeam,
     queryFn: listSalesTeamProfiles,
     enabled: authReady && role !== "sales",
   });
   const { data: commercialItems = [] } = useQuery({
-    queryKey: ["commercial-items", "all"],
+    queryKey: TASKS_INBOX_QUERY_KEYS.commercialItemsAll,
     queryFn: listCommercialItems,
     enabled: authReady,
   });
-  const clientsById = useMemo(() => {
-    const map: Record<string, { id: string; name: string }> = {};
-    for (const c of clientList) map[c.id] = { id: c.id, name: c.name };
-    return map;
-  }, [clientList]);
-  const commercialItemsById = useMemo(() => {
-    const map: CommercialLookup = {};
-    for (const c of commercialItems) map[c.id] = c;
-    return map;
-  }, [commercialItems]);
+  const clientsById = useMemo(
+    () => indexTasksInboxClients(clientList),
+    [clientList],
+  );
+  const commercialItemsById = useMemo(
+    () => indexTasksInboxCommercialItems(commercialItems),
+    [commercialItems],
+  );
 
   const canEdit = role !== "executive";
 
@@ -273,6 +193,28 @@ function TasksInboxPage() {
   );
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
+
+  // "Waiting PO" quick action -> Commit stage move. Stage 4 Task 4.3: this
+  // used to write stage + an unstructured activity_log row directly,
+  // bypassing transition_commercial_stage's structured event_data (broke
+  // Stage 4 funnel/dwell coverage for this path). Reuses the same
+  // confirmation dialog and RPC path Pipeline's drag-and-drop already uses.
+  const [waitingPoMove, setWaitingPoMove] =
+    useState<PendingPipelineMove | null>(null);
+  const [waitingPoNextAction, setWaitingPoNextAction] = useState("");
+  const [waitingPoNextDate, setWaitingPoNextDate] = useState("");
+  const [waitingPoTaskMode, setWaitingPoTaskMode] = useState<
+    "existing_task" | "create_task"
+  >("existing_task");
+  const [waitingPoTaskId, setWaitingPoTaskId] = useState("");
+
+  // Completed/Archived are server-paginated in bounded pages, not a full
+  // month's worth of history, so the month-grid Calendar view (which needs
+  // every task in the visible month at once) doesn't apply to them.
+  const isHistoryView = activeView === "completed" || activeView === "archived";
+  useEffect(() => {
+    if (isHistoryView && view === "calendar") setView("agenda");
+  }, [isHistoryView, view]);
 
   const toggleSelected = (id: string) => {
     setSelected((prev) => {
@@ -303,39 +245,101 @@ function TasksInboxPage() {
 
   const scopedTasks = useMemo(() => {
     if (role === "executive") {
-      return filterExecutiveTaskExceptions(tasks, profilesById);
+      return filterExecutiveTaskExceptions(activeTasks, profilesById);
     }
-    if (role !== "manager") return tasks;
+    if (role !== "manager") return activeTasks;
     if (managerTaskMode === "team-exceptions") {
-      return filterManagerTeamExceptions(tasks, profilesById);
+      return filterManagerTeamExceptions(activeTasks, profilesById);
     }
-    return filterManagerMyTasks(tasks, currentActorId);
-  }, [role, managerTaskMode, tasks, profilesById, currentActorId]);
+    return filterManagerMyTasks(activeTasks, currentActorId);
+  }, [role, managerTaskMode, activeTasks, profilesById, currentActorId]);
+
+  // Completed/Archived history views are server-paginated (see
+  // listTasksPage() in lib/data/tasks.ts) instead of being sliced out of
+  // activeTasks, which deliberately excludes them. filterExecutiveTaskExceptions
+  // and filterManagerTeamExceptions both require archived=false and an active
+  // workflow status, so executive exceptions and manager team-exceptions mode
+  // can never show any Completed/Archived rows -- history fetching is skipped
+  // entirely for those, matching what scopedTasks already implies.
+  const historyBlocked = isTaskHistoryBlocked({
+    role,
+    managerTaskMode,
+    ownerId,
+    currentActorId,
+  });
+
+  const historyFilters = useMemo<TaskListFilters>(
+    () =>
+      buildTaskHistoryFilters({
+        role,
+        managerTaskMode,
+        ownerId,
+        currentActorId,
+        method,
+        priority,
+        commercialType,
+        query,
+        clients: clientList,
+        commercialItems,
+      }),
+    [
+      role,
+      managerTaskMode,
+      ownerId,
+      currentActorId,
+      method,
+      priority,
+      commercialType,
+      query,
+      clientList,
+      commercialItems,
+    ],
+  );
+
+  const completedQuery = useTasksInboxHistory({
+    view: "completed",
+    filters: historyFilters,
+    enabled: authReady && !historyBlocked,
+  });
+  const archivedQuery = useTasksInboxHistory({
+    view: "archived",
+    filters: historyFilters,
+    enabled: authReady && !historyBlocked,
+  });
+  const completedRows = useMemo(
+    () => (completedQuery.data?.pages ?? []).flatMap((p) => p.rows),
+    [completedQuery.data],
+  );
+  const archivedRows = useMemo(
+    () => (archivedQuery.data?.pages ?? []).flatMap((p) => p.rows),
+    [archivedQuery.data],
+  );
+  const completedTotal = historyBlocked
+    ? 0
+    : (completedQuery.data?.pages[0]?.totalCount ?? 0);
+  const archivedTotal = historyBlocked
+    ? 0
+    : (archivedQuery.data?.pages[0]?.totalCount ?? 0);
+
+  const knownTasksById = useMemo(() => {
+    return indexTasksInboxTasks([
+      ...activeTasks,
+      ...completedRows,
+      ...archivedRows,
+    ]);
+  }, [activeTasks, completedRows, archivedRows]);
 
   // Filtered by common criteria (excluding view). Applied before view split so
   // per-view counts always reflect current filters.
   const commonFiltered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return scopedTasks.filter((t) => {
-      if (ownerId !== "all" && t.ownerId !== ownerId) return false;
-      if (method !== "all" && t.method !== method) return false;
-      if (priority !== "all" && t.priority !== priority) return false;
-      if (commercialType !== "all") {
-        if (commercialType === "none") {
-          if (t.commercialItemId) return false;
-        } else {
-          const ci = t.commercialItemId
-            ? commercialItems.find((c) => c.id === t.commercialItemId)
-            : undefined;
-          if (!ci || ci.type !== commercialType) return false;
-        }
-      }
-      if (q) {
-        const client = t.clientId ? clientsById[t.clientId] : undefined;
-        const hay = `${t.title} ${client?.name ?? ""}`.toLowerCase();
-        if (!hay.includes(q)) return false;
-      }
-      return true;
+    return filterTasksInboxRows(scopedTasks, {
+      ownerId,
+      method,
+      priority,
+      commercialType,
+      query,
+      clientsById,
+      commercialItems,
     });
   }, [
     scopedTasks,
@@ -349,16 +353,11 @@ function TasksInboxPage() {
   ]);
 
   const viewCounts = useMemo(() => {
-    const c: Record<ViewKey, number> = {
-      today: 0,
-      upcoming: 0,
-      overdue: 0,
-      completed: 0,
-      archived: 0,
-    };
-    for (const t of commonFiltered) c[viewForTask(t, Boolean(t.archived))]++;
-    return c;
-  }, [commonFiltered]);
+    return countTasksInboxViews(commonFiltered, {
+      completedTotal,
+      archivedTotal,
+    });
+  }, [commonFiltered, completedTotal, archivedTotal]);
 
   const filtered = useMemo(
     () =>
@@ -369,97 +368,15 @@ function TasksInboxPage() {
   );
 
   const grouped = useMemo(() => {
-    const g: Record<Bucket, Task[]> = {
-      overdue: [],
-      today: [],
-      week: [],
-      later: [],
-      done: [],
-    };
-    for (const t of filtered) g[bucketFor(t)].push(t);
-    const byDate = (a: Task, b: Task) => a.dueDate.localeCompare(b.dueDate);
-    (Object.keys(g) as Bucket[]).forEach((k) => g[k].sort(byDate));
-    return g;
+    return groupTasksInboxAgenda(filtered);
   }, [filtered]);
 
-  const logTaskEvent = async (
-    t: Task,
-    title: string,
-    detail?: string,
-  ): Promise<void> => {
-    const actorId = await getCurrentActorId();
-    if (!actorId) return;
-    await logActivity({
-      kind: "task_status_change",
-      ownerId: t.ownerId,
-      actorId,
-      clientId: t.clientId,
-      taskId: t.id,
-      title,
-      detail,
-    });
-  };
-
-  const invalidateTasks = async () => {
-    await queryClient.invalidateQueries({ queryKey: ["tasks"] });
-    await queryClient.invalidateQueries({ queryKey: ["activity-log"] });
-  };
-
   const handleDone = async (t: Task) => {
-    try {
-      await recordTaskProgress({
-        taskId: t.id,
-        nextAction: null,
-        nextActionDate: null,
-        workflowStatusTarget: "Done",
-      });
-      await invalidateTasks();
-      const client = t.clientId ? clientsById[t.clientId] : undefined;
-      toast.success(`Task diselesaikan — ${client?.name ?? "Klien"}`, {
-        description: t.title,
-      });
-    } catch (error) {
-      toast.error("Gagal menyelesaikan task", {
-        description: error instanceof Error ? error.message : "Unknown error",
-      });
-    }
+    await markTasksInboxTaskDone({ task: t, queryClient, clientsById });
   };
 
   const handleSnooze = async (t: Task) => {
-    const next = new Date(t.dueDate);
-    next.setDate(next.getDate() + 1);
-    const iso = next.toISOString().slice(0, 10);
-    const prevDueDate = t.dueDate;
-    try {
-      await updateTask(t.id, { dueDate: iso });
-      await logTaskEvent(t, `Ditunda +1 hari → ${formatDateShort(iso)}`);
-      await invalidateTasks();
-      toast(`Ditunda ke ${formatDateShort(iso)}`, {
-        description: t.title,
-        action: {
-          label: "Undo",
-          onClick: () =>
-            void (async () => {
-              try {
-                await updateTask(t.id, {
-                  dueDate: prevDueDate,
-                });
-                await logTaskEvent(t, "Penundaan dibatalkan");
-                await invalidateTasks();
-              } catch (error) {
-                toast.error("Gagal membatalkan penundaan", {
-                  description:
-                    error instanceof Error ? error.message : "Unknown error",
-                });
-              }
-            })(),
-        },
-      });
-    } catch (error) {
-      toast.error("Gagal menunda task", {
-        description: error instanceof Error ? error.message : "Unknown error",
-      });
-    }
+    await snoozeTasksInboxTask({ task: t, queryClient });
   };
 
   const handleUndo = (t: Task) => {
@@ -470,92 +387,33 @@ function TasksInboxPage() {
   };
 
   const handleArchive = async (t: Task) => {
-    try {
-      await updateTask(t.id, { archived: true });
-      await logTaskEvent(t, "Task diarsipkan");
-      await invalidateTasks();
-      toast("Task diarsipkan", {
-        description: t.title,
-        action: {
-          label: "Undo",
-          onClick: () =>
-            void (async () => {
-              try {
-                await updateTask(t.id, { archived: false });
-                await logTaskEvent(t, "Task dikembalikan dari arsip");
-                await invalidateTasks();
-              } catch (error) {
-                toast.error("Gagal mengembalikan task", {
-                  description:
-                    error instanceof Error ? error.message : "Unknown error",
-                });
-              }
-            })(),
-        },
-      });
-    } catch (error) {
-      toast.error("Gagal mengarsipkan task", {
-        description: error instanceof Error ? error.message : "Unknown error",
-      });
-    }
+    await archiveTasksInboxTask({ task: t, queryClient });
   };
 
   const handleUnarchive = async (t: Task) => {
-    try {
-      await updateTask(t.id, { archived: false });
-      await logTaskEvent(t, "Task dikembalikan dari arsip");
-      await invalidateTasks();
-      toast("Task dikembalikan ke inbox", { description: t.title });
-    } catch (error) {
-      toast.error("Gagal mengembalikan task", {
-        description: error instanceof Error ? error.message : "Unknown error",
-      });
-    }
+    await unarchiveTasksInboxTask({ task: t, queryClient });
   };
 
   const handleCreateChildTask = async (
     t: Task,
     kind: "Quotation" | "Prototype",
   ) => {
-    const client = t.clientId ? clientsById[t.clientId] : undefined;
-    const due = new Date(NOW);
-    due.setDate(due.getDate() + (kind === "Quotation" ? 2 : 3));
-    const iso = due.toISOString().slice(0, 10);
-    try {
-      const childTask = await createTask({
-        clientId: t.clientId,
-        commercialDocumentId: t.commercialItemId,
-        ownerId: t.ownerId,
-        title:
-          kind === "Quotation" ? "Siapkan quotation" : "Koordinasi prototype",
-        method: kind === "Quotation" ? "Email" : "Meeting",
-        priority: "Normal",
-        dueDate: iso,
-      });
-      const actorId = await getCurrentActorId();
-      if (actorId) {
-        await logActivity({
-          kind: "task_created",
-          ownerId: t.ownerId,
-          actorId,
-          clientId: t.clientId,
-          taskId: childTask.id,
-          title: `Task ${kind} dibuat`,
-          detail: childTask.title,
-        });
-      }
-      await invalidateTasks();
-      toast.success(`Task ${kind} dibuat`, {
-        description: `${client?.name ?? "Klien"} · due ${formatDateShort(iso)}`,
-      });
-    } catch (error) {
-      toast.error(`Gagal membuat task ${kind}`, {
-        description: error instanceof Error ? error.message : "Unknown error",
-      });
-    }
+    await createTasksInboxChildTask({
+      task: t,
+      kind,
+      queryClient,
+      clientsById,
+    });
   };
 
-  const handleMoveWaitingPO = async (t: Task) => {
+  // "Waiting PO" isn't one of the 7 weighted stages (see
+  // commercial-stages.ts) — it's the old pre-refactor name for what's now
+  // "Commit", same mapping already applied to dashboard/report "waiting PO"
+  // figures elsewhere. Opens the same next-action confirmation dialog
+  // Pipeline's drag-and-drop uses, then moves through transition_commercial_
+  // stage so the structured stage-event gets written (see comment on
+  // waitingPoMove state above).
+  const handleMoveWaitingPO = (t: Task) => {
     if (!t.commercialItemId) {
       toast.error("Task ini belum terhubung ke commercial item");
       return;
@@ -565,40 +423,47 @@ function TasksInboxPage() {
       toast.error("Commercial item tidak ditemukan");
       return;
     }
-    try {
-      // "Waiting PO" isn't one of the 7 weighted stages (see
-      // commercial-stages.ts) — it's the old pre-refactor name for what's
-      // now "Commit", same mapping already applied to dashboard/report
-      // "waiting PO" figures elsewhere. Writing the old name here silently
-      // misrouted the card to the pipeline board's fallback column.
-      await updateCommercialItem(t.commercialItemId, { stage: "Commit" });
-      const changes = [{ field: "stage", from: ci.stage, to: "Commit" }];
-      const actorId = await getCurrentActorId();
-      if (actorId) {
-        await logActivity({
-          kind: "commercial_item_stage_change",
-          ownerId: ci.ownerId,
-          actorId,
-          clientId: ci.clientId,
-          commercialDocumentId: ci.id,
-          title: `${ci.description} diperbarui`,
-          detail: `${describeCommercialItemChanges(changes)} — dipindah dari task: ${t.title}`,
-        });
-      }
-      await queryClient.invalidateQueries({ queryKey: ["commercial-items"] });
-      await queryClient.invalidateQueries({ queryKey: ["activity-log"] });
-      toast.success("Commercial item → Commit", { description: t.title });
-    } catch (error) {
-      toast.error("Gagal memindahkan commercial item", {
-        description: error instanceof Error ? error.message : "Unknown error",
-      });
-    }
+    const client = clientsById[ci.clientId];
+    setWaitingPoNextAction(`Follow-up stage Commit`);
+    setWaitingPoNextDate(toLocalIsoDate(NOW));
+    setWaitingPoTaskMode("existing_task");
+    setWaitingPoTaskId(t.id);
+    setWaitingPoMove({
+      itemId: ci.id,
+      fromStage: ci.stage,
+      toStage: "Commit",
+      clientName: client?.name ?? "-",
+      currentNext: t.dueDate,
+    });
   };
 
+  async function confirmMoveWaitingPO() {
+    if (!waitingPoMove) return;
+    const moved = await confirmTasksInboxWaitingPoMove({
+      waitingPoMove,
+      waitingPoTaskMode,
+      waitingPoTaskId,
+      waitingPoNextAction,
+      waitingPoNextDate,
+      queryClient,
+    });
+    if (moved) {
+      setWaitingPoMove(null);
+    }
+  }
+
   // -------------------------- Bulk actions --------------------------
+  // Looks up across activeTasks + whatever history pages are loaded, not
+  // just scopedTasks, so bulk actions still work on selected rows rendered
+  // from the paginated Completed/Archived views.
   const selectedTasks = useMemo(
-    () => scopedTasks.filter((t) => selected.has(t.id)),
-    [scopedTasks, selected],
+    () =>
+      selectedTasksFromIds(selected, [
+        ...activeTasks,
+        ...completedRows,
+        ...archivedRows,
+      ]),
+    [selected, activeTasks, completedRows, archivedRows],
   );
   const selectedIdList = useMemo(
     () => selectedTasks.map((t) => t.id),
@@ -606,121 +471,33 @@ function TasksInboxPage() {
   );
 
   const bulkDone = async () => {
-    const targets = selectedTasks.filter((t) => bucketFor(t) !== "done");
-    if (targets.length === 0) return;
-    try {
-      await Promise.all(
-        targets.map(async (t) => {
-          await recordTaskProgress({
-            taskId: t.id,
-            nextAction: null,
-            nextActionDate: null,
-            workflowStatusTarget: "Done",
-          });
-        }),
-      );
-      await invalidateTasks();
-      toast.success(`${targets.length} task ditandai Done`);
-    } catch (error) {
-      toast.error("Gagal menandai task selesai", {
-        description: error instanceof Error ? error.message : "Unknown error",
-      });
-    }
-    clearSelection();
+    await bulkMarkTasksInboxDone({
+      tasks: selectedTasks,
+      queryClient,
+      clearSelection,
+    });
   };
 
   const bulkSnooze = async () => {
-    const targets = selectedTasks.filter((t) => bucketFor(t) !== "done");
-    if (targets.length === 0) return;
-    const snapshot = targets.map((t) => ({
-      id: t.id,
-      dueDate: t.dueDate,
-      t,
-    }));
-    try {
-      await Promise.all(
-        targets.map(async (t) => {
-          const next = new Date(t.dueDate);
-          next.setDate(next.getDate() + 1);
-          const iso = next.toISOString().slice(0, 10);
-          await updateTask(t.id, { dueDate: iso });
-          await logTaskEvent(
-            t,
-            `Ditunda +1 hari → ${formatDateShort(iso)} (massal)`,
-          );
-        }),
-      );
-      await invalidateTasks();
-      toast(`${targets.length} task ditunda +1 hari`, {
-        action: {
-          label: "Undo",
-          onClick: () =>
-            void (async () => {
-              await Promise.all(
-                snapshot.map(({ id, dueDate, t }) =>
-                  updateTask(id, { dueDate }).then(() =>
-                    logTaskEvent(t, "Penundaan dibatalkan (massal undo)"),
-                  ),
-                ),
-              );
-              await invalidateTasks();
-            })(),
-        },
-      });
-    } catch (error) {
-      toast.error("Gagal menunda task", {
-        description: error instanceof Error ? error.message : "Unknown error",
-      });
-    }
-    clearSelection();
+    await bulkSnoozeTasksInbox({
+      tasks: selectedTasks,
+      queryClient,
+      clearSelection,
+    });
   };
 
   const bulkChangeOwner = async (newOwnerId: string) => {
-    const target = profilesById[newOwnerId];
-    if (!target) return;
-    const targets = selectedTasks.filter((t) => t.ownerId !== newOwnerId);
-    if (targets.length === 0) return;
-    const snapshot = targets.map((t) => ({ id: t.id, ownerId: t.ownerId, t }));
-    try {
-      await Promise.all(
-        targets.map(async (t) => {
-          const prevOwner = profilesById[t.ownerId];
-          await updateTask(t.id, { ownerId: newOwnerId });
-          await logTaskEvent(
-            t,
-            `Owner: ${prevOwner?.name ?? t.ownerId} → ${target.name}`,
-          );
-        }),
-      );
-      await invalidateTasks();
-      toast(`Owner ${targets.length} task → ${target.name}`, {
-        action: {
-          label: "Undo",
-          onClick: () =>
-            void (async () => {
-              await Promise.all(
-                snapshot.map(({ id, ownerId, t }) =>
-                  updateTask(id, { ownerId }).then(() =>
-                    logTaskEvent(t, "Owner dibatalkan (massal undo)"),
-                  ),
-                ),
-              );
-              await invalidateTasks();
-            })(),
-        },
-      });
-    } catch (error) {
-      toast.error("Gagal mengubah owner", {
-        description: error instanceof Error ? error.message : "Unknown error",
-      });
-    }
-    clearSelection();
+    await bulkChangeTasksInboxOwner({
+      tasks: selectedTasks,
+      newOwnerId,
+      queryClient,
+      profilesById,
+      clearSelection,
+    });
   };
 
   const handleOpen = (t: Task) => setOpenTaskId(t.id);
-  const openTask = openTaskId
-    ? (tasks.find((t) => t.id === openTaskId) ?? null)
-    : null;
+  const openTask = openTaskId ? (knownTasksById.get(openTaskId) ?? null) : null;
   const isManagerTeamExceptions =
     role === "manager" && managerTaskMode === "team-exceptions";
   const pageTitle =
@@ -781,7 +558,10 @@ function TasksInboxPage() {
               >
                 <AlertTriangle className="h-3.5 w-3.5" /> Team Exceptions
                 <span className="num rounded bg-muted px-1 text-[10px]">
-                  {filterManagerTeamExceptions(tasks, profilesById).length}
+                  {
+                    filterManagerTeamExceptions(activeTasks, profilesById)
+                      .length
+                  }
                 </span>
               </ToggleGroupItem>
             </ToggleGroup>
@@ -803,6 +583,12 @@ function TasksInboxPage() {
             <ToggleGroupItem
               value="calendar"
               className="h-8 gap-1.5 px-2.5 text-xs"
+              disabled={isHistoryView}
+              title={
+                isHistoryView
+                  ? "Kalender tidak tersedia untuk Completed/Archived — riwayat dimuat bertahap, bukan sekaligus"
+                  : undefined
+              }
             >
               <CalendarDays className="h-3.5 w-3.5" /> Kalender
             </ToggleGroupItem>
@@ -810,6 +596,8 @@ function TasksInboxPage() {
           {canEdit && <CreateTaskDialog role={role} />}
         </div>
       </header>
+
+      <CalendarIncompleteWarning tasks={activeTasks} />
 
       {/* View segmented control — Today / Upcoming / Overdue / Completed / Archived */}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
@@ -944,85 +732,74 @@ function TasksInboxPage() {
         </CardContent>
       </Card>
 
-      {view === "agenda" ? (
-        <div className="flex flex-col gap-3">
-          {(["overdue", "today", "week", "later", "done"] as Bucket[]).map(
-            (b) => {
-              const rows = grouped[b];
-              if (rows.length === 0) return null;
-              const meta = BUCKET_META[b];
-              const ids = rows.map((r) => r.id);
-              const allSelected =
-                ids.length > 0 && ids.every((id) => selected.has(id));
-              const someSelected =
-                !allSelected && ids.some((id) => selected.has(id));
-              return (
-                <Card key={b} className="border-border shadow-none">
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle
-                      className={`flex items-center gap-2 text-sm font-semibold ${meta.tone}`}
-                    >
-                      <Checkbox
-                        checked={
-                          allSelected
-                            ? true
-                            : someSelected
-                              ? "indeterminate"
-                              : false
-                        }
-                        onCheckedChange={(v) =>
-                          setBucketSelection(ids, v === true)
-                        }
-                        aria-label={`Pilih semua ${meta.title}`}
-                      />
-                      {meta.title}
-                      <span className="ml-1 text-xs font-normal text-muted-foreground">
-                        {rows.length}
-                      </span>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-0">
-                    <ul className="divide-y divide-border">
-                      {rows.map((task) => (
-                        <TaskRow
-                          key={task.id}
-                          task={task}
-                          isArchived={Boolean(task.archived)}
-                          canEdit={canEdit}
-                          onDone={handleDone}
-                          onSnooze={handleSnooze}
-                          onUndo={handleUndo}
-                          onOpen={handleOpen}
-                          onArchive={handleArchive}
-                          onUnarchive={handleUnarchive}
-                          onCreateChildTask={handleCreateChildTask}
-                          onMoveWaitingPO={handleMoveWaitingPO}
-                          onLogFollowUp={handleOpen}
-                          selected={selected.has(task.id)}
-                          onToggleSelect={canEdit ? toggleSelected : undefined}
-                          clientsById={clientsById}
-                          profilesById={profilesById}
-                          commercialItemsById={commercialItemsById}
-                        />
-                      ))}
-                    </ul>
-                  </CardContent>
-                </Card>
-              );
-            },
+      {view === "agenda" && isHistoryView ? (
+        <TaskHistorySection
+          title={activeView === "completed" ? "Selesai" : "Diarsipkan"}
+          tone={
+            activeView === "completed"
+              ? "text-success"
+              : "text-muted-foreground"
+          }
+          totalCount={
+            activeView === "completed" ? completedTotal : archivedTotal
+          }
+          rows={activeView === "completed" ? completedRows : archivedRows}
+          isLoading={
+            (activeView === "completed" ? completedQuery : archivedQuery)
+              .isLoading
+          }
+          isFetchingNextPage={
+            (activeView === "completed" ? completedQuery : archivedQuery)
+              .isFetchingNextPage
+          }
+          hasNextPage={Boolean(
+            (activeView === "completed" ? completedQuery : archivedQuery)
+              .hasNextPage,
           )}
-
-          {filtered.length === 0 && (
-            <EmptyState
-              className="py-12"
-              icon={Inbox}
-              title="Inbox kosong"
-              description="Tidak ada task yang cocok dengan filter saat ini."
-            />
-          )}
-        </div>
+          onLoadMore={() =>
+            void (
+              activeView === "completed" ? completedQuery : archivedQuery
+            ).fetchNextPage()
+          }
+          canEdit={canEdit}
+          onDone={handleDone}
+          onSnooze={handleSnooze}
+          onUndo={handleUndo}
+          onOpen={handleOpen}
+          onArchive={handleArchive}
+          onUnarchive={handleUnarchive}
+          onCreateChildTask={handleCreateChildTask}
+          onMoveWaitingPO={handleMoveWaitingPO}
+          onLogFollowUp={handleOpen}
+          selected={selected}
+          onToggleSelect={toggleSelected}
+          clientsById={clientsById}
+          profilesById={profilesById}
+          commercialItemsById={commercialItemsById}
+        />
+      ) : view === "agenda" ? (
+        <TasksAgendaView
+          grouped={grouped}
+          filteredCount={filtered.length}
+          setBucketSelection={setBucketSelection}
+          canEdit={canEdit}
+          onDone={handleDone}
+          onSnooze={handleSnooze}
+          onUndo={handleUndo}
+          onOpen={handleOpen}
+          onArchive={handleArchive}
+          onUnarchive={handleUnarchive}
+          onCreateChildTask={handleCreateChildTask}
+          onMoveWaitingPO={handleMoveWaitingPO}
+          onLogFollowUp={handleOpen}
+          selected={selected}
+          onToggleSelect={toggleSelected}
+          clientsById={clientsById}
+          profilesById={profilesById}
+          commercialItemsById={commercialItemsById}
+        />
       ) : (
-        <CalendarView
+        <TasksCalendarView
           tasks={filtered}
           month={calendarMonth}
           onPrev={() =>
@@ -1059,6 +836,29 @@ function TasksInboxPage() {
         task={openTask}
         open={openTaskId !== null}
         onOpenChange={(o) => !o && setOpenTaskId(null)}
+      />
+      <PipelineStageMoveDialog
+        pendingMove={waitingPoMove}
+        pendingMoveItem={
+          waitingPoMove ? commercialItemsById[waitingPoMove.itemId] : undefined
+        }
+        onOpenChange={(o) => !o && setWaitingPoMove(null)}
+        tasks={activeTasks}
+        nextActionInput={waitingPoNextAction}
+        onNextActionInputChange={setWaitingPoNextAction}
+        nextDateInput={waitingPoNextDate}
+        onNextDateInputChange={setWaitingPoNextDate}
+        taskMode={waitingPoTaskMode}
+        onTaskModeChange={setWaitingPoTaskMode}
+        taskIdInput={waitingPoTaskId}
+        onTaskIdInputChange={setWaitingPoTaskId}
+        collectsLostReason={false}
+        lostReason=""
+        onLostReasonChange={() => {}}
+        lostReasonDetail=""
+        onLostReasonDetailChange={() => {}}
+        onCancel={() => setWaitingPoMove(null)}
+        onConfirm={() => void confirmMoveWaitingPO()}
       />
 
       {selectedIdList.length > 0 && (
@@ -1129,535 +929,5 @@ function TasksInboxPage() {
         </div>
       )}
     </div>
-  );
-}
-
-function TaskRow({
-  task,
-  isArchived,
-  canEdit,
-  onDone,
-  onSnooze,
-  onUndo,
-  onOpen,
-  onArchive,
-  onUnarchive,
-  onCreateChildTask,
-  onMoveWaitingPO,
-  onLogFollowUp,
-  selected = false,
-  onToggleSelect,
-  clientsById,
-  profilesById,
-  commercialItemsById,
-}: {
-  task: Task;
-  isArchived: boolean;
-  canEdit: boolean;
-  onDone: (t: Task) => void;
-  onSnooze: (t: Task) => void;
-  onUndo: (t: Task) => void;
-  onOpen: (t: Task) => void;
-  onArchive: (t: Task) => void;
-  onUnarchive: (t: Task) => void;
-  onCreateChildTask: (t: Task, kind: "Quotation" | "Prototype") => void;
-  onMoveWaitingPO: (t: Task) => void;
-  onLogFollowUp: (t: Task) => void;
-  selected?: boolean;
-  onToggleSelect?: (id: string) => void;
-  clientsById: ClientLookup;
-  profilesById: ProfileLookup;
-  commercialItemsById: CommercialLookup;
-}) {
-  const client = task.clientId ? clientsById[task.clientId] : undefined;
-  const commercial = task.commercialItemId
-    ? commercialItemsById[task.commercialItemId]
-    : undefined;
-  const owner = profilesById[task.ownerId];
-  const Icon = METHOD_ICON[task.method];
-  const isDone = bucketFor(task) === "done";
-  const isOverdueRow = bucketFor(task) === "overdue";
-  const aging = agingDays(task);
-
-  return (
-    <li
-      className={cn(
-        "flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:gap-4",
-        selected && "bg-primary-soft/40",
-        isOverdueRow && !isDone && "border-l-2 border-destructive",
-      )}
-    >
-      {onToggleSelect && (
-        <Checkbox
-          checked={selected}
-          onCheckedChange={() => onToggleSelect(task.id)}
-          aria-label={`Pilih task ${task.title}`}
-          className="mt-0.5 self-start sm:self-center"
-        />
-      )}
-      <div className="flex min-w-0 flex-1 items-start gap-3">
-        <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary-soft text-primary">
-          <Icon className="h-4 w-4" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            {client ? (
-              <Link
-                to="/clients/$clientId"
-                params={{ clientId: client.id }}
-                className="truncate text-sm font-medium text-foreground hover:text-primary hover:underline"
-              >
-                {client.name}
-              </Link>
-            ) : (
-              <span className="truncate text-sm font-medium text-foreground">
-                Tanpa klien
-              </span>
-            )}
-            {task.priority === "High" && (
-              <Badge
-                variant="outline"
-                className="border-warning/40 bg-warning/10 text-[10px] font-medium text-warning"
-              >
-                High
-              </Badge>
-            )}
-            {isDone && (
-              <Badge
-                variant="outline"
-                className="border-success/40 bg-success/10 text-[10px] font-medium text-success"
-              >
-                Done
-              </Badge>
-            )}
-            {isArchived && (
-              <Badge
-                variant="outline"
-                className="border-border bg-muted text-[10px] font-medium text-muted-foreground"
-              >
-                Archived
-              </Badge>
-            )}
-            {isOverdueRow && !isDone && aging > 0 && (
-              <Badge
-                variant="outline"
-                className={cn(
-                  "text-[10px] font-medium",
-                  aging >= 7
-                    ? "border-destructive/50 bg-destructive/10 text-destructive"
-                    : "border-warning/40 bg-warning/10 text-warning",
-                )}
-                title="Advisory SLA — hari sejak jatuh tempo"
-              >
-                +{aging}d overdue
-              </Badge>
-            )}
-            {!isDone && !isOverdueRow && aging < 0 && (
-              <span className="text-[10px] text-muted-foreground">
-                dalam {Math.abs(aging)} hari
-              </span>
-            )}
-          </div>
-          <div className="mt-0.5 truncate text-xs text-muted-foreground">
-            {task.title}
-            {commercial
-              ? ` · ${commercial.type} · ${commercial.stage}`
-              : " · tanpa commercial item"}
-          </div>
-        </div>
-      </div>
-
-      <div className="flex items-center justify-between gap-3 sm:justify-end">
-        <div className="text-right">
-          {commercial ? (
-            <div className="num text-sm font-medium text-foreground">
-              {formatRupiahShort(commercial.estimatedValue)}
-            </div>
-          ) : (
-            <div className="text-xs text-muted-foreground">—</div>
-          )}
-          <div className="text-[11px] text-muted-foreground">
-            Due {formatDateShort(task.dueDate)}
-            {owner ? ` · ${owner.initials}` : ""}
-          </div>
-        </div>
-
-        <div className="flex items-center gap-1">
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-8 w-8 p-0"
-            title="Buka detail task"
-            onClick={() => onOpen(task)}
-          >
-            <Info className="h-4 w-4" />
-          </Button>
-          {client && (
-            <Button
-              asChild
-              size="sm"
-              variant="ghost"
-              className="h-8 w-8 p-0"
-              title="Buka profil klien"
-            >
-              <Link to="/clients/$clientId" params={{ clientId: client.id }}>
-                <ExternalLink className="h-4 w-4" />
-              </Link>
-            </Button>
-          )}
-          {canEdit &&
-            !isArchived &&
-            (isDone ? (
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-8"
-                onClick={() => onUndo(task)}
-              >
-                <Undo2 className="mr-1 h-4 w-4" /> Undo
-              </Button>
-            ) : (
-              <>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-8"
-                  onClick={() => onLogFollowUp(task)}
-                  title="Log follow-up"
-                >
-                  <PhoneCall className="h-4 w-4" />
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-8"
-                  onClick={() => onSnooze(task)}
-                  title="Tunda +1 hari"
-                >
-                  <Clock className="h-4 w-4" />
-                </Button>
-                <Button
-                  size="sm"
-                  variant={isOverdueRow ? "default" : "secondary"}
-                  className="h-8"
-                  onClick={() => onDone(task)}
-                >
-                  <CheckCircle2 className="mr-1 h-4 w-4" /> Done
-                </Button>
-              </>
-            ))}
-          {canEdit && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-8 w-8 p-0"
-                  title="Aksi cepat"
-                >
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel>Quick actions</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {!isArchived && !isDone && (
-                  <>
-                    <DropdownMenuItem onSelect={() => onLogFollowUp(task)}>
-                      <PhoneCall className="mr-2 h-4 w-4" /> Log follow-up
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onSelect={() => onCreateChildTask(task, "Quotation")}
-                    >
-                      <FileText className="mr-2 h-4 w-4" /> Create Quotation
-                      task
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onSelect={() => onCreateChildTask(task, "Prototype")}
-                    >
-                      <Wrench className="mr-2 h-4 w-4" /> Create Prototype task
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onSelect={() => onMoveWaitingPO(task)}
-                      disabled={!task.commercialItemId}
-                    >
-                      <PackageCheck className="mr-2 h-4 w-4" /> Move to Commit
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                  </>
-                )}
-                {isArchived ? (
-                  <DropdownMenuItem onSelect={() => onUnarchive(task)}>
-                    <ArchiveRestore className="mr-2 h-4 w-4" /> Restore dari
-                    arsip
-                  </DropdownMenuItem>
-                ) : (
-                  <DropdownMenuItem onSelect={() => onArchive(task)}>
-                    <Archive className="mr-2 h-4 w-4" /> Arsipkan
-                  </DropdownMenuItem>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-        </div>
-      </div>
-    </li>
-  );
-}
-
-const MONTH_ID = "id-ID";
-const WEEKDAYS_ID = ["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"];
-
-function isoDay(d: Date) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-function CalendarView({
-  tasks,
-  month,
-  onPrev,
-  onNext,
-  onToday,
-  onDone,
-  onSnooze,
-  onUndo,
-  onOpen,
-  onArchive,
-  onUnarchive,
-  onCreateChildTask,
-  onMoveWaitingPO,
-  onLogFollowUp,
-  canEdit,
-  selected,
-  onToggleSelect,
-  clientsById,
-  profilesById,
-  commercialItemsById,
-}: {
-  tasks: Task[];
-  month: Date;
-  onPrev: () => void;
-  onNext: () => void;
-  onToday: () => void;
-  onDone: (t: Task) => void;
-  onSnooze: (t: Task) => void;
-  onUndo: (t: Task) => void;
-  onOpen: (t: Task) => void;
-  onArchive: (t: Task) => void;
-  onUnarchive: (t: Task) => void;
-  onCreateChildTask: (t: Task, kind: "Quotation" | "Prototype") => void;
-  onMoveWaitingPO: (t: Task) => void;
-  onLogFollowUp: (t: Task) => void;
-  canEdit: boolean;
-  clientsById: ClientLookup;
-  profilesById: ProfileLookup;
-  commercialItemsById: CommercialLookup;
-  selected: Set<string>;
-  onToggleSelect: (id: string) => void;
-}) {
-  const [selectedISO, setSelectedISO] = useState<string | null>(isoDay(NOW));
-
-  // Build 6-week grid starting Monday
-  const cells = useMemo(() => {
-    const first = new Date(month.getFullYear(), month.getMonth(), 1);
-    // Monday = 0
-    const dow = (first.getDay() + 6) % 7;
-    const start = new Date(first);
-    start.setDate(first.getDate() - dow);
-    const arr: Date[] = [];
-    for (let i = 0; i < 42; i++) {
-      const d = new Date(start);
-      d.setDate(start.getDate() + i);
-      arr.push(d);
-    }
-    return arr;
-  }, [month]);
-
-  const tasksByDay = useMemo(() => {
-    const m = new Map<string, Task[]>();
-    for (const t of tasks) {
-      const key = t.dueDate.slice(0, 10);
-      if (!m.has(key)) m.set(key, []);
-      m.get(key)!.push(t);
-    }
-    for (const list of m.values())
-      list.sort((a, b) => a.dueDate.localeCompare(b.dueDate));
-    return m;
-  }, [tasks]);
-
-  const todayISO = isoDay(NOW);
-  const monthLabel = month.toLocaleDateString(MONTH_ID, {
-    month: "long",
-    year: "numeric",
-  });
-
-  const selectedTasks = selectedISO ? (tasksByDay.get(selectedISO) ?? []) : [];
-
-  return (
-    <Card className="border-border shadow-none">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-semibold capitalize text-foreground">
-          {monthLabel}
-        </CardTitle>
-        <div className="flex items-center gap-1">
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-8 px-2"
-            onClick={onPrev}
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-8 text-xs"
-            onClick={onToday}
-          >
-            Hari ini
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-8 px-2"
-            onClick={onNext}
-          >
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3 p-3 pt-0">
-        <div className="grid grid-cols-7 text-center text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-          {WEEKDAYS_ID.map((w) => (
-            <div key={w} className="py-1">
-              {w}
-            </div>
-          ))}
-        </div>
-        <div className="grid grid-cols-7 gap-1">
-          {cells.map((d) => {
-            const iso = isoDay(d);
-            const inMonth = d.getMonth() === month.getMonth();
-            const isToday = iso === todayISO;
-            const isSelected = iso === selectedISO;
-            const dayTasks = tasksByDay.get(iso) ?? [];
-            const overdue = dayTasks.some(
-              (t) =>
-                t.workflowStatus !== "Done" &&
-                t.workflowStatus !== "Cancelled" &&
-                iso < todayISO,
-            );
-            const done =
-              dayTasks.length > 0 &&
-              dayTasks.every(
-                (t) =>
-                  t.workflowStatus === "Done" ||
-                  t.workflowStatus === "Cancelled",
-              );
-            return (
-              <button
-                key={iso}
-                type="button"
-                onClick={() => setSelectedISO(iso)}
-                className={cn(
-                  "group flex min-h-[68px] flex-col rounded-md border p-1 text-left transition-colors",
-                  inMonth ? "bg-card" : "bg-muted/30 text-muted-foreground",
-                  isSelected && "border-primary ring-1 ring-primary",
-                  !isSelected && "hover:border-primary/50",
-                )}
-              >
-                <span
-                  className={cn(
-                    "num flex h-5 w-5 items-center justify-center rounded text-[11px] font-semibold",
-                    isToday && "bg-primary text-primary-foreground",
-                    !isToday && inMonth && "text-foreground",
-                  )}
-                >
-                  {d.getDate()}
-                </span>
-                {dayTasks.length > 0 && (
-                  <div className="mt-1 flex flex-col gap-0.5">
-                    {dayTasks.slice(0, 2).map((t) => (
-                      <span
-                        key={t.id}
-                        className={cn(
-                          "truncate rounded px-1 py-0.5 text-[10px] leading-tight",
-                          t.workflowStatus === "Done" ||
-                            t.workflowStatus === "Cancelled"
-                            ? "bg-success/10 text-success line-through"
-                            : overdue
-                              ? "bg-destructive/10 text-destructive"
-                              : "bg-primary-soft text-primary",
-                        )}
-                      >
-                        {t.title}
-                      </span>
-                    ))}
-                    {dayTasks.length > 2 && (
-                      <span className="text-[10px] text-muted-foreground">
-                        +{dayTasks.length - 2}
-                      </span>
-                    )}
-                  </div>
-                )}
-                {dayTasks.length === 0 && inMonth && (
-                  <span className="mt-auto text-[10px] text-muted-foreground/40">
-                    &nbsp;
-                  </span>
-                )}
-                {done && dayTasks.length > 0 && (
-                  <CheckCircle2 className="mt-auto h-3 w-3 self-end text-success" />
-                )}
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="border-t pt-3">
-          <div className="mb-2 flex items-center justify-between">
-            <p className="text-xs font-semibold text-foreground">
-              {selectedISO
-                ? new Date(selectedISO).toLocaleDateString(MONTH_ID, {
-                    weekday: "long",
-                    day: "numeric",
-                    month: "long",
-                  })
-                : "Pilih tanggal"}
-            </p>
-            <span className="text-[11px] text-muted-foreground">
-              {selectedTasks.length} task
-            </span>
-          </div>
-          {selectedTasks.length === 0 ? (
-            <EmptyState description="Tidak ada task pada tanggal ini." />
-          ) : (
-            <ul className="divide-y divide-border">
-              {selectedTasks.map((t) => (
-                <TaskRow
-                  key={t.id}
-                  task={t}
-                  isArchived={Boolean(t.archived)}
-                  canEdit={canEdit}
-                  onDone={onDone}
-                  onSnooze={onSnooze}
-                  onUndo={onUndo}
-                  onOpen={onOpen}
-                  onArchive={onArchive}
-                  onUnarchive={onUnarchive}
-                  onCreateChildTask={onCreateChildTask}
-                  onMoveWaitingPO={onMoveWaitingPO}
-                  onLogFollowUp={onLogFollowUp}
-                  selected={selected.has(t.id)}
-                  onToggleSelect={canEdit ? onToggleSelect : undefined}
-                  clientsById={clientsById}
-                  profilesById={profilesById}
-                  commercialItemsById={commercialItemsById}
-                />
-              ))}
-            </ul>
-          )}
-        </div>
-      </CardContent>
-    </Card>
   );
 }

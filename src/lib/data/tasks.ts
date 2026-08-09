@@ -5,6 +5,11 @@ import {
   listBusinessCalendarHolidays,
   todayInJakarta,
 } from "@/lib/data/business-calendar";
+import {
+  encodePageCursor,
+  normalizeListPageInput,
+  type ListPageInput,
+} from "@/lib/pagination-contracts";
 
 type TaskRow = {
   id: string;
@@ -91,6 +96,29 @@ function toTask(
 export async function listTasks(): Promise<Task[]> {
   const [{ data, error }, holidays] = await Promise.all([
     supabase.from("tasks").select("*"),
+    listBusinessCalendarHolidays(),
+  ]);
+  if (error) throw error;
+  const asOf = todayInJakarta();
+  return (data ?? []).map((row) => toTask(row, holidays, asOf));
+}
+
+// Same RLS reasoning as listTasks(), scoped to the "still open" working set
+// (not archived, not Done/Cancelled) -- used by the Tasks Inbox page's
+// Today/Upcoming/Overdue views, which never include Done/Cancelled/archived
+// rows by construction (see bucketFor/viewForTask). Completed and Archived
+// history is bounded/paginated separately via listTasksPage() so this fetch
+// doesn't grow with historical task volume. Other callers needing the full
+// history (Dashboard metrics, Pipeline/Client/Commercial follow-up context)
+// keep using listTasks().
+export async function listActiveTasks(): Promise<Task[]> {
+  const [{ data, error }, holidays] = await Promise.all([
+    supabase
+      .from("tasks")
+      .select("*")
+      .eq("archived", false)
+      .neq("workflow_status", "Done")
+      .neq("workflow_status", "Cancelled"),
     listBusinessCalendarHolidays(),
   ]);
   if (error) throw error;
@@ -191,4 +219,116 @@ export async function createTask(input: {
   ]);
   if (error) throw error;
   return toTask(data, holidays, todayInJakarta());
+}
+
+// Backing the Tasks Inbox page's Completed/Archived history views. These two
+// views are the only ones that grow without bound over time (Today/Upcoming/
+// Overdue are self-limiting -- they only ever hold a team's current open
+// follow-ups), so they're the ones that get server-side keyset pagination;
+// see the Stage 3 pagination checklist decision. "completed" means not
+// archived and workflow_status is Done/Cancelled (the same predicate the
+// client-side bucketFor()/viewForTask() use); "archived" means archived =
+// true regardless of status.
+export type TaskHistoryView = "completed" | "archived";
+
+export type TaskListFilters = {
+  ownerId?: string;
+  method?: Task["method"];
+  priority?: Task["priority"];
+  search?: string;
+  // Resolved client-name matches for `search`, computed by the caller from
+  // its already-loaded client list -- this module has no client table
+  // knowledge of its own, same reasoning as other data modules keeping
+  // cross-table joins out of their row shape.
+  clientIds?: string[];
+  // Resolved commercial-item matches for the UI's commercial-type filter;
+  // "none" means "task has no linked commercial item at all".
+  commercialItemIds?: string[] | "none";
+};
+
+export type TaskRowsPage = {
+  rows: Task[];
+  totalCount: number;
+  nextCursor: string | null;
+};
+
+export async function listTasksPage(input: {
+  view: TaskHistoryView;
+  filters?: TaskListFilters;
+  page?: ListPageInput;
+}): Promise<TaskRowsPage> {
+  const filters = input.filters ?? {};
+  const page = normalizeListPageInput(input.page);
+
+  let query = supabase
+    .from("tasks")
+    .select("*", { count: "exact" })
+    .order("due_date", { ascending: true })
+    .order("id", { ascending: true })
+    .limit(page.pageSize + 1);
+
+  query =
+    input.view === "completed"
+      ? query.eq("archived", false).in("workflow_status", ["Done", "Cancelled"])
+      : query.eq("archived", true);
+
+  if (filters.ownerId) {
+    query = query.eq("owner_id", filters.ownerId);
+  }
+  if (filters.method) {
+    query = query.eq("method", filters.method);
+  }
+  if (filters.priority) {
+    query = query.eq("priority", filters.priority);
+  }
+
+  if (filters.commercialItemIds === "none") {
+    query = query
+      .is("commercial_document_id", null)
+      .is("commercial_item_id", null);
+  } else if (
+    filters.commercialItemIds &&
+    filters.commercialItemIds.length > 0
+  ) {
+    const list = filters.commercialItemIds.join(",");
+    query = query.or(
+      `commercial_document_id.in.(${list}),commercial_item_id.in.(${list})`,
+    );
+  }
+
+  const search = filters.search?.trim();
+  if (search) {
+    const escaped = search.replaceAll("%", "\\%").replaceAll(",", "\\,");
+    const clauses = [`title.ilike.%${escaped}%`];
+    if (filters.clientIds && filters.clientIds.length > 0) {
+      clauses.push(`client_id.in.(${filters.clientIds.join(",")})`);
+    }
+    query = query.or(clauses.join(","));
+  }
+
+  if (page.cursor) {
+    query = query.or(
+      `due_date.gt.${page.cursor.sortValue},and(due_date.eq.${page.cursor.sortValue},id.gt.${page.cursor.id})`,
+    );
+  }
+
+  const [{ data, error, count }, holidays] = await Promise.all([
+    query,
+    listBusinessCalendarHolidays(),
+  ]);
+  if (error) throw error;
+
+  const asOf = todayInJakarta();
+  const rawRows = (data ?? []) as TaskRow[];
+  const pageRows = rawRows.slice(0, page.pageSize);
+  const lastRow = pageRows.at(-1);
+
+  return {
+    rows: pageRows.map((row) => toTask(row, holidays, asOf)),
+    totalCount: count ?? pageRows.length,
+    nextCursor:
+      rawRows.length > page.pageSize && lastRow
+        ? encodePageCursor({ sortValue: lastRow.due_date, id: lastRow.id })
+        : null,
+  };
 }

@@ -7,7 +7,11 @@ import {
   type RoleFixtureUsers,
 } from "../../../supabase/tests/helpers";
 import { supabase } from "@/lib/supabase";
-import { listCommercialItems, updateCommercialItem } from "./commercial-items";
+import {
+  listCommercialItems,
+  updateCommercialItem,
+  type CommercialItemPatch,
+} from "./commercial-items";
 
 let fixtures: RoleFixtureUsers;
 let clientId: string;
@@ -104,7 +108,7 @@ describe("commercial-items compatibility facade", () => {
     await supabase.auth.signOut();
   });
 
-  test("updates supported header fields and rejects legacy-only patches", async () => {
+  test("updates supported header fields", async () => {
     const authClient = await signInAs(fixtures.sales);
     const session = (await authClient.auth.getSession()).data.session!;
     await supabase.auth.setSession({
@@ -114,9 +118,28 @@ describe("commercial-items compatibility facade", () => {
     expect(
       (await updateCommercialItem(documentId, { stage: "Negotiation" })).stage,
     ).toBe("Negotiation");
-    await expect(
-      updateCommercialItem(documentId, { customerPoNumber: "MANUAL" }),
-    ).rejects.toThrow("UNSUPPORTED_NORMALIZED_DOCUMENT_PATCH");
     await supabase.auth.signOut();
+  });
+
+  test("public patch input excludes Sales Order and Task owned fields", () => {
+    const supportedPatch: CommercialItemPatch = {
+      stage: "Hot Prospect",
+      quotationNumber: "DSM-26QUO-9999",
+      quotationExpiredDate: "2026-09-09",
+      note: "Header correction",
+    };
+    expect(supportedPatch).toMatchObject({ stage: "Hot Prospect" });
+
+    // @ts-expect-error customerPoNumber is owned by the Sales Order API.
+    const customerPoPatch: CommercialItemPatch = { customerPoNumber: "PO-1" };
+    // @ts-expect-error taxType is owned by the Sales Order API.
+    const taxPatch: CommercialItemPatch = { taxType: "PPN" };
+    const nextActionPatch: CommercialItemPatch = {
+      // @ts-expect-error nextActionDate is owned by Task/follow-up APIs.
+      nextActionDate: "2026-09-09",
+    };
+    void customerPoPatch;
+    void taxPatch;
+    void nextActionPatch;
   });
 });

@@ -16,13 +16,6 @@ DSM Sales Execution & Client Revenue Tracking System — a TanStack Start (React
 Package manager is **bun** (`bun.lock`, `bunfig.toml`).
 
 ```bash
-bun install        # install deps
-bun run dev         # vite dev server
-bun run build        # production build
-bun run build:dev     # dev-mode build
-bun run preview       # preview a build
-bun run lint         # eslint .
-bun run format        # prettier --write .
 bun run test          # bun:test — RLS policy tests + data-layer tests, against the LOCAL Supabase stack only
 
 bunx supabase start    # start local Supabase (Postgres+Auth+Studio, needs Docker Desktop running)
@@ -34,7 +27,7 @@ Note: `bun test` (bare, no `run`) will fail with a missing-env-var error — Bun
 
 The repository uses `bun:test`; `bun run test` loads `.env.local` and includes RLS/data-layer/import tests against local Supabase where applicable.
 
-`vite.config.ts` is intentionally minimal — `@lovable.dev/vite-tanstack-config` already wires TanStack devtools, `tanstackStart`, `viteReact`, `tailwindcss`, `tsConfigPaths`, nitro, `@` path alias, and React/TanStack dedupe. Do not re-add any of those plugins manually or the app breaks with duplicate plugins.
+`vite.config.ts` is the canonical manual Vite/TanStack Start wiring for this repo. It directly configures `tanstackStart`, `nitro`, `@vitejs/plugin-react`, `tailwindcss`, `vite-tsconfig-paths`, the `@` path alias, and React/TanStack dedupe. There is no `@lovable.dev/vite-tanstack-config` dependency in `package.json`; do not assume Lovable owns this config indirectly.
 
 ## Architecture
 
@@ -99,12 +92,12 @@ When extending business data, follow the current core business flows (PRD §6):
 
 ### Component organization
 
-`src/components/` is organized by domain area (`clients/`, `commercial/`, `dashboard/`, `pipeline/`, `reports/`, `shell/`, `tasks/`) plus `ui/` for shadcn/ui primitives (`components.json`: style `new-york`, base color `slate`, icons via `lucide-react`, path aliases `@/components`, `@/lib`, `@/hooks`, `@/components/ui`). Routes/hooks fetch through `src/lib/data/`; presentation components receive real typed data and use pure selectors.
+`src/components/` is organized by domain area (`clients/`, `commercial/`, `dashboard/`, `pipeline/`, `reports/`, `shell/`, `tasks/`) plus `ui/` for shadcn/ui primitives. Routes/hooks fetch through `src/lib/data/`; presentation components receive real typed data and use pure selectors.
 
 ### Export utilities
 
-`src/lib/export-csv.ts`, `export-xlsx.ts`, `export-pdf.ts`, `export-activity.ts` implement client-side data export (PDF via `jspdf`/`jspdf-autotable`, spreadsheets via `xlsx`). Dashboard exports receive the same backend snapshot used by the visible Dashboard; never add hidden seed/mock fallbacks.
+Dashboard exports receive the same backend snapshot used by the visible Dashboard; never add hidden seed/mock fallbacks.
 
 ### Error handling
 
-`src/lib/error-capture.ts` / `error-page.ts` and `src/lib/lovable-error-reporting.ts` wire SSR/client error capture into Lovable's error reporting pipeline — see `src/server.ts` for the SSR entry (referenced from `vite.config.ts`'s `tanstackStart.server.entry`).
+`src/lib/error-capture.ts`, `src/lib/error-page.ts`, `src/lib/server-monitoring.ts`, and `src/lib/browser-monitoring.ts` wire SSR/client error capture. Sentry is env-gated: set `SENTRY_DSN` for server monitoring and `VITE_SENTRY_DSN` for browser monitoring; without those DSNs the app keeps its local error-page fallback only. See `src/server.ts` for the SSR entry (referenced from `vite.config.ts`'s `tanstackStart.server.entry`).

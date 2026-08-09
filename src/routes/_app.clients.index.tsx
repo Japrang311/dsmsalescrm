@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -42,14 +42,19 @@ import { toast } from "sonner";
 
 import { useRole } from "@/context/role-context";
 import { CLIENT_STATUSES } from "@/lib/business-rules";
-import { listClientRows, listSalesTeamProfiles } from "@/lib/data/clients";
+import {
+  listClientRowsPage,
+  listSalesTeamProfiles,
+  type ClientListFilters,
+  type ClientNextFollowUpWindow,
+} from "@/lib/data/clients";
 import { listSalesOrders } from "@/lib/data/sales-orders";
 import { revenueByTax } from "@/lib/data/dashboard-selectors";
 import { ClientsTable } from "@/components/clients/ClientsTable";
 import { AddClientDialog } from "@/components/clients/AddClientDialog";
-import { daysBetween, formatRupiahShort } from "@/lib/format";
-import { NOW } from "@/lib/domain";
+import { formatRupiahShort } from "@/lib/format";
 import type { ClientSource, ClientStatus } from "@/lib/domain";
+import { listQueryKey } from "@/lib/pagination-contracts";
 
 const SOURCES: ClientSource[] = [
   "Referral",
@@ -77,9 +82,64 @@ export const Route = createFileRoute("/_app/clients/")({
 function ClientListPage() {
   const { role, authReady } = useRole();
 
-  const { data: rows = [], isLoading } = useQuery({
-    queryKey: ["clients", "rows"],
-    queryFn: listClientRows,
+  const [search, setSearch] = useState("");
+  const [statuses, setStatuses] = useState<ClientStatus[]>([]);
+  const [sources, setSources] = useState<ClientSource[]>([]);
+  const [ownerId, setOwnerId] = useState<string>("all");
+  const [commercialTypes, setCommercialTypes] = useState<string[]>([]);
+  const [overdueOnly, setOverdueOnly] = useState(false);
+  const [nextFuWindow, setNextFuWindow] = useState<string>("all");
+  const [spendingRange, setSpendingRange] = useState<[number, number]>([
+    0, 3000,
+  ]); // in juta (Rp M)
+  const [density, setDensity] = useState<"compact" | "comfortable">("compact");
+  const [page, setPage] = useState(1);
+  const [pageCursors, setPageCursors] = useState<Record<number, string | null>>(
+    { 1: null },
+  );
+  const [savedView, setSavedView] = useState<SavedView>(SAVED_VIEWS[0]);
+  const pageSize = 10;
+
+  const clientFilters = useMemo<ClientListFilters>(
+    () => ({
+      search,
+      statuses,
+      sources,
+      ownerId: role !== "sales" ? ownerId : "all",
+      overdueOnly,
+      nextFuWindow: nextFuWindow as ClientNextFollowUpWindow,
+    }),
+    [nextFuWindow, overdueOnly, ownerId, role, search, sources, statuses],
+  );
+  const clientFilterKey = useMemo(
+    () =>
+      JSON.stringify({
+        search: search.trim(),
+        statuses: [...statuses].sort(),
+        sources: [...sources].sort(),
+        ownerId: role !== "sales" ? ownerId : "all",
+        overdueOnly,
+        nextFuWindow,
+      }),
+    [nextFuWindow, overdueOnly, ownerId, role, search, sources, statuses],
+  );
+
+  useEffect(() => {
+    setPage(1);
+    setPageCursors({ 1: null });
+  }, [clientFilterKey]);
+
+  const currentCursor = pageCursors[page] ?? null;
+  const clientRowsPage = useQuery({
+    queryKey: listQueryKey("clients", "page", {
+      filters: clientFilters,
+      page: { pageSize, cursor: currentCursor },
+    }),
+    queryFn: () =>
+      listClientRowsPage({
+        filters: clientFilters,
+        page: { pageSize, cursor: currentCursor },
+      }),
     enabled: authReady,
   });
   const { data: salesTeam = [] } = useQuery({
@@ -93,29 +153,23 @@ function ClientListPage() {
     enabled: authReady,
   });
 
-  const [search, setSearch] = useState("");
-  const [statuses, setStatuses] = useState<ClientStatus[]>([]);
-  const [sources, setSources] = useState<ClientSource[]>([]);
-  const [ownerId, setOwnerId] = useState<string>("all");
-  const [commercialTypes, setCommercialTypes] = useState<string[]>([]);
-  const [overdueOnly, setOverdueOnly] = useState(false);
-  const [nextFuWindow, setNextFuWindow] = useState<string>("all");
-  const [spendingRange, setSpendingRange] = useState<[number, number]>([
-    0, 3000,
-  ]); // in juta (Rp M)
-  const [density, setDensity] = useState<"compact" | "comfortable">("compact");
-  const [page, setPage] = useState(1);
-  const [savedView, setSavedView] = useState<SavedView>(SAVED_VIEWS[0]);
-  const pageSize = 10;
-
   // Compute per-client PPN/Non-PPN/Spending YTD from real Sales Orders data
   // (client.spendingYtd is a raw stored column the Sheet import never
-  // populated — it's always 0/stale, so this recomputes it like ppn/nonPpn)
+  // populated — it's always 0/stale, so this recomputes it like ppn/nonPpn).
+  // Scoped to SOs whose owner_id matches the client's current owner, so a
+  // sum across one sales rep's client list matches their Dashboard/Reports
+  // revenue (which is attributed by SO owner, not by current client
+  // ownership) — a client that changed hands mid-year no longer drags a
+  // previous owner's closed deals into the new owner's total here.
   const enrichedRows = useMemo(() => {
+    const rows = clientRowsPage.data?.rows ?? [];
     if (salesOrders.length === 0) return rows;
     return rows.map((row) => {
       const tax = revenueByTax(
-        salesOrders.filter((so) => so.clientId === row.client.id),
+        salesOrders.filter(
+          (so) =>
+            so.clientId === row.client.id && so.ownerId === row.client.ownerId,
+        ),
       );
       return {
         ...row,
@@ -124,56 +178,14 @@ function ClientListPage() {
         spendingYtd: tax.total,
       };
     });
-  }, [rows, salesOrders]);
-
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return enrichedRows.filter((r) => {
-      if (q && !r.client.name.toLowerCase().includes(q)) return false;
-      if (statuses.length && !statuses.includes(r.client.status)) return false;
-      if (sources.length && !sources.includes(r.client.source)) return false;
-      if (ownerId !== "all" && r.client.ownerId !== ownerId) return false;
-      if (
-        commercialTypes.length &&
-        !commercialTypes.some((t) => r.activeCommercialTypes.includes(t))
-      )
-        return false;
-      const spendJuta = r.spendingYtd / 1_000_000;
-      if (spendJuta < spendingRange[0]) return false;
-      if (spendingRange[1] < 3000 && spendJuta > spendingRange[1]) return false;
-      if (overdueOnly) {
-        if (!r.nextFu) return false;
-        if (daysBetween(NOW, r.nextFu) >= 0) return false;
-      }
-      if (nextFuWindow !== "all") {
-        if (!r.nextFu) return false;
-        const diff = daysBetween(NOW, r.nextFu);
-        if (nextFuWindow === "today" && diff !== 0) return false;
-        if (nextFuWindow === "7d" && (diff < 0 || diff > 7)) return false;
-        if (nextFuWindow === "30d" && (diff < 0 || diff > 30)) return false;
-      }
-      return true;
-    });
-  }, [
-    enrichedRows,
-    search,
-    statuses,
-    sources,
-    ownerId,
-    commercialTypes,
-    overdueOnly,
-    nextFuWindow,
-    spendingRange,
-  ]);
+  }, [clientRowsPage.data?.rows, salesOrders]);
 
   const activeFilterCount =
     statuses.length +
     sources.length +
     (ownerId !== "all" ? 1 : 0) +
-    commercialTypes.length +
     (overdueOnly ? 1 : 0) +
-    (nextFuWindow !== "all" ? 1 : 0) +
-    (spendingRange[0] > 0 || spendingRange[1] < 3000 ? 1 : 0);
+    (nextFuWindow !== "all" ? 1 : 0);
 
   const resetFilters = () => {
     setStatuses([]);
@@ -185,6 +197,16 @@ function ClientListPage() {
     setSpendingRange([0, 3000]);
     setSearch("");
     setPage(1);
+    setPageCursors({ 1: null });
+  };
+
+  const changePage = (nextPage: number) => {
+    if (nextPage > page) {
+      const nextCursor = clientRowsPage.data?.nextCursor;
+      if (!nextCursor) return;
+      setPageCursors((current) => ({ ...current, [nextPage]: nextCursor }));
+    }
+    setPage(nextPage);
   };
 
   return (
@@ -383,17 +405,28 @@ function ClientListPage() {
       </div>
 
       {/* Table */}
-      {!authReady || isLoading ? (
+      {spendingRange[0] > 0 || spendingRange[1] < 3000 ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          Filter Spending YTD belum diterapkan ke server pagination karena angka
+          spending dihitung dari Sales Orders. Nilai spending tetap tampil,
+          tetapi daftar klien tidak difilter oleh slider ini.
+        </div>
+      ) : null}
+
+      {!authReady || clientRowsPage.isLoading ? (
         <div className="flex items-center justify-center rounded-lg border border-dashed py-16 text-sm text-muted-foreground">
           Loading clients…
         </div>
       ) : (
         <ClientsTable
-          rows={filtered}
+          rows={enrichedRows}
           density={density}
           page={page}
           pageSize={pageSize}
-          onPageChange={setPage}
+          onPageChange={changePage}
+          totalRows={clientRowsPage.data?.totalCount ?? 0}
+          hasNextPage={Boolean(clientRowsPage.data?.nextCursor)}
+          serverPaginated
         />
       )}
     </div>

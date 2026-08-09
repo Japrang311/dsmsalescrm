@@ -1,12 +1,18 @@
 import { supabase } from "@/lib/supabase";
-import type {
-  PrototypeStatus,
-  RevenueSource,
-  SoType,
-  TaxType,
+import {
+  toLocalIsoDate,
+  type PrototypeStatus,
+  type RevenueSource,
+  type SoType,
+  type TaxType,
 } from "@/lib/domain";
 import type { LineItemInput } from "./commercial-documents";
 import type { Uom } from "./document-numbering";
+import {
+  encodePageCursor,
+  normalizeListPageInput,
+  type ListPageInput,
+} from "@/lib/pagination-contracts";
 
 export type SalesOrderLineItem = {
   id: string;
@@ -24,6 +30,7 @@ export type SalesOrderDocument = {
   id: string;
   soNumber: string;
   customerPoNumber: string | null;
+  customerPoDate: string | null;
   date: string;
   clientId: string;
   ownerId: string;
@@ -37,6 +44,7 @@ export type SalesOrderDocument = {
   value: number | null;
   qty?: number;
   unitPrice?: number;
+  sourceCommercialDocumentId: string | null;
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
@@ -60,6 +68,7 @@ type SalesOrderRow = {
   id: string;
   so_number: string;
   customer_po_number: string | null;
+  customer_po_date: string | null;
   date: string;
   client_id: string;
   owner_id: string;
@@ -70,6 +79,7 @@ type SalesOrderRow = {
   number_mode: SalesOrderDocument["numberMode"];
   backdate_reason: string | null;
   total_value: number | null;
+  source_commercial_document_id: string | null;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
@@ -118,6 +128,7 @@ function toSalesOrder(row: SalesOrderRow): SalesOrderDocument {
     id: row.id,
     soNumber: row.so_number,
     customerPoNumber: row.customer_po_number,
+    customerPoDate: row.customer_po_date,
     date: row.date,
     clientId: row.client_id,
     ownerId: row.owner_id,
@@ -134,6 +145,7 @@ function toSalesOrder(row: SalesOrderRow): SalesOrderDocument {
     qty: items.length === 1 ? (items[0].qty ?? undefined) : undefined,
     unitPrice:
       items.length === 1 ? (items[0].unitPrice ?? undefined) : undefined,
+    sourceCommercialDocumentId: row.source_commercial_document_id,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     deletedAt: row.deleted_at,
@@ -165,6 +177,91 @@ export async function listSalesOrders(
   return ((data ?? []) as SalesOrderRow[])
     .map(toSalesOrder)
     .sort(compareSalesOrdersByNewestNumber);
+}
+
+export type SalesOrderListFilters = {
+  from?: Date;
+  to?: Date;
+  ownerId?: string;
+  clientId?: string;
+  taxType?: string; // "all" | "PPN" | "Non-PPN"
+  source?: string; // "all" | RevenueSource | "Prototype FOC"
+  soType?: string; // "all" | SoType
+  deleted?: boolean;
+};
+
+export type SalesOrdersPage = {
+  rows: SalesOrderDocument[];
+  totalCount: number;
+  nextCursor: string | null;
+};
+
+// Bounded per-page keyset load, same shape as listClientRowsPage /
+// listCommercialDocumentsPage. Ordered by so_number descending: every series
+// zero-pads its sequence to three digits (DSM-26SO001 … DSM-26SO160), so a
+// plain text sort matches compareSalesOrdersByNewestNumber's natural-number
+// order within a series and year. created_at is not usable here — imported
+// rows share a handful of bulk-insert timestamps.
+export async function listSalesOrdersPage(input: {
+  filters?: SalesOrderListFilters;
+  page?: ListPageInput;
+}): Promise<SalesOrdersPage> {
+  const filters = input.filters ?? {};
+  const page = normalizeListPageInput(input.page);
+  let query = supabase
+    .from("sales_orders")
+    .select("*, sales_order_items(*)", { count: "exact" })
+    .order("so_number", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(page.pageSize + 1);
+
+  query = filters.deleted
+    ? query.not("deleted_at", "is", null)
+    : query.is("deleted_at", null);
+
+  if (filters.from) query = query.gte("date", isoDate(filters.from));
+  if (filters.to) query = query.lte("date", isoDate(filters.to));
+  if (filters.ownerId && filters.ownerId !== "all")
+    query = query.eq("owner_id", filters.ownerId);
+  if (filters.clientId && filters.clientId !== "all")
+    query = query.eq("client_id", filters.clientId);
+  if (filters.taxType && filters.taxType !== "all")
+    query = query.eq("tax_type", filters.taxType);
+  if (filters.soType && filters.soType !== "all")
+    query = query.eq("type", filters.soType);
+  if (filters.source && filters.source !== "all") {
+    query = query.eq(
+      "source",
+      filters.source === "New Product" ? "RFQ / New Product" : filters.source,
+    );
+  }
+
+  if (page.cursor) {
+    const sortValue = JSON.stringify(page.cursor.sortValue);
+    query = query.or(
+      `so_number.lt.${sortValue},and(so_number.eq.${sortValue},id.lt.${page.cursor.id})`,
+    );
+  }
+
+  const { data, error, count } = await query;
+  if (error) throw error;
+
+  const rawRows = (data ?? []) as SalesOrderRow[];
+  const pageRows = rawRows.slice(0, page.pageSize);
+  const lastRow = pageRows.at(-1);
+
+  return {
+    rows: pageRows.map(toSalesOrder),
+    totalCount: count ?? pageRows.length,
+    nextCursor:
+      rawRows.length > page.pageSize && lastRow
+        ? encodePageCursor({ sortValue: lastRow.so_number, id: lastRow.id })
+        : null,
+  };
+}
+
+function isoDate(date: Date): string {
+  return toLocalIsoDate(date);
 }
 
 export async function getSalesOrder(
@@ -203,6 +300,7 @@ export type CreateSalesOrderInput = {
   clientId: string;
   date: string;
   customerPoNumber: string;
+  customerPoDate?: string;
   type: SoType;
   taxType?: TaxType;
   prototypeStatus?: PrototypeStatus;
@@ -211,6 +309,7 @@ export type CreateSalesOrderInput = {
   manualSoNumber: string;
   backdateReason?: string;
   items: LineItemInput[];
+  sourceCommercialDocumentId?: string;
 };
 
 export async function createSalesOrder(
@@ -231,6 +330,8 @@ export async function createSalesOrder(
     p_manual_so_number: manualSoNumber || null,
     p_backdate_reason: backdateReason || null,
     p_items: input.items,
+    p_source_commercial_document_id: input.sourceCommercialDocumentId ?? null,
+    p_customer_po_date: input.customerPoDate ?? null,
   });
   if (error) throw error;
   return toSalesOrder(data as SalesOrderRow);
@@ -255,6 +356,7 @@ export type UpdateSalesOrderHeaderInput = Partial<{
   clientId: string;
   ownerId: string;
   customerPoNumber: string;
+  customerPoDate: string | null;
   date: string;
 }>;
 
@@ -267,12 +369,14 @@ export async function updateSalesOrderHeader(
   id: string,
   patch: UpdateSalesOrderHeaderInput,
 ): Promise<SalesOrderDocument> {
-  const row: Record<string, string> = {};
+  const row: Record<string, string | null> = {};
   if (patch.soNumber !== undefined) row.so_number = patch.soNumber.trim();
   if (patch.clientId !== undefined) row.client_id = patch.clientId;
   if (patch.ownerId !== undefined) row.owner_id = patch.ownerId;
   if (patch.customerPoNumber !== undefined)
     row.customer_po_number = patch.customerPoNumber;
+  if (patch.customerPoDate !== undefined)
+    row.customer_po_date = patch.customerPoDate;
   if (patch.date !== undefined) row.date = patch.date;
 
   const { data, error } = await supabase

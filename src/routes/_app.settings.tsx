@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { getErrorMessage } from "@/lib/utils";
 import {
   Pencil,
   Plus,
@@ -14,6 +15,7 @@ import {
   User2,
   Target as TargetIcon,
   Database,
+  CalendarDays,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -80,6 +82,12 @@ import {
   type OrgSettings,
 } from "@/lib/data/org-settings";
 import {
+  deleteBusinessCalendarHoliday,
+  importBusinessCalendarHolidays,
+  listBusinessCalendarHolidayRows,
+  previewBusinessCalendarCsv,
+} from "@/lib/data/business-calendar";
+import {
   listTeamMembers,
   createTeamMember,
   updateTeamMemberProfile,
@@ -88,7 +96,10 @@ import {
   reactivateTeamMember,
   transferTeamOwnership,
   deleteEligibleTeamMember,
+  getTeamMemberReferenceCounts,
   getCurrentProfileId,
+  formatBlockingReferenceCounts,
+  formatOwnedActiveCounts,
   TeamAdminError,
   type AppRole,
   type TeamMember,
@@ -141,7 +152,10 @@ function SettingsPage() {
   });
   const currentProfileId = useQuery({
     queryKey: ["current-profile-id"],
-    queryFn: getCurrentProfileId,
+    // Not `queryFn: getCurrentProfileId` directly — see the listTeamMembers
+    // comment below for why a bare function reference with an optional
+    // client-parameter default breaks under React Query.
+    queryFn: () => getCurrentProfileId(),
     enabled: authReady,
   });
 
@@ -405,11 +419,7 @@ const TEAM_ROLE_LABELS: Record<AppRole, string> = {
 };
 
 type TeamAction =
-  | "change_role"
-  | "deactivate"
-  | "reactivate"
-  | "transfer"
-  | "delete";
+  "change_role" | "deactivate" | "reactivate" | "transfer" | "delete";
 
 function TeamTab({
   canManage,
@@ -428,7 +438,11 @@ function TeamTab({
     isFetching,
   } = useQuery({
     queryKey: ["team-members"],
-    queryFn: listTeamMembers,
+    // Not `queryFn: listTeamMembers` directly: React Query always calls
+    // queryFn with a QueryFunctionContext argument, which would override
+    // listTeamMembers' optional `client` parameter default and break its
+    // internal client.rpc(...) call ("e.rpc is not a function").
+    queryFn: () => listTeamMembers(),
   });
   const [addOpen, setAddOpen] = useState(false);
   const [editing, setEditing] = useState<TeamMember | null>(null);
@@ -609,9 +623,9 @@ function TeamTab({
                         <span className="font-medium text-foreground">
                           {m.ownedActiveCounts.total}
                         </span>{" "}
-                        total · {m.ownedActiveCounts.clients} client ·{" "}
-                        {m.ownedActiveCounts.tasks} task ·{" "}
-                        {m.ownedActiveCounts.commercialItems} commercial
+                        ownership aktif · {m.ownedActiveCounts.clients} client
+                        aktif · {m.ownedActiveCounts.tasks} task aktif ·{" "}
+                        {m.ownedActiveCounts.commercialItems} commercial aktif
                       </TableCell>
                       <TableCell className="max-w-[210px] text-xs text-muted-foreground">
                         {m.lastAdministrativeChange ? (
@@ -887,8 +901,7 @@ function MemberDialog({
                     ? "Gagal memperbarui anggota"
                     : "Gagal menambahkan anggota",
                   {
-                    description:
-                      error instanceof Error ? error.message : "Unknown error",
+                    description: getErrorMessage(error),
                   },
                 );
               } finally {
@@ -905,15 +918,13 @@ function MemberDialog({
 }
 
 function referenceGuidance(error: TeamAdminError): string {
-  const counts = Object.entries(error.details ?? {})
-    .filter(([key, value]) => key !== "total_all" && value > 0)
-    .map(([key, value]) => `${key.replaceAll("_", " ")}: ${value}`)
-    .join(" · ");
   if (error.status === 409 && error.code === "ACCOUNT_HAS_REFERENCES") {
-    return `${error.message}${counts ? ` ${counts}.` : ""} Gunakan Nonaktifkan Akun apabila riwayat harus tetap dipertahankan.`;
+    const counts = formatBlockingReferenceCounts(error.details);
+    return `${error.message} ${counts}. Gunakan Nonaktifkan Akun apabila riwayat harus tetap dipertahankan.`;
   }
   if (error.status === 409 && error.code === "ACCOUNT_HAS_OWNERSHIP") {
-    return `${error.message}${counts ? ` ${counts}.` : ""} Alihkan ownership aktif ke Sales atau Manager aktif terlebih dahulu.`;
+    const counts = formatBlockingReferenceCounts(error.details);
+    return `${error.message} ${counts}. Alihkan ownership aktif ke Sales atau Manager aktif terlebih dahulu.`;
   }
   return error.message;
 }
@@ -943,6 +954,13 @@ function TeamActionDialog({
       candidate.accountStatus === "active" &&
       (candidate.role === "sales" || candidate.role === "manager"),
   );
+  const referenceCountsQuery = useQuery({
+    queryKey: ["team-member-reference-counts", member.id],
+    queryFn: () => getTeamMemberReferenceCounts(member.id),
+    enabled: action === "delete",
+  });
+  const blockingReferences =
+    referenceCountsQuery.data?.total_blocking ?? undefined;
 
   const title: Record<TeamAction, string> = {
     change_role: `Ubah role ${member.name}`,
@@ -954,7 +972,11 @@ function TeamActionDialog({
   const valid =
     reason.trim().length > 0 &&
     (action !== "change_role" || nextRole !== member.role) &&
-    (action !== "transfer" || destinationId.length > 0);
+    (action !== "transfer" || destinationId.length > 0) &&
+    (action !== "delete" ||
+      (!referenceCountsQuery.isLoading &&
+        !referenceCountsQuery.isError &&
+        blockingReferences === 0));
 
   async function submit() {
     setSubmitting(true);
@@ -1000,13 +1022,50 @@ function TeamActionDialog({
         <DialogTitle>{title[action]}</DialogTitle>
         <DialogDescription>
           {action === "delete"
-            ? "Penghapusan hanya dapat dilakukan jika akun tidak memiliki referensi yang memblokir. Nonaktifkan Akun adalah pilihan default untuk mempertahankan riwayat."
+            ? "Penghapusan memakai gate referensi historis dari database, bukan angka ownership aktif di tabel. Nonaktifkan Akun adalah pilihan default untuk mempertahankan riwayat."
             : action === "transfer"
-              ? "Hanya client non-Lost, task terbuka yang belum diarsipkan, dan commercial non-terminal yang dialihkan. Riwayat tetap pada owner asal."
+              ? "Transfer memakai angka ownership aktif di tabel: client non-Lost, task workflow-active yang belum diarsipkan, dan commercial active/current/open. Referensi historis tetap pada owner asal."
               : "Perubahan ini dicatat pada Activity Log dan alasan administratif wajib diisi."}
         </DialogDescription>
       </DialogHeader>
       <div className="space-y-4">
+        {action === "transfer" && (
+          <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+            <p className="font-medium text-foreground">Gate transfer aktif</p>
+            <p>{formatOwnedActiveCounts(member.ownedActiveCounts)}</p>
+            <p className="mt-1">
+              Angka ini bukan delete eligibility; referensi historis tetap
+              dipertahankan untuk audit.
+            </p>
+          </div>
+        )}
+        {action === "delete" && (
+          <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+            <p className="font-medium text-foreground">
+              Gate hapus permanen: referensi historis
+            </p>
+            {referenceCountsQuery.isLoading ? (
+              <p>Memuat angka blocking reference…</p>
+            ) : referenceCountsQuery.isError ? (
+              <p>
+                Angka blocking reference gagal dimuat. Tutup dialog lalu coba
+                lagi sebelum menghapus permanen.
+              </p>
+            ) : (
+              <>
+                <p>
+                  {formatBlockingReferenceCounts(referenceCountsQuery.data)}
+                </p>
+                {(referenceCountsQuery.data?.total_blocking ?? 0) > 0 && (
+                  <p className="mt-1">
+                    Akun ini belum eligible untuk hapus permanen. Nonaktifkan
+                    akun atau pindahkan ownership/referensi yang masih blocking.
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+        )}
         {action === "change_role" && (
           <Field label="Role baru">
             <Select
@@ -1304,8 +1363,24 @@ function OrgTab({ canEdit }: { canEdit: boolean }) {
     queryKey: ["org-settings"],
     queryFn: getOrgSettings,
   });
+  const {
+    data: holidays = [],
+    isLoading: holidaysLoading,
+    isError: holidaysIsError,
+    error: holidaysError,
+  } = useQuery({
+    queryKey: ["business-calendar-holidays"],
+    queryFn: listBusinessCalendarHolidayRows,
+  });
   const [form, setForm] = useState<OrgSettings | null>(null);
   const [saving, setSaving] = useState(false);
+  const [holidayCsv, setHolidayCsv] = useState(
+    "holiday_date,label,source\n2026-01-01,Tahun Baru,manual-import",
+  );
+  const [importingHolidays, setImportingHolidays] = useState(false);
+  const [deletingHolidayId, setDeletingHolidayId] = useState<string | null>(
+    null,
+  );
 
   useEffect(() => {
     if (org) setForm(org);
@@ -1320,6 +1395,10 @@ function OrgTab({ canEdit }: { canEdit: boolean }) {
   }
 
   const dirty = JSON.stringify(form) !== JSON.stringify(org);
+  const holidayPreview = previewBusinessCalendarCsv(holidayCsv);
+  const holidayYears = [
+    ...new Set(holidays.map((holiday) => holiday.holidayDate.slice(0, 4))),
+  ].sort();
 
   return (
     <div className="space-y-4">
@@ -1433,6 +1512,217 @@ function OrgTab({ canEdit }: { canEdit: boolean }) {
                 <Save className="mr-1.5 h-4 w-4" />{" "}
                 {saving ? "Menyimpan…" : "Simpan"}
               </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CalendarDays className="h-5 w-5 text-primary" />
+            Kalender Hari Libur
+          </CardTitle>
+          <CardDescription>
+            Kalender bisnis Asia/Jakarta dipakai untuk menghitung due state
+            Task. Import CSV divalidasi dulu di browser lalu disimpan lewat satu
+            RPC atomik.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {!canEdit && (
+            <div className="rounded-md border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+              Hanya Manager atau Super Admin yang dapat mengubah kalender.
+            </div>
+          )}
+
+          <div className="grid gap-3 sm:grid-cols-3">
+            <SummaryCard
+              label="Total tanggal"
+              value={String(holidays.length)}
+              hint="Row aktif di kalender"
+            />
+            <SummaryCard
+              label="Tahun tercakup"
+              value={holidayYears.length ? holidayYears.join(", ") : "—"}
+              hint="Tahun tanpa row akan memicu warning"
+            />
+            <SummaryCard
+              label="Preview valid"
+              value={`${holidayPreview.validRows.length} row`}
+              hint={
+                holidayPreview.errors.length
+                  ? `${holidayPreview.errors.length} error`
+                  : "Siap import"
+              }
+            />
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
+            <Field label="CSV holiday_date,label,source">
+              <Textarea
+                value={holidayCsv}
+                disabled={!canEdit || importingHolidays}
+                onChange={(e) => setHolidayCsv(e.target.value)}
+                className="min-h-36 font-mono text-xs"
+              />
+            </Field>
+            <div className="space-y-3 rounded-md border bg-muted/20 p-3">
+              <div>
+                <p className="text-sm font-medium">Preview import</p>
+                <p className="text-xs text-muted-foreground">
+                  Tahun:{" "}
+                  {holidayPreview.affectedYears.length
+                    ? holidayPreview.affectedYears.join(", ")
+                    : "—"}
+                </p>
+              </div>
+              {holidayPreview.errors.length > 0 ? (
+                <ul className="space-y-1 text-xs text-destructive">
+                  {holidayPreview.errors.slice(0, 5).map((error) => (
+                    <li key={error}>• {error}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  {holidayPreview.validRows.length} row valid. Import akan
+                  mengganti tanggal yang sama dan menambah tanggal baru.
+                </p>
+              )}
+              <Button
+                disabled={
+                  !canEdit ||
+                  importingHolidays ||
+                  holidayPreview.validRows.length === 0 ||
+                  holidayPreview.errors.length > 0
+                }
+                onClick={() => {
+                  void (async () => {
+                    setImportingHolidays(true);
+                    try {
+                      const result = await importBusinessCalendarHolidays(
+                        holidayPreview.validRows,
+                      );
+                      await queryClient.invalidateQueries({
+                        queryKey: ["business-calendar-holidays"],
+                      });
+                      await queryClient.invalidateQueries({
+                        queryKey: ["tasks"],
+                      });
+                      toast.success("Kalender hari libur diimport", {
+                        description: `${result.importedCount} row · ${result.affectedYears.join(", ")}`,
+                      });
+                    } catch (error) {
+                      toast.error("Import kalender gagal", {
+                        description:
+                          error instanceof Error
+                            ? error.message
+                            : "Unknown error",
+                      });
+                    } finally {
+                      setImportingHolidays(false);
+                    }
+                  })();
+                }}
+              >
+                {importingHolidays ? "Mengimport…" : "Import kalender"}
+              </Button>
+            </div>
+          </div>
+
+          {holidaysLoading ? (
+            <div className="rounded-md border border-dashed py-8 text-center text-sm text-muted-foreground">
+              Memuat kalender…
+            </div>
+          ) : holidaysIsError ? (
+            <div className="rounded-md border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+              {holidaysError instanceof Error
+                ? holidaysError.message
+                : "Kalender gagal dimuat."}
+            </div>
+          ) : (
+            <div className="rounded-md border border-border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Tanggal</TableHead>
+                    <TableHead>Label</TableHead>
+                    <TableHead>Source</TableHead>
+                    <TableHead>Synced</TableHead>
+                    {canEdit && (
+                      <TableHead className="w-[90px] text-right">
+                        Aksi
+                      </TableHead>
+                    )}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {holidays.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={canEdit ? 5 : 4}
+                        className="h-20 text-center text-sm text-muted-foreground"
+                      >
+                        Belum ada hari libur. Due-state akan menampilkan
+                        calendar incomplete untuk tahun tanpa data.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    holidays.map((holiday) => (
+                      <TableRow key={holiday.id}>
+                        <TableCell className="font-medium tabular-nums">
+                          {holiday.holidayDate}
+                        </TableCell>
+                        <TableCell>{holiday.label}</TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {holiday.source}
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground">
+                          {holiday.syncedAt.slice(0, 10)}
+                        </TableCell>
+                        {canEdit && (
+                          <TableCell className="text-right">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              disabled={deletingHolidayId === holiday.id}
+                              aria-label={`Hapus libur ${holiday.holidayDate}`}
+                              onClick={() => {
+                                void (async () => {
+                                  setDeletingHolidayId(holiday.id);
+                                  try {
+                                    await deleteBusinessCalendarHoliday(
+                                      holiday.id,
+                                    );
+                                    await queryClient.invalidateQueries({
+                                      queryKey: ["business-calendar-holidays"],
+                                    });
+                                    await queryClient.invalidateQueries({
+                                      queryKey: ["tasks"],
+                                    });
+                                    toast.success("Hari libur dihapus");
+                                  } catch (error) {
+                                    toast.error("Gagal menghapus hari libur", {
+                                      description:
+                                        error instanceof Error
+                                          ? error.message
+                                          : "Unknown error",
+                                    });
+                                  } finally {
+                                    setDeletingHolidayId(null);
+                                  }
+                                })();
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
             </div>
           )}
         </CardContent>

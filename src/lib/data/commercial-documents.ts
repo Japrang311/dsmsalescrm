@@ -3,8 +3,16 @@ import type {
   CommercialType,
   QuotationLostReason,
   SourceFlow,
+  TaskDueState,
+  TaskWorkflowStatus,
 } from "@/lib/domain";
+import type { FollowUpResult } from "@/lib/data/follow-ups";
 import type { Uom } from "./document-numbering";
+import {
+  encodePageCursor,
+  normalizeListPageInput,
+  type ListPageInput,
+} from "@/lib/pagination-contracts";
 
 export type LineItemInput = {
   productName: string;
@@ -161,6 +169,89 @@ export async function listCommercialDocuments(
   return ((data ?? []) as CommercialDocumentRow[]).map(toDocument);
 }
 
+// ---------------------------------------------------------------------------
+// Stage 3 pagination: bounded per-stage keyset query + aggregate RPC wrapper
+// ---------------------------------------------------------------------------
+
+export type CommercialDocumentPageFilters = {
+  stage?: string;
+  ownerId?: string;
+  clientStatus?: string;
+};
+
+export type CommercialDocumentPage = {
+  rows: CommercialDocumentWithItems[];
+  totalCount: number;
+  nextCursor: string | null;
+};
+
+/**
+ * Bounded keyset-paginated query for Pipeline kanban columns.
+ * Only returns current Quotation revisions (is_current_revision = true) —
+ * the Pipeline bug fix for superseded revisions appearing as duplicate cards.
+ */
+export async function listCommercialDocumentsPage(input: {
+  filters?: CommercialDocumentPageFilters;
+  page?: ListPageInput;
+}): Promise<CommercialDocumentPage> {
+  const filters = input.filters ?? {};
+  const page = normalizeListPageInput(input.page);
+
+  let query = supabase
+    .from("commercial_documents")
+    // clients!inner(status) is required for the .eq("clients.status", ...)
+    // filter below to work at all -- PostgREST 400s on a filter referencing
+    // an embedded resource that wasn't actually selected/joined. client_id
+    // is NOT NULL with an FK to clients, so the inner join never excludes a
+    // row that a plain select wouldn't have already included.
+    .select("*, commercial_document_items(*), clients!inner(status)", {
+      count: "exact",
+    })
+    .neq("type", "RFQ")
+    .is("deleted_at", null)
+    // Bug fix: only current Quotation revisions on the Pipeline board
+    .or("type.neq.Quotation,is_current_revision.eq.true")
+    .order("updated_at", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(page.pageSize + 1);
+
+  if (filters.stage) {
+    query = query.eq("stage", filters.stage);
+  }
+  if (filters.ownerId && filters.ownerId !== "all") {
+    query = query.eq("owner_id", filters.ownerId);
+  }
+  if (filters.clientStatus && filters.clientStatus !== "all") {
+    // Filter by client status via embedded resource join
+    query = query.eq("clients.status", filters.clientStatus);
+  }
+
+  if (page.cursor) {
+    query = query.or(
+      `updated_at.lt.${page.cursor.sortValue},and(updated_at.eq.${page.cursor.sortValue},id.lt.${page.cursor.id})`,
+    );
+  }
+
+  const { data, error, count } = await query;
+  if (error) throw error;
+
+  const rawRows = (data ?? []) as CommercialDocumentRow[];
+  const pageRows = rawRows.slice(0, page.pageSize);
+  const lastRow = pageRows.at(-1);
+
+  return {
+    rows: pageRows.map(toDocument),
+    totalCount: count ?? pageRows.length,
+    nextCursor:
+      rawRows.length > page.pageSize && lastRow
+        ? encodePageCursor({
+            sortValue: lastRow.updated_at,
+            id: lastRow.id,
+          })
+        : null,
+  };
+}
+
 export async function getCommercialDocument(
   id: string,
   options: CommercialDocumentQuery = {},
@@ -216,6 +307,8 @@ export type CreateQuotationInput = {
   soNumber?: string;
   note?: string;
   items: LineItemInput[];
+  nextAction: string;
+  nextActionDate: string;
 };
 
 export async function createQuotation(
@@ -229,6 +322,8 @@ export async function createQuotation(
     p_so_number: input.soNumber ?? null,
     p_note: input.note ?? null,
     p_items: input.items,
+    p_next_action: input.nextAction,
+    p_next_action_date: input.nextActionDate,
   });
   if (error) throw error;
   return toDocument(data as CommercialDocumentRow);
@@ -240,6 +335,8 @@ export type ReviseQuotationInput = {
   soNumber?: string;
   note?: string;
   items: LineItemInput[];
+  nextAction: string;
+  nextActionDate: string;
 };
 
 export async function reviseQuotation(
@@ -253,6 +350,8 @@ export async function reviseQuotation(
     p_so_number: input.soNumber ?? null,
     p_note: input.note ?? null,
     p_items: input.items,
+    p_next_action: input.nextAction,
+    p_next_action_date: input.nextActionDate,
   });
   if (error) throw error;
   return toDocument(data as CommercialDocumentRow);
@@ -337,4 +436,87 @@ export async function updateCommercialDocumentLineItem(
     .single();
   if (error) throw error;
   return toLineItem(data as LineItemRow);
+}
+
+export type TransitionCommercialStageInput = {
+  commercialDocumentId: string;
+  expectedFromStage: string;
+  toStage: string;
+  taskId?: string;
+  createTaskTitle?: string;
+  taskDueDate?: string;
+  nextAction: string | null;
+  nextActionDate: string | null;
+  note?: string;
+  method?: "Phone" | "Email" | "Visit" | "WhatsApp" | "Meeting";
+  result?: FollowUpResult;
+  fuDate?: string;
+  workflowStatusTarget?: TaskWorkflowStatus;
+  lostReason?: QuotationLostReason | null;
+  lostReasonDetail?: string | null;
+};
+
+export type TransitionCommercialStageResult = {
+  commercialDocumentId: string;
+  fromStage: string;
+  toStage: string;
+  stageActivityLogId: string;
+  taskId: string;
+  followUpLogId: string;
+  taskActivityLogId: string;
+  createdTask: boolean;
+  workflowStatus: TaskWorkflowStatus;
+  dueState: TaskDueState;
+  calendarIncomplete: boolean;
+};
+
+type TransitionCommercialStageRow = {
+  commercial_document_id: string;
+  from_stage: string;
+  to_stage: string;
+  stage_activity_log_id: string;
+  task_id: string;
+  follow_up_log_id: string;
+  task_activity_log_id: string;
+  created_task: boolean;
+  workflow_status: TaskWorkflowStatus;
+  due_state: TaskDueState;
+  calendar_incomplete: boolean;
+};
+
+export async function transitionCommercialStage(
+  input: TransitionCommercialStageInput,
+): Promise<TransitionCommercialStageResult> {
+  const { data, error } = await supabase.rpc("transition_commercial_stage", {
+    p_commercial_document_id: input.commercialDocumentId,
+    p_expected_from_stage: input.expectedFromStage,
+    p_to_stage: input.toStage,
+    p_task_id: input.taskId ?? null,
+    p_create_task_title: input.createTaskTitle ?? null,
+    p_task_due_date: input.taskDueDate ?? null,
+    p_next_action: input.nextAction,
+    p_next_action_date: input.nextActionDate,
+    p_note: input.note ?? null,
+    p_method: input.method ?? "Phone",
+    p_result: input.result ?? "Progress Update",
+    p_fu_date: input.fuDate ?? null,
+    p_workflow_status_target: input.workflowStatusTarget ?? "In Progress",
+    p_lost_reason: input.lostReason ?? null,
+    p_lost_reason_detail: input.lostReasonDetail ?? null,
+  });
+  if (error) throw error;
+  const row = data![0] as TransitionCommercialStageRow;
+  return {
+    commercialDocumentId: row.commercial_document_id,
+    fromStage: row.from_stage,
+    toStage: row.to_stage,
+    stageActivityLogId: row.stage_activity_log_id,
+    taskId: row.task_id,
+    followUpLogId: row.follow_up_log_id,
+    taskActivityLogId: row.task_activity_log_id,
+    createdTask: row.created_task,
+    workflowStatus: row.workflow_status,
+    dueState: row.due_state,
+    calendarIncomplete: row.calendar_incomplete,
+  };
 }

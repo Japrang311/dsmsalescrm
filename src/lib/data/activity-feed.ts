@@ -2,6 +2,14 @@ import type { CommercialItem } from "@/lib/domain";
 import type { ActivityLogEntry } from "@/lib/data/activity-log";
 import type { FollowUpLog } from "@/lib/data/follow-ups";
 
+const CLIENT_STATUSES = new Set([
+  "Prospect",
+  "Active Customer",
+  "Dormant",
+  "Lost",
+  "Repeat Order",
+]);
+
 export type FeedLink = {
   to: string;
   params?: Record<string, string>;
@@ -21,6 +29,7 @@ export type FeedEvent = {
     | "order_created"
     | "task_created"
     | "so_tax_change"
+    | "ownership_change"
     | "record_lifecycle"
     | "team_admin";
   clientId?: string;
@@ -32,6 +41,10 @@ export type FeedEvent = {
   title: string;
   detail?: string;
   link?: FeedLink;
+  // Raw ids behind `link`, kept so callers (the related-events lookup) can
+  // query "same underlying record" without re-parsing link.params.
+  commercialItemId?: string;
+  salesOrderId?: string;
 };
 
 // Direct Order/Prototype/Customer PO no longer have a dedicated list/detail
@@ -106,6 +119,13 @@ function teamAdminTargetName(
   return targetProfileName ?? entry.targetProfileSnapshot?.name;
 }
 
+function isLegacyOwnerChange(entry: ActivityLogEntry): boolean {
+  if (entry.kind !== "client_status_change") return false;
+  const [statusLine] = (entry.detail ?? "").split("\n");
+  const [from, to] = statusLine.split(" → ").map((value) => value.trim());
+  return !from || !to || !CLIENT_STATUSES.has(from) || !CLIENT_STATUSES.has(to);
+}
+
 function activityFeedEvent(
   entry: ActivityLogEntry,
   owners: OwnersById,
@@ -117,7 +137,20 @@ function activityFeedEvent(
     case "client_created":
       return { ...base, kind: "client_created" };
     case "client_status_change":
+      if (isLegacyOwnerChange(entry)) {
+        return {
+          ...base,
+          kind: "ownership_change",
+          targetName: owners[entry.ownerId]?.name,
+        };
+      }
       return { ...base, kind: "status_change" };
+    case "client_owner_change":
+      return {
+        ...base,
+        kind: "ownership_change",
+        targetName: owners[entry.ownerId]?.name,
+      };
     case "commercial_item_created":
       return {
         ...base,
