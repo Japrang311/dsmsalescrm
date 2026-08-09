@@ -303,16 +303,23 @@ semua versi sekaligus.
 
 **Acceptance criteria:**
 
-- [ ] Setiap advisory punya parent dependency, runtime/build reachability, dan
-      keputusan upgrade/exception.
-- [ ] Critical/High diselesaikan atau memiliki exception bertanggal.
-- [ ] PDF/CSV/XLSX export dan production build tetap berfungsi.
+- [x] Setiap advisory punya parent dependency, runtime/build reachability, dan
+      keputusan upgrade/exception — lihat
+      `docs/reports/2026-08-09-dependency-advisory-triage.md`.
+- [x] Critical/High diselesaikan atau memiliki exception bertanggal —
+      `brace-expansion` tersisa sebagai exception Project Owner sampai
+      2026-09-09 karena dua major line tidak aman dipaksa lewat override global.
+- [x] PDF/CSV/XLSX export dan production build tetap berfungsi — focused
+      export tests, browser CSV download smoke, dan production build pass.
 
 **Verification:**
 
-- [ ] `bun audit --json`
-- [ ] `bun run typecheck && bun run test && bun run build`
-- [ ] Focused export tests dan browser download smoke.
+- [x] `bun audit --json` — exit 1 hanya untuk accepted `brace-expansion`
+      exception; audit output sekarang 7 advisory / 1 paket unik.
+- [x] `bun run typecheck && bun run test && bun run build` — typecheck pass,
+      full test suite 598 pass, build pass.
+- [x] Focused export tests dan browser download smoke — focused export/data
+      tests 26 pass; `bun run test:e2e` 9 pass.
 
 **Dependencies:** Checkpoint A
 
