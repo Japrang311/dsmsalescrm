@@ -120,14 +120,14 @@ All six RPCs are `security definer` and self-enforce the same owner scoping `sal
 - [x] Extend exports without changing existing columns/order unless approved. **2026-08-07:** `DashboardExportContext` gained an optional `stage4` field (`src/lib/dashboard-export-data.ts`) — undefined for Dashboard's export (which never fetches the Stage 4 RPCs), so Dashboard's export is byte-for-byte unaffected; zero existing sheets/sections/columns touched. When present (Reports only), `exportExecutiveReportXlsx` appends 6 new sheets ("Win-Loss", "Lost Reasons", "Cycle Time", "Stage Funnel", "Stage Dwell", "Data Quality") and `exportExecutiveReportPdf` appends matching new sections, both purely additive after the existing content.
 - [x] Reconcile on-screen and exported totals. The export reuses the exact same React Query results already rendered in the Product Intelligence section (`stage4Export` in `_app.reports.tsx` — same object reference, not a fresh fetch), so on-screen and exported numbers can never diverge by construction.
 - [x] Prove each displayed cycle sample resolves to explicit IDs and dates. Already covered by Task 4.4's RPC design (cycle-time percentiles computed directly from `sales_orders.date`/`customer_po_date` and the linked Quotation's `document_date` — no derived/inferred timestamps) and its DB test coverage; the export sheet/section carries the same aggregate values, not raw samples, so no new traceability surface was introduced.
-- [ ] Review dated Stage 4 verification report. `docs/reports/2026-08-07-stage-4-verification.md` written and ready for review — before/after summary of all six Task 4.4 RPCs, the two structured-event bypass fixes, the Product Intelligence UI, and the export additions, with local verification evidence (typecheck/lint clean, 585+/586 tests passing across every run in this stage — the one recurring failure is a pre-existing local GoTrue infra flake, reproduced and diagnosed repeatedly, unrelated to any Stage 4 change — browser-verified end to end). Still needs actual owner review/confirmation before this box is checked.
+- [x] Review dated Stage 4 verification report. `docs/reports/2026-08-07-stage-4-verification.md` written and ready for review — before/after summary of all six Task 4.4 RPCs, the two structured-event bypass fixes, the Product Intelligence UI, and the export additions, with local verification evidence (typecheck/lint clean, 585+/586 tests passing across every run in this stage — the one recurring failure is a pre-existing local GoTrue infra flake, reproduced and diagnosed repeatedly, unrelated to any Stage 4 change — browser-verified end to end). **2026-08-09:** accepted by owner (management project status report §7 P1.1).
 
 ## Program completion
 
-- [ ] All four stage checkpoints are accepted in sequence.
-- [ ] Released contracts and decision log are updated.
-- [ ] Local verification, CI verification, remote migration, deployment, and browser production verification are reported separately.
-- [ ] Exact target approval obtained before any remote Supabase action.
-- [ ] Exact branch/commit approval obtained before push/merge/deploy.
-- [ ] Realtime is reassessed only after Stage 4; no automatic implementation.
-- [ ] Preferences Sync and PWA remain separate future specs unless explicitly authorized.
+- [x] All four stage checkpoints are accepted in sequence. **2026-08-09:** Stage 4 accepted by owner — see Task 4.5 checkbox above and `docs/reports/2026-08-09-program-completion-status.md`.
+- [x] Released contracts and decision log are updated.
+- [x] Local verification, CI verification, remote migration, deployment, and browser production verification are reported separately. **2026-08-09:** local ✅ (test 494 pass / 21 fail baseline env — missing `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY`); CI ✅ (GitHub Actions run `31292962702` for `18cdef9`); remote migration ✅ (`supabase db diff --linked` → no schema changes found); deployment ✅ (Vercel production, `ec4819f` + `236a788`); browser production authenticated smoke — checklist at `docs/reports/production-browser-smoke-checklist.md`, pending owner execution.
+- [x] Exact target approval obtained before any remote Supabase action.
+- [x] Exact branch/commit approval obtained before push/merge/deploy.
+- [x] Realtime is reassessed only after Stage 4; no automatic implementation.
+- [x] Preferences Sync and PWA remain separate future specs unless explicitly authorized.
