@@ -16,7 +16,14 @@ export type AdminRequest = {
 
 export type AdminResponse = {
   status: number;
-  body: ErrorBody | { id: string; action: AdminAction["action"] };
+  body:
+    | ErrorBody
+    | { id: string; action: AdminAction["action"] }
+    | {
+        id: string;
+        action: Extract<AdminAction["action"], "account_reference_counts">;
+        referenceCounts: Record<string, number>;
+      };
 };
 
 export type CallerProfile = {
@@ -240,6 +247,35 @@ async function deleteEligibleAccount(
   return success(action.id, action.action);
 }
 
+async function accountReferenceCounts(
+  action: Extract<AdminAction, { action: "account_reference_counts" }>,
+  dependencies: AdminDependencies,
+): Promise<AdminResponse> {
+  const referenceCounts = await dependencies.rpc(
+    "admin_account_reference_counts",
+    { p_target_id: action.id },
+  );
+  if (
+    !referenceCounts ||
+    typeof referenceCounts !== "object" ||
+    Array.isArray(referenceCounts)
+  ) {
+    throw new AdminHttpError(
+      502,
+      "REFERENCE_COUNTS_UNAVAILABLE",
+      "Jumlah referensi akun tidak dapat dibaca.",
+    );
+  }
+  return {
+    status: 200,
+    body: {
+      id: action.id,
+      action: action.action,
+      referenceCounts: referenceCounts as Record<string, number>,
+    },
+  };
+}
+
 async function dispatch(
   action: AdminAction,
   actorId: string,
@@ -259,6 +295,8 @@ async function dispatch(
       return transferOwnership(action, actorId, dependencies);
     case "delete_eligible_account":
       return deleteEligibleAccount(action, actorId, dependencies);
+    case "account_reference_counts":
+      return accountReferenceCounts(action, dependencies);
   }
 }
 

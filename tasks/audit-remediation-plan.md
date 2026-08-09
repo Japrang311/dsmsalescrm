@@ -147,6 +147,14 @@ delete blocker tetap lewat `private.account_reference_counts()`, sehingga
 soft-deleted/superseded/terminal commercial documents tidak dipindah saat
 transfer aktif tetapi tetap memblokir permanent delete.
 
+Catatan C3 lokal: Settings Team membedakan label workload `ownership aktif`
+dari `referensi historis blocking`. Dialog transfer menampilkan angka active
+ownership dari `admin_team_summary`; dialog hapus permanen mengambil preview
+`admin_account_reference_counts` melalui Edge Function `manage-team-member`
+sebelum tombol konfirmasi dapat dipakai. Browser check lokal memakai fixture
+Super Admin sementara dan row seed Nur Iman untuk membuktikan tabel, dialog
+transfer, dan dialog delete menampilkan gate yang benar.
+
 ### Fase D — Tutup Risiko Dependency
 
 1. Triage 17 advisory berdasarkan dependency graph dan reachability.

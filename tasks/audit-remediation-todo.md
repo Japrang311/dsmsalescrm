@@ -1,6 +1,6 @@
 # Checklist Remediasi Audit Codebase
 
-> **Status:** IN PROGRESS — Task 0, Fase A, B1-B3, C1, dan C2 lokal selesai;
+> **Status:** IN PROGRESS — Task 0, Fase A, B1-B3, dan C1-C3 lokal selesai;
 > Checkpoint B terverifikasi
 > **Plan:** `tasks/audit-remediation-plan.md`
 > **Sumber:** `audit/00-REPORT.md`
@@ -270,14 +270,14 @@ delete eligibility.
 
 **Acceptance criteria:**
 
-- [ ] UI membedakan “ownership aktif” dan “referensi historis”.
-- [ ] Dialog transfer/delete menampilkan angka sesuai RPC yang menjadi gate.
-- [ ] Tidak ada angka summary yang dipakai untuk menyimpulkan delete eligibility.
+- [x] UI membedakan “ownership aktif” dan “referensi historis”.
+- [x] Dialog transfer/delete menampilkan angka sesuai RPC yang menjadi gate.
+- [x] Tidak ada angka summary yang dipakai untuk menyimpulkan delete eligibility.
 
 **Verification:**
 
-- [ ] Component/data tests untuk active count dan blocking reference count.
-- [ ] Manual browser check untuk akun dengan active + historical fixtures.
+- [x] Component/data tests untuk active count dan blocking reference count.
+- [x] Manual browser check untuk akun dengan active + historical fixtures.
 
 **Dependencies:** Task C2
 

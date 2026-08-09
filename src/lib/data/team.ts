@@ -61,6 +61,21 @@ export type OwnedActiveCounts = {
   total: number;
 };
 
+export type BlockingReferenceCounts = {
+  clients?: number;
+  tasks?: number;
+  commercial_items?: number;
+  sales_orders?: number;
+  follow_up_logs?: number;
+  targets?: number;
+  activity_log_owner?: number;
+  activity_log_actor?: number;
+  activity_log_target?: number;
+  profile_status_changes?: number;
+  total_blocking?: number;
+  total_all?: number;
+};
+
 export type TeamAdministrativeChange = {
   kind: string;
   title: string;
@@ -282,6 +297,52 @@ function administrativeReason(reason: string): string {
 }
 
 type ActionResult = { id: string; action?: string };
+type ReferenceCountsResult = {
+  id: string;
+  action?: string;
+  referenceCounts?: BlockingReferenceCounts;
+};
+
+const BLOCKING_REFERENCE_LABELS: Record<
+  Exclude<keyof BlockingReferenceCounts, "total_blocking" | "total_all">,
+  string
+> = {
+  clients: "client historis",
+  tasks: "task historis",
+  commercial_items: "commercial historis",
+  sales_orders: "sales order historis",
+  follow_up_logs: "follow-up historis",
+  targets: "target",
+  activity_log_owner: "activity owner",
+  activity_log_actor: "activity actor",
+  activity_log_target: "activity target",
+  profile_status_changes: "status profile",
+};
+
+export function formatOwnedActiveCounts(counts: OwnedActiveCounts): string {
+  return [
+    `${counts.total} ownership aktif`,
+    `${counts.clients} client aktif`,
+    `${counts.tasks} task aktif`,
+    `${counts.commercialItems} commercial aktif`,
+  ].join(" · ");
+}
+
+export function formatBlockingReferenceCounts(
+  counts: BlockingReferenceCounts | undefined,
+): string {
+  if (!counts) return "Referensi historis belum dimuat.";
+  const details = Object.entries(BLOCKING_REFERENCE_LABELS)
+    .map(([key, label]) => {
+      const value = counts[key as keyof typeof BLOCKING_REFERENCE_LABELS] ?? 0;
+      return value > 0 ? `${value} ${label}` : undefined;
+    })
+    .filter(Boolean);
+  const totalBlocking = counts.total_blocking ?? 0;
+  return [`${totalBlocking} referensi historis blocking`, ...details].join(
+    " · ",
+  );
+}
 
 export async function createTeamMember(
   input: {
@@ -384,4 +445,18 @@ export async function deleteEligibleTeamMember(
     },
     client,
   );
+}
+
+export async function getTeamMemberReferenceCounts(
+  id: string,
+  client: TeamSupabaseClient = realTeamClient,
+): Promise<BlockingReferenceCounts> {
+  const result = await invokeManageTeamMember<ReferenceCountsResult>(
+    {
+      action: "account_reference_counts",
+      id,
+    },
+    client,
+  );
+  return result.referenceCounts ?? {};
 }

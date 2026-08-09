@@ -96,7 +96,10 @@ import {
   reactivateTeamMember,
   transferTeamOwnership,
   deleteEligibleTeamMember,
+  getTeamMemberReferenceCounts,
   getCurrentProfileId,
+  formatBlockingReferenceCounts,
+  formatOwnedActiveCounts,
   TeamAdminError,
   type AppRole,
   type TeamMember,
@@ -624,9 +627,9 @@ function TeamTab({
                         <span className="font-medium text-foreground">
                           {m.ownedActiveCounts.total}
                         </span>{" "}
-                        total · {m.ownedActiveCounts.clients} client ·{" "}
-                        {m.ownedActiveCounts.tasks} task ·{" "}
-                        {m.ownedActiveCounts.commercialItems} commercial
+                        ownership aktif · {m.ownedActiveCounts.clients} client
+                        aktif · {m.ownedActiveCounts.tasks} task aktif ·{" "}
+                        {m.ownedActiveCounts.commercialItems} commercial aktif
                       </TableCell>
                       <TableCell className="max-w-[210px] text-xs text-muted-foreground">
                         {m.lastAdministrativeChange ? (
@@ -919,15 +922,13 @@ function MemberDialog({
 }
 
 function referenceGuidance(error: TeamAdminError): string {
-  const counts = Object.entries(error.details ?? {})
-    .filter(([key, value]) => key !== "total_all" && value > 0)
-    .map(([key, value]) => `${key.replaceAll("_", " ")}: ${value}`)
-    .join(" · ");
   if (error.status === 409 && error.code === "ACCOUNT_HAS_REFERENCES") {
-    return `${error.message}${counts ? ` ${counts}.` : ""} Gunakan Nonaktifkan Akun apabila riwayat harus tetap dipertahankan.`;
+    const counts = formatBlockingReferenceCounts(error.details);
+    return `${error.message} ${counts}. Gunakan Nonaktifkan Akun apabila riwayat harus tetap dipertahankan.`;
   }
   if (error.status === 409 && error.code === "ACCOUNT_HAS_OWNERSHIP") {
-    return `${error.message}${counts ? ` ${counts}.` : ""} Alihkan ownership aktif ke Sales atau Manager aktif terlebih dahulu.`;
+    const counts = formatBlockingReferenceCounts(error.details);
+    return `${error.message} ${counts}. Alihkan ownership aktif ke Sales atau Manager aktif terlebih dahulu.`;
   }
   return error.message;
 }
@@ -957,6 +958,13 @@ function TeamActionDialog({
       candidate.accountStatus === "active" &&
       (candidate.role === "sales" || candidate.role === "manager"),
   );
+  const referenceCountsQuery = useQuery({
+    queryKey: ["team-member-reference-counts", member.id],
+    queryFn: () => getTeamMemberReferenceCounts(member.id),
+    enabled: action === "delete",
+  });
+  const blockingReferences =
+    referenceCountsQuery.data?.total_blocking ?? undefined;
 
   const title: Record<TeamAction, string> = {
     change_role: `Ubah role ${member.name}`,
@@ -968,7 +976,11 @@ function TeamActionDialog({
   const valid =
     reason.trim().length > 0 &&
     (action !== "change_role" || nextRole !== member.role) &&
-    (action !== "transfer" || destinationId.length > 0);
+    (action !== "transfer" || destinationId.length > 0) &&
+    (action !== "delete" ||
+      (!referenceCountsQuery.isLoading &&
+        !referenceCountsQuery.isError &&
+        blockingReferences === 0));
 
   async function submit() {
     setSubmitting(true);
@@ -1014,13 +1026,50 @@ function TeamActionDialog({
         <DialogTitle>{title[action]}</DialogTitle>
         <DialogDescription>
           {action === "delete"
-            ? "Penghapusan hanya dapat dilakukan jika akun tidak memiliki referensi yang memblokir. Nonaktifkan Akun adalah pilihan default untuk mempertahankan riwayat."
+            ? "Penghapusan memakai gate referensi historis dari database, bukan angka ownership aktif di tabel. Nonaktifkan Akun adalah pilihan default untuk mempertahankan riwayat."
             : action === "transfer"
-              ? "Hanya client non-Lost, task terbuka yang belum diarsipkan, dan commercial non-terminal yang dialihkan. Riwayat tetap pada owner asal."
+              ? "Transfer memakai angka ownership aktif di tabel: client non-Lost, task workflow-active yang belum diarsipkan, dan commercial active/current/open. Referensi historis tetap pada owner asal."
               : "Perubahan ini dicatat pada Activity Log dan alasan administratif wajib diisi."}
         </DialogDescription>
       </DialogHeader>
       <div className="space-y-4">
+        {action === "transfer" && (
+          <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+            <p className="font-medium text-foreground">Gate transfer aktif</p>
+            <p>{formatOwnedActiveCounts(member.ownedActiveCounts)}</p>
+            <p className="mt-1">
+              Angka ini bukan delete eligibility; referensi historis tetap
+              dipertahankan untuk audit.
+            </p>
+          </div>
+        )}
+        {action === "delete" && (
+          <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+            <p className="font-medium text-foreground">
+              Gate hapus permanen: referensi historis
+            </p>
+            {referenceCountsQuery.isLoading ? (
+              <p>Memuat angka blocking reference…</p>
+            ) : referenceCountsQuery.isError ? (
+              <p>
+                Angka blocking reference gagal dimuat. Tutup dialog lalu coba
+                lagi sebelum menghapus permanen.
+              </p>
+            ) : (
+              <>
+                <p>
+                  {formatBlockingReferenceCounts(referenceCountsQuery.data)}
+                </p>
+                {(referenceCountsQuery.data?.total_blocking ?? 0) > 0 && (
+                  <p className="mt-1">
+                    Akun ini belum eligible untuk hapus permanen. Nonaktifkan
+                    akun atau pindahkan ownership/referensi yang masih blocking.
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+        )}
         {action === "change_role" && (
           <Field label="Role baru">
             <Select

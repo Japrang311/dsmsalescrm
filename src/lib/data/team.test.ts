@@ -121,7 +121,7 @@ afterEach(() => {
 });
 
 describe("Team lifecycle request serialization", () => {
-  test("serializes all seven lifecycle actions exactly", async () => {
+  test("serializes all eight team actions exactly", async () => {
     await team.createTeamMember(
       {
         name: "Ayu",
@@ -159,9 +159,10 @@ describe("Team lifecycle request serialization", () => {
       "Akun duplikat",
       teamClient,
     );
+    await team.getTeamMemberReferenceCounts("member-1", teamClient);
 
     expect(invoke.mock.calls.map((call) => call[0])).toEqual(
-      Array(7).fill("manage-team-member"),
+      Array(8).fill("manage-team-member"),
     );
     expect(invoke.mock.calls.map((call) => call[1])).toEqual([
       {
@@ -219,6 +220,12 @@ describe("Team lifecycle request serialization", () => {
           reason: "Akun duplikat",
         },
       },
+      {
+        body: {
+          action: "account_reference_counts",
+          id: "member-1",
+        },
+      },
     ]);
   });
 
@@ -271,6 +278,31 @@ describe("Team lifecycle request serialization", () => {
         details: { clients: 2, tasks: 3 },
       });
     }
+  });
+
+  test("formats active ownership separately from blocking historical references", () => {
+    expect(
+      team.formatOwnedActiveCounts({
+        clients: 1,
+        tasks: 2,
+        commercialItems: 3,
+        total: 6,
+      }),
+    ).toBe(
+      "6 ownership aktif · 1 client aktif · 2 task aktif · 3 commercial aktif",
+    );
+
+    expect(
+      team.formatBlockingReferenceCounts({
+        clients: 2,
+        commercial_items: 1,
+        activity_log_target: 4,
+        total_blocking: 3,
+        total_all: 7,
+      }),
+    ).toBe(
+      "3 referensi historis blocking · 2 client historis · 1 commercial historis · 4 activity target",
+    );
   });
 });
 

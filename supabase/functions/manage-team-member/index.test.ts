@@ -112,7 +112,7 @@ describe("manage-team-member validation boundary", () => {
     expect(typeof contracts.toHttpError).toBe("function");
   });
 
-  test("parses and normalizes the exact seven-action contract", () => {
+  test("parses and normalizes the exact eight-action contract", () => {
     const inputs: Array<[Record<string, unknown>, AdminAction]> = [
       [
         {
@@ -208,6 +208,16 @@ describe("manage-team-member validation boundary", () => {
           action: "delete_eligible_account",
           id: TARGET_ID,
           reason: "Akun duplikat tanpa referensi",
+        },
+      ],
+      [
+        {
+          action: "account_reference_counts",
+          id: TARGET_ID,
+        },
+        {
+          action: "account_reference_counts",
+          id: TARGET_ID,
         },
       ],
     ];
@@ -444,6 +454,46 @@ describe("manage-team-member protected handler", () => {
         value: { name: item.rpc, args: item.args },
       });
     }
+  });
+
+  test("routes account reference preview to the same RPC used by delete eligibility", async () => {
+    const harness = dependencyHarness({
+      async rpc(name, args) {
+        harness.calls.push({ operation: "rpc", value: { name, args } });
+        return {
+          clients: 1,
+          commercial_items: 1,
+          total_blocking: 2,
+          total_all: 3,
+        };
+      },
+    });
+
+    const result = await invokeHandler(
+      post({ action: "account_reference_counts", id: TARGET_ID }),
+      harness.dependencies,
+    );
+
+    expect(result).toEqual({
+      status: 200,
+      body: {
+        id: TARGET_ID,
+        action: "account_reference_counts",
+        referenceCounts: {
+          clients: 1,
+          commercial_items: 1,
+          total_blocking: 2,
+          total_all: 3,
+        },
+      },
+    });
+    expect(harness.calls).toContainEqual({
+      operation: "rpc",
+      value: {
+        name: "admin_account_reference_counts",
+        args: { p_target_id: TARGET_ID },
+      },
+    });
   });
 
   test("creates Auth first and compensates when the atomic profile/audit RPC fails", async () => {
