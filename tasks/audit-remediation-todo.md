@@ -438,13 +438,19 @@ focused DB tests
 
 **Acceptance criteria:**
 
-- [ ] Pure tests mencakup filter, grouping, sort, dan view-specific selection.
-- [ ] Exact query keys dan invalidation prefixes dicatat dalam tests.
-- [ ] E2E smoke tersedia untuk Table, Kanban, dan Calendar.
+- [x] Pure tests mencakup filter, grouping, sort, dan view-specific selection.
+- [x] Exact query keys dan invalidation prefixes dicatat dalam tests.
+- [x] E2E smoke tersedia untuk mode Tasks Inbox yang ada saat ini: Agenda
+      (table/list), Calendar, dan Completed/Archived history. Catatan: source
+      route saat ini tidak memiliki Kanban mode eksplisit.
 
 **Verification:**
 
-- [ ] Focused Task tests dan tiga E2E mode pass sebelum ekstraksi.
+- [x] Focused Task tests dan tiga E2E mode pass sebelum ekstraksi:
+      `bun --env-file=.env.local test src/lib/tasks-inbox-controller.test.ts
+      src/lib/data/tasks.test.ts src/lib/data/task-exceptions.test.ts`,
+      `bun run lint`, `bun run typecheck`, `bun run build`, dan focused
+      Playwright `Tasks inbox renders agenda, calendar, and history modes`.
 
 **Dependencies:** Checkpoint A
 
@@ -461,14 +467,19 @@ dari route tanpa mengubah contract.
 
 **Acceptance criteria:**
 
-- [ ] Pure transform tidak berada di component route.
-- [ ] Query keys dan mutation side effects tetap identik.
-- [ ] Tidak ada perubahan UI/copy/role behavior.
+- [x] Pure transform tidak berada di component route.
+- [x] Query keys dan mutation side effects tetap identik.
+- [x] Tidak ada perubahan UI/copy/role behavior.
 
 **Verification:**
 
-- [ ] Focused tests dari Task F1 tetap hijau.
-- [ ] `bun run lint && bun run typecheck && bun run build`.
+- [x] Focused tests dari Task F1 tetap hijau:
+      `bun --env-file=.env.local test src/lib/tasks-inbox-controller.test.ts
+      src/lib/data/tasks.test.ts src/lib/data/task-exceptions.test.ts` — 24
+      pass.
+- [x] `bun run lint` — 0 error, 15 warning lama; `bun run typecheck`; `bun run
+      build`; focused Playwright `Tasks inbox renders agenda, calendar, and
+      history modes`.
 
 **Dependencies:** Task F1
 
@@ -481,18 +492,27 @@ hook/actions baru, focused tests
 
 ## Task F3 — Ekstrak Table, Kanban, dan Calendar secara serial
 
-**Description:** Menyelesaikan SEV-05 dengan satu view per commit/checkpoint.
+**Description:** Menyelesaikan SEV-05 dengan satu view per checkpoint. Catatan:
+source route saat ini tidak memiliki Kanban mode eksplisit; view aktual yang
+diekstrak adalah Agenda/table-list, Calendar, dan Completed/Archived history.
 
 **Acceptance criteria:**
 
-- [ ] Table, Kanban, dan Calendar menjadi component terpisah dengan props typed.
-- [ ] Setiap ekstraksi diverifikasi sebelum lanjut ke view berikutnya.
-- [ ] Route menjadi orchestrator, bukan pemilik seluruh render/action logic.
+- [x] Agenda/table-list, Calendar, dan Completed/Archived history menjadi
+      component terpisah dengan props typed.
+- [x] Setiap ekstraksi diverifikasi sebelum lanjut ke view berikutnya.
+- [x] Route menjadi orchestrator, bukan pemilik seluruh render/action logic.
 
 **Verification:**
 
-- [ ] Focused tests dan E2E mode pass setelah setiap ekstraksi.
-- [ ] Full `bun run test`, lint, typecheck, build, dan E2E pass pada akhir task.
+- [x] Focused tests dan E2E mode pass setelah ekstraksi:
+      `bun --env-file=.env.local test src/lib/tasks-inbox-controller.test.ts
+      src/lib/data/tasks.test.ts src/lib/data/task-exceptions.test.ts` — 24
+      pass; focused Playwright `Tasks inbox renders agenda, calendar, and
+      history modes` — 1 pass.
+- [x] Full `bun run test`, lint, typecheck, build, dan E2E pass pada akhir task:
+      `bun run test` — 612 pass; `bun run lint` — 0 error, 15 warning lama;
+      `bun run typecheck`; `bun run build`; `bun run test:e2e` — 11 pass.
 
 **Dependencies:** Task F2
 

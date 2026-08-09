@@ -66,6 +66,27 @@ test("sales can create a Task, reload, and mark it Done", async ({ page }) => {
   expectNoConsoleIssues(consoleIssues);
 });
 
+test("Tasks inbox renders agenda, calendar, and history modes", async ({
+  page,
+}) => {
+  const consoleIssues = collectConsoleIssues(page);
+
+  await signIn(page, USERS.sales);
+  await page.goto("/tasks");
+  await expect(page.getByRole("heading", { name: "My Tasks" })).toBeVisible();
+  await expect(page.getByRole("radio", { name: /Agenda/ })).toBeChecked();
+
+  await page.getByRole("radio", { name: /Kalender/ }).click();
+  await expect(page.getByRole("button", { name: "Hari ini" })).toBeVisible();
+  await expect(page.getByText("Sen")).toBeVisible();
+
+  await page.getByRole("button", { name: /COMPLETED/i }).click();
+  await expect(page.getByRole("radio", { name: /Agenda/ })).toBeChecked();
+  await expect(page.getByRole("radio", { name: /Kalender/ })).toBeDisabled();
+
+  expectNoConsoleIssues(consoleIssues);
+});
+
 test("sales can record a client follow-up that survives reload", async ({
   page,
 }) => {
@@ -113,8 +134,13 @@ test("sales can create a client that appears after create and reload", async ({
     await addClientButton.click();
     await expect(dialog).toBeVisible();
   }
+  await expect(dialog.locator('input[value="Nur Iman"]')).toBeVisible();
   await dialog.getByLabel("Nama Klien").fill(clientName);
-  await dialog.getByRole("button", { name: "Simpan Klien" }).click();
+  const saveClientButton = dialog.getByRole("button", {
+    name: "Simpan Klien",
+  });
+  await expect(saveClientButton).toBeEnabled();
+  await saveClientButton.click();
   await expect(page.getByText("Klien berhasil ditambahkan")).toBeVisible();
 
   await page.getByPlaceholder("Cari nama klien…").fill(clientName);
@@ -123,7 +149,13 @@ test("sales can create a client that appears after create and reload", async ({
   ).toBeVisible();
 
   await page.reload();
-  await page.getByPlaceholder("Cari nama klien…").fill(clientName);
+  await expect(page.getByRole("heading", { name: "Clients" })).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "CV. ABADI TECHNIC", exact: true }),
+  ).toBeVisible();
+  const reloadedClientSearch = page.getByPlaceholder("Cari nama klien…");
+  await reloadedClientSearch.fill(clientName);
+  await expect(reloadedClientSearch).toHaveValue(clientName);
   await expect(
     page.getByRole("link", { name: clientName, exact: true }),
   ).toBeVisible();

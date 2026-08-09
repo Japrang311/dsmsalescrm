@@ -27,8 +27,13 @@ export async function signIn(
   password = LOCAL_PASSWORD,
 ) {
   await page.goto("/login");
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill(password);
+  const emailInput = page.getByLabel("Email");
+  const passwordInput = page.getByLabel("Password");
+  await expect(emailInput).toBeVisible();
+  await emailInput.fill(email);
+  await expect(emailInput).toHaveValue(email);
+  await passwordInput.fill(password);
+  await expect(passwordInput).toHaveValue(password);
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/dashboard$/);
 }
