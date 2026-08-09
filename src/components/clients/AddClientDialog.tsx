@@ -32,7 +32,6 @@ import {
   listSalesTeamProfiles,
   listOwners,
   createClient,
-  type ClientListRow,
 } from "@/lib/data/clients";
 import { getCurrentActorId, logActivity } from "@/lib/data/activity-log";
 import { CLIENT_STATUSES } from "@/lib/business-rules";
@@ -177,28 +176,6 @@ export function AddClientDialog({
         name: created.name,
         ownerId: created.ownerId,
       });
-      queryClient.setQueriesData<ClientListRow[]>(
-        { queryKey: ["clients", "rows"], exact: true },
-        (rows) =>
-          rows
-            ? [
-                {
-                  client: created,
-                  ownerName,
-                  spendingYtd: created.spendingYtd,
-                  lastFu: created.lastFu,
-                  nextFu: created.nextFu,
-                  ppn: 0,
-                  nonPpn: 0,
-                  activeCommercialCount: 0,
-                  activeCommercialTypes: [],
-                  risk: "Unknown",
-                  advisories: 0,
-                },
-                ...rows.filter((row) => row.client.id !== created.id),
-              ]
-            : rows,
-      );
       await queryClient.invalidateQueries({ queryKey: ["clients"] });
       await queryClient.invalidateQueries({ queryKey: ["activity-log"] });
       toast.success("Klien berhasil ditambahkan", {

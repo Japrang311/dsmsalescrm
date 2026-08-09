@@ -388,14 +388,14 @@ mengganti dengan updater paginated yang benar bila UX membutuhkannya.
 
 **Acceptance criteria:**
 
-- [ ] Tidak ada write exact ke key tanpa consumer.
-- [ ] Add Client muncul benar setelah create dan setelah reload.
-- [ ] Query-key factory digunakan untuk cache paginated.
+- [x] Tidak ada write exact ke key tanpa consumer.
+- [x] Add Client muncul benar setelah create dan setelah reload.
+- [x] Query-key factory digunakan untuk cache paginated.
 
 **Verification:**
 
-- [ ] Focused query-cache test menggunakan key production yang nyata.
-- [ ] Browser create Client + reload pass.
+- [x] Focused query-cache test menggunakan key production yang nyata.
+- [x] Browser create Client + reload pass.
 
 **Dependencies:** Checkpoint A
 
@@ -413,14 +413,14 @@ baru, atau menandai sebagai resolved bila Task B/C sudah menghapus variabelnya.
 
 **Acceptance criteria:**
 
-- [ ] Tidak mengedit migration lama.
-- [ ] `v_old_owner_id`, `v_new_owner_name`, dan `v_so_linked` tidak lagi unused.
-- [ ] Semantik function tidak berubah kecuali yang disetujui Task B/C.
+- [x] Tidak mengedit migration lama.
+- [x] `v_old_owner_id`, `v_new_owner_name`, dan `v_so_linked` tidak lagi unused.
+- [x] Semantik function tidak berubah kecuali yang disetujui Task B/C.
 
 **Verification:**
 
-- [ ] Fresh DB reset.
-- [ ] `supabase db lint --local --level warning --fail-on none` tidak lagi
+- [x] Fresh DB reset.
+- [x] `supabase db lint --local --level warning --fail-on none` tidak lagi
       melaporkan tiga unused variable tersebut.
 
 **Dependencies:** Tasks B2, C2

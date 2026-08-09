@@ -93,6 +93,44 @@ test("sales can record a client follow-up that survives reload", async ({
   expectNoConsoleIssues(consoleIssues);
 });
 
+test("sales can create a client that appears after create and reload", async ({
+  page,
+}) => {
+  const consoleIssues = collectConsoleIssues(page);
+  const clientName = uniqueToken("E2E cache client");
+
+  await signIn(page, USERS.sales);
+  await page.goto("/clients");
+  await expect(page.getByRole("heading", { name: "Clients" })).toBeVisible();
+
+  const addClientButton = page.getByRole("button", { name: "Add Client" });
+  const dialog = page.getByRole("dialog", { name: "Tambah Klien Baru" });
+  await expect(addClientButton).toBeEnabled();
+  await addClientButton.click();
+  try {
+    await expect(dialog).toBeVisible({ timeout: 5_000 });
+  } catch {
+    await addClientButton.click();
+    await expect(dialog).toBeVisible();
+  }
+  await dialog.getByLabel("Nama Klien").fill(clientName);
+  await dialog.getByRole("button", { name: "Simpan Klien" }).click();
+  await expect(page.getByText("Klien berhasil ditambahkan")).toBeVisible();
+
+  await page.getByPlaceholder("Cari nama klien…").fill(clientName);
+  await expect(
+    page.getByRole("link", { name: clientName, exact: true }),
+  ).toBeVisible();
+
+  await page.reload();
+  await page.getByPlaceholder("Cari nama klien…").fill(clientName);
+  await expect(
+    page.getByRole("link", { name: clientName, exact: true }),
+  ).toBeVisible();
+
+  expectNoConsoleIssues(consoleIssues);
+});
+
 test("manager can reassign client owner and see ownership audit after reload", async ({
   page,
 }) => {
