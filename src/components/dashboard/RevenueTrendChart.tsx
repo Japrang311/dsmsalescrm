@@ -5,7 +5,6 @@ import {
   BarChart,
   CartesianGrid,
   Line,
-  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -16,7 +15,7 @@ import type { Role } from "@/lib/domain";
 import { monthlyRevenueTrendFromRpc } from "@/lib/data/dashboard-selectors";
 import { getSalesOrdersMonthlyTrend } from "@/lib/data/sales-orders-trend";
 import { useDashboardData } from "@/hooks/use-dashboard-data";
-import { useRole } from "@/context/role-context";
+import { useRole } from "@/context/role-context-core";
 import { formatRupiahShort } from "@/lib/format";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -166,6 +165,3 @@ export function SimpleBarChart({
     </div>
   );
 }
-
-// LineChart re-export just to satisfy tree-shake noise (unused)
-export const _Line = LineChart;

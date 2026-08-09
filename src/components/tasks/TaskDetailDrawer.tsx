@@ -32,7 +32,7 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRole } from "@/context/role-context";
+import { useRole } from "@/context/role-context-core";
 import {
   toLocalIsoDate,
   type Task,
@@ -156,6 +156,11 @@ export function TaskDetailDrawer({
         : "",
     );
     setProgressNote("");
+    // Intentional: seed draft fields only when the task identity or drawer
+    // visibility changes — NOT on every object identity change from a
+    // refetch (would wipe an in-progress edit). Field values are read
+    // directly inside the effect, so they don't need to be dependencies.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [task?.id, open]);
 
   const detailDirty = useMemo(() => {

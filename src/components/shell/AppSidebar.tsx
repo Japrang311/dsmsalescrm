@@ -22,7 +22,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { useRole } from "@/context/role-context";
+import { useRole } from "@/context/role-context-core";
 import dsmMarkUrl from "/dsm-mark.png";
 
 const NAV_FULL = [

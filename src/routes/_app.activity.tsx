@@ -16,7 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { listClients, listOwners } from "@/lib/data/clients";
-import { useRole } from "@/context/role-context";
+import { useRole } from "@/context/role-context-core";
 import {
   Activity,
   Phone,

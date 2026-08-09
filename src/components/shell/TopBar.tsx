@@ -34,7 +34,7 @@ import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 
-import { ROLE_LABEL, useRole } from "@/context/role-context";
+import { ROLE_LABEL, useRole } from "@/context/role-context-core";
 import { useDashboardData } from "@/hooks/use-dashboard-data";
 import {
   hasTaskDueState,

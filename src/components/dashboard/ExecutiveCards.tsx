@@ -16,7 +16,7 @@ import {
   getTopCustomers,
 } from "@/lib/data/sales-performance-metrics";
 import { useDashboardData } from "@/hooks/use-dashboard-data";
-import { useRole } from "@/context/role-context";
+import { useRole } from "@/context/role-context-core";
 import { CURRENT_YEAR, NOW } from "@/lib/domain";
 import { formatPercent, formatRupiahShort } from "@/lib/format";
 import { KpiCard, KpiProgress } from "./KpiCard";

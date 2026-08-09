@@ -34,7 +34,7 @@ import { StatusBadge } from "@/components/clients/StatusBadges";
 import { cn, getErrorMessage } from "@/lib/utils";
 import { invalidateCommercialStageQueries } from "@/lib/query-invalidation";
 import { formatRupiahShort, formatDateShort } from "@/lib/format";
-import { useRole } from "@/context/role-context";
+import { useRole } from "@/context/role-context-core";
 import {
   toLocalIsoDate,
   type CommercialItem,

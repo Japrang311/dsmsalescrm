@@ -40,15 +40,15 @@ import {
 } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-import { useRole } from "@/context/role-context";
+import { useRole } from "@/context/role-context-core";
 import { NOW, CURRENT_YEAR } from "@/lib/domain";
+import { ReportFilterBar } from "@/components/reports/ReportFilterBar";
 import {
-  ReportFilterBar,
   defaultReportFilters,
   type ReportFilters,
-} from "@/components/reports/ReportFilterBar";
+} from "@/components/reports/report-filters";
 import { filterSalesOrders } from "@/lib/report-selectors";
-import { ROLE_LABEL } from "@/context/role-context";
+import { ROLE_LABEL } from "@/context/role-context-core";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   compareSalesOrdersByNewestNumber,

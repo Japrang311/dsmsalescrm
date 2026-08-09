@@ -14,7 +14,7 @@ import { salesPerformanceFromRpc } from "@/lib/data/dashboard-selectors";
 import { getSalesOrdersOwnerYtd } from "@/lib/data/sales-orders-trend";
 import { getSalesTaskClientMetrics } from "@/lib/data/sales-performance-metrics";
 import { useDashboardData } from "@/hooks/use-dashboard-data";
-import { useRole } from "@/context/role-context";
+import { useRole } from "@/context/role-context-core";
 import { formatRupiahShort, formatPercent } from "@/lib/format";
 import { cn } from "@/lib/utils";
 

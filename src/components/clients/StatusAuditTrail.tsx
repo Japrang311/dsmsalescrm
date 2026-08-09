@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/clients/StatusBadges";
 import { listClientStatusHistory } from "@/lib/data/activity-log";
-import { ROLE_LABEL } from "@/context/role-context";
+import { ROLE_LABEL } from "@/context/role-context-core";
 
 function formatWhen(iso: string) {
   const d = new Date(iso);

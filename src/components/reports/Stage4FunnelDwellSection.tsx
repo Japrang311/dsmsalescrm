@@ -6,8 +6,10 @@ import type {
   StageDwellMetric,
   StageFunnelMetric,
 } from "@/lib/data/stage4-analytics";
-import { CHART_COLORS, ChartEmpty } from "./ReportPrimitives";
-import { CoverageNote, formatDays } from "./Stage4Primitives";
+import { ChartEmpty } from "./ReportPrimitives";
+import { CHART_COLORS } from "./chart-colors";
+import { CoverageNote } from "./Stage4Primitives";
+import { formatDays } from "./format-days";
 
 export function Stage4FunnelDwellSection({
   funnel,

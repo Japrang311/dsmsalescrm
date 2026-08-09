@@ -40,7 +40,7 @@ import { Label } from "@/components/ui/label";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { toast } from "sonner";
 
-import { useRole } from "@/context/role-context";
+import { useRole } from "@/context/role-context-core";
 import { CLIENT_STATUSES } from "@/lib/business-rules";
 import {
   listClientRowsPage,

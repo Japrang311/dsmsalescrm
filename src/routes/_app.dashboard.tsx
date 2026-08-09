@@ -37,7 +37,7 @@ import {
   exportTopCustomersXlsx,
 } from "@/lib/export-xlsx";
 
-import { useRole, ROLE_LABEL } from "@/context/role-context";
+import { useRole, ROLE_LABEL } from "@/context/role-context-core";
 import { CURRENT_MONTH } from "@/lib/domain";
 import {
   monthlyTargetValue,

@@ -35,7 +35,7 @@ import {
 } from "@/lib/data/clients";
 import { getCurrentActorId, logActivity } from "@/lib/data/activity-log";
 import { CLIENT_STATUSES } from "@/lib/business-rules";
-import { useRole } from "@/context/role-context";
+import { useRole } from "@/context/role-context-core";
 import { cacheListRecord } from "@/lib/query-cache-updates";
 
 const schema = z.object({

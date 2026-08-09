@@ -32,7 +32,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRole } from "@/context/role-context";
+import { useRole } from "@/context/role-context-core";
 import { NOW, toLocalIsoDate } from "@/lib/domain";
 import type { Task } from "@/lib/domain";
 import { listActiveTasks, type TaskListFilters } from "@/lib/data/tasks";

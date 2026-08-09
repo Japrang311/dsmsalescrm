@@ -8,7 +8,8 @@ import {
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatRupiahShort } from "@/lib/format";
-import { CHART_COLORS, ChartEmpty, ForecastTile } from "./ReportPrimitives";
+import { ChartEmpty, ForecastTile } from "./ReportPrimitives";
+import { CHART_COLORS } from "./chart-colors";
 
 export function ReportsForecastSection({
   totalRevenue,

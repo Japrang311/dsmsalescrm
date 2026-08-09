@@ -35,7 +35,7 @@ import { listClients, listSalesTeamProfiles } from "@/lib/data/clients";
 import { ClientPickerField } from "@/components/clients/ClientPicker";
 import { createTask } from "@/lib/data/tasks";
 import { getCurrentActorId, logActivity } from "@/lib/data/activity-log";
-import { useRole } from "@/context/role-context";
+import { useRole } from "@/context/role-context-core";
 
 const METHODS = ["Phone", "Email", "WhatsApp", "Visit", "Meeting"] as const;
 const PRIORITIES = ["High", "Normal", "Low"] as const;

@@ -14,7 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { StatusBadge } from "@/components/clients/StatusBadges";
 import { ArrowRight, ShieldCheck } from "lucide-react";
 import type { ClientStatus } from "@/lib/domain";
-import { ROLE_LABEL } from "@/context/role-context";
+import { ROLE_LABEL } from "@/context/role-context-core";
 import type { Role } from "@/lib/domain";
 
 type Props = {

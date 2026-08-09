@@ -2,7 +2,7 @@ import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
-import { ROLE_LABEL } from "@/context/role-context";
+import { ROLE_LABEL } from "@/context/role-context-core";
 import { toLocalIsoDate, type DateRange, type Role } from "@/lib/domain";
 import type { SalesOrderDocument } from "@/lib/data/sales-orders";
 import { EmptyExportError } from "@/lib/export-csv";

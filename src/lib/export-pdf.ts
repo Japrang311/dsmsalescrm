@@ -14,7 +14,7 @@ import {
   formatPercent,
   formatRupiahShort,
 } from "@/lib/format";
-import { ROLE_LABEL } from "@/context/role-context";
+import { ROLE_LABEL } from "@/context/role-context-core";
 import { toLocalIsoDate } from "@/lib/domain";
 
 const BRAND = { r: 1, g: 118, b: 211 }; // #0176D3

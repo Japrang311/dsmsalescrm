@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { activityCompliance } from "@/lib/data/dashboard-selectors";
 import { getSalesTaskClientMetrics } from "@/lib/data/sales-performance-metrics";
 import { useDashboardData } from "@/hooks/use-dashboard-data";
-import { useRole } from "@/context/role-context";
+import { useRole } from "@/context/role-context-core";
 import { formatPercent } from "@/lib/format";
 import { cn } from "@/lib/utils";
 

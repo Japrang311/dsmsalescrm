@@ -7,7 +7,7 @@ import { getErrorMessage } from "@/lib/utils";
 import { invalidateCommercialStageQueries } from "@/lib/query-invalidation";
 import { stagesForFlow } from "@/lib/business-rules";
 import type { CommercialItem, QuotationLostReason } from "@/lib/domain";
-import { useRole } from "@/context/role-context";
+import { useRole } from "@/context/role-context-core";
 import { NOW, toLocalIsoDate } from "@/lib/domain";
 import { canManageSoftDeletedRecord } from "@/components/commercial/soft-delete-controls";
 import { CommercialDetailHeader } from "@/components/commercial/CommercialDetailHeader";

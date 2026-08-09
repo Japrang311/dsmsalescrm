@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ArrowRight, ShieldCheck } from "lucide-react";
-import { ROLE_LABEL } from "@/context/role-context";
+import { ROLE_LABEL } from "@/context/role-context-core";
 import type { Role } from "@/lib/domain";
 
 type TeamMember = {

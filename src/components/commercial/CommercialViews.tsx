@@ -34,7 +34,7 @@ import {
 import { cn } from "@/lib/utils";
 import { formatRupiahShort, formatDateShort, daysBetween } from "@/lib/format";
 import { NOW } from "@/lib/domain";
-import { useRole } from "@/context/role-context";
+import { useRole } from "@/context/role-context-core";
 import type { CommercialItem } from "@/lib/domain";
 import { StatusBadge } from "@/components/clients/StatusBadges";
 import { useQuery, useQueryClient } from "@tanstack/react-query";

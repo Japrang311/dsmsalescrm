@@ -28,7 +28,7 @@ import {
   getSalesOrdersOwnerYtd,
 } from "@/lib/data/sales-orders-trend";
 import { useDashboardData } from "@/hooks/use-dashboard-data";
-import { useRole } from "@/context/role-context";
+import { useRole } from "@/context/role-context-core";
 import { formatPercent, formatRupiahShort } from "@/lib/format";
 import { useIsMobile } from "@/hooks/use-mobile";
 

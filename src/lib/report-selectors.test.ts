@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { defaultReportFilters } from "@/components/reports/ReportFilterBar";
+import { defaultReportFilters } from "@/components/reports/report-filters";
 import { CURRENT_MONTH, CURRENT_YEAR, NOW, PINNED_TODAY } from "@/lib/domain";
 import type { Client, CommercialItem, SalesOrder, Task } from "@/lib/domain";
 import {
