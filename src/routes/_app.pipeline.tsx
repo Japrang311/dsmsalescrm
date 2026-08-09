@@ -213,16 +213,11 @@ function PipelineBoardPage({ role }: { role: Role }) {
     );
   }, [stageQueries]);
 
-  // For each commercial item, compute the earliest upcoming (or most-overdue) task date.
-  // `items` is the real commercial_items data, so it.nextActionDate is
-  // already authoritative — only fall back to related tasks if it's unset.
+  // For each commercial document, compute the earliest active linked Task date.
+  // The normalized commercial document facade does not own next follow-up state.
   const nextByItem = useMemo(() => {
     const map = new Map<string, string | undefined>();
     for (const it of allLoadedItems) {
-      if (it.nextActionDate) {
-        map.set(it.id, it.nextActionDate);
-        continue;
-      }
       const related = activeCommercialTasks(tasks, it.id)
         .map((t) => t.dueDate)
         .sort();

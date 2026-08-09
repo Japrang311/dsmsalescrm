@@ -154,7 +154,6 @@ export function CommercialViews(props: CommercialViewsProps) {
           it.description,
           it.projectName,
           it.quotationNumber,
-          it.customerPoNumber,
         ]
           .filter(Boolean)
           .join(" ")
@@ -165,16 +164,11 @@ export function CommercialViews(props: CommercialViewsProps) {
     });
   }, [scoped, ownerFilter, stageFilter, q, clients]);
 
-  // `nextActionDate` on CommercialItem is not populated by the normalized
-  // read path; fall back to the earliest active linked Task due date, same
-  // as the Pipeline board.
+  // Next follow-up state is owned by Tasks, not the normalized commercial
+  // document compatibility facade.
   const nextByItem = useMemo(() => {
     const map = new Map<string, string | undefined>();
     for (const it of filtered) {
-      if (it.nextActionDate) {
-        map.set(it.id, it.nextActionDate);
-        continue;
-      }
       const related = activeCommercialTasks(tasks, it.id)
         .map((t) => t.dueDate)
         .sort();
@@ -370,7 +364,6 @@ export function CommercialViews(props: CommercialViewsProps) {
                     <TableHead>Owner</TableHead>
                     <TableHead>Source flow</TableHead>
                     <TableHead>Stage</TableHead>
-                    <TableHead>No. Customer PO</TableHead>
                     <TableHead>Next FU</TableHead>
                     <TableHead>Aging</TableHead>
                     <TableHead />
@@ -448,13 +441,7 @@ export function CommercialViews(props: CommercialViewsProps) {
                           {it.itemCount ?? 0}
                         </TableCell>
                         <TableCell className="whitespace-nowrap text-right font-medium tabular-nums">
-                          {it.prototypeStatus === "FOC" ? (
-                            <span className="text-muted-foreground">
-                              FOC · Rp0
-                            </span>
-                          ) : (
-                            formatRupiahShort(it.estimatedValue)
-                          )}
+                          {formatRupiahShort(it.estimatedValue)}
                         </TableCell>
                         <TableCell className="whitespace-nowrap text-right text-xs tabular-nums">
                           {it.type === "Quotation"
@@ -476,9 +463,6 @@ export function CommercialViews(props: CommercialViewsProps) {
                           <Badge variant="secondary" className="text-[10px]">
                             {it.stage}
                           </Badge>
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap font-mono text-[11px]">
-                          {it.customerPoNumber ?? "—"}
                         </TableCell>
                         <TableCell className="whitespace-nowrap text-xs">
                           {next ? (
@@ -596,9 +580,7 @@ export function CommercialViews(props: CommercialViewsProps) {
                           </p>
                           <div className="flex items-center justify-between pt-0.5">
                             <span className="text-[12px] font-semibold tabular-nums text-foreground">
-                              {it.prototypeStatus === "FOC"
-                                ? "FOC · Rp0"
-                                : formatRupiahShort(it.estimatedValue)}
+                              {formatRupiahShort(it.estimatedValue)}
                             </span>
                             {client && <StatusBadge status={client.status} />}
                           </div>

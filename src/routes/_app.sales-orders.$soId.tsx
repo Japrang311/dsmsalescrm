@@ -97,7 +97,7 @@ function SalesOrderDetail() {
     ? items.filter(
         (ci) =>
           ci.soNumber === so.soNumber ||
-          (ci.customerPoNumber && ci.clientId === so.clientId),
+          ci.id === so.sourceCommercialDocumentId,
       )
     : [];
   const sourceQuotation = so?.sourceCommercialDocumentId

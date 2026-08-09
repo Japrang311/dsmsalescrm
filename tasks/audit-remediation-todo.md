@@ -362,15 +362,15 @@ yang benar-benar didukung runtime.
 
 **Acceptance criteria:**
 
-- [ ] Unsupported fields tidak ada dalam public patch input.
-- [ ] Caller menggunakan API document/task yang menjadi source of truth.
-- [ ] Transitional facade diberi deprecation/contract note yang akurat.
+- [x] Unsupported fields tidak ada dalam public patch input.
+- [x] Caller menggunakan API document/task yang menjadi source of truth.
+- [x] Transitional facade diberi deprecation/contract note yang akurat.
 
 **Verification:**
 
-- [ ] Focused commercial-items tests pass.
-- [ ] `bun run typecheck` membuktikan caller tidak memakai field legacy.
-- [ ] Pipeline next follow-up behavior tetap sama.
+- [x] Focused commercial-items tests pass.
+- [x] `bun run typecheck` membuktikan caller tidak memakai field legacy.
+- [x] Pipeline next follow-up behavior tetap sama.
 
 **Dependencies:** Checkpoint C
 

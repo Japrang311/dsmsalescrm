@@ -74,8 +74,12 @@ export function compareCommercialItemsByNewestQuotationNumber(
 }
 
 /**
- * Transitional read facade for routes that still consume CommercialItem.
- * Each result is now one normalized document header, never one line row.
+ * @deprecated Transitional compatibility facade for routes that still consume
+ * CommercialItem. Each row represents one normalized commercial_documents
+ * header, never one line row. Fields owned by Sales Orders or Tasks
+ * (customerPoNumber, taxType, prototypeStatus, nextActionDate) are intentionally
+ * not part of this facade's update contract; use the Sales Order and Task APIs
+ * as the source of truth for those values.
  */
 type CommercialItemsQueryInput =
   CommercialDocumentQuery | { queryKey: readonly unknown[] };
@@ -93,14 +97,11 @@ export type CommercialItemPatch = Partial<{
   stage: string;
   ownerId: string;
   documentDate: string;
-  nextActionDate: string | null;
   quotationNumber: string | null;
   quotationBaseNumber: string | null;
   quotationExpiredDate: string | null;
-  customerPoNumber: string | null;
   soNumber: string | null;
   note: string | null;
-  taxType: CommercialItem["taxType"] | null;
   lostReason: CommercialItem["lostReason"] | null;
   lostReasonDetail: string | null;
 }>;
@@ -109,13 +110,6 @@ export async function updateCommercialItem(
   id: string,
   patch: CommercialItemPatch,
 ): Promise<CommercialItem> {
-  if (
-    patch.nextActionDate !== undefined ||
-    patch.customerPoNumber !== undefined ||
-    patch.taxType !== undefined
-  ) {
-    throw new Error("UNSUPPORTED_NORMALIZED_DOCUMENT_PATCH");
-  }
   return toCommercialItem(
     await updateCommercialDocument(id, {
       quotationNumber: patch.quotationNumber,
