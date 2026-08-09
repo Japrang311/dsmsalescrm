@@ -155,6 +155,16 @@ sebelum tombol konfirmasi dapat dipakai. Browser check lokal memakai fixture
 Super Admin sementara dan row seed Nur Iman untuk membuktikan tabel, dialog
 transfer, dan dialog delete menampilkan gate yang benar.
 
+Catatan Checkpoint C lokal: fresh `supabase db reset --local` berhasil sampai
+migration C2, lalu `bun --env-file=.env.local test
+supabase/tests/account-lifecycle.test.ts` pass 16/16. `supabase db lint
+--local --level warning --fail-on none` diperiksa dan masih melaporkan finding
+lama analyzer temp-table pada import/migration helper serta variabel PL/pgSQL
+tidak terbaca `v_so_linked`. `supabase db advisors --local --type all --level
+info --fail-on none` diperiksa dan hanya mengembalikan INFO performance untuk
+unindexed foreign keys/unused indexes. Tidak ada bukti regresi pada active
+transfer atau permanent delete fail-closed.
+
 ### Fase D — Tutup Risiko Dependency
 
 1. Triage 17 advisory berdasarkan dependency graph dan reachability.

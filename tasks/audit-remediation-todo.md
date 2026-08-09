@@ -1,7 +1,7 @@
 # Checklist Remediasi Audit Codebase
 
-> **Status:** IN PROGRESS — Task 0, Fase A, B1-B3, dan C1-C3 lokal selesai;
-> Checkpoint B terverifikasi
+> **Status:** IN PROGRESS — Task 0, Fase A, B1-B3, C1-C3, dan Checkpoint C
+> lokal selesai; Checkpoint B terverifikasi
 > **Plan:** `tasks/audit-remediation-plan.md`
 > **Sumber:** `audit/00-REPORT.md`
 > **Bukti rilis B:** Commit `f701816`, fix test `22e7612`, push `origin/main`,
@@ -290,9 +290,9 @@ focused tests
 
 ## Checkpoint C — Account Lifecycle
 
-- [ ] Account lifecycle full suite pass.
-- [ ] `supabase db lint --local` dan advisors diperiksa.
-- [ ] Active transfer benar; permanent delete tetap fail-closed.
+- [x] Account lifecycle full suite pass.
+- [x] `supabase db lint --local` dan advisors diperiksa.
+- [x] Active transfer benar; permanent delete tetap fail-closed.
 
 ---
 
