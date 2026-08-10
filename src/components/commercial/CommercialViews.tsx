@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
   LayoutGrid,
@@ -8,6 +8,8 @@ import {
   User2,
   ArrowRight,
   RotateCcw,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
@@ -99,6 +101,8 @@ export function CommercialViews(props: CommercialViewsProps) {
   const [q, setQ] = useState("");
   const [ownerFilter, setOwnerFilter] = useState<string>("all");
   const [stageFilter, setStageFilter] = useState<string>("all");
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 20;
 
   const { data: clientList = [] } = useQuery({
     queryKey: ["clients", "all"],
@@ -163,6 +167,20 @@ export function CommercialViews(props: CommercialViewsProps) {
       return true;
     });
   }, [scoped, ownerFilter, stageFilter, q, clients]);
+
+  // Table view shows 20 rows per page; board view renders all filtered items.
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pageItems = useMemo(() => {
+    if (view !== "table") return filtered;
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return filtered.slice(start, start + PAGE_SIZE);
+  }, [filtered, currentPage, view]);
+
+  // Return to page 1 when the filter/search changes.
+  useEffect(() => {
+    setPage(1);
+  }, [q, ownerFilter, stageFilter, deletedMode]);
 
   // Next follow-up state is owned by Tasks, not the normalized commercial
   // document compatibility facade.
@@ -370,7 +388,7 @@ export function CommercialViews(props: CommercialViewsProps) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filtered.map((it) => {
+                  {pageItems.map((it) => {
                     const client = clients[it.clientId];
                     const owner = owners[it.ownerId];
                     const next = nextByItem.get(it.id);
@@ -522,6 +540,38 @@ export function CommercialViews(props: CommercialViewsProps) {
                 </TableBody>
               </Table>
             </div>
+            {filtered.length > PAGE_SIZE && (
+              <div className="flex items-center justify-between border-t px-3 py-2 text-xs text-muted-foreground">
+                <span>
+                  {(currentPage - 1) * PAGE_SIZE + 1}–
+                  {(currentPage - 1) * PAGE_SIZE + pageItems.length} dari{" "}
+                  {filtered.length}
+                </span>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    aria-label="Halaman sebelumnya"
+                    disabled={currentPage <= 1}
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <span className="tabular-nums">
+                    {currentPage} / {totalPages}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    aria-label="Halaman berikutnya"
+                    disabled={currentPage >= totalPages}
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       ) : (
