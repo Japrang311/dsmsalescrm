@@ -13,6 +13,7 @@ Self-service change password + admin reset password implemented and deployed. In
 - Tests: 20 Edge Function tests pass (5 reset-password handler tests), 9 team tests pass (reset serialization + blank-reason guard), lint/typecheck/build pass after hardening.
 - Migrations: `20260810120000_add_team_member_password_reset_activity_kind.sql` adds enum value; `20260810120001_log_team_member_password_reset_activity.sql` updates reason constraint, Activity Feed view labels/search, and Team summary latest-change filter.
 - Codex review: 0 FAIL, 4 WARN — all addressed (inactive-account disable, `autoComplete` attributes, shared password validation helper, handler tests).
+- Codex second review (audit hardening commit): PASS across reason end-to-end, audit-failure surfacing, migration boundaries, secret scan; 1 WARN — spec's handler snippet noise removed.
 - Deployed to production via `vercel --prod --yes`.
 
 ## HANDOFF — Team Settings N+1 fixed + the deferred "Tim & Role" render bug SOLVED (2026-08-06, read this first)

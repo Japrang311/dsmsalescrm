@@ -109,11 +109,23 @@ async function resetPassword(
     );
   }
   await dependencies.updateAuthUserPassword(action.id, action.password);
-  await dependencies.logPasswordReset({
-    actorId,
-    targetId: action.id,
-    reason: action.reason,
-  });
+  try {
+    await dependencies.logPasswordReset({
+      actorId,
+      targetId: action.id,
+      reason: action.reason,
+    });
+  } catch (error) {
+    // Auth already changed — surface the partial failure honestly.
+    return {
+      status: 502,
+      body: {
+        error:
+          "Kata sandi berhasil diubah tapi audit tidak tercatat. Hubungi Super Admin.",
+        code: "PASSWORD_RESET_AUDIT_INCOMPLETE",
+      },
+    };
+  }
   return success(action.id, action.action);
 }
 ```
@@ -129,6 +141,7 @@ Add to `AdminDependencies` type:
 
 ```ts
 updateAuthUserPassword(id: string, password: string): Promise<void>;
+logPasswordReset(input: { actorId: string; targetId: string; reason: string }): Promise<void>;
 ```
 
 ### index.ts
