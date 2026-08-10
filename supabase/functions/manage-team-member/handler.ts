@@ -41,6 +41,7 @@ export type AdminDependencies = {
   deleteAuthUser(id: string): Promise<void>;
   setAuthBan(id: string, banned: boolean): Promise<void>;
   rpc(name: string, args: Record<string, unknown>): Promise<unknown>;
+  updateAuthUserPassword(id: string, password: string): Promise<void>;
 };
 
 function success(id: string, action: AdminAction["action"]): AdminResponse {
@@ -276,6 +277,22 @@ async function accountReferenceCounts(
   };
 }
 
+async function resetPassword(
+  action: Extract<AdminAction, { action: "reset_password" }>,
+  actorId: string,
+  dependencies: AdminDependencies,
+): Promise<AdminResponse> {
+  if (action.id === actorId) {
+    throw new AdminHttpError(
+      409,
+      "SELF_RESET_FORBIDDEN",
+      "Super Admin tidak dapat mereset kata sandi akun yang sedang digunakan.",
+    );
+  }
+  await dependencies.updateAuthUserPassword(action.id, action.password);
+  return success(action.id, action.action);
+}
+
 async function dispatch(
   action: AdminAction,
   actorId: string,
@@ -297,6 +314,8 @@ async function dispatch(
       return deleteEligibleAccount(action, actorId, dependencies);
     case "account_reference_counts":
       return accountReferenceCounts(action, dependencies);
+    case "reset_password":
+      return resetPassword(action, actorId, dependencies);
   }
 }
 

@@ -119,6 +119,13 @@ function createDependencies(): AdminDependencies {
       if (error) throw error;
       return data;
     },
+
+    async updateAuthUserPassword(id, password) {
+      const { error } = await adminClient.auth.admin.updateUserById(id, {
+        password,
+      });
+      if (error) throw error;
+    },
   };
 }
 

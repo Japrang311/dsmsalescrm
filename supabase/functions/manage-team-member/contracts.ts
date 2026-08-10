@@ -40,6 +40,11 @@ export type AdminAction =
   | {
       action: "account_reference_counts";
       id: string;
+    }
+  | {
+      action: "reset_password";
+      id: string;
+      password: string;
     };
 
 export type ErrorBody = {
@@ -131,6 +136,11 @@ const DATABASE_ERRORS: Record<string, { status: number; message: string }> = {
   ROLE_UNCHANGED: {
     status: 409,
     message: "Role akun sudah sesuai dengan permintaan.",
+  },
+  SELF_RESET_FORBIDDEN: {
+    status: 409,
+    message:
+      "Super Admin tidak dapat mereset kata sandi akun yang sedang digunakan.",
   },
 };
 
@@ -299,6 +309,14 @@ export function parseAdminAction(rawBody: string): AdminAction {
       return {
         action: "account_reference_counts",
         id: requireUuid(decoded.id, "ID anggota tim"),
+      };
+
+    case "reset_password":
+      requireExactKeys(decoded, ["action", "id", "password"]);
+      return {
+        action: "reset_password",
+        id: requireUuid(decoded.id, "ID anggota tim"),
+        password: requireString(decoded.password, "Password", 8, 128, false),
       };
 
     default:

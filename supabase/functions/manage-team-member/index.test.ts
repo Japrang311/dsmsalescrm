@@ -34,6 +34,7 @@ type TestDependencies = {
   deleteAuthUser(id: string): Promise<void>;
   setAuthBan(id: string, banned: boolean): Promise<void>;
   rpc(name: string, args: Record<string, unknown>): Promise<unknown>;
+  updateAuthUserPassword(id: string, password: string): Promise<void>;
 };
 
 type DependencyOverrides = Partial<TestDependencies>;
@@ -76,6 +77,12 @@ function dependencyHarness(overrides: DependencyOverrides = {}) {
       calls.push({ operation: "rpc", value: { name, args } });
       return { id: TARGET_ID };
     },
+    async updateAuthUserPassword(id, password) {
+      calls.push({
+        operation: "updateAuthUserPassword",
+        value: { id, password },
+      });
+    },
     ...overrides,
   };
   return { calls, dependencies };
@@ -112,7 +119,7 @@ describe("manage-team-member validation boundary", () => {
     expect(typeof contracts.toHttpError).toBe("function");
   });
 
-  test("parses and normalizes the exact eight-action contract", () => {
+  test("parses and normalizes the exact nine-action contract", () => {
     const inputs: Array<[Record<string, unknown>, AdminAction]> = [
       [
         {
@@ -218,6 +225,18 @@ describe("manage-team-member validation boundary", () => {
         {
           action: "account_reference_counts",
           id: TARGET_ID,
+        },
+      ],
+      [
+        {
+          action: "reset_password",
+          id: TARGET_ID,
+          password: " kata-sandi-baru-123 ",
+        },
+        {
+          action: "reset_password",
+          id: TARGET_ID,
+          password: " kata-sandi-baru-123 ",
         },
       ],
     ];
@@ -819,5 +838,89 @@ describe("manage-team-member protected handler", () => {
         body: { code },
       });
     }
+  });
+
+  test("reset_password success calls updateAuthUserPassword with target id and new password", async () => {
+    const harness = dependencyHarness();
+    const result = await invokeHandler(
+      post({
+        action: "reset_password",
+        id: TARGET_ID,
+        password: "kata-sandi-baru-123",
+      }),
+      harness.dependencies,
+    );
+    expect(result).toEqual({
+      status: 200,
+      body: { id: TARGET_ID, action: "reset_password" },
+    });
+    expect(harness.calls).toContainEqual({
+      operation: "updateAuthUserPassword",
+      value: { id: TARGET_ID, password: "kata-sandi-baru-123" },
+    });
+    expect(harness.calls.some((call) => call.operation === "rpc")).toBe(false);
+  });
+
+  test("reset_password on self returns 409 SELF_RESET_FORBIDDEN", async () => {
+    const harness = dependencyHarness({
+      async authenticate() {
+        return { id: TARGET_ID };
+      },
+    });
+    const result = await invokeHandler(
+      post({
+        action: "reset_password",
+        id: TARGET_ID,
+        password: "kata-sandi-baru-123",
+      }),
+      harness.dependencies,
+    );
+    expect(result).toMatchObject({
+      status: 409,
+      body: { code: "SELF_RESET_FORBIDDEN" },
+    });
+    expect(
+      harness.calls.some((c) => c.operation === "updateAuthUserPassword"),
+    ).toBe(false);
+  });
+
+  test("reset_password from non-super-admin returns 403 and never reaches updateAuthUserPassword", async () => {
+    const manager = dependencyHarness({
+      async getCallerProfile() {
+        return { role: "manager", account_status: "active" };
+      },
+    });
+    const result = await invokeHandler(
+      post({
+        action: "reset_password",
+        id: TARGET_ID,
+        password: "kata-sandi-baru-123",
+      }),
+      manager.dependencies,
+    );
+    expect(result).toMatchObject({
+      status: 403,
+      body: { code: "ACTIVE_SUPER_ADMIN_REQUIRED" },
+    });
+    expect(
+      manager.calls.some((c) => c.operation === "updateAuthUserPassword"),
+    ).toBe(false);
+  });
+
+  test("reset_password with short password returns 400 INVALID_REQUEST", async () => {
+    const harness = dependencyHarness();
+    const result = await invokeHandler(
+      post({
+        action: "reset_password",
+        id: TARGET_ID,
+        password: "1234567",
+      }),
+      harness.dependencies,
+    );
+    expect(result.status).toBe(400);
+    expect(result.body.code).toBe("INVALID_REQUEST");
+    expect(
+      harness.calls.some((c) => c.operation === "updateAuthUserPassword"),
+    ).toBe(false);
   });
 });

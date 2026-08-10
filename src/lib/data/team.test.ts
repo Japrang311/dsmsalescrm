@@ -227,6 +227,22 @@ describe("Team lifecycle request serialization", () => {
     ]);
   });
 
+  test("serializes the reset_password action", async () => {
+    await team.resetTeamMemberPassword(
+      "member-1",
+      "new-temporary-password",
+      teamClient,
+    );
+
+    expect(invoke).toHaveBeenCalledWith("manage-team-member", {
+      body: {
+        action: "reset_password",
+        id: "member-1",
+        password: "new-temporary-password",
+      },
+    });
+  });
+
   test("rejects blank administrative reasons before invoking the function", async () => {
     for (const operation of [
       () => team.changeTeamMemberRole("member-1", "manager", "  "),

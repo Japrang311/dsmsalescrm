@@ -3,6 +3,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { getErrorMessage } from "@/lib/utils";
+import { supabase } from "@/lib/supabase";
+import { isValidPassword } from "@/lib/auth/password-validation";
 import {
   Pencil,
   Plus,
@@ -16,6 +18,7 @@ import {
   Target as TargetIcon,
   Database,
   CalendarDays,
+  KeyRound,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -100,6 +103,7 @@ import {
   getCurrentProfileId,
   formatBlockingReferenceCounts,
   formatOwnedActiveCounts,
+  resetTeamMemberPassword,
   TeamAdminError,
   type AppRole,
   type TeamMember,
@@ -198,6 +202,9 @@ function SettingsPage() {
           <TabsTrigger value="profile" className="gap-1.5">
             <User2 className="h-3.5 w-3.5" /> Profil
           </TabsTrigger>
+          <TabsTrigger value="account" className="gap-1.5">
+            <KeyRound className="h-3.5 w-3.5" /> Akun
+          </TabsTrigger>
           {canViewTeam && (
             <TabsTrigger value="team" className="gap-1.5">
               <Users className="h-3.5 w-3.5" /> Tim &amp; Role
@@ -221,6 +228,9 @@ function SettingsPage() {
             defaultName={defaultProfile.name}
             defaultEmail={defaultProfile.email}
           />
+        </TabsContent>
+        <TabsContent value="account">
+          <AccountTab email={realProfile?.email ?? defaultProfile.email} />
         </TabsContent>
         {canViewTeam && (
           <TabsContent value="team">
@@ -398,6 +408,97 @@ function ProfileTab({
 }
 
 // ---------------------------------------------------------------------------
+// Account tab (self-service change password)
+// ---------------------------------------------------------------------------
+
+function AccountTab({ email }: { email: string }) {
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const valid =
+    currentPassword.length > 0 &&
+    isValidPassword(newPassword) &&
+    newPassword === confirmPassword;
+
+  async function submit() {
+    setSubmitting(true);
+    try {
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password: currentPassword,
+      });
+      if (signInError) {
+        toast.error("Kata sandi saat ini tidak sesuai");
+        return;
+      }
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+      if (updateError) {
+        toast.error("Gagal mengubah kata sandi", {
+          description: updateError.message,
+        });
+        return;
+      }
+      toast.success("Kata sandi berhasil diubah");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (error) {
+      toast.error("Gagal mengubah kata sandi", {
+        description: getErrorMessage(error),
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Ubah Kata Sandi</CardTitle>
+        <CardDescription>
+          Perubahan kata sandi berlaku langsung untuk akun login Anda.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="max-w-md space-y-3">
+        <Field label="Kata sandi saat ini">
+          <Input
+            type="password"
+            autoComplete="current-password"
+            value={currentPassword}
+            onChange={(e) => setCurrentPassword(e.target.value)}
+          />
+        </Field>
+        <Field label="Kata sandi baru">
+          <Input
+            type="password"
+            autoComplete="new-password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            placeholder="Minimal 8 karakter"
+          />
+        </Field>
+        <Field label="Konfirmasi kata sandi baru">
+          <Input
+            type="password"
+            autoComplete="new-password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+          />
+        </Field>
+        <div className="flex justify-end pt-2">
+          <Button disabled={!valid || submitting} onClick={() => void submit()}>
+            {submitting ? "Menyimpan…" : "Ubah kata sandi"}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Team tab
 // ---------------------------------------------------------------------------
 
@@ -454,6 +555,8 @@ function TeamTab({
     kind: TeamAction;
     member: TeamMember;
   } | null>(null);
+  const [resetPasswordTarget, setResetPasswordTarget] =
+    useState<TeamMember | null>(null);
 
   const visibleTeam = team.filter(
     (member) => statusFilter === "all" || member.accountStatus === statusFilter,
@@ -672,6 +775,25 @@ function TeamTab({
                             >
                               <Users className="h-3.5 w-3.5" />
                             </Button>
+                            {currentProfileId !== m.id && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                disabled={
+                                  busyId === m.id ||
+                                  m.accountStatus !== "active"
+                                }
+                                onClick={() => setResetPasswordTarget(m)}
+                                title={
+                                  m.accountStatus !== "active"
+                                    ? "Akun nonaktif — aktifkan dulu untuk reset kata sandi"
+                                    : "Reset kata sandi"
+                                }
+                              >
+                                <KeyRound className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
                             <Button
                               variant="ghost"
                               size="icon"
@@ -782,8 +904,87 @@ function TeamTab({
             />
           )}
         </Dialog>
+        <Dialog
+          open={!!resetPasswordTarget}
+          onOpenChange={(open) => !open && setResetPasswordTarget(null)}
+        >
+          {resetPasswordTarget && (
+            <ResetPasswordDialog
+              member={resetPasswordTarget}
+              onClose={() => setResetPasswordTarget(null)}
+            />
+          )}
+        </Dialog>
       </CardContent>
     </Card>
+  );
+}
+
+function ResetPasswordDialog({
+  member,
+  onClose,
+}: {
+  member: TeamMember;
+  onClose: () => void;
+}) {
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const valid = isValidPassword(newPassword) && newPassword === confirmPassword;
+
+  return (
+    <DialogContent>
+      <DialogHeader>
+        <DialogTitle>Reset kata sandi {member.name}</DialogTitle>
+        <DialogDescription>
+          Kata sandi baru berlaku langsung. Beritahu kata sandi ini ke anggota
+          tim secara langsung.
+        </DialogDescription>
+      </DialogHeader>
+      <div className="space-y-3">
+        <Field label="Kata sandi baru">
+          <Input
+            type="password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            placeholder="Minimal 8 karakter"
+          />
+        </Field>
+        <Field label="Konfirmasi kata sandi baru">
+          <Input
+            type="password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+          />
+        </Field>
+      </div>
+      <DialogFooter>
+        <Button variant="outline" onClick={onClose} disabled={submitting}>
+          Batal
+        </Button>
+        <Button
+          disabled={!valid || submitting}
+          onClick={() => {
+            void (async () => {
+              setSubmitting(true);
+              try {
+                await resetTeamMemberPassword(member.id, newPassword);
+                toast.success(`${member.name} kata sandi berhasil direset`);
+                onClose();
+              } catch (error) {
+                toast.error("Gagal mereset kata sandi", {
+                  description: getErrorMessage(error),
+                });
+              } finally {
+                setSubmitting(false);
+              }
+            })();
+          }}
+        >
+          {submitting ? "Memproses…" : "Reset kata sandi"}
+        </Button>
+      </DialogFooter>
+    </DialogContent>
   );
 }
 
@@ -811,7 +1012,7 @@ function MemberDialog({
   const valid =
     name.trim().length > 1 &&
     /.+@.+\..+/.test(email) &&
-    (member || password.length >= 8);
+    (member || isValidPassword(password));
 
   return (
     <DialogContent>
