@@ -64,6 +64,13 @@ If the account is inactive, the app must show the unavailable-account state, sig
 
 After the first bootstrap, create and manage Sales, Sales Manager, Top Executive, and additional Super Admin accounts only through Settings → `Tim & Role` and the protected server endpoint. Only an active Super Admin can assign `super_admin`.
 
+## Password management (live, 2026-08-10)
+
+- **Self-service change password**: Settings → Akun tab. Any authenticated user verifies their current password via `supabase.auth.signInWithPassword` before calling `updateUser({ password })`. Min 8 characters.
+- **Admin reset password**: Settings → Tim & Role → "Reset Kata Sandi" button, Super Admin only. Calls the `manage-team-member` Edge Function's `reset_password` action (`auth.admin.updateUserById`). Returns `SELF_RESET_FORBIDDEN` (409) if a Super Admin tries to reset their own password this way — use the self-service flow instead. Button is disabled for inactive accounts and hidden on the acting Super Admin's own row.
+- Shared validation: `src/lib/auth/password-validation.ts` (`isValidPassword`, 8-128 chars), used by create-account, change-password, and reset-password.
+- Forgot-password / email recovery is still **not implemented** — needs SMTP config. See `specs/change-password.md` Out of Scope.
+
 ## Safety rules
 
 - Do not run bootstrap against a remote project without separate approval naming that target.

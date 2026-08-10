@@ -2,6 +2,18 @@
 
 Context dump for continuing this work in another tool (Codex). Written 2026-07-18; Phase 11/12 status refreshed 2026-07-19; Phase 11 import-review reconciliation session added 2026-07-19; post-import UX/bugfix session added 2026-07-20; second 2026-07-20 session (pipeline permissions/FK bugfixes) added 2026-07-20; Client Detail/Client List real-data wiring session added 2026-07-21; remote-migration-push + data-restoration session added 2026-07-21; browser-verification + spending_ytd fix + SO edit audit trail session added 2026-07-21; unused-code cleanup + client database (company info/contacts) feature session added 2026-07-22; contact position + Client Detail product/description fixes + commercial item product-name migration reconciliation added 2026-07-22; dynamic per-month sales target UI/calculation update added 2026-07-22; soft-delete implementation, remote Supabase apply, and main/live push closeout added 2026-07-24; RFQ retirement and documentation refresh added 2026-07-25; Sales Task Control Loop spec approval and Phase 1-2 implementation (Tasks 46-52) added 2026-07-27; unified progress timeline Task 53/8 and Manager Team Exceptions Task 54/9 added 2026-07-27; visual design audit Phase 1 (critical usability/responsiveness fixes) added 2026-07-27; Executive exception detail and aggregate-only Task metrics Task 55/10 added 2026-07-27; Dashboard/TopBar consumer migration Task 56/11 added 2026-07-27; Reports consumer migration Task 57/12 added 2026-07-27; export migration Task 58/13 added 2026-07-27; Pipeline/Client Detail/commercial follow-up migration Task 59/14 added 2026-07-27; ownership/account lifecycle migration Task 60/15 added 2026-07-27; production deployment audit + RLS/security-advisor review + two security-hardening migrations added 2026-07-30; Stage 1/Stage 2 checklist closeout + Sentry source-map wiring + commercial Next FU fix (commit `7ae20aa`, pushed, CI green) + Stage 3 Pipeline-pagination brainstorming in progress added 2026-08-05.
 
+## HANDOFF — Password feature deployed (2026-08-10)
+
+Self-service change password + admin reset password implemented and deployed. Commit `2bcd346`, deployed to `dsmsalescrm.vercel.app`.
+
+- 9 files changed (7 modified, 2 new).
+- Edge Function: `reset_password` action added to `manage-team-member` (`contracts.ts`, `handler.ts`, `index.ts`).
+- Client: `resetTeamMemberPassword` added to `src/lib/data/team.ts`; `AccountTab` and `ResetPasswordDialog` added to `src/routes/_app.settings.tsx`.
+- Shared helper: `src/lib/auth/password-validation.ts`.
+- Tests: 19 Edge Function tests pass (4 new), 9 team tests pass (1 new), lint/typecheck/build all pass.
+- Codex review: 0 FAIL, 4 WARN — all addressed (inactive-account disable, `autoComplete` attributes, shared password validation helper, handler tests).
+- Deployed to production via `vercel --prod --yes`.
+
 ## HANDOFF — Team Settings N+1 fixed + the deferred "Tim & Role" render bug SOLVED (2026-08-06, read this first)
 
 Latest state, ahead of everything below. Two Stage 3 checklist items done together: "Replace
@@ -13,7 +25,7 @@ fixed as a genuine side effect of this work — not chased separately.
 
 - **What was actually wrong** (two false starts before finding it — see below): Settings
   (`src/routes/_app.settings.tsx`) passed `queryFn: listTeamMembers` and `queryFn:
-  getCurrentProfileId` directly to `useQuery`. Both functions have an optional first parameter
+getCurrentProfileId` directly to `useQuery`. Both functions have an optional first parameter
   (`client: TeamSupabaseClient = realTeamClient`) used for test injection. React Query always
   calls `queryFn` with a `QueryFunctionContext` argument — which silently overrode that default,
   so `client` became the context object (no `.from`/`.rpc`/`.auth` methods) instead of the real
@@ -23,7 +35,7 @@ fixed as a genuine side effect of this work — not chased separately.
   Both call sites now wrap in an arrow function (`() => listTeamMembers()`).
 - **Two wrong hypotheses along the way, corrected in real time, worth remembering:** (1) First
   guessed `admin_count_active_commercial_items`/`private.count_active_commercial_items` still
-  referenced the dropped `public.commercial_items` table — checked the *live* production function
+  referenced the dropped `public.commercial_items` table — checked the _live_ production function
   definition via `pg_get_functiondef` and it was already correctly repointed to
   `commercial_documents` back on 2026-07-19 (migration `20260719024024`). (2) Then reproduced
   `listTeamMembers()` cleanly against local Supabase with zero errors, ruling out a data-shape
@@ -67,7 +79,7 @@ Orders, Activity) — is implemented, verified locally and against production, a
 - **Why this one needed a different design than the other three:** Activity Log isn't one table.
   `src/routes/_app.activity.tsx` merged `activity_log` (355 rows) and `follow_up_logs` (79 rows)
   into one timeline in the browser (`buildActivityFeed()`), with free-text search running over
-  *enriched* fields (constructed titles, resolved owner/client names) rather than raw DB columns.
+  _enriched_ fields (constructed titles, resolved owner/client names) rather than raw DB columns.
   A mechanical per-table keyset (the Clients/Pipeline/Sales Orders pattern) doesn't apply to a
   merged, search-across-enriched-fields feed. Owner explicitly chose the full redesign over a
   cheaper partial fix (see the design-options question and answer in this session).
@@ -133,7 +145,7 @@ Orders, Activity) — is implemented, verified locally and against production, a
   (`Date.now() + 24h`), but `computeTaskDueState()`'s `asOf` uses `todayInJakarta()`
   (`src/lib/data/business-calendar.ts`, Asia/Jakarta = UTC+7). Whenever CI's UTC clock is at or
   past 17:00, Jakarta has already rolled to the next calendar day, so the UTC "+24h tomorrow" and
-  Jakarta's "today" land on the *same* date — the created task is classified `Today`, not
+  Jakarta's "today" land on the _same_ date — the created task is classified `Today`, not
   `Upcoming`, and the UPCOMING-tab assertion fails. Reproduced the exact date collision locally
   (`2026-08-05T22:27:13Z` → both computed `2026-08-06`), fixed `tomorrowIsoDate()` to derive
   tomorrow from Jakarta's calendar date instead, confirmed the full local `bun run test:e2e` (8/8)
@@ -151,7 +163,7 @@ to production.
 - `src/lib/data/sales-orders.ts` — `listSalesOrdersPage()`: keyset pagination, page size 25,
   cursor `so_number`+`id`, server-side filters for date range / owner / client / tax type /
   source / SO type / deleted mode.
-- **Ordering decision:** sorts by `so_number` descending, *not* `created_at`. Production has 209
+- **Ordering decision:** sorts by `so_number` descending, _not_ `created_at`. Production has 209
   active Sales Orders but only 21 distinct `created_at` values (bulk Sheet import), so a
   created_at sort is effectively arbitrary. Every series zero-pads its sequence to three digits
   (`DSM-26SO001` … `DSM-26SO160`, `DSM-26NP017`, `DSM-26PROTY008`), so plain text ordering equals
@@ -183,9 +195,9 @@ to production.
   `supabase db push` run printed unrelated `pgdelta-target-ca.crt` ENOENT noise from the CLI's
   edge runtime; the migration still applied.
 - Committed as `7d036ba` and pushed to `main`. GitHub Actions run `31020505720`: all 7 jobs pass.
-- Note on the *previous* commit `7a71cd3` (Pipeline pagination): its CI run `31011022207`
+- Note on the _previous_ commit `7a71cd3` (Pipeline pagination): its CI run `31011022207`
   failed the "Production migration parity" job, because the Pipeline migration was pushed to
-  Supabase *after* the git push. Every other job passed and no code regression was involved —
+  Supabase _after_ the git push. Every other job passed and no code regression was involved —
   the gate was correctly reporting a real window where production lacked the RPC. Push the
   migration to Supabase **before** pushing the commit, which is the order used for `7d036ba`.
 
@@ -262,7 +274,7 @@ commercial_documents). Tasks pagination remains not started; revisit after Sales
 - Wired Sentry source-map upload (`@sentry/vite-plugin` in `vite.config.ts`), gated on
   `SENTRY_AUTH_TOKEN`/`SENTRY_ORG`/`SENTRY_PROJECT` all being present (no-op otherwise). Uses
   `sourcemap: "hidden"` after a dry run with throwaway fake credentials proved the plugin only
-  deletes local `.map` files after a *successful* upload — a failed/misconfigured token would
+  deletes local `.map` files after a _successful_ upload — a failed/misconfigured token would
   otherwise leak maps into the public static output. No Sentry project/DSN exists for this app
   yet; production source-map upload and external event ingestion remain genuinely unverified
   until the owner creates a Sentry project and supplies real credentials (a credential/account
@@ -304,8 +316,8 @@ either way, treat the decisions below as already made so you don't re-ask them:
      `_app.quotations.index.tsx` — has a Table mode (flat, no drag-drop, closest analog to the
      already-paginated Clients route) and a Board mode (kanban-style but read-only, no
      drag-drop).
-   **Owner chose: focus on Pipeline (the kanban drag-drop board) first**, Quotations
-   Table/Board later.
+     **Owner chose: focus on Pipeline (the kanban drag-drop board) first**, Quotations
+     Table/Board later.
 4. **Open, unanswered question — was asked, owner said "checkpoint, continue with another
    agent" before answering:** Pipeline (`_app.pipeline.tsx`) does **not** filter
    `isCurrentRevision !== false` for Quotations the way `CommercialViews.tsx`'s `scoped` memo
@@ -319,7 +331,7 @@ either way, treat the decisions below as already made so you don't re-ask them:
 ### Design considerations already surfaced (not yet decided/presented as options)
 
 - **Summary stats problem:** `PipelineAnalytics` and the header cards (Total Pipeline, Open
-  Value, Won Value, Win Rate, per-stage %) are currently computed client-side from the *full*
+  Value, Won Value, Win Rate, per-stage %) are currently computed client-side from the _full_
   in-memory `items` array (all non-deleted commercial_documents, fetched via
   `["commercial-items", "all"]` / `listCommercialItems()`). If Pipeline moves to bounded
   per-stage loading, these numbers can no longer be computed from what's rendered — they need a
@@ -337,15 +349,14 @@ either way, treat the decisions below as already made so you don't re-ask them:
   loaded N-per-column must be draggable (would need eager-loading or a different interaction),
   or whether it's acceptable that only already-loaded cards can be dragged until the column is
   expanded.
-- **Client-status filter:** the existing `status` filter dropdown filters by the *client's*
+- **Client-status filter:** the existing `status` filter dropdown filters by the _client's_
   status, not the document's — currently done via a client-side join against a separately
   fetched `clients` list. Whether this moves server-side (via a Supabase embedded-resource
   filter on the `clients` foreign-key relation) or stays a client-side post-filter on the loaded
   page is still open.
 - **Rough options sketched (not yet presented to the owner as a formal choice):**
   - **A (leaning recommended):** bounded-per-stage keyset load (extend
-    `listCommercialDocuments`/add a paginated variant, called per-stage with a small limit e.g.
-    50) + a new aggregate RPC for the header/analytics numbers, following the
+    `listCommercialDocuments`/add a paginated variant, called per-stage with a small limit e.g. 50) + a new aggregate RPC for the header/analytics numbers, following the
     `task_control_loop_metrics_rpc` pattern.
   - **B (minimal/quick-win):** don't implement true per-column pagination yet; just move the
     summary-stat computation to a server RPC and trim the per-card payload. Doesn't actually
@@ -367,7 +378,7 @@ either way, treat the decisions below as already made so you don't re-ask them:
   lists `"commercial-documents"` and `"tasks"` in its `ListResource` union, ready to use.
 - Clients pagination: `src/lib/data/clients.ts:listClientRowsPage` (server-side search/status/
   source/owner/next-FU filters, keyset cursor on `created_at`+`id`) wired into
-  `src/routes/_app.clients.index.tsx`. This is the reference implementation for the *mechanical*
+  `src/routes/_app.clients.index.tsx`. This is the reference implementation for the _mechanical_
   parts of the pattern (query shape, cursor encode/decode, `listQueryKey` usage) — Pipeline's
   kanban shape still needs its own design as noted above.
 

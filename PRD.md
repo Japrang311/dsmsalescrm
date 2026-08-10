@@ -342,6 +342,7 @@ Lovable should visually represent these permissions, but not implement real enfo
 - Sales Manager can view and edit company/team business data when needed, but Team & Role is read-only.
 - Top Executive is read-only.
 - Super Admin can manage Team & Role, deactivate/reactivate accounts, transfer ownership, and edit all supported business data company-wide.
+- Super Admin can reset any team member's password from Settings → Tim & Role.
 - Only an active Super Admin can create or assign another Super Admin.
 - Super Admin cannot own clients, targets, pipeline, or revenue and is excluded from Sales performance comparisons.
 - Activity Log is append-only for every role, including Super Admin.
@@ -666,6 +667,7 @@ These decisions were confirmed during product discovery and must be treated as i
 - The production database is Supabase PostgreSQL.
 - Authentication uses Supabase Auth.
 - User accounts are created by Super Admin after the first controlled manual bootstrap; public sign-up is not available.
+- Any authenticated user can change their own password from Settings → Akun tab. Current password verification is required.
 - Roles are stored in the database: `Sales`, `Sales Manager`, `Top Executive`, and `Super Admin`.
 - Database permissions and application queries must enforce the role scope defined in Section 9.
 - Lovable remains responsible only for UI/UX and mock interactions; it must not implement the production backend, authentication, permission, or import logic.
