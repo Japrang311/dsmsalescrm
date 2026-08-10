@@ -42,6 +42,11 @@ export type AdminDependencies = {
   setAuthBan(id: string, banned: boolean): Promise<void>;
   rpc(name: string, args: Record<string, unknown>): Promise<unknown>;
   updateAuthUserPassword(id: string, password: string): Promise<void>;
+  logPasswordReset(input: {
+    actorId: string;
+    targetId: string;
+    reason: string;
+  }): Promise<void>;
 };
 
 function success(id: string, action: AdminAction["action"]): AdminResponse {
@@ -290,6 +295,19 @@ async function resetPassword(
     );
   }
   await dependencies.updateAuthUserPassword(action.id, action.password);
+  try {
+    await dependencies.logPasswordReset({
+      actorId,
+      targetId: action.id,
+      reason: action.reason,
+    });
+  } catch {
+    throw new AdminHttpError(
+      502,
+      "PASSWORD_RESET_AUDIT_INCOMPLETE",
+      "Kata sandi Auth sudah direset, tetapi pencatatan audit belum selesai. Catat alasan administratif secara manual dan hubungi administrator server.",
+    );
+  }
   return success(action.id, action.action);
 }
 

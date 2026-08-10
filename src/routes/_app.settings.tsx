@@ -929,8 +929,12 @@ function ResetPasswordDialog({
 }) {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const valid = isValidPassword(newPassword) && newPassword === confirmPassword;
+  const valid =
+    isValidPassword(newPassword) &&
+    newPassword === confirmPassword &&
+    reason.trim().length > 0;
 
   return (
     <DialogContent>
@@ -957,6 +961,13 @@ function ResetPasswordDialog({
             onChange={(e) => setConfirmPassword(e.target.value)}
           />
         </Field>
+        <Field label="Alasan administratif">
+          <Textarea
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="cth. Reset diminta langsung oleh anggota tim"
+          />
+        </Field>
       </div>
       <DialogFooter>
         <Button variant="outline" onClick={onClose} disabled={submitting}>
@@ -968,7 +979,7 @@ function ResetPasswordDialog({
             void (async () => {
               setSubmitting(true);
               try {
-                await resetTeamMemberPassword(member.id, newPassword);
+                await resetTeamMemberPassword(member.id, newPassword, reason);
                 toast.success(`${member.name} kata sandi berhasil direset`);
                 onClose();
               } catch (error) {

@@ -67,7 +67,7 @@ After the first bootstrap, create and manage Sales, Sales Manager, Top Executive
 ## Password management (live, 2026-08-10)
 
 - **Self-service change password**: Settings → Akun tab. Any authenticated user verifies their current password via `supabase.auth.signInWithPassword` before calling `updateUser({ password })`. Min 8 characters.
-- **Admin reset password**: Settings → Tim & Role → "Reset Kata Sandi" button, Super Admin only. Calls the `manage-team-member` Edge Function's `reset_password` action (`auth.admin.updateUserById`). Returns `SELF_RESET_FORBIDDEN` (409) if a Super Admin tries to reset their own password this way — use the self-service flow instead. Button is disabled for inactive accounts and hidden on the acting Super Admin's own row.
+- **Admin reset password**: Settings → Tim & Role → "Reset Kata Sandi" button, Super Admin only. Requires a new password plus an administrative reason. Calls the `manage-team-member` Edge Function's `reset_password` action (`auth.admin.updateUserById`) and then writes a `team_member_password_reset` Activity Log event with actor, target snapshot, and reason. Returns `SELF_RESET_FORBIDDEN` (409) if a Super Admin tries to reset their own password this way — use the self-service flow instead. Button is disabled for inactive accounts and hidden on the acting Super Admin's own row.
 - Shared validation: `src/lib/auth/password-validation.ts` (`isValidPassword`, 8-128 chars), used by create-account, change-password, and reset-password.
 - Forgot-password / email recovery is still **not implemented** — needs SMTP config. See `specs/change-password.md` Out of Scope.
 

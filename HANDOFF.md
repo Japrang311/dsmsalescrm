@@ -4,13 +4,14 @@ Context dump for continuing this work in another tool (Codex). Written 2026-07-1
 
 ## HANDOFF — Password feature deployed (2026-08-10)
 
-Self-service change password + admin reset password implemented and deployed. Commit `2bcd346`, deployed to `dsmsalescrm.vercel.app`.
+Self-service change password + admin reset password implemented and deployed. Initial commit `2bcd346`, deployed to `dsmsalescrm.vercel.app`. Follow-up audit hardening after Codex review adds required reset reason + `team_member_password_reset` Activity Log event before the next release.
 
 - 9 files changed (7 modified, 2 new).
-- Edge Function: `reset_password` action added to `manage-team-member` (`contracts.ts`, `handler.ts`, `index.ts`).
+- Edge Function: `reset_password` action added to `manage-team-member` (`contracts.ts`, `handler.ts`, `index.ts`); follow-up hardening makes it require an administrative reason, block self-reset, update Auth, then log `team_member_password_reset`.
 - Client: `resetTeamMemberPassword` added to `src/lib/data/team.ts`; `AccountTab` and `ResetPasswordDialog` added to `src/routes/_app.settings.tsx`.
 - Shared helper: `src/lib/auth/password-validation.ts`.
-- Tests: 19 Edge Function tests pass (4 new), 9 team tests pass (1 new), lint/typecheck/build all pass.
+- Tests: 20 Edge Function tests pass (5 reset-password handler tests), 9 team tests pass (reset serialization + blank-reason guard), lint/typecheck/build pass after hardening.
+- Migrations: `20260810120000_add_team_member_password_reset_activity_kind.sql` adds enum value; `20260810120001_log_team_member_password_reset_activity.sql` updates reason constraint, Activity Feed view labels/search, and Team summary latest-change filter.
 - Codex review: 0 FAIL, 4 WARN — all addressed (inactive-account disable, `autoComplete` attributes, shared password validation helper, handler tests).
 - Deployed to production via `vercel --prod --yes`.
 

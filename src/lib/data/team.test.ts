@@ -231,6 +231,7 @@ describe("Team lifecycle request serialization", () => {
     await team.resetTeamMemberPassword(
       "member-1",
       "new-temporary-password",
+      "Reset diminta langsung",
       teamClient,
     );
 
@@ -239,6 +240,7 @@ describe("Team lifecycle request serialization", () => {
         action: "reset_password",
         id: "member-1",
         password: "new-temporary-password",
+        reason: "Reset diminta langsung",
       },
     });
   });
@@ -249,7 +251,8 @@ describe("Team lifecycle request serialization", () => {
       () => team.deactivateTeamMember("member-1", ""),
       () => team.reactivateTeamMember("member-1", "\t"),
       () => team.transferTeamOwnership("member-1", "member-2", " "),
-      () => team.deleteEligibleTeamMember("member-1", ""),
+      () => team.deleteEligibleTeamMember("member-1", "  "),
+      () => team.resetTeamMemberPassword("member-1", "password-baru", "  "),
     ]) {
       await expect(operation()).rejects.toMatchObject({
         name: "TeamAdminError",

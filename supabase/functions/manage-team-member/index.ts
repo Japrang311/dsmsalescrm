@@ -126,6 +126,28 @@ function createDependencies(): AdminDependencies {
       });
       if (error) throw error;
     },
+
+    async logPasswordReset({ actorId, targetId, reason }) {
+      const { data: target, error: targetError } = await adminClient
+        .from("profiles")
+        .select("name, email, role")
+        .eq("id", targetId)
+        .maybeSingle();
+      if (targetError) throw targetError;
+      if (!target) throw new Error("Target profile was not found");
+
+      const { error } = await adminClient.from("activity_log").insert({
+        kind: "team_member_password_reset",
+        owner_id: actorId,
+        actor_id: actorId,
+        target_profile_id: targetId,
+        target_profile_snapshot: target,
+        administrative_reason: reason,
+        title: "Kata sandi anggota tim direset",
+        detail: "Kata sandi login direset oleh Super Admin.",
+      });
+      if (error) throw error;
+    },
   };
 }
 

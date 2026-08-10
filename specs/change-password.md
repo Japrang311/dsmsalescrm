@@ -2,11 +2,11 @@
 
 ## Implementation Status
 
-IMPLEMENTED 2026-08-10. Deployed to production. Commit 2bcd346.
+IMPLEMENTED 2026-08-10. Deployed to production. Initial commit 2bcd346; follow-up audit hardening adds required reset reason, `team_member_password_reset` Activity Log event, and two Supabase migrations for the new activity kind/view mapping.
 
 ## Objective
 
-Allow users to change their own password from Settings, and allow Super Admin to reset any team member's password from the Team & Role screen.
+Allow users to change their own password from Settings, and allow Super Admin to reset any other active team member's password from the Team & Role screen.
 
 ## Tech Stack
 
@@ -16,7 +16,7 @@ Allow users to change their own password from Settings, and allow Super Admin to
 ## Scope
 
 1. **Self-service change password** — any authenticated user can change their own password from Settings page. Uses Supabase client SDK `supabase.auth.updateUser({ password })`. No backend/Edge Function needed.
-2. **Admin reset password** — Super Admin can reset any team member's password from Settings → Tim & Role. Uses new `reset_password` action in existing `manage-team-member` Edge Function. Calls `auth.admin.updateUserById(targetId, { password })`.
+2. **Admin reset password** — Super Admin can reset any other active team member's password from Settings → Tim & Role. Uses new `reset_password` action in existing `manage-team-member` Edge Function. Requires an administrative reason, calls `auth.admin.updateUserById(targetId, { password })`, then writes a `team_member_password_reset` Activity Log event.
 
 ## Out of Scope
 
@@ -51,9 +51,11 @@ Add a new action button on each member row (visible only to Super Admin, alongsi
 
 - New password field (min 8 chars)
 - Confirm new password field
+- Administrative reason field (required; stored in Activity Log)
 - Submit → calls `manage-team-member` Edge Function with new `reset_password` action
 - Success: toast "{nama} kata sandi berhasil direset"
 - Cannot reset own password via this path (SELF_RESET_FORBIDDEN)
+- Inactive accounts cannot be reset from this button; activate the account first
 
 ## Edge Function Changes — `supabase/functions/manage-team-member/`
 
@@ -66,6 +68,7 @@ Add new action type:
     action: "reset_password";
     id: string;
     password: string;
+    reason: string;
   }
 ```
 
@@ -73,11 +76,12 @@ Add parsing in `parseAdminAction` switch:
 
 ```ts
 case "reset_password":
-  requireExactKeys(decoded, ["action", "id", "password"]);
+  requireExactKeys(decoded, ["action", "id", "password", "reason"]);
   return {
     action: "reset_password",
     id: requireUuid(decoded.id, "ID anggota tim"),
     password: requireString(decoded.password, "Password", 8, 128, false),
+    reason: requireReason(decoded.reason),
   };
 ```
 
@@ -105,6 +109,11 @@ async function resetPassword(
     );
   }
   await dependencies.updateAuthUserPassword(action.id, action.password);
+  await dependencies.logPasswordReset({
+    actorId,
+    targetId: action.id,
+    reason: action.reason,
+  });
   return success(action.id, action.action);
 }
 ```
@@ -141,10 +150,11 @@ Add new function:
 export async function resetTeamMemberPassword(
   id: string,
   password: string,
+  reason: string,
   client: TeamSupabaseClient = realTeamClient,
 ): Promise<ActionResult> {
   return invokeManageTeamMember(
-    { action: "reset_password", id, password },
+    { action: "reset_password", id, password, reason },
     client,
   );
 }
@@ -169,12 +179,12 @@ Form logic:
 
 ### Reset password action on member rows
 
-Add "Reset Kata Sandi" button to each member row's action area (visible to Super Admin only). Opens a dialog (reuse Dialog pattern) with new password + confirm fields. Calls `resetTeamMemberPassword(member.id, newPassword)`.
+Add "Reset Kata Sandi" button to each active member row's action area (visible to Super Admin only, hidden for own row). Opens a dialog (reuse Dialog pattern) with new password + confirm + administrative reason fields. Calls `resetTeamMemberPassword(member.id, newPassword, reason)`.
 
 ## Security Considerations
 
 - Self-service change: must verify current password before allowing change (prevents session hijack → password change). Use `signInWithPassword` before `updateUser`.
-- Admin reset: only Super Admin (already gated by Edge Function auth check). Cannot reset own password via this path.
+- Admin reset: only Super Admin (already gated by Edge Function auth check). Cannot reset own password via this path. Requires an administrative reason and writes an append-only `team_member_password_reset` Activity Log event.
 - Min 8 chars enforced both client-side and server-side (contracts.ts `requireString(..., 8, 128, false)`).
 - No password logging or toast exposure of the password value.
 
@@ -184,10 +194,11 @@ Add "Reset Kata Sandi" button to each member row's action area (visible to Super
 
 Add test cases:
 
-- `reset_password` action with valid super_admin token → 200
+- `reset_password` action with valid super_admin token → 200 and calls both `updateAuthUserPassword` and `logPasswordReset`
 - `reset_password` action for self → 409 SELF_RESET_FORBIDDEN
 - `reset_password` action from non-super_admin → 403
 - `reset_password` action with short password → 400
+- `reset_password` action where Auth succeeds but audit insert fails → 502 PASSWORD_RESET_AUDIT_INCOMPLETE
 
 ### Client data layer tests — `src/lib/data/team.test.ts`
 
@@ -205,7 +216,7 @@ After implementation:
 
 1. Any authenticated user can change their own password from Settings → Akun tab
 2. Current password is verified before allowing the change
-3. Super Admin can reset any team member's password from Tim & Role
+3. Super Admin can reset any other active team member's password from Tim & Role with an administrative reason
 4. Super Admin cannot reset their own password via Tim & Role (must use self-service)
 5. Min 8 character password enforced both client and server side
 6. `bun run test`, `bun run lint`, `bun run typecheck`, `bun run build` all pass
@@ -231,6 +242,6 @@ What actually got built vs. planned:
 - Reset button disabled for inactive accounts (`accountStatus !== 'active'`) with tooltip "Akun nonaktif — aktifkan dulu untuk reset kata sandi".
 - Reset button hidden on own row (`currentProfileId === m.id`), in addition to the server-side `SELF_RESET_FORBIDDEN` check.
 - `autoComplete` attributes added: `current-password` for the old password field, `new-password` for the new and confirm fields.
-- Handler tests added: success path (calls `updateAuthUserPassword`), self-reset 409, non-admin 403, short password 400 — 4 new tests.
-- No new migrations needed. No new dependencies added.
+- Handler tests added: success path (calls `updateAuthUserPassword` and `logPasswordReset`), self-reset 409, non-admin 403, short password 400, audit-incomplete 502.
+- No new dependencies added. Follow-up audit hardening adds two Supabase migrations: one enum-only migration for `team_member_password_reset`, then one migration updating the administrative-reason constraint, Activity Feed view mapping, and Team summary latest-change filter.
 - Codex review passed: 0 FAIL, 4 WARN (all addressed — see items above).

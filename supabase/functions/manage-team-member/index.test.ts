@@ -35,6 +35,11 @@ type TestDependencies = {
   setAuthBan(id: string, banned: boolean): Promise<void>;
   rpc(name: string, args: Record<string, unknown>): Promise<unknown>;
   updateAuthUserPassword(id: string, password: string): Promise<void>;
+  logPasswordReset(input: {
+    actorId: string;
+    targetId: string;
+    reason: string;
+  }): Promise<void>;
 };
 
 type DependencyOverrides = Partial<TestDependencies>;
@@ -82,6 +87,9 @@ function dependencyHarness(overrides: DependencyOverrides = {}) {
         operation: "updateAuthUserPassword",
         value: { id, password },
       });
+    },
+    async logPasswordReset(input) {
+      calls.push({ operation: "logPasswordReset", value: input });
     },
     ...overrides,
   };
@@ -232,11 +240,13 @@ describe("manage-team-member validation boundary", () => {
           action: "reset_password",
           id: TARGET_ID,
           password: " kata-sandi-baru-123 ",
+          reason: " Reset diminta langsung ",
         },
         {
           action: "reset_password",
           id: TARGET_ID,
           password: " kata-sandi-baru-123 ",
+          reason: "Reset diminta langsung",
         },
       ],
     ];
@@ -288,6 +298,7 @@ describe("manage-team-member validation boundary", () => {
         initials: "SN",
         role: "sales",
         password: "1234567",
+        reason: "Reset diminta langsung",
       }),
     );
     expect(weakPassword.status).toBe(400);
@@ -847,6 +858,7 @@ describe("manage-team-member protected handler", () => {
         action: "reset_password",
         id: TARGET_ID,
         password: "kata-sandi-baru-123",
+        reason: "Reset diminta langsung",
       }),
       harness.dependencies,
     );
@@ -857,6 +869,14 @@ describe("manage-team-member protected handler", () => {
     expect(harness.calls).toContainEqual({
       operation: "updateAuthUserPassword",
       value: { id: TARGET_ID, password: "kata-sandi-baru-123" },
+    });
+    expect(harness.calls).toContainEqual({
+      operation: "logPasswordReset",
+      value: {
+        actorId: CALLER_ID,
+        targetId: TARGET_ID,
+        reason: "Reset diminta langsung",
+      },
     });
     expect(harness.calls.some((call) => call.operation === "rpc")).toBe(false);
   });
@@ -872,6 +892,7 @@ describe("manage-team-member protected handler", () => {
         action: "reset_password",
         id: TARGET_ID,
         password: "kata-sandi-baru-123",
+        reason: "Reset diminta langsung",
       }),
       harness.dependencies,
     );
@@ -895,6 +916,7 @@ describe("manage-team-member protected handler", () => {
         action: "reset_password",
         id: TARGET_ID,
         password: "kata-sandi-baru-123",
+        reason: "Reset diminta langsung",
       }),
       manager.dependencies,
     );
@@ -914,6 +936,7 @@ describe("manage-team-member protected handler", () => {
         action: "reset_password",
         id: TARGET_ID,
         password: "1234567",
+        reason: "Reset diminta langsung",
       }),
       harness.dependencies,
     );
@@ -922,5 +945,30 @@ describe("manage-team-member protected handler", () => {
     expect(
       harness.calls.some((c) => c.operation === "updateAuthUserPassword"),
     ).toBe(false);
+  });
+
+  test("reset_password reports incomplete audit if Auth update succeeds but audit insert fails", async () => {
+    const harness = dependencyHarness({
+      async logPasswordReset() {
+        throw new Error("audit unavailable");
+      },
+    });
+    const result = await invokeHandler(
+      post({
+        action: "reset_password",
+        id: TARGET_ID,
+        password: "kata-sandi-baru-123",
+        reason: "Reset diminta langsung",
+      }),
+      harness.dependencies,
+    );
+    expect(result).toMatchObject({
+      status: 502,
+      body: { code: "PASSWORD_RESET_AUDIT_INCOMPLETE" },
+    });
+    expect(harness.calls).toContainEqual({
+      operation: "updateAuthUserPassword",
+      value: { id: TARGET_ID, password: "kata-sandi-baru-123" },
+    });
   });
 });

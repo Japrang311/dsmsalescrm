@@ -45,6 +45,7 @@ export type AdminAction =
       action: "reset_password";
       id: string;
       password: string;
+      reason: string;
     };
 
 export type ErrorBody = {
@@ -312,11 +313,12 @@ export function parseAdminAction(rawBody: string): AdminAction {
       };
 
     case "reset_password":
-      requireExactKeys(decoded, ["action", "id", "password"]);
+      requireExactKeys(decoded, ["action", "id", "password", "reason"]);
       return {
         action: "reset_password",
         id: requireUuid(decoded.id, "ID anggota tim"),
         password: requireString(decoded.password, "Password", 8, 128, false),
+        reason: requireReason(decoded.reason),
       };
 
     default:

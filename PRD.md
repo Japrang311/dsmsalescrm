@@ -342,7 +342,7 @@ Lovable should visually represent these permissions, but not implement real enfo
 - Sales Manager can view and edit company/team business data when needed, but Team & Role is read-only.
 - Top Executive is read-only.
 - Super Admin can manage Team & Role, deactivate/reactivate accounts, transfer ownership, and edit all supported business data company-wide.
-- Super Admin can reset any team member's password from Settings → Tim & Role.
+- Super Admin can reset any other active team member's password from Settings → Tim & Role; resetting their own password must use Settings → Akun.
 - Only an active Super Admin can create or assign another Super Admin.
 - Super Admin cannot own clients, targets, pipeline, or revenue and is excluded from Sales performance comparisons.
 - Activity Log is append-only for every role, including Super Admin.

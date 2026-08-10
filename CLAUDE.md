@@ -53,7 +53,7 @@ The database enum now includes `super_admin` alongside `sales | manager | execut
 - Deactivate by default. Permanent delete only when the server proves zero business/audit references.
 - Protect the logged-in Super Admin and the last active Super Admin from deactivation/deletion; never allow zero active Super Admins.
 - Activity Log is append-only for all roles. Every admin action requires a reason and logs actor plus a safe target snapshot.
-- `manage-team-member` now implements the Super-Admin-only lifecycle contract described above (create/update/role-change/deactivate/reactivate/transfer/delete). `bootstrap_manager_role.sql` is historical and superseded by `bootstrap_super_admin_role.sql` (ADR-002); do not use it to establish the production authority model.
+- `manage-team-member` now implements the Super-Admin-only lifecycle contract described above (create/update/role-change/deactivate/reactivate/transfer/delete/reset_password). `reset_password` requires an administrative reason, writes an append-only `team_member_password_reset` audit event with a safe target snapshot, and cannot target the acting Super Admin (self-service password change lives in Settings → Akun via `supabase.auth.updateUser` after current-password verification). `bootstrap_manager_role.sql` is historical and superseded by `bootstrap_super_admin_role.sql` (ADR-002); do not use it to establish the production authority model.
 
 ### Data layer and canonical shared modules
 

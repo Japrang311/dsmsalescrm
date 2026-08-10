@@ -32,7 +32,7 @@ Add `super_admin` as a fourth explicit value in `public.app_role`. An active Sup
 
 Extend `public.profiles` with an `active`/`inactive` account state and status-change metadata. Role resolution and every exposed-table policy must require an active profile, so inactive accounts fail closed at the database boundary. The application also signs inactive sessions out and displays a clear unavailable-account state.
 
-Team and role mutations remain behind a protected server endpoint using server-side Auth administration. The endpoint must authenticate an active Super Admin, require an administrative reason, enforce self/last-admin protections, execute multi-table changes atomically where applicable, and append an Activity Log event.
+Team and role mutations remain behind a protected server endpoint using server-side Auth administration. The endpoint must authenticate an active Super Admin, require an administrative reason, enforce self/last-admin protections, execute multi-table changes atomically where applicable, and append an Activity Log event. Password reset is part of this lifecycle contract: it updates Supabase Auth through `reset_password`, requires a reason, blocks self-reset through Team & Role, and logs `team_member_password_reset` with actor plus safe target snapshot.
 
 Account lifecycle follows these rules:
 
