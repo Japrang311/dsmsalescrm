@@ -2,7 +2,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { EmptyExportError } from "@/lib/export-csv";
 import { formatDateShort } from "@/lib/format";
-import { ROLE_LABEL } from "@/context/role-context";
+import { ROLE_LABEL } from "@/context/role-context-core";
 import type { Role } from "@/lib/domain";
 
 export type ActivityExportEvent = {

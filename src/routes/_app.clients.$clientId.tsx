@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getErrorMessage } from "@/lib/utils";
 
-import { useRole } from "@/context/role-context";
+import { useRole } from "@/context/role-context-core";
 import {
   getClientById,
   listOwners,

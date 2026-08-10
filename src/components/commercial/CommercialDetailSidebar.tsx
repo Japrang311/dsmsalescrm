@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { formatDateShort } from "@/lib/format";
-import { ROLE_LABEL } from "@/context/role-context";
+import { ROLE_LABEL } from "@/context/role-context-core";
 import type { CommercialItem, Task } from "@/lib/domain";
 import type { CommercialItemHistoryEntry } from "@/lib/data/activity-log";
 import type { FollowUpLog } from "@/lib/data/follow-ups";

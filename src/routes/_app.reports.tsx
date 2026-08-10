@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { formatDateShort, formatRupiahShort } from "@/lib/format";
-import { useRole, ROLE_LABEL } from "@/context/role-context";
+import { useRole, ROLE_LABEL } from "@/context/role-context-core";
 import { CURRENT_MONTH, CURRENT_YEAR, NOW } from "@/lib/domain";
 import {
   activityCompliance,
@@ -42,11 +42,11 @@ import {
   getStageFunnelMetrics,
   getWinLossMetrics,
 } from "@/lib/data/stage4-analytics";
+import { ReportFilterBar } from "@/components/reports/ReportFilterBar";
 import {
-  ReportFilterBar,
   defaultReportFilters,
   type ReportFilters,
-} from "@/components/reports/ReportFilterBar";
+} from "@/components/reports/report-filters";
 import {
   agingBucket,
   filterCommercialItems,

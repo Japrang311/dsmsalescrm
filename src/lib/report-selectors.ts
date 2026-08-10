@@ -1,4 +1,4 @@
-import type { ReportFilters } from "@/components/reports/ReportFilterBar";
+import type { ReportFilters } from "@/components/reports/report-filters";
 import { NOW } from "@/lib/app-time";
 import type { Client, CommercialItem, SalesOrder, Task } from "@/lib/domain";
 import {

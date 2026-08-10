@@ -56,7 +56,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { useRole, ROLE_LABEL } from "@/context/role-context";
+import { useRole, ROLE_LABEL } from "@/context/role-context-core";
 import {
   QUOTATION_STAGES,
   REPEAT_STAGES,

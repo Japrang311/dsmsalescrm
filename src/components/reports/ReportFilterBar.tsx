@@ -30,34 +30,12 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import {
-  DateRangePicker,
-  type PeriodRange,
-} from "@/components/dashboard/DateRangePicker";
+import { DateRangePicker } from "@/components/dashboard/DateRangePicker";
 import type { Client } from "@/lib/domain";
 import type { Role } from "@/lib/domain";
 import { cn } from "@/lib/utils";
 import { filterClientOptions } from "@/components/reports/client-filter";
-
-export type ReportFilters = {
-  range: PeriodRange;
-  ownerId: string; // "all" or user id
-  clientId: string; // "all" or client id
-  taxType: string; // "all" | "PPN" | "Non-PPN"
-  source: string; // "all" | "New Product" | "Existing / Repeat Order" | "Prototype Paid" | "Prototype FOC"
-  soType: string; // "all" | "Regular" | "Prototype"
-};
-
-export function defaultReportFilters(range: PeriodRange): ReportFilters {
-  return {
-    range,
-    ownerId: "all",
-    clientId: "all",
-    taxType: "all",
-    source: "all",
-    soType: "all",
-  };
-}
+import type { ReportFilters } from "@/components/reports/report-filters";
 
 type Props = {
   role: Role;

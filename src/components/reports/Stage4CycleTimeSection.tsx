@@ -6,7 +6,8 @@ import type {
   CycleTimeMetric,
 } from "@/lib/data/stage4-analytics";
 import { ChartEmpty } from "./ReportPrimitives";
-import { CoverageNote, formatDays } from "./Stage4Primitives";
+import { CoverageNote } from "./Stage4Primitives";
+import { formatDays } from "./format-days";
 
 const LEG_LABEL: Record<CycleTimeLeg, string> = {
   quote_to_po: "Quote → Customer PO",

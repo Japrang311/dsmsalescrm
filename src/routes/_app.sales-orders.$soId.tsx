@@ -63,7 +63,7 @@ import {
 } from "@/lib/format";
 import { ClientPickerField } from "@/components/clients/ClientPicker";
 import { StatusBadge } from "@/components/clients/StatusBadges";
-import { useRole, ROLE_LABEL } from "@/context/role-context";
+import { useRole, ROLE_LABEL } from "@/context/role-context-core";
 import { useDashboardData } from "@/hooks/use-dashboard-data";
 
 export const Route = createFileRoute("/_app/sales-orders/$soId")({

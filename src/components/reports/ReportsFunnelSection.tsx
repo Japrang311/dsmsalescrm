@@ -16,7 +16,8 @@ import type {
   quotationFunnel,
   taskCounts,
 } from "@/lib/data/dashboard-selectors";
-import { CHART_COLORS, StatBlock } from "./ReportPrimitives";
+import { StatBlock } from "./ReportPrimitives";
+import { CHART_COLORS } from "./chart-colors";
 
 export function ReportsFunnelSection({
   funnel,

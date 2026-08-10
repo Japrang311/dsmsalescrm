@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "timestamp": "2026-07-24T17:43:57+0700",
+  "timestamp": "2026-08-03T00:00:00+0700",
   "phase": null,
   "phase_name": "default",
   "phase_dir": ".planning",
@@ -11,58 +11,87 @@
   "completed_tasks": [
     {
       "id": 1,
-      "name": "Implement RFQ/Quotation/Sales Order soft delete and restore",
+      "name": "Retire RFQ as an active application feature",
       "status": "done",
-      "commit": "92ee99e"
+      "commit": "b0dc808"
     },
     {
       "id": 2,
-      "name": "Record verification and implementation handoff",
+      "name": "Ship soft delete and restore for RFQ, Quotation, and Sales Order",
       "status": "done",
       "commit": "007b7c5"
     },
     {
       "id": 3,
-      "name": "Push feature branch to origin",
+      "name": "Complete and release Sales Task Control Loop",
       "status": "done",
-      "commit": "007b7c5"
+      "commit": "b33efe3"
     },
     {
       "id": 4,
-      "name": "Apply Supabase remote migrations to qhtfixgbcpcitokeryxb",
+      "name": "Run production audit and security hardening",
       "status": "done",
-      "commit": "007b7c5"
+      "commit": "1c35c1a"
     },
     {
       "id": 5,
-      "name": "Fast-forward main and push origin/main for live deployment path",
+      "name": "Prevent concurrent duplicate client names",
       "status": "done",
-      "commit": "007b7c5"
+      "commit": "8fd6912"
+    },
+    {
+      "id": 6,
+      "name": "Reconcile stale task documentation with current production state",
+      "status": "done",
+      "commit": null
     }
   ],
-  "remaining_tasks": [],
+  "remaining_tasks": [
+    {
+      "name": "Authenticated production browser smoke",
+      "status": "blocked_by_missing_production_credentials_or_session"
+    },
+    {
+      "name": "Mobile global search product decision",
+      "status": "backlog"
+    },
+    {
+      "name": "Owner-mismatched SO/commercial document data-quality cleanup",
+      "status": "requires_owner_decision_before_any_bulk_change"
+    },
+    {
+      "name": "business_calendar_holidays direct edit behavior",
+      "status": "requires_future_ui_policy_decision"
+    }
+  ],
   "blockers": [],
   "async_jobs": [],
   "human_actions_pending": [],
   "decisions": [
     {
-      "decision": "Soft delete is the browser-accessible deletion model for RFQ, Quotation, and Sales Order",
-      "rationale": "It preserves auditability and avoids irreversible user-facing deletes."
+      "decision": "RFQ-retirement migrations are confirmed applied on qhtfixgbcpcitokeryxb",
+      "rationale": "2026-07-30 production audit listed all local migrations through 20260730033312 on the remote project."
     },
     {
-      "decision": "Remote Supabase target was qhtfixgbcpcitokeryxb",
-      "rationale": "The owner explicitly approved applying migrations to this exact project ref."
+      "decision": "Sales Task Control Loop Tasks 46-63 are complete",
+      "rationale": "Canonical checklist and handoff record local verification, explicit release gate, production deployment, SQL/RLS smoke, and HTTP smoke."
     },
     {
-      "decision": "Main was fast-forwarded to the feature payload and pushed to origin/main",
-      "rationale": "This repo's live path is the Lovable-connected Git remote, with production URL responding after push."
+      "decision": "Future remote Supabase mutations still require fresh exact-target approval",
+      "rationale": "The remote project backs production and irreversible schema/data changes must not be made silently."
     },
     {
-      "decision": "Production URL reachability is not the same as Vercel dashboard deployment proof",
-      "rationale": "The session verified HTTP 200 from dsmsalescrm.vercel.app but did not have direct Vercel deployment status access."
+      "decision": "RLS/database is the access-control boundary",
+      "rationale": "CLAUDE.md and ADR-002 record that UI role filtering is never sufficient."
     }
   ],
-  "uncommitted_files": [],
-  "next_action": "Run git status --short --branch and git log -5 --oneline --decorate. If validating live deployment, check Vercel/Lovable deployment status or perform a read-only browser pass against https://dsmsalescrm.vercel.app.",
-  "context_notes": "Repo was on main at 007b7c5 and matched origin/main before this session-handoff documentation commit. Supabase remote qhtfixgbcpcitokeryxb was up to date after applying five migrations. No dev server is intentionally left running."
+  "uncommitted_files": [
+    "tasks/rfq-removal-todo.md",
+    "tasks/plan.md",
+    "tasks/todo.md",
+    ".planning/.continue-here.md",
+    ".planning/HANDOFF.json"
+  ],
+  "next_action": "Run git status --short --branch and git log -5 --oneline --decorate. Use HANDOFF.md plus .planning/.continue-here.md as current state before starting new work.",
+  "context_notes": "Checkpoint refreshed 2026-08-03. Branch was main synced to origin/main at 8fd6912 before documentation edits. No dev server intentionally left running. No remote mutation performed in this documentation reconciliation."
 }

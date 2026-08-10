@@ -10,7 +10,7 @@ import { todaysFollowUps } from "@/lib/data/dashboard-selectors";
 import { listActiveTasks } from "@/lib/data/tasks";
 import { useDashboardData } from "@/hooks/use-dashboard-data";
 import { formatDateShort, formatRupiahShort } from "@/lib/format";
-import { useRole } from "@/context/role-context";
+import { useRole } from "@/context/role-context-core";
 
 const METHOD_ICON = {
   Phone,

@@ -36,7 +36,8 @@ import {
 import { listTasks } from "@/lib/data/tasks";
 import { activeClientTasks } from "@/lib/data/task-relations";
 import { buildExplicitFollowUpCommand } from "@/lib/follow-up-command";
-import { useClientResolution, ClientPickerField } from "./ClientPicker";
+import { useClientResolution } from "./use-client-resolution";
+import { ClientPickerField } from "./ClientPicker";
 
 const METHODS = ["Phone", "Email", "WhatsApp", "Visit", "Meeting"] as const;
 const RESULTS: FollowUpResult[] = [

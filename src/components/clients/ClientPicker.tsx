@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { Check, ChevronsUpDown } from "lucide-react";
 
 import { Label } from "@/components/ui/label";
@@ -17,7 +16,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { searchClients } from "@/lib/data/clients";
 import { cn } from "@/lib/utils";
 
 // Shared by every "create X for a client" dialog that can be opened either
@@ -25,41 +23,6 @@ import { cn } from "@/lib/utils";
 // without one (from the global Quick Create menu — resolves which client
 // is effectively selected via a picker rendered as the form's first field).
 //
-// Uses searchClients() (client_search_index) instead of listClients()
-// (clients table with ownership RLS) so that the picker shows ALL clients
-// regardless of owner. This fixes the owner-mismatch case where a SO was
-// imported under one sales rep but its client is registered to another —
-// the client didn't appear in the picker because clients_select RLS hid it.
-export function useClientResolution(props: {
-  clientId?: string;
-  clientName?: string;
-  ownerId?: string;
-}) {
-  const needsPicker = !props.clientId;
-  const { data: clients = [] } = useQuery({
-    queryKey: ["clients", "search"],
-    queryFn: searchClients,
-    enabled: needsPicker,
-  });
-  const [pickedId, setPickedId] = useState("");
-  const picked = clients.find((c) => c.id === pickedId);
-
-  const clientId = props.clientId ?? picked?.id;
-  const clientName = props.clientId ? props.clientName : picked?.name;
-  const ownerId = props.clientId ? props.ownerId : picked?.ownerId;
-
-  return {
-    needsPicker,
-    clients,
-    pickedId,
-    setPickedId,
-    clientId,
-    clientName,
-    ownerId,
-    resolved: !!clientId && !!ownerId,
-  };
-}
-
 // Searchable combobox instead of a plain dropdown — with dozens of real
 // clients, scrolling a closed list to find one by eye doesn't scale;
 // typing a few letters does. Only needs id/name, so it accepts both the

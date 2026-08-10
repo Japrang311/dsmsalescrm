@@ -6,7 +6,8 @@ import type {
   LostReasonMetric,
   WinLossMetrics,
 } from "@/lib/data/stage4-analytics";
-import { CHART_COLORS, ChartEmpty, StatBlock } from "./ReportPrimitives";
+import { ChartEmpty, StatBlock } from "./ReportPrimitives";
+import { CHART_COLORS } from "./chart-colors";
 import { CoverageNote } from "./Stage4Primitives";
 
 export function Stage4WinLossSection({

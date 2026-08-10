@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { GitBranch } from "lucide-react";
 import { toast } from "sonner";
@@ -17,7 +17,7 @@ import {
 import { CreateSalesOrderDialog } from "@/components/clients/CreateRecordDialogs";
 
 import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRole } from "@/context/role-context";
+import { useRole } from "@/context/role-context-core";
 import {
   NOW,
   toLocalIsoDate,
@@ -117,7 +117,7 @@ function PipelineBoardPage({ role }: { role: Role }) {
   );
 
   // Reset cursors when filters change
-  useMemo(() => {
+  useEffect(() => {
     setStageCursors({} as Record<Stage, string | null>);
   }, [filters]);
 

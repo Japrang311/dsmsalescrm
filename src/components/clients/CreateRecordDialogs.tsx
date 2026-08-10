@@ -47,7 +47,8 @@ import { toCommercialItem } from "@/lib/data/commercial-items";
 import { createSalesOrder } from "@/lib/data/sales-orders";
 import { cacheListRecord } from "@/lib/query-cache-updates";
 import { documentNumberExample } from "@/lib/data/document-numbering";
-import { useClientResolution, ClientPickerField } from "./ClientPicker";
+import { useClientResolution } from "./use-client-resolution";
+import { ClientPickerField } from "./ClientPicker";
 import {
   buildSalesOrderSchema,
   prototypeRequestSchema,

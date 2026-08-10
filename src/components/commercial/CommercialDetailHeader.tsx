@@ -2,7 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { ArrowLeft, Save } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ROLE_LABEL } from "@/context/role-context";
+import { ROLE_LABEL } from "@/context/role-context-core";
 import { LogCommercialFollowUpDialog } from "@/components/commercial/LogCommercialFollowUpDialog";
 import { SoftDeleteAction } from "@/components/commercial/SoftDeleteAction";
 import { ReviseQuotationDialog } from "@/components/clients/CreateRecordDialogs";
