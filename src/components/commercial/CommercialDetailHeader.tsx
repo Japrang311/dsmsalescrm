@@ -105,6 +105,7 @@ export function CommercialDetailHeader({
             signer={{
               name: signerProfile?.name ?? "",
               title: ROLE_LABEL[signerProfile?.role ?? role],
+              email: signerProfile?.email ?? "",
             }}
           />
         )}

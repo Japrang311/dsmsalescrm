@@ -36,6 +36,7 @@ import {
   QUOTATION_PDF_DEFAULTS,
   quotationAddressLines,
   quotationPdfFilename,
+  quotationSignerDefaults,
   type QuotationPdfInput,
 } from "@/lib/export-quotation-pdf";
 
@@ -51,7 +52,7 @@ export function QuotationPreviewDialog({
   client: Client;
   owner: { name: string; email: string };
   /** Signed-in user — the PDF is printed and signed by hand by whoever exports it. */
-  signer: { name: string; title: string };
+  signer: { name: string; title: string; email: string };
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -111,12 +112,16 @@ function PreviewBody({
 
   const [picIndex, setPicIndex] = useState(picOptions[0]?.index ?? 0);
   const [customerReference, setCustomerReference] = useState("");
+  const signerDefaults = useMemo(
+    () => quotationSignerDefaults(signer.email, signer.title),
+    [signer.email, signer.title],
+  );
   const [terms, setTerms] = useState(QUOTATION_PDF_DEFAULTS.terms.join("\n"));
   const [closing, setClosing] = useState(
-    QUOTATION_PDF_DEFAULTS.closingLines.join("\n"),
+    signerDefaults.closingLines.join("\n"),
   );
   const [signerName, setSignerName] = useState(signer.name);
-  const [signerTitle, setSignerTitle] = useState(signer.title);
+  const [signerTitle, setSignerTitle] = useState(signerDefaults.title);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
 
