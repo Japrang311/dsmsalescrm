@@ -10,6 +10,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import { NOW, toLocalIsoDate } from "@/lib/domain";
 import {
+  addSalesOrderItem,
   createSalesOrder,
   deleteSalesOrder,
   getSalesOrder,
@@ -107,6 +108,30 @@ describe("normalized Sales Order adapter", () => {
     expect(listed.find((order) => order.id === created.id)?.items).toHaveLength(
       2,
     );
+
+    const addedItem = await addSalesOrderItem({
+      salesOrderId: created.id,
+      linePosition: 3,
+      productName: "Added correction item",
+      description: "Added after SO was created",
+      qty: 2,
+      uom: "Pcs",
+      unitPrice: 7_500,
+    });
+    expect(addedItem).toMatchObject({
+      salesOrderId: created.id,
+      productName: "Added correction item",
+      linePosition: 3,
+      lineTotal: 15_000,
+    });
+
+    const withAddedItem = await getSalesOrder(created.id);
+    expect(withAddedItem?.items).toHaveLength(3);
+    expect(withAddedItem?.items.map((item) => item.linePosition)).toEqual([
+      1, 2, 3,
+    ]);
+    expect(withAddedItem?.totalValue).toBe(40_000);
+    expect(withAddedItem?.value).toBe(40_000);
 
     await deleteSalesOrder(created.id);
     expect(await getSalesOrder(created.id)).toBeNull();

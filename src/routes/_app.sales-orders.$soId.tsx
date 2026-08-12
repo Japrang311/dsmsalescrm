@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, Check, Lock, Pencil, Receipt, X } from "lucide-react";
+import { ArrowLeft, Check, Lock, Pencil, Plus, Receipt, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Card, CardContent } from "@/components/ui/card";
@@ -41,6 +41,7 @@ import {
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  addSalesOrderItem,
   deleteSalesOrder,
   updateSalesOrderHeader,
   updateSalesOrderItem,
@@ -801,11 +802,28 @@ function SalesOrderItemsTable({
   showMoney: boolean;
   canEdit: boolean;
 }) {
+  const [adding, setAdding] = useState(false);
+  const nextLinePosition =
+    items.reduce((max, item) => Math.max(max, item.linePosition), 0) + 1;
+
   return (
     <div>
-      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        Line Items
-      </p>
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          Line Items
+        </p>
+        {canEdit && !adding && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 gap-1.5 text-xs"
+            onClick={() => setAdding(true)}
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Tambah Item
+          </Button>
+        )}
+      </div>
       <div className="overflow-x-auto rounded-md border">
         <Table>
           <TableHeader>
@@ -836,6 +854,18 @@ function SalesOrderItemsTable({
                 canEdit={canEdit}
               />
             ))}
+            {adding && (
+              <NewSalesOrderItemRow
+                soId={soId}
+                soNumber={soNumber}
+                clientId={clientId}
+                ownerId={ownerId}
+                linePosition={nextLinePosition}
+                showMoney={showMoney}
+                onCancel={() => setAdding(false)}
+                onSaved={() => setAdding(false)}
+              />
+            )}
           </TableBody>
         </Table>
       </div>
@@ -844,6 +874,174 @@ function SalesOrderItemsTable({
 }
 
 const UOM_OPTIONS: Uom[] = ["Unit", "Pcs", "Set", "Lot"];
+
+function NewSalesOrderItemRow({
+  soId,
+  soNumber,
+  clientId,
+  ownerId,
+  linePosition,
+  showMoney,
+  onCancel,
+  onSaved,
+}: {
+  soId: string;
+  soNumber: string;
+  clientId: string;
+  ownerId: string;
+  linePosition: number;
+  showMoney: boolean;
+  onCancel: () => void;
+  onSaved: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const [productName, setProductName] = useState("");
+  const [description, setDescription] = useState("");
+  const [qty, setQty] = useState("1");
+  const [uom, setUom] = useState<Uom>("Unit");
+  const [unitPrice, setUnitPrice] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  async function save() {
+    const cleanProductName = productName.trim();
+    if (!cleanProductName) {
+      toast.error("Nama Product wajib diisi");
+      return;
+    }
+    const qtyNum = Number(qty);
+    if (!Number.isFinite(qtyNum) || qtyNum <= 0) {
+      toast.error("Qty harus lebih dari 0");
+      return;
+    }
+    const priceNum = showMoney ? Number(unitPrice) : null;
+    if (showMoney && (!Number.isFinite(priceNum) || (priceNum ?? 0) <= 0)) {
+      toast.error("Unit Price harus lebih dari 0");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await addSalesOrderItem({
+        salesOrderId: soId,
+        linePosition,
+        productName: cleanProductName,
+        description: description.trim() || null,
+        qty: qtyNum,
+        uom,
+        unitPrice: priceNum,
+      });
+
+      const actorId = await getCurrentActorId();
+      if (actorId) {
+        await logActivity({
+          kind: "sales_order_item_change",
+          ownerId,
+          actorId,
+          clientId,
+          salesOrderId: soId,
+          title: `Item baru ditambahkan ke SO ${soNumber}`,
+          detail: cleanProductName,
+        });
+      }
+
+      await queryClient.invalidateQueries({ queryKey: ["sales-orders"] });
+      await queryClient.invalidateQueries({ queryKey: ["activity-log"] });
+      toast.success("Item ditambahkan");
+      onSaved();
+    } catch (error) {
+      toast.error("Gagal menambah item", {
+        description: getErrorMessage(error),
+      });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <TableRow>
+      <TableCell>
+        <Input
+          aria-label="Nama Product baru"
+          value={productName}
+          onChange={(e) => setProductName(e.target.value)}
+          className="h-8 min-w-[140px] text-xs"
+          placeholder="Nama Product"
+        />
+      </TableCell>
+      <TableCell>
+        <Input
+          aria-label="Description baru"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          className="h-8 min-w-[160px] text-xs"
+          placeholder="Description"
+        />
+      </TableCell>
+      <TableCell>
+        <Input
+          aria-label="Qty baru"
+          type="number"
+          min="0"
+          value={qty}
+          onChange={(e) => setQty(e.target.value)}
+          className="h-8 w-20 text-right text-xs"
+        />
+      </TableCell>
+      <TableCell>
+        <Select value={uom} onValueChange={(v) => setUom(v as Uom)}>
+          <SelectTrigger className="h-8 w-24 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {UOM_OPTIONS.map((u) => (
+              <SelectItem key={u} value={u}>
+                {u}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </TableCell>
+      {showMoney && (
+        <>
+          <TableCell>
+            <Input
+              aria-label="Unit Price baru"
+              type="number"
+              min="0"
+              value={unitPrice}
+              onChange={(e) => setUnitPrice(e.target.value)}
+              className="h-8 w-28 text-right text-xs"
+            />
+          </TableCell>
+          <TableCell className="text-right text-xs text-muted-foreground">
+            {formatRupiahFull((Number(qty) || 0) * (Number(unitPrice) || 0))}
+          </TableCell>
+        </>
+      )}
+      <TableCell>
+        <div className="flex gap-1">
+          <Button
+            size="icon"
+            className="h-7 w-7"
+            disabled={saving}
+            onClick={() => void save()}
+          >
+            <Check className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            disabled={saving}
+            onClick={onCancel}
+          >
+            <X className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </TableCell>
+    </TableRow>
+  );
+}
 
 function SalesOrderItemRow({
   soId,

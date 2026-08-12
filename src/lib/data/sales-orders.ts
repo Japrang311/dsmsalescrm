@@ -400,6 +400,11 @@ export type UpdateSalesOrderItemInput = {
   unitPrice: number | null;
 };
 
+export type AddSalesOrderItemInput = UpdateSalesOrderItemInput & {
+  salesOrderId: string;
+  linePosition: number;
+};
+
 // line_total is always derived as qty * unitPrice here, never taken as a
 // separate input — same "value is always Qty × Unit Price, never manually
 // overridable" rule the Create dialogs already use. The parent
@@ -421,4 +426,25 @@ export async function updateSalesOrderItem(
     })
     .eq("id", itemId);
   if (error) throw error;
+}
+
+export async function addSalesOrderItem(
+  input: AddSalesOrderItemInput,
+): Promise<SalesOrderLineItem> {
+  const { data, error } = await supabase
+    .from("sales_order_items")
+    .insert({
+      sales_order_id: input.salesOrderId,
+      product_name: input.productName,
+      description: input.description,
+      qty: input.qty,
+      uom: input.uom,
+      unit_price: input.unitPrice,
+      line_total: input.unitPrice === null ? null : input.qty * input.unitPrice,
+      line_position: input.linePosition,
+    })
+    .select("*")
+    .single();
+  if (error) throw error;
+  return toLineItem(data as SalesOrderItemRow);
 }
