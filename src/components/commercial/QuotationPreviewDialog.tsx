@@ -93,7 +93,7 @@ function PreviewBody({
   item: CommercialItem;
   client: Client;
   owner: { name: string; email: string };
-  signer: { name: string; title: string };
+  signer: { name: string; title: string; email: string };
   onClose: () => void;
 }) {
   const { data: orgSettings } = useQuery({

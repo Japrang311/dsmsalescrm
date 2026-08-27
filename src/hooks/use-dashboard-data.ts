@@ -11,6 +11,7 @@ import {
 import { listTargets } from "@/lib/data/targets";
 import { companyMonthlyTarget } from "@/lib/data/dashboard-selectors";
 import { getCurrentActorId } from "@/lib/data/activity-log";
+import { useRealtimeSync } from "@/hooks/use-realtime-sync";
 
 // Shared real-data fetch for every dashboard/reports/activity component.
 // Each query reuses the same queryKey used elsewhere in the app (Clients
@@ -18,6 +19,8 @@ import { getCurrentActorId } from "@/lib/data/activity-log";
 // of firing duplicate network requests.
 export function useDashboardData() {
   const { authReady, role } = useRole();
+  // Live dashboard: new tasks and sales orders appear without a refresh.
+  useRealtimeSync(["tasks", "sales_orders"], authReady);
 
   const orders = useQuery({
     queryKey: ["sales-orders", "all"],

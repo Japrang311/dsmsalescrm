@@ -55,6 +55,7 @@ import {
 import { getErrorMessage } from "@/lib/utils";
 import { invalidateCommercialStageQueries } from "@/lib/query-invalidation";
 import { listQueryKey } from "@/lib/pagination-contracts";
+import { useRealtimeSync } from "@/hooks/use-realtime-sync";
 
 export const Route = createFileRoute("/_app/pipeline")({
   head: () => ({
@@ -120,6 +121,10 @@ function PipelineBoardPage({ role }: { role: Role }) {
   useEffect(() => {
     setStageCursors({} as Record<Stage, string | null>);
   }, [filters]);
+
+  // Live board: a stage change made by another user (or in another tab) shows
+  // up here without a manual refresh.
+  useRealtimeSync(["commercial_documents"], authReady);
 
   // Per-stage paginated queries (6 columns, fetched in parallel)
   const stageQueries = useQueries({

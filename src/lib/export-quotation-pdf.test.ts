@@ -60,7 +60,9 @@ describe("quotationSignerDefaults", () => {
   });
 
   test("falls back to the given role title and generic closing lines for unknown accounts", () => {
-    expect(quotationSignerDefaults("someone-else@example.com", "Manager")).toEqual({
+    expect(
+      quotationSignerDefaults("someone-else@example.com", "Manager"),
+    ).toEqual({
       title: "Manager",
       closingLines: [...QUOTATION_PDF_DEFAULTS.closingLines],
     });

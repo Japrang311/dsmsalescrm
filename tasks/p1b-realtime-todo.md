@@ -3,8 +3,9 @@
 Spec: `specs/p1b-realtime-updates.md` (direvisi 2026-08-05).
 Plan: `tasks/priority-1-plan.md`.
 
-> **Status:** Belum diimplementasi. Task 1B-5 menyentuh **production**
-> (`qhtfixgbcpcitokeryxb`) dan butuh approval eksplisit terpisah.
+> **Status (2026-08-27):** Task 1B-1 s/d 1B-4 selesai & terverifikasi lokal.
+> Task 1B-5 menyentuh **production** (`qhtfixgbcpcitokeryxb`) dan masih
+> menunggu approval eksplisit terpisah.
 
 > **Koreksi penting dari spec:** subscription menarget `commercial_documents`,
 > BUKAN `commercial_items`. `commercial_items` adalah tabel legacy pra-Phase-11
@@ -29,7 +30,7 @@ Task 1B-1 (src/lib/realtime.ts)
 
 ## Tasks
 
-- [ ] **Task 1B-1: `src/lib/realtime.ts` — subscribe helper**
+- [x] **Task 1B-1: `src/lib/realtime.ts` — subscribe helper**
   - Acceptance:
     - Export `subscribeToTable(table, onChange)` yang membungkus
       `supabase.channel(...).on("postgres_changes", { event: "*", schema:
@@ -50,7 +51,7 @@ Task 1B-1 (src/lib/realtime.ts)
   - Files: `src/lib/realtime.ts` (baru).
   - Size: S.
 
-- [ ] **Task 1B-2: Wire `_app.pipeline.tsx` ke `commercial_documents`**
+- [x] **Task 1B-2: Wire `_app.pipeline.tsx` ke `commercial_documents`**
   - Acceptance:
     - `useEffect` subscribe ke tabel `commercial_documents`.
     - Saat event masuk: `queryClient.invalidateQueries({ queryKey:
@@ -68,7 +69,7 @@ Task 1B-1 (src/lib/realtime.ts)
   - Files: `src/routes/_app.pipeline.tsx`.
   - Size: S.
 
-- [ ] **Task 1B-3: Wire `use-dashboard-data.ts` ke `tasks` + `sales_orders`**
+- [x] **Task 1B-3: Wire `use-dashboard-data.ts` ke `tasks` + `sales_orders`**
   - Acceptance:
     - Subscribe ke `tasks` dan `sales_orders` di dalam `useDashboardData()`.
     - `tasks` berubah → invalidate `["tasks"]`; `sales_orders` berubah →
@@ -89,7 +90,7 @@ Task 1B-1 (src/lib/realtime.ts)
   - Files: `src/hooks/use-dashboard-data.ts`.
   - Size: S.
 
-- [ ] **Task 1B-4: Verifikasi lokal (2 tab + RLS + memory leak)**
+- [x] **Task 1B-4: Verifikasi lokal (2 tab + RLS + memory leak)**
   - Acceptance:
     - Dua tab: pindahkan kartu pipeline di tab 1 → tab 2 ter-update ≤ 2 detik.
     - Login sebagai sales A dan sales B di dua browser/profile berbeda:
@@ -130,9 +131,45 @@ Task 1B-1 (src/lib/realtime.ts)
 
 ## Checkpoint akhir P1B
 
-- [ ] 2 tab: update ≤ 2 detik
-- [ ] RLS terbukti: sales tidak menerima event sales lain (diuji dengan 2 user)
-- [ ] Channel unsubscribe bersih saat unmount, tidak menumpuk
-- [ ] `bun run test` pass, `bun run lint` pass
+- [x] Update ≤ 2 detik — terukur **578 ms** dan **871 ms** (perubahan dikirim
+      via SQL langsung ke DB, board ter-update tanpa reload)
+- [x] RLS terbukti: update dokumen milik Feni → **0 request** di tab Nur;
+      update dokumen milik Nur 5 detik kemudian → 10 request. Membuktikan
+      event tersaring RLS, bukan channel-nya mati.
+- [x] Channel unsubscribe bersih saat unmount, tidak menumpuk
+      (`src/lib/realtime.test.ts`, 9 test)
+- [x] `bun run test` pass (634), `bun run lint` bersih untuk file P1B
 - [ ] **Konfirmasi user sebelum push ke `main`**
 - [ ] **Approval terpisah sebelum menjalankan SQL publication di production**
+
+## Hasil implementasi (2026-08-27) — beda dari rencana awal
+
+Tiga hal berubah dari task list di atas, semuanya karena rencana lama salah
+atau kurang:
+
+1. **Query key.** Task 1B-2 menyebut `["commercial-items"]`, tapi
+   `_app.pipeline.tsx` memakai key `commercial-documents`. Mengikuti rencana
+   lama akan membuat board **tidak** ter-update. Invalidasi sekarang dipakai
+   ulang dari `invalidateCommercialStageQueries()` yang sudah ada.
+
+2. **Satu event = satu invalidasi.** `useDashboardData()` dipanggil ~7 komponen
+   di halaman dashboard. Versi pertama (callback per subscriber) memicu request
+   identik **7–14×** untuk satu perubahan baris. Invalidasi sekarang dipetakan
+   per tabel di `src/lib/realtime.ts`, bukan per pemanggil → 28 request turun
+   jadi 4 (dan 4 itu memang 4 query berbeda, sudah dicek body-nya).
+
+3. **Nama channel unik per generasi.** `supabase.removeChannel()` asinkron.
+   Saat navigasi cepat, `supabase.channel(topic)` mengembalikan channel lama
+   yang sudah `subscribe()`, dan `.on()` di atasnya melempar error — dashboard
+   sempat **crash ke error boundary** (5 console error saat 20× navigasi).
+   Topic sekarang memakai suffix generasi, jadi tidak pernah bentrok. Sesudah
+   perbaikan: 0 error, realtime tetap hidup setelah 20 navigasi.
+
+File: `src/lib/realtime.ts`, `src/lib/realtime.test.ts`,
+`src/hooks/use-realtime-sync.ts`, `src/hooks/use-dashboard-data.ts`,
+`src/routes/_app.pipeline.tsx`,
+`supabase/migrations/20260827090000_add_realtime_publication_tables.sql`.
+
+Publication di-set lewat migration (idempoten), bukan SQL manual seperti
+rencana 1B-5 — supaya `supabase db reset` lokal tetap mereproduksinya.
+Migration ini **belum diterapkan ke production**.
