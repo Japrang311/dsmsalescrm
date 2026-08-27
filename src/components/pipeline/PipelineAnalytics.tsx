@@ -19,9 +19,11 @@ function pct(part: number, whole: number): number {
 export function PipelineAnalytics({
   metrics,
   showOwners,
+  scopeLabel,
 }: {
   metrics: PipelineMetrics;
   showOwners: boolean;
+  scopeLabel?: string;
 }) {
   const totals = useMemo(() => {
     return {
@@ -72,6 +74,11 @@ export function PipelineAnalytics({
 
   return (
     <div className="flex flex-col gap-3">
+      {scopeLabel && (
+        <div className="rounded-md border border-warning/30 bg-warning/5 px-3 py-2 text-xs text-warning">
+          {scopeLabel}
+        </div>
+      )}
       {/* KPI row */}
       <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
         <KpiTile
@@ -145,9 +152,9 @@ export function PipelineAnalytics({
                         className={cn(
                           "h-full rounded-full transition-all",
                           isLost
-                            ? "bg-zinc-400"
+                            ? "bg-border-strong"
                             : isWon
-                              ? "bg-emerald-500"
+                              ? "bg-success"
                               : "bg-primary",
                         )}
                         style={{
@@ -211,9 +218,9 @@ export function PipelineAnalytics({
                       className={cn(
                         "w-14 rounded px-1.5 py-0.5 text-right text-[11px] font-medium tabular-nums",
                         o.winRate >= 50
-                          ? "bg-emerald-50 text-emerald-700"
+                          ? "bg-success/10 text-success"
                           : o.winRate > 0
-                            ? "bg-amber-50 text-amber-700"
+                            ? "bg-warning/10 text-warning"
                             : "bg-muted text-muted-foreground",
                       )}
                     >
@@ -249,9 +256,9 @@ function KpiTile({
     tone === "primary"
       ? "text-primary"
       : tone === "success"
-        ? "text-emerald-600"
+        ? "text-success"
         : tone === "warning"
-          ? "text-amber-600"
+          ? "text-warning"
           : "text-foreground";
   return (
     <div className="rounded-lg border bg-card p-3">

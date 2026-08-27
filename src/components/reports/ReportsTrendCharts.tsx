@@ -15,6 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatRupiahShort } from "@/lib/format";
 import { CURRENT_YEAR } from "@/lib/domain";
 import { ChartEmpty } from "./ReportPrimitives";
+import { CHART_COLORS } from "./chart-colors";
 
 type TrendPoint = { month: string; achievement: number; target: number };
 type MonthlyPoint = { month: string; revenue: number; target: number };
@@ -69,14 +70,14 @@ export function ReportsTrendCharts({
                 <Bar
                   dataKey="achievement"
                   name="Achievement"
-                  fill="#0176D3"
+                  fill={CHART_COLORS[0]}
                   radius={[4, 4, 0, 0]}
                 />
                 <Line
                   type="monotone"
                   dataKey="target"
                   name="Target"
-                  stroke="#F59E0B"
+                  stroke={CHART_COLORS[2]}
                   strokeWidth={2}
                   dot={{ r: 3 }}
                 />
@@ -127,13 +128,13 @@ export function ReportsTrendCharts({
                 <Bar
                   dataKey="target"
                   name="Target"
-                  fill="#CBD5E1"
+                  fill="var(--color-border-strong)"
                   radius={[4, 4, 0, 0]}
                 />
                 <Bar
                   dataKey="revenue"
                   name="Revenue"
-                  fill="#0176D3"
+                  fill={CHART_COLORS[0]}
                   radius={[4, 4, 0, 0]}
                 />
               </BarChart>

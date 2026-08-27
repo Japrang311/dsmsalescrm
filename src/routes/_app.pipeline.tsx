@@ -5,7 +5,6 @@ import { toast } from "sonner";
 import { PipelineCardDrawer } from "@/components/pipeline/PipelineCardDrawer";
 import { PipelineAnalytics } from "@/components/pipeline/PipelineAnalytics";
 import { PipelineFilterBar } from "@/components/pipeline/PipelineFilterBar";
-import type { PipelineNextWindow } from "@/components/pipeline/PipelineFilterBar";
 import {
   PipelineBoard,
   type PipelineColumnData,
@@ -56,6 +55,12 @@ import { getErrorMessage } from "@/lib/utils";
 import { invalidateCommercialStageQueries } from "@/lib/query-invalidation";
 import { listQueryKey } from "@/lib/pagination-contracts";
 import { useRealtimeSync } from "@/hooks/use-realtime-sync";
+import {
+  filterCommercialItemsByNextWindow,
+  pipelineMetricsFromItems,
+  type PipelineNextWindow,
+} from "@/lib/pipeline-next-action-filter";
+import { PageContainer } from "@/components/layout/PageContainer";
 
 export const Route = createFileRoute("/_app/pipeline")({
   head: () => ({
@@ -231,13 +236,34 @@ function PipelineBoardPage({ role }: { role: Role }) {
     return map;
   }, [allLoadedItems, tasks]);
 
+  const filteredLoadedItems = useMemo(
+    () =>
+      filterCommercialItemsByNextWindow(
+        allLoadedItems,
+        nextByItem,
+        nextWindow,
+        NOW,
+      ),
+    [allLoadedItems, nextByItem, nextWindow],
+  );
+  const filteredLoadedIds = useMemo(
+    () => new Set(filteredLoadedItems.map((item) => item.id)),
+    [filteredLoadedItems],
+  );
+  const visibleMetrics = useMemo(
+    () => pipelineMetricsFromItems(filteredLoadedItems),
+    [filteredLoadedItems],
+  );
+
   // Per-stage column data for the board (rows/sum/hasMore/isFetching), keeps
   // PipelineBoard decoupled from the raw useQueries result shape.
   const stageColumns: PipelineColumnData[] = useMemo(
     () =>
       STAGES.map((stage, stageIndex) => {
         const query = stageQueries[stageIndex];
-        const items = (query.data?.rows ?? []).map(toCommercialItem);
+        const items = (query.data?.rows ?? [])
+          .map(toCommercialItem)
+          .filter((item) => filteredLoadedIds.has(item.id));
         const sum = items.reduce((s, it) => s + it.estimatedValue, 0);
         return {
           stage,
@@ -247,7 +273,7 @@ function PipelineBoardPage({ role }: { role: Role }) {
           isFetching: query.isFetching,
         };
       }),
-    [stageQueries],
+    [filteredLoadedIds, stageQueries],
   );
 
   // Live derived flag, not a stored status: a Closed Won Quotation counts as
@@ -295,6 +321,10 @@ function PipelineBoardPage({ role }: { role: Role }) {
     (owner !== "all" ? 1 : 0) +
     (status !== "all" ? 1 : 0) +
     (nextWindow !== "all" ? 1 : 0);
+  const nextWindowFiltered = nextWindow !== "all";
+  const headerTotals = nextWindowFiltered
+    ? visibleMetrics.totals
+    : metrics?.totals;
 
   const { data: currentUserId } = useQuery({
     queryKey: ["current-user-id"],
@@ -454,7 +484,7 @@ function PipelineBoardPage({ role }: { role: Role }) {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <PageContainer size="wide">
       {/* Header */}
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div>
@@ -463,8 +493,14 @@ function PipelineBoardPage({ role }: { role: Role }) {
             Commercial Pipeline
           </h1>
           <p className="text-sm text-muted-foreground">
-            {metrics.totals.itemCount} item · Total estimasi{" "}
-            {formatRupiahShort(metrics.totals.totalValue)}
+            {headerTotals?.itemCount ?? 0} item
+            {nextWindowFiltered ? " ditampilkan" : ""} · Total estimasi{" "}
+            {formatRupiahShort(headerTotals?.totalValue ?? 0)}
+            {nextWindowFiltered && (
+              <span className="ml-2 text-muted-foreground/70">
+                dari data yang sudah dimuat
+              </span>
+            )}
             {canDrag && (
               <span className="ml-2 hidden md:inline text-muted-foreground/70">
                 · Drag kartu untuk pindah stage
@@ -499,7 +535,13 @@ function PipelineBoardPage({ role }: { role: Role }) {
       />
 
       {/* Analytics */}
-      <PipelineAnalytics metrics={metrics} showOwners={role !== "sales"} />
+      <PipelineAnalytics
+        metrics={nextWindowFiltered ? visibleMetrics : metrics}
+        showOwners={role !== "sales"}
+        scopeLabel={
+          nextWindowFiltered ? "Berdasarkan card yang ditampilkan" : undefined
+        }
+      />
 
       {/* Board -- more stage columns than fit most viewports; the edge
           fade hints at the horizontal scroll so it doesn't look like the
@@ -593,6 +635,6 @@ function PipelineBoardPage({ role }: { role: Role }) {
         profilesById={ownerById}
         onWonWithoutSo={(item) => openCreateSoForItem(item.id)}
       />
-    </div>
+    </PageContainer>
   );
 }

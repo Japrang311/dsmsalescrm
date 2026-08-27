@@ -87,6 +87,7 @@ import {
   PipelineStageMoveDialog,
   type PendingPipelineMove,
 } from "@/components/pipeline/PipelineStageMoveDialog";
+import { PageContainer } from "@/components/layout/PageContainer";
 
 export const Route = createFileRoute("/_app/tasks")({
   head: () => ({
@@ -520,7 +521,7 @@ function TasksInboxPage() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <PageContainer>
       <header className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex flex-col gap-1">
           <h1 className="text-xl font-semibold tracking-tight text-foreground">
@@ -928,6 +929,6 @@ function TasksInboxPage() {
           </div>
         </div>
       )}
-    </div>
+    </PageContainer>
   );
 }

@@ -66,6 +66,7 @@ import { ReportsComplianceSection } from "@/components/reports/ReportsCompliance
 import { Stage4WinLossSection } from "@/components/reports/Stage4WinLossSection";
 import { Stage4CycleTimeSection } from "@/components/reports/Stage4CycleTimeSection";
 import { Stage4FunnelDwellSection } from "@/components/reports/Stage4FunnelDwellSection";
+import { PageContainer } from "@/components/layout/PageContainer";
 
 export const Route = createFileRoute("/_app/reports")({
   head: () => ({ meta: [{ title: "Executive Reports · DSM" }] }),
@@ -514,7 +515,7 @@ function ReportsPage() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <PageContainer>
       <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
         <div>
           <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
@@ -642,6 +643,6 @@ function ReportsPage() {
           create/edit/archive/delete pada laporan ini.
         </p>
       )}
-    </div>
+    </PageContainer>
   );
 }

@@ -75,6 +75,7 @@ import {
   type SalesOrdersExportContext,
 } from "@/lib/export-sales-orders";
 import { EmptyExportError } from "@/lib/export-csv";
+import { PageContainer } from "@/components/layout/PageContainer";
 
 export const Route = createFileRoute("/_app/sales-orders/")({
   head: () => ({ meta: [{ title: "Sales Orders & Revenue · DSM" }] }),
@@ -304,7 +305,7 @@ function SalesOrdersRevenuePage() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <PageContainer size="wide">
       <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
         <div>
           <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
@@ -627,7 +628,7 @@ function SalesOrdersRevenuePage() {
           </Button>
         </div>
       )}
-    </div>
+    </PageContainer>
   );
 }
 

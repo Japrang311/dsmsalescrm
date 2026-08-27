@@ -55,6 +55,7 @@ import { AddClientDialog } from "@/components/clients/AddClientDialog";
 import { formatRupiahShort } from "@/lib/format";
 import type { ClientSource, ClientStatus } from "@/lib/domain";
 import { listQueryKey } from "@/lib/pagination-contracts";
+import { PageContainer } from "@/components/layout/PageContainer";
 
 const SOURCES: ClientSource[] = [
   "Referral",
@@ -210,7 +211,7 @@ function ClientListPage() {
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-4 p-4 md:p-6">
+    <PageContainer size="wide">
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
@@ -429,7 +430,7 @@ function ClientListPage() {
           serverPaginated
         />
       )}
-    </div>
+    </PageContainer>
   );
 }
 

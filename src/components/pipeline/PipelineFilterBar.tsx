@@ -7,8 +7,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { Role } from "@/lib/domain";
-
-export type PipelineNextWindow = "all" | "overdue" | "today" | "week" | "none";
+import type { PipelineNextWindow } from "@/lib/pipeline-next-action-filter";
 
 type Props = {
   role: Role;
