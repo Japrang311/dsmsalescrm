@@ -15,7 +15,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { listClients, listOwners } from "@/lib/data/clients";
+import {
+  listClients,
+  listOwners,
+  listSalesTeamProfiles,
+} from "@/lib/data/clients";
 import { useRole } from "@/context/role-context-core";
 import {
   Activity,
@@ -177,6 +181,16 @@ function ActivityPage() {
   const { data: clientList = [] } = useQuery({
     queryKey: ["clients", "all"],
     queryFn: listClients,
+    enabled: authReady,
+  });
+  // Owner filter options, deliberately NOT `owners`: that lookup is every
+  // profile (needed so a row logged by a deactivated account still renders a
+  // name instead of a raw id). Offering all of them as filters listed people
+  // who can't own anything — a director, deactivated reps, a QA account —
+  // and picking one always returned an empty feed.
+  const { data: salesTeam = [] } = useQuery({
+    queryKey: ["profiles", "sales-team"],
+    queryFn: listSalesTeamProfiles,
     enabled: authReady,
   });
 
@@ -456,9 +470,9 @@ function ActivityPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Semua owner</SelectItem>
-                {Object.entries(owners).map(([id, m]) => (
-                  <SelectItem key={id} value={id}>
-                    {m.name}
+                {salesTeam.map((member) => (
+                  <SelectItem key={member.id} value={member.id}>
+                    {member.name}
                   </SelectItem>
                 ))}
               </SelectContent>
