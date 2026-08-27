@@ -168,7 +168,7 @@ atau kurang:
 File: `src/lib/realtime.ts`, `src/lib/realtime.test.ts`,
 `src/hooks/use-realtime-sync.ts`, `src/hooks/use-dashboard-data.ts`,
 `src/routes/_app.pipeline.tsx`,
-`supabase/migrations/20260827090000_add_realtime_publication_tables.sql`.
+`supabase/migrations/20260827135012_add_realtime_publication_tables.sql`.
 
 Publication di-set lewat migration (idempoten), bukan SQL manual seperti
 rencana 1B-5 — supaya `supabase db reset` lokal tetap mereproduksinya.
