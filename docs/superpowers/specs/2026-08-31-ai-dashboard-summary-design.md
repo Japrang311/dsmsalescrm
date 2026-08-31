@@ -128,7 +128,7 @@ mention individual tasks.
 
 | File | Responsibility | Tested |
 | --- | --- | --- |
-| `src/lib/ai/access.ts` | Allow-listed emails; `canUseAiSummary(email, status)` | Yes |
+| `src/lib/ai/access.ts` | Allow-listed emails; `canUseAiSummary(email)` — a non-null `realProfile` already proves the account is active, and the server re-checks `status` independently | Yes |
 | `src/lib/ai/summary-facts.ts` | Dashboard data → role-specific formatted facts | Yes |
 | `src/lib/ai/summary-prompt.ts` | Facts → prompt text | Yes |
 | `src/server/ai-summary.ts` | Auth + allow-list gate, Gateway call, error mapping | Gate logic tested |
