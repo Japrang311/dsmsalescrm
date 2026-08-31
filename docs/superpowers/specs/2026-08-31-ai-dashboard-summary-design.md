@@ -31,12 +31,23 @@ Out of scope, deliberately:
 
 ## 3. Core invariant
 
-> **The summary may only discuss what that role already sees on its own
-> Dashboard.**
+> **The summary may only discuss data the signed-in role can already reach in
+> the app under RLS, and must honour the Executive aggregate-only rule.**
 
-The AI never surfaces new information; it narrates what is already on screen.
-This makes the privacy story simple, keeps role rules from Phase 12 intact,
-and is directly testable (§7).
+The AI never surfaces information the reader could not already obtain by
+navigating the app. This keeps the privacy story simple, keeps the Phase 12
+role rules intact, and is directly testable (§7).
+
+An earlier draft phrased this as "only what that role sees on its own
+Dashboard". That was too narrow: Dashboard card placement is a layout choice,
+not an authorization rule. `commercial_documents_select` grants `manager`
+read access to every commercial document, and `_app.pipeline.tsx:347` already
+shows Manager the full pipeline. So Manager may be told about the quotation
+funnel even though `ExecutiveCards.tsx` renders that card only for Executive.
+
+The Executive restrictions in §6 are different in kind — they come from
+accepted Phase 12 decisions (aggregate-only reporting, `includeTaskDetail =
+false` in Reports), not from layout. They are binding.
 
 ## 4. Second invariant: code computes, AI only writes sentences
 
@@ -57,12 +68,12 @@ numbers. Therefore:
 Browser (session already RLS-scoped to the signed-in user)
   │
   ├─ existing selectors compute the numbers
-  │    Manager:   salesPerformanceInRange, targetPerSales,
-  │               filterManagerTeamExceptions, taskCounts,
-  │               monthlyRevenueTrend, topCustomersInRange, revenueByTax
-  │    Executive: monthlyRevenueTrend, ytdRevenue, ytdTargetValue,
-  │               getRiskAlertCounts, topCustomersInRange, revenueByTax,
-  │               pipeline/quotation funnel metrics
+  │    Shared:    monthlyRevenueTrend, ytdRevenue, ytdTargetValue,
+  │               revenueByTax, topCustomersInRange, getRiskAlertCounts,
+  │               getPipelineMetrics (funnel + forecast)
+  │    Manager
+  │    only:      salesPerformanceInRange, targetPerSales,
+  │               filterManagerTeamExceptions, taskCounts
   │
   ├─ summary-facts.ts formats them into a small role-specific facts object
   │
@@ -93,20 +104,25 @@ arithmetic.
 
 ## 6. Role-specific content
 
-Derived from what each role's Dashboard actually renders
-(`src/routes/_app.dashboard.tsx`).
+Manager receives every topic. Executive receives everything except the two
+categories that accepted Phase 12 rules withhold from that role.
 
 | Topic | Manager (Adhitya) | Executive (Triyanto) |
 | --- | --- | --- |
 | Revenue vs target | Yes | Yes |
 | Revenue trend, PPN / Non-PPN split | Yes | Yes |
 | Top customers | Yes | Yes |
-| Per-sales performance, by name | **Yes** | **No** — `SalesPerformanceTable` is not rendered for Executive |
-| Escalated tasks | **Yes**, owned by sales (`filterManagerTeamExceptions`) | **No** — Reports sets `includeTaskDetail = false` for Executive |
 | Stuck / at-risk deals | Yes | Yes (`RiskAlertsCard`) |
-| Quotation funnel, forecast vs achievement | No | **Yes** (`QuotationFunnelCard`, `ForecastVsAchievementCard`) |
+| Quotation funnel, forecast vs achievement | Yes | Yes (`ExecutiveCards.tsx`) |
+| Per-sales performance, by name | Yes | **No** — aggregate-only reporting |
+| Escalated tasks | Yes, owned by sales (`filterManagerTeamExceptions`) | **No** — Reports sets `includeTaskDetail = false` |
 
-Executive summaries name clients but never individual sales people.
+Manager gets the quotation funnel and forecast even though those cards are
+not on the Manager Dashboard; the data is already available to Manager via
+RLS and the Pipeline page (see §3).
+
+Executive summaries name clients but never individual sales people, and never
+mention individual tasks.
 
 ## 7. Modules and tests
 
