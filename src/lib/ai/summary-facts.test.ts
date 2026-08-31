@@ -7,7 +7,12 @@ import { buildSummaryFacts, type SummaryFactsInput } from "./summary-facts";
 // DateRange is { from: Date; to: Date } — Date objects, not ISO strings.
 const RANGE = { from: new Date(2026, 7, 1), to: new Date(2026, 7, 31) };
 
-function order(id: string, ownerId: string, clientId: string, value: number): SalesOrder {
+function order(
+  id: string,
+  ownerId: string,
+  clientId: string,
+  value: number,
+): SalesOrder {
   return {
     id,
     ownerId,

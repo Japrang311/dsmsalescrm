@@ -13,7 +13,11 @@ import {
   topCustomersInRange,
 } from "@/lib/data/dashboard-selectors";
 import { filterManagerTeamExceptions } from "@/lib/data/task-exceptions";
-import { formatDateShort, formatPercent, formatRupiahShort } from "@/lib/format";
+import {
+  formatDateShort,
+  formatPercent,
+  formatRupiahShort,
+} from "@/lib/format";
 
 export type SummaryAudience = "manager" | "executive";
 
@@ -73,8 +77,18 @@ export type SummaryFactsInput = {
 };
 
 const MONTHS = [
-  "Januari", "Februari", "Maret", "April", "Mei", "Juni",
-  "Juli", "Agustus", "September", "Oktober", "November", "Desember",
+  "Januari",
+  "Februari",
+  "Maret",
+  "April",
+  "Mei",
+  "Juni",
+  "Juli",
+  "Agustus",
+  "September",
+  "Oktober",
+  "November",
+  "Desember",
 ];
 
 function attainment(actual: number, target: number): string {
@@ -84,8 +98,18 @@ function attainment(actual: number, target: number): string {
 
 export function buildSummaryFacts(input: SummaryFactsInput): SummaryFacts {
   const {
-    audience, now, range, orders, tasks, clients, salesTeam,
-    ownersById, targetsByMember, companyTarget, riskCounts, pipeline,
+    audience,
+    now,
+    range,
+    orders,
+    tasks,
+    clients,
+    salesTeam,
+    ownersById,
+    targetsByMember,
+    companyTarget,
+    riskCounts,
+    pipeline,
   } = input;
 
   const actual = revenueInRange(orders, range);
@@ -136,7 +160,11 @@ export function buildSummaryFacts(input: SummaryFactsInput): SummaryFacts {
   const nameById = new Map(salesTeam.map((m) => [m.id, m.name]));
 
   facts.salesPerformance = salesPerformanceInRange(
-    orders, tasks, salesTeam, range, targetsByMember,
+    orders,
+    tasks,
+    salesTeam,
+    range,
+    targetsByMember,
   ).map((row) => ({
     name: row.member.name,
     revenueLabel: formatRupiahShort(row.revenue),

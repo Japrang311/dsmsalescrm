@@ -25,7 +25,11 @@ function facts(audience: SummaryFacts["audience"]): SummaryFacts {
       winRateLabel: "42%",
       openValueLabel: "Rp 3,1 M",
       stages: [
-        { stage: "Negosiasi", countLabel: "12 item", openValueLabel: "Rp 3,1 M" },
+        {
+          stage: "Negosiasi",
+          countLabel: "12 item",
+          openValueLabel: "Rp 3,1 M",
+        },
       ],
     },
   };
@@ -97,7 +101,11 @@ describe("buildSummaryPrompt", () => {
         winRateLabel: "42%",
         openValueLabel: "Rp 3,1 M",
         stages: [
-          { stage: "Negosiasi", countLabel: "12 item", openValueLabel: "Rp 3,1 M" },
+          {
+            stage: "Negosiasi",
+            countLabel: "12 item",
+            openValueLabel: "Rp 3,1 M",
+          },
         ],
       },
       salesPerformance: [

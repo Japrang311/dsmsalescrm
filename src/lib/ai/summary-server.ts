@@ -6,8 +6,7 @@ import { buildSummaryPrompt } from "@/lib/ai/summary-prompt";
 import type { SummaryFacts } from "@/lib/ai/summary-facts";
 
 export type AiSummaryResult =
-  | { ok: true; text: string }
-  | { ok: false; message: string };
+  { ok: true; text: string } | { ok: false; message: string };
 
 const DENIED: AiSummaryResult = {
   ok: false,
@@ -87,9 +86,8 @@ export async function authorize(
     const client = buildClient(accessToken);
     if (!client) return null;
 
-    const { data: userData, error: userError } = await client.auth.getUser(
-      accessToken,
-    );
+    const { data: userData, error: userError } =
+      await client.auth.getUser(accessToken);
     if (userError || !userData.user) return null;
 
     const { data: profile, error: profileError } = await client

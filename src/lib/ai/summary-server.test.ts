@@ -72,10 +72,7 @@ describe("authorize", () => {
   });
 
   test("returns the authenticated user id on success", async () => {
-    const result = await authorize(
-      "token-abc",
-      activeAllowedProfileClient,
-    );
+    const result = await authorize("token-abc", activeAllowedProfileClient);
     expect(result).toBe("user-123");
   });
 
