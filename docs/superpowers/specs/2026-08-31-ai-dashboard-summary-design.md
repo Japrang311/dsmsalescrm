@@ -1,6 +1,6 @@
 # AI Dashboard Summary — Design
 
-Status: Accepted (pending one open item, see §9)
+Status: Accepted
 Date: 2026-08-31
 Author: Adhitya Wirambara (with Claude Code)
 
@@ -169,12 +169,18 @@ Two accounts, held in `src/lib/ai/access.ts` as a single exported constant
 used by both the UI (to decide whether to render the card) and the server (to
 authorize the call). One source of truth.
 
-- Adhitya — `adhitya@dutasolusimetalindo.com` (role `manager`), confirmed
-  from `QUOTATION_PDF_DEFAULTS` in `src/lib/export-quotation-pdf.ts`.
-- Triyanto — role `executive`. **Open item: production login email not yet
-  confirmed.** It must be supplied by the owner before implementation; it will
-  not be guessed from the `namadepan@dutasolusimetalindo.com` pattern, because
-  a wrong value fails silently and is hard to diagnose.
+- Adhitya — `adhitya@dutasolusimetalindo.com`, role `manager`. Confirmed from
+  `QUOTATION_PDF_DEFAULTS` in `src/lib/export-quotation-pdf.ts`.
+- Triyanto — `triyanto@dutasolusimetalindo.com`, role `executive`. Confirmed
+  by the owner on 2026-08-31.
+
+Both addresses are compared lower-cased. Neither was inferred from the
+`namadepan@dutasolusimetalindo.com` pattern; a wrong entry here fails
+silently and is hard to diagnose, so both were confirmed explicitly.
+
+First implementation step: verify both addresses match a row in production
+`public.profiles` with the expected role and `status = 'active'`. If either
+does not match, stop and report rather than adjusting the list to fit.
 
 Hiding the card in the browser is convenience, not security. The server-side
 check is the boundary.
