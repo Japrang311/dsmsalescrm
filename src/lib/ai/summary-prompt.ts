@@ -19,13 +19,27 @@ export function buildSummaryPrompt(facts: SummaryFacts): {
   system: string;
   prompt: string;
 } {
+  // Defence in depth: strip salesPerformance and escalatedTasks for executive audience.
+  // This is intentional duplication with summary-facts.ts logic — if summary-facts.ts
+  // regresses and incorrectly populates these fields for an executive, this layer will
+  // still prevent a sales name from reaching the model. This duplication must not be
+  // "simplified" away without explicit Phase 12 compliance review.
+  let factsToSerialize = facts;
+  if (facts.audience === "executive") {
+    factsToSerialize = {
+      ...facts,
+      salesPerformance: undefined,
+      escalatedTasks: undefined,
+    };
+  }
+
   return {
     system: `${SHARED_RULES}\n${AUDIENCE_RULES[facts.audience]}`,
     prompt: [
       `Periode: ${facts.periodLabel}`,
       "",
       "Data (salin angka persis seperti tertulis):",
-      JSON.stringify(facts, null, 2),
+      JSON.stringify(factsToSerialize, null, 2),
     ].join("\n"),
   };
 }
