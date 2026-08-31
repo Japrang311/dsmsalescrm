@@ -1,0 +1,73 @@
+import { describe, expect, test } from "bun:test";
+import type { SummaryFacts } from "./summary-facts";
+import { buildSummaryPrompt } from "./summary-prompt";
+
+function facts(audience: SummaryFacts["audience"]): SummaryFacts {
+  const base: SummaryFacts = {
+    audience,
+    periodLabel: "Agustus 2026",
+    generatedAtLabel: "31 Agu 2026, 14:30",
+    revenue: {
+      actualLabel: "Rp 2,1 M",
+      targetLabel: "Rp 2,8 M",
+      attainmentLabel: "75%",
+      ppnLabel: "Rp 1,4 M",
+      nonPpnLabel: "Rp 0,7 M",
+    },
+    topCustomers: [{ name: "PT Karya Utama", revenueLabel: "Rp 800 jt" }],
+    risk: {
+      overdueTaskCountLabel: "7 task",
+      bigPendingCommitCountLabel: "3 dokumen",
+      bigPendingCommitValueLabel: "Rp 480 jt",
+      dormantHighValueClientCountLabel: "2 client",
+    },
+    funnel: {
+      winRateLabel: "42%",
+      openValueLabel: "Rp 3,1 M",
+      stages: [
+        { stage: "Negosiasi", countLabel: "12 item", openValueLabel: "Rp 3,1 M" },
+      ],
+    },
+  };
+  if (audience === "manager") {
+    base.salesPerformance = [
+      {
+        name: "Budi Santoso",
+        revenueLabel: "Rp 900 jt",
+        targetLabel: "Rp 700 jt",
+        attainmentLabel: "129%",
+      },
+    ];
+    base.escalatedTasks = [
+      { ownerName: "Budi Santoso", title: "Follow up PT Karya Utama" },
+    ];
+  }
+  return base;
+}
+
+describe("buildSummaryPrompt", () => {
+  test("forbids inventing or recomputing figures", () => {
+    const { system } = buildSummaryPrompt(facts("manager"));
+    expect(system).toContain("persis seperti tertulis");
+    expect(system).toContain("Jangan menghitung");
+  });
+
+  test("asks for Indonesian output", () => {
+    const { system } = buildSummaryPrompt(facts("manager"));
+    expect(system.toLowerCase()).toContain("bahasa indonesia");
+  });
+
+  test("carries every provided figure into the prompt", () => {
+    const { prompt } = buildSummaryPrompt(facts("manager"));
+    expect(prompt).toContain("Rp 2,1 M");
+    expect(prompt).toContain("75%");
+    expect(prompt).toContain("PT Karya Utama");
+    expect(prompt).toContain("Budi Santoso");
+  });
+
+  test("executive prompt names no sales person and instructs aggregate-only", () => {
+    const { system, prompt } = buildSummaryPrompt(facts("executive"));
+    expect(prompt).not.toContain("Budi Santoso");
+    expect(system).toContain("jangan menyebut nama sales");
+  });
+});
