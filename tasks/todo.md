@@ -1744,3 +1744,67 @@ Detailed checklist: `tasks/sales-task-control-loop-todo.md`
       Production/security state was refreshed again 2026-07-30: all local
       migrations through `20260730033312_prevent_duplicate_client_names` were
       confirmed applied on `qhtfixgbcpcitokeryxb`; see `HANDOFF.md`.
+
+---
+
+## Post-Phase 13: AI Dashboard Summary Pilot
+
+### Task 64: On-demand AI-written Dashboard summary card (two-account pilot)
+
+**Status:** Code complete and locally verified (2026-08-31). Live end-to-end
+generation has never been executed — blocked on Vercel/Supabase env
+prerequisites, see below. Not pushed to `main`.
+
+**Description:** Add a "Buat Ringkasan" card to the Dashboard that turns
+already-computed Dashboard figures into an Indonesian-language paragraph via
+Vercel AI Gateway, for exactly two allow-listed accounts
+(`adhitya@dutasolusimetalindo.com`, manager; `triyanto@dutasolusimetalindo.com`,
+executive). No database schema change, no migration, no RLS change, no CSP
+change.
+
+**Acceptance criteria:**
+
+- [x] `src/lib/ai/access.ts` — allow list of exactly the two accounts above,
+      compared lower-cased
+- [x] `src/lib/ai/summary-facts.ts` — role-specific facts object whose every
+      leaf is a pre-formatted string (the AI never computes)
+- [x] `src/lib/ai/summary-prompt.ts` — builds the prompt; redacts sales names
+      for the executive audience as defence in depth
+- [x] `src/lib/ai/summary-server.ts` — the app's first server-side code; a
+      `createServerFn` verifying session + active profile + allow-list
+      membership before calling Vercel AI Gateway (`ai` v7.0.85)
+- [x] `src/components/dashboard/AiSummaryCard.tsx`, mounted in
+      `src/routes/_app.dashboard.tsx`
+- [x] Client/server split verified by grepping the built bundles: client
+      assets contain zero occurrences of `SUPABASE_ANON_KEY`,
+      `providerOptions`, the model slug, `feature:dashboard-summary`, the
+      Indonesian server-side error strings, or `generateText`; the server
+      bundle carries the model slug and tags
+- [ ] Manual check against the two real accounts plus a non-allow-listed
+      account and a forced-error path (spec §12) — **outstanding**, blocked on
+      environment prerequisites below
+- [ ] Management approval for sending DSM revenue figures, client names, and
+      (manager variant) individual sales performance to a third-party model
+      provider (spec §11) — **outstanding**
+
+**Deployment prerequisites, both currently UNSET:** AI Gateway must be
+enabled on the `dsmsalescrm` Vercel project (auth is Vercel OIDC, no manual
+API key), and `SUPABASE_URL` / `SUPABASE_ANON_KEY` — without the `VITE_`
+prefix — must be set for Production and Preview. The feature fails closed
+and shows an in-card error if these are missing; the rest of the Dashboard
+is unaffected.
+
+**Verification:** `bun run verify:app` — exit 0, lint clean, typecheck
+clean, 664 tests pass / 0 fail across 90 files, build succeeds. `verify:db`
+was not run (no schema change). No live AI Gateway call has ever been made;
+see `HANDOFF.md` for what remains outstanding before production.
+
+**Files touched:** `src/lib/ai/access.ts`, `src/lib/ai/summary-facts.ts`,
+`src/lib/ai/summary-prompt.ts`, `src/lib/ai/summary-server.ts`,
+`src/components/dashboard/AiSummaryCard.tsx`,
+`src/routes/_app.dashboard.tsx`.
+
+**Spec:** `docs/superpowers/specs/2026-08-31-ai-dashboard-summary-design.md`
+**Plan:** `docs/superpowers/plans/2026-08-31-ai-dashboard-summary-implementation.md`
+
+**Estimated scope:** Medium (6 files, no migration)
