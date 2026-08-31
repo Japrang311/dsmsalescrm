@@ -49,6 +49,7 @@ import { getSalesOrdersMetrics } from "@/lib/data/sales-orders-metrics";
 import { getPipelineMetrics } from "@/lib/data/pipeline-metrics";
 import { formatPercent, formatRupiahShort } from "@/lib/format";
 
+import { AiSummaryCard } from "@/components/dashboard/AiSummaryCard";
 import { KpiCard, KpiProgress } from "@/components/dashboard/KpiCard";
 import { TodaysFollowUpList } from "@/components/dashboard/TodaysFollowUpList";
 import { RevenueTrendChart } from "@/components/dashboard/RevenueTrendChart";
@@ -425,6 +426,8 @@ function DashboardPage() {
           </DropdownMenu>
         </div>
       </div>
+
+      <AiSummaryCard />
 
       <CalendarIncompleteWarning tasks={allTasks} metrics={taskMetrics} />
 

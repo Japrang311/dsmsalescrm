@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { canUseAiSummary } from "@/lib/ai/access";
-import { authorize, mapGatewayError } from "./ai-summary";
+import { authorize, mapGatewayError } from "./summary-server";
 
 const ALLOWED_EMAIL = "adhitya@dutasolusimetalindo.com";
 
