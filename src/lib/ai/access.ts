@@ -1,8 +1,10 @@
 /**
- * Limited pilot. The AI Dashboard summary is available to these two accounts
- * only — Adhitya (manager) and Triyanto (executive). Both were confirmed
- * against production `public.profiles` before this list was written; see
+ * Limited pilot. The AI Dashboard summary is available to one account only —
+ * Adhitya (manager), confirmed against production `public.profiles`; see
  * docs/superpowers/specs/2026-08-31-ai-dashboard-summary-design.md §9.
+ * Triyanto (executive) was on this list originally but was removed on
+ * 2026-09-01 at the owner's request — the executive-audience code paths in
+ * summary-facts.ts / summary-prompt.ts are kept as defensive dead code.
  *
  * This constant is the single source of truth: the Dashboard reads it to
  * decide whether to render the card, and the server function reads it to
@@ -11,7 +13,6 @@
  */
 export const AI_SUMMARY_ALLOWED_EMAILS: readonly string[] = [
   "adhitya@dutasolusimetalindo.com",
-  "triyanto@dutasolusimetalindo.com",
 ];
 
 export function canUseAiSummary(email: string | null | undefined): boolean {

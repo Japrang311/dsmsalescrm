@@ -3,17 +3,17 @@
 Date started: 2026-09-01
 Production: https://dsmsalescrm.vercel.app
 Feature: "Ringkasan AI" card on `/dashboard`, button "Buat Ringkasan".
-Allow list (`src/lib/ai/access.ts`): `adhitya@dutasolusimetalindo.com` (manager),
-`triyanto@dutasolusimetalindo.com` (executive).
+Allow list (`src/lib/ai/access.ts`): `adhitya@dutasolusimetalindo.com`
+(manager) — **one account only** since 2026-09-01. Triyanto (executive) was
+removed; he is now a good negative test.
 
 ## Prerequisites (state as of 2026-09-01)
 
 - [x] `SUPABASE_URL` / `SUPABASE_ANON_KEY` set as Production secrets on Vercel
       `dsmsalescrm` (verified via `vercel env ls production`).
-- [ ] AI Gateway enabled for the project **and** has non-zero credit
-      (Hobby plan). NOT yet confirmed — this check will confirm it: a working
-      generation proves it; a `402` "Kuota AI bulan ini sudah habis." means
-      credit is exhausted / not provisioned.
+- [x] Credit card added to the Vercel team `HIULAUKGALAK` (owner, 2026-09-01)
+      — unblocks the `customer_verification_required` 403 from the first
+      attempt. A working generation confirms AI Gateway is live.
 
 ## How to run
 
@@ -35,26 +35,16 @@ Allow list (`src/lib/ai/access.ts`): `adhitya@dutasolusimetalindo.com` (manager)
 - Output captured:
 - Log line (status / model / error):
 
-### Check 2 — Executive account (`triyanto@dutasolusimetalindo.com`) — PHASE 12 GUARD
+### Check 2 — Non-allow-listed accounts (Triyanto + any sales account)
 
-- [ ] The card is visible.
-- [ ] "Buat Ringkasan" produces a paragraph.
-- [ ] The paragraph names **NO** individual sales person.
-- [ ] The paragraph mentions **NO** individual task.
-- Output captured:
-- Reviewer sign-off (name / date):
-
-> This is the check that protects an accepted Phase 12 rule. Record the exact
-> output text and an explicit human sign-off that it contains no sales names.
-
-### Check 3 — Non-allow-listed account (any sales account)
-
-- [ ] The "Ringkasan AI" card does **not** appear on the Dashboard at all.
+- [ ] Signed in as `triyanto@dutasolusimetalindo.com` (executive) — the
+      "Ringkasan AI" card does **not** appear on the Dashboard at all.
+- [ ] Signed in as any sales account — the card does **not** appear.
 - [ ] (Optional, defence-in-depth) Replaying the POST to the server function
-      with this account's token returns `{"ok":false,"message":"Fitur ini
+      with a non-allowed token returns `{"ok":false,"message":"Fitur ini
       tidak tersedia untuk akun Anda."}`.
 
-### Check 4 — Forced failure path
+### Check 3 — Forced failure path
 
 Pick one:
 - In browser DevTools, set the network to **Offline**, then click
@@ -65,15 +55,42 @@ Pick one:
 - [ ] Every other Dashboard widget (KPI row, charts, tables) still works.
 - Error text shown:
 
+## 2026-09-01 first attempt — BLOCKED on Vercel billing
+
+Four "Buat Ringkasan" clicks at ~05:02–05:04 UTC (domain `www.dsmsales.app`)
+all failed the same way. Server logs:
+
+```
+AI summary failed GatewayInternalServerError: AI Gateway requires a valid
+credit card on file to service requests. ... statusCode: 403,
+type: 'customer_verification_required'
+```
+
+What this proves:
+
+- The server function is reachable, `authorize()` passes for the caller, and
+  OIDC auth to Vercel AI Gateway works — the request reached the Gateway.
+- The Gateway refuses **all** requests (even the free credits) until the
+  Vercel team **HIULAUKGALAK** has a credit card on file.
+  Add one at: Vercel dashboard → team HIULAUKGALAK → AI → "Add credit card".
+- The failure is contained to the card (rest of Dashboard unaffected), but
+  the error message shown is the generic
+  "Ringkasan gagal dibuat. Coba lagi nanti." — the `GatewayInternalServerError`
+  (403, wrapping the APICallError as `.cause`) does not match
+  `APICallError.isInstance`, so `mapGatewayError` never sees the status code.
+  Minor follow-up: unwrap `error.cause` / handle 403 in
+  `src/lib/ai/summary-server.ts`.
+
+Card was added on 2026-09-01. Re-run pending.
+
 ## Outcome
 
 | Check | Result | Notes |
 |---|---|---|
-| 1 Manager names present |  |  |
-| 2 Executive names absent |  |  |
-| 3 Card hidden for others |  |  |
-| 4 Error contained to card |  |  |
+| 1 Adhitya: card visible + paragraph names sales |  |  |
+| 2 Triyanto / sales: card hidden |  |  |
+| 3 Forced failure contained to card |  |  |
 
-Management approval for sending revenue / client names / (manager) per-sales
+Management approval for sending revenue / client names / per-sales
 performance to a third-party model provider (spec §11): _______ (still
 outstanding as of 2026-09-01).

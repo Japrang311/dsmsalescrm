@@ -165,18 +165,24 @@ Dashboard widgets.
 
 ## 9. Access control
 
-Two accounts, held in `src/lib/ai/access.ts` as a single exported constant
+One account, held in `src/lib/ai/access.ts` as a single exported constant
 used by both the UI (to decide whether to render the card) and the server (to
 authorize the call). One source of truth.
 
 - Adhitya — `adhitya@dutasolusimetalindo.com`, role `manager`. Confirmed from
   `QUOTATION_PDF_DEFAULTS` in `src/lib/export-quotation-pdf.ts`.
-- Triyanto — `triyanto@dutasolusimetalindo.com`, role `executive`. Confirmed
-  by the owner on 2026-08-31.
 
-Both addresses are compared lower-cased. Neither was inferred from the
+> **2026-09-01 scope change.** Triyanto
+> (`triyanto@dutasolusimetalindo.com`, `executive`) was originally the
+> second pilot account but was removed at the owner's request before the
+> pilot went live. The executive-audience code (redaction in
+> `summary-facts.ts` / `summary-prompt.ts`, the `executive` branch in
+> `authorize()`) is kept as defensive dead code; the §3 invariant tests
+> still exercise it.
+
+The address is compared lower-cased. It was not inferred from the
 `namadepan@dutasolusimetalindo.com` pattern; a wrong entry here fails
-silently and is hard to diagnose, so both were confirmed explicitly.
+silently and is hard to diagnose, so it was confirmed explicitly.
 
 First implementation step: verify both addresses match a row in production
 `public.profiles` with the expected role and `status = 'active'`. If either

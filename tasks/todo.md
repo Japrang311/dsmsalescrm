@@ -1752,22 +1752,24 @@ Detailed checklist: `tasks/sales-task-control-loop-todo.md`
 ### Task 64: On-demand AI-written Dashboard summary card (two-account pilot)
 
 **Status:** Merged to `main` (`56c4c76`), pushed, and deployed to production
-(2026-09-01). `SUPABASE_URL` / `SUPABASE_ANON_KEY` are now set as Production
-secrets on the Vercel `dsmsalescrm` project. Still outstanding: the spec §12
-live manual check (never run against a real account), confirmation that AI
-Gateway is enabled with credit on this Hobby-plan project, and management
-approval (spec §11). See `HANDOFF.md`'s 2026-09-01 section.
+(2026-09-01). `SUPABASE_URL` / `SUPABASE_ANON_KEY` set as Production secrets;
+Vercel team credit card added (unblocks AI Gateway). **Scope narrowed to
+Adhitya only** — `triyanto@dutasolusimetalindo.com` removed from the allow
+list at the owner's request. Still outstanding: the spec §12 live manual
+check (never run against a real account) and management approval (spec §11).
+See `HANDOFF.md`'s 2026-09-01 section.
 
 **Description:** Add a "Buat Ringkasan" card to the Dashboard that turns
 already-computed Dashboard figures into an Indonesian-language paragraph via
-Vercel AI Gateway, for exactly two allow-listed accounts
-(`adhitya@dutasolusimetalindo.com`, manager; `triyanto@dutasolusimetalindo.com`,
-executive). No database schema change, no migration, no RLS change, no CSP
-change.
+Vercel AI Gateway, for one allow-listed account
+(`adhitya@dutasolusimetalindo.com`, manager). Narrowed from two accounts on
+2026-09-01 — `triyanto@dutasolusimetalindo.com` (executive) removed at the
+owner's request. No database schema change, no migration, no RLS change, no
+CSP change.
 
 **Acceptance criteria:**
 
-- [x] `src/lib/ai/access.ts` — allow list of exactly the two accounts above,
+- [x] `src/lib/ai/access.ts` — allow list of exactly the one account above,
       compared lower-cased
 - [x] `src/lib/ai/summary-facts.ts` — role-specific facts object whose every
       leaf is a pre-formatted string (the AI never computes)
@@ -1783,10 +1785,11 @@ change.
       `providerOptions`, the model slug, `feature:dashboard-summary`, the
       Indonesian server-side error strings, or `generateText`; the server
       bundle carries the model slug and tags
-- [ ] Manual check against the two real accounts plus a non-allow-listed
-      account and a forced-error path (spec §12) — **outstanding**. Env
-      prerequisites are no longer the blocker; needs a live click-test on
-      production.
+- [ ] Manual check: Adhitya sees the card and generates a paragraph naming
+      per-sales performance; a non-allow-listed account never sees the card;
+      a forced network/model failure renders an in-card error while the rest
+      of the Dashboard works (spec §12) — **outstanding**. Env and billing
+      prerequisites are resolved; needs a live click-test on production.
 - [ ] Management approval for sending DSM revenue figures, client names, and
       (manager variant) individual sales performance to a third-party model
       provider (spec §11) — **outstanding**
