@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { APICallError, generateText } from "ai";
 import { canUseAiSummary } from "@/lib/ai/access";
 import { buildSummaryPrompt } from "@/lib/ai/summary-prompt";
-import type { SummaryFacts } from "@/lib/ai/summary-facts";
+import type { SummaryAudience, SummaryFacts } from "@/lib/ai/summary-facts";
 
 export type AiSummaryResult =
   { ok: true; text: string } | { ok: false; message: string };
@@ -44,7 +44,11 @@ type AuthClient = {
         value: string,
       ) => {
         single: () => Promise<{
-          data: { email: string | null; status: string } | null;
+          data: {
+            email: string | null;
+            status: string;
+            role: string | null;
+          } | null;
           error: unknown;
         }>;
       };
@@ -68,8 +72,10 @@ function defaultAuthClient(accessToken: string): AuthClient | null {
  * for everyone else, but that is convenience — this is the boundary. Reads
  * the caller's own profile with the caller's own token, so RLS applies.
  *
- * Returns the authenticated user's id on success, or `null` on ANY failure —
+ * Returns the authenticated user's id AND the role read from the database on
+ * success, or `null` on ANY failure —
  * a returned error, a missing/inactive profile, an email off the allow list,
+ * a role other than `manager`/`executive`,
  * or an unexpected thrown exception (network blip, DNS failure, malformed
  * response). The whole body runs inside try/catch so a throw here can never
  * escape as an unhandled error; it is indistinguishable from any other
@@ -78,10 +84,12 @@ function defaultAuthClient(accessToken: string): AuthClient | null {
  * `buildClient` defaults to a real Supabase client and is only ever
  * overridden in tests, to exercise the throw path without a live backend.
  */
+export type AuthorizedCaller = { userId: string; role: SummaryAudience };
+
 export async function authorize(
   accessToken: string,
   buildClient: (accessToken: string) => AuthClient | null = defaultAuthClient,
-): Promise<string | null> {
+): Promise<AuthorizedCaller | null> {
   try {
     const client = buildClient(accessToken);
     if (!client) return null;
@@ -92,28 +100,46 @@ export async function authorize(
 
     const { data: profile, error: profileError } = await client
       .from("profiles")
-      .select("email, status")
+      .select("email, status, role")
       .eq("id", userData.user.id)
       .single();
     if (profileError || !profile) return null;
     if (profile.status !== "active") return null;
     if (!canUseAiSummary(profile.email)) return null;
+    // The audience is derived here, from the database, and nowhere else.
+    if (profile.role !== "manager" && profile.role !== "executive") return null;
 
-    return userData.user.id;
+    return { userId: userData.user.id, role: profile.role };
   } catch (error) {
     console.error("AI summary authorization failed", error);
     return null;
   }
 }
 
+/**
+ * The posted `facts.audience` is attacker-controlled: the server function is a
+ * plain POST endpoint, so any allow-listed caller can hand-build a body. The
+ * audience is therefore overwritten with the role read from the database
+ * before the prompt is built, which is what makes the executive strip in
+ * `summary-prompt.ts` a genuinely independent second guard.
+ */
+export function factsForRole(
+  facts: SummaryFacts,
+  role: SummaryAudience,
+): SummaryFacts {
+  return { ...facts, audience: role };
+}
+
 export const generateAiSummary = createServerFn({ method: "POST" })
   .validator((data: { accessToken: string; facts: SummaryFacts }) => data)
   .handler(async ({ data }): Promise<AiSummaryResult> => {
     if (!data.accessToken) return DENIED;
-    const userId = await authorize(data.accessToken);
-    if (!userId) return DENIED;
+    const caller = await authorize(data.accessToken);
+    if (!caller) return DENIED;
 
-    const { system, prompt } = buildSummaryPrompt(data.facts);
+    const { system, prompt } = buildSummaryPrompt(
+      factsForRole(data.facts, caller.role),
+    );
 
     try {
       const result = await generateText({
@@ -124,7 +150,7 @@ export const generateAiSummary = createServerFn({ method: "POST" })
           gateway: {
             models: ["openai/gpt-5.4"],
             tags: ["feature:dashboard-summary"],
-            user: userId,
+            user: caller.userId,
           },
         },
       });

@@ -9,6 +9,11 @@ import { buildSummaryFacts } from "@/lib/ai/summary-facts";
 import { targetForMonth } from "@/lib/data/dashboard-selectors";
 import { getPipelineMetrics } from "@/lib/data/pipeline-metrics";
 import { getRiskAlertCounts } from "@/lib/data/sales-performance-metrics";
+import { getSalesOrdersMetrics } from "@/lib/data/sales-orders-metrics";
+import {
+  DATA_UNAVAILABLE_MESSAGE,
+  summaryDataBlocked,
+} from "@/lib/ai/summary-readiness";
 import { supabase } from "@/lib/supabase";
 import { CURRENT_MONTH, CURRENT_YEAR, NOW } from "@/lib/domain";
 import { generateAiSummary } from "@/lib/ai/summary-server";
@@ -26,6 +31,8 @@ export function AiSummaryCard() {
   if (role !== "manager" && role !== "executive") return null;
 
   const audience = role === "manager" ? "manager" : "executive";
+  const blocked = summaryDataBlocked(data);
+  const dataUnavailable = data.hasError;
 
   async function onGenerate() {
     setBusy(true);
@@ -50,9 +57,13 @@ export function AiSummaryCard() {
         to: NOW,
       };
 
-      const [riskCounts, pipeline] = await Promise.all([
+      // Same RPC, same range as the Dashboard's own month KPI (see
+      // _app.dashboard.tsx:125) so the paragraph and the box above it agree
+      // by construction. Fetched here, on click — nothing loads before then.
+      const [riskCounts, pipeline, monthMetrics] = await Promise.all([
         getRiskAlertCounts(),
         getPipelineMetrics(),
+        getSalesOrdersMetrics({ from: range.from, to: range.to }),
       ]);
 
       const facts = buildSummaryFacts({
@@ -69,6 +80,10 @@ export function AiSummaryCard() {
         // per calendar month), not a number — buildSummaryFacts wants the
         // single monthly target figure for the period being summarized.
         companyTarget: targetForMonth(data.companyTarget, CURRENT_MONTH),
+        revenueTotals: {
+          ppn: monthMetrics.ppnValue,
+          nonPpn: monthMetrics.nonPpnValue,
+        },
         riskCounts,
         pipeline,
       });
@@ -98,12 +113,15 @@ export function AiSummaryCard() {
           size="sm"
           variant="outline"
           onClick={onGenerate}
-          disabled={busy || data.isLoading}
+          disabled={busy || blocked}
         >
           {busy ? "Menyusun…" : "Buat Ringkasan"}
         </Button>
       </CardHeader>
       <CardContent className="space-y-3">
+        {dataUnavailable ? (
+          <p className="text-sm text-destructive">{DATA_UNAVAILABLE_MESSAGE}</p>
+        ) : null}
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
         {text ? (
@@ -128,7 +146,7 @@ export function AiSummaryCard() {
               </Button>
             </div>
           </>
-        ) : !error ? (
+        ) : !error && !dataUnavailable ? (
           <p className="text-sm text-muted-foreground">
             Tekan “Buat Ringkasan” untuk merangkum kinerja periode ini.
           </p>

@@ -7,8 +7,6 @@ import type { RiskAlertCounts } from "@/lib/data/sales-performance-metrics";
 import type { SalesTeamMember } from "@/lib/data/dashboard-selectors";
 import type { TargetsByMember } from "@/lib/data/targets";
 import {
-  revenueByTaxInRange,
-  revenueInRange,
   salesPerformanceInRange,
   topCustomersInRange,
 } from "@/lib/data/dashboard-selectors";
@@ -72,6 +70,14 @@ export type SummaryFactsInput = {
   ownersById: Record<string, { role?: Role }>;
   targetsByMember: TargetsByMember;
   companyTarget: number;
+  /**
+   * Month revenue split, taken from the `sales_orders_metrics` RPC — the same
+   * source as the Dashboard KPI rendered directly above the card. Deliberately
+   * NOT recomputed here with `revenueInRange`: that selector parses dates as
+   * UTC while the range end is local midnight, so it drops orders dated today
+   * and the summary would quietly contradict the box above it.
+   */
+  revenueTotals: { ppn: number; nonPpn: number };
   riskCounts: RiskAlertCounts;
   pipeline: PipelineMetrics;
 };
@@ -91,6 +97,19 @@ const MONTHS = [
   "Desember",
 ];
 
+/**
+ * Free text typed by app users (client names, task titles, sales names) is
+ * capped before it reaches the model. A long injected instruction cannot
+ * survive the cut, and the ellipsis makes truncation visible rather than
+ * silent. The system prompt additionally tells the model this block is data.
+ */
+const MAX_FREE_TEXT = 120;
+
+function capFreeText(value: string): string {
+  if (value.length <= MAX_FREE_TEXT) return value;
+  return `${value.slice(0, MAX_FREE_TEXT - 1)}\u2026`;
+}
+
 function attainment(actual: number, target: number): string {
   if (target <= 0) return "tidak ada target";
   return formatPercent(actual / target);
@@ -108,12 +127,12 @@ export function buildSummaryFacts(input: SummaryFactsInput): SummaryFacts {
     ownersById,
     targetsByMember,
     companyTarget,
+    revenueTotals,
     riskCounts,
     pipeline,
   } = input;
 
-  const actual = revenueInRange(orders, range);
-  const tax = revenueByTaxInRange(orders, range);
+  const actual = revenueTotals.ppn + revenueTotals.nonPpn;
 
   const facts: SummaryFacts = {
     audience,
@@ -126,11 +145,11 @@ export function buildSummaryFacts(input: SummaryFactsInput): SummaryFacts {
       actualLabel: formatRupiahShort(actual),
       targetLabel: formatRupiahShort(companyTarget),
       attainmentLabel: attainment(actual, companyTarget),
-      ppnLabel: formatRupiahShort(tax.ppn),
-      nonPpnLabel: formatRupiahShort(tax.nonPpn),
+      ppnLabel: formatRupiahShort(revenueTotals.ppn),
+      nonPpnLabel: formatRupiahShort(revenueTotals.nonPpn),
     },
     topCustomers: topCustomersInRange(orders, clients, range).map((row) => ({
-      name: row.client.name,
+      name: capFreeText(row.client.name),
       revenueLabel: formatRupiahShort(row.revenue),
     })),
     risk: {
@@ -166,7 +185,7 @@ export function buildSummaryFacts(input: SummaryFactsInput): SummaryFacts {
     range,
     targetsByMember,
   ).map((row) => ({
-    name: row.member.name,
+    name: capFreeText(row.member.name),
     revenueLabel: formatRupiahShort(row.revenue),
     targetLabel: formatRupiahShort(row.target),
     attainmentLabel: attainment(row.revenue, row.target),
@@ -174,8 +193,8 @@ export function buildSummaryFacts(input: SummaryFactsInput): SummaryFacts {
 
   facts.escalatedTasks = filterManagerTeamExceptions(tasks, ownersById).map(
     (t) => ({
-      ownerName: nameById.get(t.ownerId) ?? "Sales",
-      title: t.title,
+      ownerName: capFreeText(nameById.get(t.ownerId) ?? "Sales"),
+      title: capFreeText(t.title),
     }),
   );
 

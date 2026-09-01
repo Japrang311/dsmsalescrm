@@ -91,6 +91,18 @@ export function useDashboardData() {
     targetsByMember,
     companyTarget: companyMonthlyTarget(targetsByMember),
     currentUserId: currentUserId.data ?? undefined,
+    // Additive signal for consumers that must not present stale/empty data as
+    // real (see src/lib/ai/summary-readiness.ts). `isLoading` alone goes false
+    // on a failed query while the data getters still return empty arrays.
+    hasError:
+      orders.isError ||
+      tasks.isError ||
+      (role !== "sales" && taskMetrics.isError) ||
+      items.isError ||
+      clients.isError ||
+      owners.isError ||
+      salesTeam.isError ||
+      targets.isError,
     isLoading:
       !authReady ||
       orders.isLoading ||
