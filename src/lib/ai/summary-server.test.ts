@@ -18,7 +18,11 @@ function activeAllowedProfileClient() {
       select: () => ({
         eq: () => ({
           single: async () => ({
-            data: { email: ALLOWED_EMAIL, status: "active", role: "manager" },
+            data: {
+              email: ALLOWED_EMAIL,
+              account_status: "active",
+              role: "manager",
+            },
             error: null,
           }),
         }),
@@ -90,7 +94,11 @@ describe("authorize", () => {
         select: () => ({
           eq: () => ({
             single: async () => ({
-              data: { email: ALLOWED_EMAIL, status: "active", role: "sales" },
+              data: {
+                email: ALLOWED_EMAIL,
+                account_status: "active",
+                role: "sales",
+              },
               error: null,
             }),
           }),
@@ -152,7 +160,7 @@ describe("authorize", () => {
             single: async () => ({
               data: {
                 email: ALLOWED_EMAIL,
-                status: "inactive",
+                account_status: "inactive",
                 role: "manager",
               },
               error: null,
@@ -178,7 +186,7 @@ describe("authorize", () => {
             single: async () => ({
               data: {
                 email: "feni@dutasolusimetalindo.com",
-                status: "active",
+                account_status: "active",
                 role: "manager",
               },
               error: null,

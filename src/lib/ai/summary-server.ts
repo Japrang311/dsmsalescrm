@@ -46,7 +46,7 @@ type AuthClient = {
         single: () => Promise<{
           data: {
             email: string | null;
-            status: string;
+            account_status: string;
             role: string | null;
           } | null;
           error: unknown;
@@ -100,11 +100,11 @@ export async function authorize(
 
     const { data: profile, error: profileError } = await client
       .from("profiles")
-      .select("email, status, role")
+      .select("email, account_status, role")
       .eq("id", userData.user.id)
       .single();
     if (profileError || !profile) return null;
-    if (profile.status !== "active") return null;
+    if (profile.account_status !== "active") return null;
     if (!canUseAiSummary(profile.email)) return null;
     // The audience is derived here, from the database, and nowhere else.
     if (profile.role !== "manager" && profile.role !== "executive") return null;
