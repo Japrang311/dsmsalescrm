@@ -1751,9 +1751,12 @@ Detailed checklist: `tasks/sales-task-control-loop-todo.md`
 
 ### Task 64: On-demand AI-written Dashboard summary card (two-account pilot)
 
-**Status:** Code complete and locally verified (2026-08-31). Live end-to-end
-generation has never been executed — blocked on Vercel/Supabase env
-prerequisites, see below. Not pushed to `main`.
+**Status:** Merged to `main` (`56c4c76`), pushed, and deployed to production
+(2026-09-01). `SUPABASE_URL` / `SUPABASE_ANON_KEY` are now set as Production
+secrets on the Vercel `dsmsalescrm` project. Still outstanding: the spec §12
+live manual check (never run against a real account), confirmation that AI
+Gateway is enabled with credit on this Hobby-plan project, and management
+approval (spec §11). See `HANDOFF.md`'s 2026-09-01 section.
 
 **Description:** Add a "Buat Ringkasan" card to the Dashboard that turns
 already-computed Dashboard figures into an Indonesian-language paragraph via
@@ -1781,18 +1784,20 @@ change.
       Indonesian server-side error strings, or `generateText`; the server
       bundle carries the model slug and tags
 - [ ] Manual check against the two real accounts plus a non-allow-listed
-      account and a forced-error path (spec §12) — **outstanding**, blocked on
-      environment prerequisites below
+      account and a forced-error path (spec §12) — **outstanding**. Env
+      prerequisites are no longer the blocker; needs a live click-test on
+      production.
 - [ ] Management approval for sending DSM revenue figures, client names, and
       (manager variant) individual sales performance to a third-party model
       provider (spec §11) — **outstanding**
 
-**Deployment prerequisites, both currently UNSET:** AI Gateway must be
-enabled on the `dsmsalescrm` Vercel project (auth is Vercel OIDC, no manual
-API key), and `SUPABASE_URL` / `SUPABASE_ANON_KEY` — without the `VITE_`
-prefix — must be set for Production and Preview. The feature fails closed
-and shows an in-card error if these are missing; the rest of the Dashboard
-is unaffected.
+**Deployment prerequisites:** `SUPABASE_URL` / `SUPABASE_ANON_KEY` (no
+`VITE_` prefix) — **SET** as Production secrets on the Vercel `dsmsalescrm`
+project as of 2026-09-01 (verified via `vercel env ls production`); not
+added to Preview. AI Gateway auth is Vercel OIDC (no manual API key) and is
+**not yet confirmed working** — enablement and the Hobby-plan credit balance
+have not been checked. The feature fails closed and shows an in-card error
+if any of this is missing; the rest of the Dashboard is unaffected.
 
 **Verification:** `bun run verify:app` — exit 0, lint clean, typecheck
 clean, 664 tests pass / 0 fail across 90 files, build succeeds. `verify:db`

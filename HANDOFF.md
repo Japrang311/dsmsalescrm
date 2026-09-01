@@ -1,6 +1,45 @@
 # Handoff — DSM Sales Web App V2
 
-Context dump for continuing this work in another tool (Codex). Written 2026-07-18; Phase 11/12 status refreshed 2026-07-19; Phase 11 import-review reconciliation session added 2026-07-19; post-import UX/bugfix session added 2026-07-20; second 2026-07-20 session (pipeline permissions/FK bugfixes) added 2026-07-20; Client Detail/Client List real-data wiring session added 2026-07-21; remote-migration-push + data-restoration session added 2026-07-21; browser-verification + spending_ytd fix + SO edit audit trail session added 2026-07-21; unused-code cleanup + client database (company info/contacts) feature session added 2026-07-22; contact position + Client Detail product/description fixes + commercial item product-name migration reconciliation added 2026-07-22; dynamic per-month sales target UI/calculation update added 2026-07-22; soft-delete implementation, remote Supabase apply, and main/live push closeout added 2026-07-24; RFQ retirement and documentation refresh added 2026-07-25; Sales Task Control Loop spec approval and Phase 1-2 implementation (Tasks 46-52) added 2026-07-27; unified progress timeline Task 53/8 and Manager Team Exceptions Task 54/9 added 2026-07-27; visual design audit Phase 1 (critical usability/responsiveness fixes) added 2026-07-27; Executive exception detail and aggregate-only Task metrics Task 55/10 added 2026-07-27; Dashboard/TopBar consumer migration Task 56/11 added 2026-07-27; Reports consumer migration Task 57/12 added 2026-07-27; export migration Task 58/13 added 2026-07-27; Pipeline/Client Detail/commercial follow-up migration Task 59/14 added 2026-07-27; ownership/account lifecycle migration Task 60/15 added 2026-07-27; production deployment audit + RLS/security-advisor review + two security-hardening migrations added 2026-07-30; Stage 1/Stage 2 checklist closeout + Sentry source-map wiring + commercial Next FU fix (commit `7ae20aa`, pushed, CI green) + Stage 3 Pipeline-pagination brainstorming in progress added 2026-08-05; AI Dashboard Summary two-account pilot (code complete, not pushed, live end-to-end untested) added 2026-08-31.
+Context dump for continuing this work in another tool (Codex). Written 2026-07-18; Phase 11/12 status refreshed 2026-07-19; Phase 11 import-review reconciliation session added 2026-07-19; post-import UX/bugfix session added 2026-07-20; second 2026-07-20 session (pipeline permissions/FK bugfixes) added 2026-07-20; Client Detail/Client List real-data wiring session added 2026-07-21; remote-migration-push + data-restoration session added 2026-07-21; browser-verification + spending_ytd fix + SO edit audit trail session added 2026-07-21; unused-code cleanup + client database (company info/contacts) feature session added 2026-07-22; contact position + Client Detail product/description fixes + commercial item product-name migration reconciliation added 2026-07-22; dynamic per-month sales target UI/calculation update added 2026-07-22; soft-delete implementation, remote Supabase apply, and main/live push closeout added 2026-07-24; RFQ retirement and documentation refresh added 2026-07-25; Sales Task Control Loop spec approval and Phase 1-2 implementation (Tasks 46-52) added 2026-07-27; unified progress timeline Task 53/8 and Manager Team Exceptions Task 54/9 added 2026-07-27; visual design audit Phase 1 (critical usability/responsiveness fixes) added 2026-07-27; Executive exception detail and aggregate-only Task metrics Task 55/10 added 2026-07-27; Dashboard/TopBar consumer migration Task 56/11 added 2026-07-27; Reports consumer migration Task 57/12 added 2026-07-27; export migration Task 58/13 added 2026-07-27; Pipeline/Client Detail/commercial follow-up migration Task 59/14 added 2026-07-27; ownership/account lifecycle migration Task 60/15 added 2026-07-27; production deployment audit + RLS/security-advisor review + two security-hardening migrations added 2026-07-30; Stage 1/Stage 2 checklist closeout + Sentry source-map wiring + commercial Next FU fix (commit `7ae20aa`, pushed, CI green) + Stage 3 Pipeline-pagination brainstorming in progress added 2026-08-05; AI Dashboard Summary two-account pilot (code complete, not pushed, live end-to-end untested) added 2026-08-31; AI Dashboard Summary pilot merged to `main` (`56c4c76`), pushed, deployed, and Production Supabase env vars set — live §12 check and management approval still pending — added 2026-09-01.
+
+## HANDOFF — AI Dashboard Summary pilot: MERGED + PUSHED + LIVE, env vars set, live check pending (2026-09-01)
+
+Supersedes the "not pushed" / "prerequisites UNSET" statements in the
+2026-08-31 section below — those are now stale.
+
+- **Merged and deployed.** `feat/ai-dashboard-summary` was merged to `main`
+  as merge commit `56c4c76` (parents `eab533f` + `f5efe75`) and pushed;
+  `main` is level with `origin/main`. The merge carried two extra commits
+  beyond the original 8: `8a4e4c8` (post-review hardening — prompt-injection
+  guard, server-derived audience, KPI-consistent revenue, load-failure
+  guard) and `f5efe75` (query the real `account_status` column in
+  `authorize()`, which had been blocking both pilot accounts). Vercel
+  auto-deployed; production deployment `dsmsalescrm-ct4yki5g7` is Ready.
+- **Env prerequisites now SET** on the Vercel `dsmsalescrm` project
+  (team `hiulaukgalak`, Hobby plan), verified 2026-09-01 via
+  `vercel env ls production`: `SUPABASE_URL` and `SUPABASE_ANON_KEY` both
+  exist as Production secrets (no `VITE_` prefix). They are **Production
+  only** — not added to Preview, which is acceptable for the pilot but means
+  Preview deploys render the in-card error.
+- **AI Gateway: not yet confirmed working.** The code authenticates to
+  Vercel AI Gateway via OIDC (`providerOptions.gateway`, no API key), which
+  is normally auto-injected on deploy. `vercel integration ls` shows no
+  marketplace resource (AI Gateway is native, so that is expected). What is
+  NOT verified: that AI Gateway is enabled for this project and that its
+  Hobby-plan credit balance is non-zero. `mapGatewayError` returns
+  "Kuota AI bulan ini sudah habis." on a 402 if credits are exhausted.
+- **No live invocation yet.** As of 2026-09-01 the `generateAiSummary`
+  server function has never been called in production — no one has clicked
+  "Buat Ringkasan". No runtime errors in the deployment logs.
+- **Still outstanding before the pilot can be called done:**
+  1. Spec §12 manual checks against the two real accounts + a
+     non-allow-listed account + a forced-error path. Check (2) — executive
+     output names no salesperson and no individual task — protects an
+     accepted Phase 12 rule and must be recorded explicitly when run.
+  2. Management approval for sending DSM revenue figures, client names, and
+     (manager variant) individual sales performance to a third-party model
+     provider via Vercel AI Gateway (spec §11). Owner decided 2026-08-31 to
+     send names as-is, not pseudonymised.
 
 ## HANDOFF — AI Dashboard Summary pilot: code complete, not pushed, live end-to-end never run (2026-08-31)
 
