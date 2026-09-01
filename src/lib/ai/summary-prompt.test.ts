@@ -56,6 +56,12 @@ describe("buildSummaryPrompt", () => {
     expect(system).toContain("Jangan menghitung");
   });
 
+  test("asks for dash-prefixed bullet points for enumerated detail", () => {
+    const { system } = buildSummaryPrompt(facts("manager"));
+    expect(system).toContain('"- "');
+    expect(system).toContain("Satu rincian per baris");
+  });
+
   test("asks for Indonesian output", () => {
     const { system } = buildSummaryPrompt(facts("manager"));
     expect(system.toLowerCase()).toContain("bahasa indonesia");

@@ -4,8 +4,9 @@ const SHARED_RULES = [
   "Kamu menulis ringkasan kinerja penjualan dalam bahasa Indonesia yang lugas dan profesional.",
   "Gunakan HANYA angka yang diberikan, disalin persis seperti tertulis. Jangan menghitung, menjumlahkan, membandingkan, atau memperkirakan angka apa pun sendiri.",
   "Jika sebuah informasi tidak diberikan, jangan menyebutnya dan jangan menebak.",
-  "Tulis 2–4 paragraf pendek. Tanpa judul, tanpa bullet, tanpa basa-basi pembuka atau penutup.",
   "Sebutkan lebih dulu hal yang paling perlu ditindaklanjuti.",
+  'Susun begini: 1–2 kalimat pembuka untuk kondisi paling mendesak, lalu daftar poin dengan awalan tanda hubung ("- ") untuk tiap rincian — misalnya pencapaian tiap sales, tiap tahap pipeline, atau tiap task yang tertunda. Satu rincian per baris. Boleh ditutup dengan satu kalimat rekomendasi. Tanpa judul, tanpa penomoran, tanpa basa-basi pembuka atau penutup.',
+  "Kelompokkan poin sejenis berurutan tanpa baris kosong di antaranya.",
   // Anti prompt-injection. Client names, task titles, and sales names inside
   // the Data block are free text typed by app users. Without this rule a user
   // could put an instruction in a task title and steer the summary.

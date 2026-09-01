@@ -18,6 +18,30 @@ import { supabase } from "@/lib/supabase";
 import { CURRENT_MONTH, CURRENT_YEAR, NOW } from "@/lib/domain";
 import { generateAiSummary } from "@/lib/ai/summary-server";
 
+type SummaryBlock =
+  | { type: "p"; text: string }
+  | { type: "ul"; items: string[] };
+
+// The model is asked (see summary-prompt.ts) for a short opener followed by
+// "- " bullet lines. Turn those bullets into a real list so the card is
+// scannable instead of one inline run-on.
+function parseSummary(text: string): SummaryBlock[] {
+  const blocks: SummaryBlock[] = [];
+  for (const rawLine of text.split("\n")) {
+    const line = rawLine.trim();
+    if (!line) continue;
+    const bullet = line.match(/^[-•*]\s+(.*)/);
+    if (bullet) {
+      const last = blocks[blocks.length - 1];
+      if (last?.type === "ul") last.items.push(bullet[1]);
+      else blocks.push({ type: "ul", items: [bullet[1]] });
+    } else {
+      blocks.push({ type: "p", text: line });
+    }
+  }
+  return blocks;
+}
+
 export function AiSummaryCard() {
   const { role, realProfile } = useRole();
   const data = useDashboardData();
@@ -127,9 +151,17 @@ export function AiSummaryCard() {
         {text ? (
           <>
             <div className="space-y-2 text-sm leading-relaxed">
-              {text.split(/\n{2,}/).map((paragraph, i) => (
-                <p key={i}>{paragraph}</p>
-              ))}
+              {parseSummary(text).map((block, i) =>
+                block.type === "ul" ? (
+                  <ul key={i} className="list-disc space-y-1 pl-5">
+                    {block.items.map((item, j) => (
+                      <li key={j}>{item}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p key={i}>{block.text}</p>
+                ),
+              )}
             </div>
             <div className="flex items-center justify-between gap-2 border-t border-border pt-2">
               <p className="text-xs text-muted-foreground">
