@@ -1,6 +1,90 @@
 # Handoff — DSM Sales Web App V2
 
-Context dump for continuing this work in another tool (Codex). Written 2026-07-18; Phase 11/12 status refreshed 2026-07-19; Phase 11 import-review reconciliation session added 2026-07-19; post-import UX/bugfix session added 2026-07-20; second 2026-07-20 session (pipeline permissions/FK bugfixes) added 2026-07-20; Client Detail/Client List real-data wiring session added 2026-07-21; remote-migration-push + data-restoration session added 2026-07-21; browser-verification + spending_ytd fix + SO edit audit trail session added 2026-07-21; unused-code cleanup + client database (company info/contacts) feature session added 2026-07-22; contact position + Client Detail product/description fixes + commercial item product-name migration reconciliation added 2026-07-22; dynamic per-month sales target UI/calculation update added 2026-07-22; soft-delete implementation, remote Supabase apply, and main/live push closeout added 2026-07-24; RFQ retirement and documentation refresh added 2026-07-25; Sales Task Control Loop spec approval and Phase 1-2 implementation (Tasks 46-52) added 2026-07-27; unified progress timeline Task 53/8 and Manager Team Exceptions Task 54/9 added 2026-07-27; visual design audit Phase 1 (critical usability/responsiveness fixes) added 2026-07-27; Executive exception detail and aggregate-only Task metrics Task 55/10 added 2026-07-27; Dashboard/TopBar consumer migration Task 56/11 added 2026-07-27; Reports consumer migration Task 57/12 added 2026-07-27; export migration Task 58/13 added 2026-07-27; Pipeline/Client Detail/commercial follow-up migration Task 59/14 added 2026-07-27; ownership/account lifecycle migration Task 60/15 added 2026-07-27; production deployment audit + RLS/security-advisor review + two security-hardening migrations added 2026-07-30; Stage 1/Stage 2 checklist closeout + Sentry source-map wiring + commercial Next FU fix (commit `7ae20aa`, pushed, CI green) + Stage 3 Pipeline-pagination brainstorming in progress added 2026-08-05.
+Context dump for continuing this work in another tool (Codex). Written 2026-07-18; Phase 11/12 status refreshed 2026-07-19; Phase 11 import-review reconciliation session added 2026-07-19; post-import UX/bugfix session added 2026-07-20; second 2026-07-20 session (pipeline permissions/FK bugfixes) added 2026-07-20; Client Detail/Client List real-data wiring session added 2026-07-21; remote-migration-push + data-restoration session added 2026-07-21; browser-verification + spending_ytd fix + SO edit audit trail session added 2026-07-21; unused-code cleanup + client database (company info/contacts) feature session added 2026-07-22; contact position + Client Detail product/description fixes + commercial item product-name migration reconciliation added 2026-07-22; dynamic per-month sales target UI/calculation update added 2026-07-22; soft-delete implementation, remote Supabase apply, and main/live push closeout added 2026-07-24; RFQ retirement and documentation refresh added 2026-07-25; Sales Task Control Loop spec approval and Phase 1-2 implementation (Tasks 46-52) added 2026-07-27; unified progress timeline Task 53/8 and Manager Team Exceptions Task 54/9 added 2026-07-27; visual design audit Phase 1 (critical usability/responsiveness fixes) added 2026-07-27; Executive exception detail and aggregate-only Task metrics Task 55/10 added 2026-07-27; Dashboard/TopBar consumer migration Task 56/11 added 2026-07-27; Reports consumer migration Task 57/12 added 2026-07-27; export migration Task 58/13 added 2026-07-27; Pipeline/Client Detail/commercial follow-up migration Task 59/14 added 2026-07-27; ownership/account lifecycle migration Task 60/15 added 2026-07-27; production deployment audit + RLS/security-advisor review + two security-hardening migrations added 2026-07-30; Stage 1/Stage 2 checklist closeout + Sentry source-map wiring + commercial Next FU fix (commit `7ae20aa`, pushed, CI green) + Stage 3 Pipeline-pagination brainstorming in progress added 2026-08-05; AI Dashboard Summary two-account pilot (code complete, not pushed, live end-to-end untested) added 2026-08-31.
+
+## HANDOFF — AI Dashboard Summary pilot: code complete, not pushed, live end-to-end never run (2026-08-31)
+
+Adds an on-demand "Buat Ringkasan" card to the Dashboard that turns
+already-computed figures into an Indonesian-language paragraph via Vercel AI
+Gateway, gated to exactly two accounts. Branch `feat/ai-dashboard-summary`,
+8 commits (`ff7be93`..`9207256`), not merged to `main`, not pushed.
+
+- **What was built:** `src/lib/ai/access.ts` (allow list of exactly
+  `adhitya@dutasolusimetalindo.com`, manager, and
+  `triyanto@dutasolusimetalindo.com`, executive, compared lower-cased);
+  `src/lib/ai/summary-facts.ts` (turns Dashboard data into a role-specific
+  facts object whose every leaf is a pre-formatted string — the AI never
+  computes a number); `src/lib/ai/summary-prompt.ts` (builds the prompt;
+  also redacts sales names for the executive audience as defence in depth);
+  `src/lib/ai/summary-server.ts` (the app's **first server-side code** — a
+  TanStack Start `createServerFn` that verifies session + active profile +
+  allow-list membership, then calls Vercel AI Gateway via the `ai` package);
+  `src/components/dashboard/AiSummaryCard.tsx`, mounted in
+  `src/routes/_app.dashboard.tsx`. No database schema change, no migration,
+  no RLS change, no CSP change.
+- **`src/server/` is NOT usable for server functions in this repo.**
+  `vite.config.ts` importProtection (`behavior: "error"`,
+  `client.files: ["**/server/**"]`) blocks any client-bundled file from
+  importing it, and a `createServerFn` module IS imported by client code
+  (the card imports the RPC stub). The server function therefore lives at
+  `src/lib/ai/summary-server.ts` instead. Anyone adding a second server
+  function must not put it under `src/server/`. Note `src/server.ts` (the
+  SSR entry, a file not a directory, referenced from
+  `vite.config.ts`'s `tanstackStart.server.entry`) is unaffected by this
+  rule.
+- **New deployment prerequisites, both currently UNSET:** AI Gateway must be
+  enabled on the `dsmsalescrm` Vercel project (auth is Vercel OIDC, no
+  manual API key), and `SUPABASE_URL` / `SUPABASE_ANON_KEY` — without the
+  `VITE_` prefix — must be set for Production and Preview. Server code
+  cannot read `VITE_`-prefixed vars. The feature fails closed and shows an
+  in-card error if these are missing; the rest of the Dashboard is
+  unaffected.
+- **`ai` resolved to 7.0.85**, not the `^6` the implementation plan assumed.
+  Compatibility was verified against the installed type definitions: plain
+  `"provider/model"` strings, `APICallError.isInstance`, and
+  `providerOptions.gateway` with `models`/`tags`/`user` are all still
+  correct at this version. Model slug is `anthropic/claude-sonnet-4.6` with
+  an `openai/gpt-5.4` fallback; slugs change over time, so check
+  `gateway.getAvailableModels()` if a call ever returns 400 for an unknown
+  model.
+- **Client/server split verified by grepping the built bundles**: the
+  client assets contain the card's UI strings but zero occurrences of
+  `SUPABASE_ANON_KEY`, `providerOptions`, `claude-sonnet-4.6`,
+  `feature:dashboard-summary`, the Indonesian server-side error strings, or
+  `generateText`. The server bundle does contain the model slug and tags.
+  The browser receives only the RPC stub. The allow-list emails DO appear
+  in the client bundle (the card must decide whether to render) — this is
+  not new exposure, `adhitya@dutasolusimetalindo.com` already ships in
+  `src/lib/export-quotation-pdf.ts`.
+- **Governance, still outstanding:** generating a summary sends DSM revenue
+  figures, client names, and — for the manager variant — individual sales
+  performance to a third-party model provider via Vercel AI Gateway. The
+  owner decided on 2026-08-31 to send names as-is rather than
+  pseudonymised. Management approval for this is still OUTSTANDING and is a
+  precondition for production.
+- **Verification:** `bun run verify:app` — exit 0, lint clean, typecheck
+  clean, **664 tests pass / 0 fail across 90 files**, build succeeds.
+  `verify:db` was not run (no schema change).
+- **What was NOT done, and must not be claimed done:** live end-to-end
+  generation has never been executed against a real account. This needs AI
+  Gateway enabled on the Vercel project plus `VERCEL_OIDC_TOKEN`, and
+  `SUPABASE_URL`/`SUPABASE_ANON_KEY` set server-side — none of that is
+  configured yet. The four manual checks from the implementation plan (spec
+  §12) remain outstanding: (1) manager account sees the card and per-sales
+  names in the output; (2) executive account sees the card and the output
+  names no sales person and no individual task; (3) a non-allow-listed
+  account never sees the card; (4) a forced network/model failure renders
+  an in-card error while the rest of the Dashboard keeps working. Check (2)
+  is the one that protects an accepted Phase 12 rule and should be recorded
+  explicitly when it is finally run.
+- **Not pushed to `main`.** Pushing deploys to production automatically.
+  The gate before that push is the owner confirming both the management
+  approval above and that the two environment prerequisites are set — see
+  `tasks/todo.md` Task 64 and
+  `docs/superpowers/plans/2026-08-31-ai-dashboard-summary-implementation.md`
+  Task 6 Step 5.
+- Spec: `docs/superpowers/specs/2026-08-31-ai-dashboard-summary-design.md`.
+  Plan: `docs/superpowers/plans/2026-08-31-ai-dashboard-summary-implementation.md`.
 
 ## HANDOFF — Password feature deployed (2026-08-10)
 
