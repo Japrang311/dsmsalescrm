@@ -171,7 +171,7 @@ export function PipelineBoard({
                           <GripVertical className="pointer-events-none absolute left-1 top-2.5 h-3.5 w-3.5 text-muted-foreground/50 group-hover:text-muted-foreground" />
                         )}
                         <div className="flex items-start justify-between gap-2">
-                          <p className="min-w-0 truncate text-[13px] font-medium text-foreground group-hover:text-primary">
+                          <p className="min-w-0 truncate text-[11px] font-medium text-muted-foreground">
                             {client?.name ?? "-"}
                           </p>
                           <Badge
@@ -181,9 +181,17 @@ export function PipelineBoard({
                             {it.type}
                           </Badge>
                         </div>
-                        <p className="line-clamp-2 text-[11px] text-muted-foreground">
-                          {it.description}
+                        {/* The project/product line is what tells one card from
+                            another when a client has many quotations — keep it
+                            the visual anchor, with the spec detail muted below. */}
+                        <p className="line-clamp-2 text-[13px] font-medium text-foreground group-hover:text-primary">
+                          {it.projectName ?? it.description}
                         </p>
+                        {it.projectName && it.description ? (
+                          <p className="line-clamp-1 text-[11px] text-muted-foreground">
+                            {it.description}
+                          </p>
+                        ) : null}
                         {pendingSoItemIds.has(it.id) && (
                           <div className="flex items-center justify-between gap-2 rounded-md border border-warning/35 bg-warning/10 px-2 py-1 text-[10px] text-warning">
                             <span className="font-medium">SO belum dibuat</span>
