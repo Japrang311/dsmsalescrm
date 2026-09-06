@@ -4,7 +4,11 @@ import {
   normalizeListPageInput,
   type ListPageInput,
 } from "@/lib/pagination-contracts";
-import type { FeedEvent, FeedLink } from "@/lib/data/activity-feed";
+import {
+  formatFeedDetail,
+  type FeedEvent,
+  type FeedLink,
+} from "@/lib/data/activity-feed";
 
 export type ActivityFeedFilters = {
   from?: Date;
@@ -263,7 +267,7 @@ export function mapActivityFeedRow(
     clientId: row.clientId ?? undefined,
     ownerName,
     title: row.title,
-    detail: row.detail ?? undefined,
+    detail: formatFeedDetail(row.dbKind, row.detail),
     commercialItemId: row.commercialItemId ?? undefined,
     salesOrderId: row.salesOrderId ?? undefined,
   };
