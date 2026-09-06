@@ -93,19 +93,19 @@ export function Stage4WinLossSection({
                   <div className="w-36 truncate text-muted-foreground">
                     {r.lostReason}
                   </div>
-                  <div className="flex-1">
-                    <div className="h-6 overflow-hidden rounded-md bg-muted/60">
+                  <div className="flex flex-1 items-center gap-2">
+                    <div className="h-6 flex-1 overflow-hidden rounded-md bg-muted/60">
                       <div
-                        className="flex h-full items-center justify-end whitespace-nowrap pr-2 text-[10px] font-medium text-white"
+                        className="h-full rounded-md"
                         style={{
-                          width: `${Math.max(6, pct)}%`,
-                          minWidth: "4.5rem",
+                          width: `${Math.max(2, pct)}%`,
                           background: CHART_COLORS[i % CHART_COLORS.length],
                         }}
-                      >
-                        {r.lostCount} · {formatRupiahShort(r.lostValue)}
-                      </div>
+                      />
                     </div>
+                    <span className="w-28 shrink-0 whitespace-nowrap text-right text-[10px] font-medium tabular-nums text-foreground">
+                      {r.lostCount} · {formatRupiahShort(r.lostValue)}
+                    </span>
                   </div>
                 </div>
               );

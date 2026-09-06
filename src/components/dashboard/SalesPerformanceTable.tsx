@@ -83,7 +83,7 @@ export function SalesPerformanceTable() {
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <Avatar className="h-7 w-7">
-                        <AvatarFallback className="bg-primary-soft text-primary text-[11px] font-semibold">
+                        <AvatarFallback className="bg-primary text-[11px] font-semibold text-primary-foreground">
                           {r.member.initials}
                         </AvatarFallback>
                       </Avatar>

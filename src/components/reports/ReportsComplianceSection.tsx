@@ -36,7 +36,10 @@ export function ReportsComplianceSection({
           <p className="text-2xl font-semibold tabular-nums">
             {formatPercent(compliance)}
           </p>
-          <Progress value={compliance * 100} />
+          <Progress
+            value={compliance * 100}
+            aria-label="Compliance follow-up terjadwal"
+          />
           <p className="text-[11px] text-muted-foreground">
             Persentase akun aktif dengan next follow-up terjadwal. Threshold
             sehat ≥ 80%.

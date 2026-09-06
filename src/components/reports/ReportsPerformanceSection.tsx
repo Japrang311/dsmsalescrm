@@ -76,7 +76,11 @@ export function ReportsPerformanceSection({
                       </TableCell>
                       <TableCell className="w-24">
                         <div className="flex items-center gap-1">
-                          <Progress value={share * 100} className="h-1.5" />
+                          <Progress
+                            value={share * 100}
+                            aria-label={`Kontribusi revenue ${client.name}`}
+                            className="h-1.5"
+                          />
                           <span className="w-8 text-[10px] tabular-nums text-muted-foreground">
                             {formatPercent(share)}
                           </span>
@@ -144,6 +148,7 @@ export function ReportsPerformanceSection({
                       <div className="flex items-center gap-1">
                         <Progress
                           value={Math.min(100, pct * 100)}
+                          aria-label={`Achievement vs target ${member.name}`}
                           className="h-1.5"
                         />
                         <span

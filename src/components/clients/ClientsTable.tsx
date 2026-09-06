@@ -112,7 +112,12 @@ export function ClientsTable({
   return (
     <div className="rounded-lg border bg-card">
       {/* Desktop table */}
-      <div className="scroll-x hidden md:block">
+      <div
+        className="scroll-x hidden focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring md:block"
+        tabIndex={0}
+        role="group"
+        aria-label="Tabel klien — gulir mendatar untuk kolom lainnya"
+      >
         <table className={cn("w-full border-collapse tabular-nums", textSize)}>
           <thead className="border-b bg-muted/40 text-left text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
             <tr>

@@ -6,7 +6,13 @@ const Table = React.forwardRef<
   HTMLTableElement,
   React.HTMLAttributes<HTMLTableElement>
 >(({ className, ...props }, ref) => (
-  <div className="scroll-x relative w-full">
+  <div
+    // A horizontally scrollable region must be keyboard-operable (WCAG 2.1.1).
+    className="scroll-x relative w-full focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+    tabIndex={0}
+    role="group"
+    aria-label="Tabel — gulir mendatar untuk kolom lainnya"
+  >
     <table
       ref={ref}
       className={cn("w-full caption-bottom text-sm", className)}
