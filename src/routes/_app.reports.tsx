@@ -66,6 +66,7 @@ import { ReportsComplianceSection } from "@/components/reports/ReportsCompliance
 import { Stage4WinLossSection } from "@/components/reports/Stage4WinLossSection";
 import { Stage4CycleTimeSection } from "@/components/reports/Stage4CycleTimeSection";
 import { Stage4FunnelDwellSection } from "@/components/reports/Stage4FunnelDwellSection";
+import { PageContainer } from "@/components/layout/PageContainer";
 
 export const Route = createFileRoute("/_app/reports")({
   head: () => ({ meta: [{ title: "Executive Reports · DSM" }] }),
@@ -478,14 +479,15 @@ function ReportsPage() {
     }
   };
 
+  // Only the filters that are actually narrowing the report — the range and
+  // "Semua …" defaults are already visible in the filter bar right above.
   const filterContext = [
-    `Rentang: ${formatDateShort(filters.range.from)} – ${formatDateShort(filters.range.to)}`,
     filters.ownerId !== "all"
       ? `Sales: ${owners[filters.ownerId]?.name ?? "-"}`
-      : "Semua sales",
+      : null,
     filters.clientId !== "all"
       ? `Klien: ${clients[filters.clientId]?.name ?? "-"}`
-      : "Semua klien",
+      : null,
     filters.source !== "all" ? `Source: ${filters.source}` : null,
     filters.taxType !== "all" ? `Pajak: ${filters.taxType}` : null,
     filters.soType !== "all" ? `Tipe: ${filters.soType}` : null,
@@ -514,7 +516,7 @@ function ReportsPage() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <PageContainer>
       <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
         <div>
           <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
@@ -557,13 +559,19 @@ function ReportsPage() {
         salesTeam={salesTeam}
       />
 
-      <div className="flex flex-wrap gap-1.5 text-[11px] text-muted-foreground">
-        {filterContext.map((f) => (
-          <Badge key={f as string} variant="secondary" className="font-normal">
-            {f}
-          </Badge>
-        ))}
-      </div>
+      {filterContext.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 text-[11px] text-muted-foreground">
+          {filterContext.map((f) => (
+            <Badge
+              key={f as string}
+              variant="secondary"
+              className="font-normal"
+            >
+              {f}
+            </Badge>
+          ))}
+        </div>
+      )}
 
       {/* KPI cards */}
       <ReportsKpiCards
@@ -642,6 +650,6 @@ function ReportsPage() {
           create/edit/archive/delete pada laporan ini.
         </p>
       )}
-    </div>
+    </PageContainer>
   );
 }

@@ -117,9 +117,7 @@ export type QuotationPdfInput = {
  */
 export const QUOTATION_PDF_DEFAULTS = {
   terms: [
-    "FOB Bandung",
-    "Delivery in 30 days (After Drawing Approved)",
-    "Payment: 60 days, after invoice",
+    "FOB Jakarta Delivery in 30 days (After Drawing Approved) Payment: 30 days, after invoice",
   ],
   closingLines: [
     "Should you have any enquiries concerning this quotes,",
@@ -129,6 +127,59 @@ export const QUOTATION_PDF_DEFAULTS = {
   validityNote:
     "This quotation is valid for 30 days unless otherwise specified",
 } as const;
+
+/**
+ * Jabatan and WhatsApp number per signed-in sales account, so the closing
+ * block is pre-filled correctly for whoever exports the quotation instead of
+ * always naming Adhitya. Keyed by profiles.email (case-insensitive).
+ */
+export const QUOTATION_SIGNER_DIRECTORY: Record<
+  string,
+  { title: string; phone: string }
+> = {
+  "leli@dutasolusimetalindo.com": {
+    title: "Sales Manager",
+    phone: "+62 857-0308-1691",
+  },
+  "iman@dutasolusimetalindo.com": {
+    title: "Sales Supervisor",
+    phone: "+62 857-7000-2408",
+  },
+  "feni@dutasolusimetalindo.com": {
+    title: "Sales",
+    phone: "+62 857-2270-0755",
+  },
+  "ika@dutasolusimetalindo.com": {
+    title: "Sales",
+    phone: "+62 813-2078-6025",
+  },
+};
+
+/**
+ * Default signer title and closing lines for the given account email. Falls
+ * back to the caller's role title and the generic closing lines for accounts
+ * not in the directory.
+ */
+export function quotationSignerDefaults(
+  email: string,
+  fallbackTitle: string,
+): { title: string; closingLines: string[] } {
+  const entry = QUOTATION_SIGNER_DIRECTORY[email.toLowerCase()];
+  if (!entry) {
+    return {
+      title: fallbackTitle,
+      closingLines: [...QUOTATION_PDF_DEFAULTS.closingLines],
+    };
+  }
+  return {
+    title: entry.title,
+    closingLines: [
+      "Should you have any enquiries concerning this quotes,",
+      `Please contact ${email}`,
+      `wa/mob ${entry.phone}`,
+    ],
+  };
+}
 
 export async function buildQuotationPdf(
   input: QuotationPdfInput,

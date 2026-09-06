@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   Bookmark,
   BookmarkPlus,
+  ChevronDown,
   Filter,
   LayoutList,
   Rows3,
@@ -55,6 +56,7 @@ import { AddClientDialog } from "@/components/clients/AddClientDialog";
 import { formatRupiahShort } from "@/lib/format";
 import type { ClientSource, ClientStatus } from "@/lib/domain";
 import { listQueryKey } from "@/lib/pagination-contracts";
+import { PageContainer } from "@/components/layout/PageContainer";
 
 const SOURCES: ClientSource[] = [
   "Referral",
@@ -210,7 +212,7 @@ function ClientListPage() {
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-4 p-4 md:p-6">
+    <PageContainer size="wide">
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
@@ -255,8 +257,8 @@ function ClientListPage() {
 
       {/* Filter bar */}
       <div className="flex flex-col gap-3 rounded-lg border bg-card p-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="relative min-w-[220px] flex-1">
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+          <div className="relative sm:min-w-[220px] sm:flex-1">
             <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               value={search}
@@ -280,7 +282,7 @@ function ClientListPage() {
                 setPage(1);
               }}
             >
-              <SelectTrigger className="h-9 w-[160px]">
+              <SelectTrigger className="h-9 w-full justify-between text-xs sm:w-auto sm:min-w-[9rem]">
                 <SelectValue placeholder="Sales" />
               </SelectTrigger>
               <SelectContent>
@@ -301,7 +303,7 @@ function ClientListPage() {
               setPage(1);
             }}
           >
-            <SelectTrigger className="h-9 w-[150px]">
+            <SelectTrigger className="h-9 w-full justify-between text-xs sm:w-auto sm:min-w-[9rem]">
               <SelectValue placeholder="Next FU" />
             </SelectTrigger>
             <SelectContent>
@@ -312,31 +314,33 @@ function ClientListPage() {
             </SelectContent>
           </Select>
 
-          <AdvancedFilters
-            commercialTypes={commercialTypes}
-            setCommercialTypes={(v) => {
-              setCommercialTypes(v);
-              setPage(1);
-            }}
-            overdueOnly={overdueOnly}
-            setOverdueOnly={(v) => {
-              setOverdueOnly(v);
-              setPage(1);
-            }}
-            spendingRange={spendingRange}
-            setSpendingRange={(v) => {
-              setSpendingRange(v);
-              setPage(1);
-            }}
-          />
+          <div className="flex items-center gap-2">
+            <AdvancedFilters
+              commercialTypes={commercialTypes}
+              setCommercialTypes={(v) => {
+                setCommercialTypes(v);
+                setPage(1);
+              }}
+              overdueOnly={overdueOnly}
+              setOverdueOnly={(v) => {
+                setOverdueOnly(v);
+                setPage(1);
+              }}
+              spendingRange={spendingRange}
+              setSpendingRange={(v) => {
+                setSpendingRange(v);
+                setPage(1);
+              }}
+            />
 
-          {activeFilterCount > 0 && (
-            <Button variant="ghost" size="sm" onClick={resetFilters}>
-              <X className="h-4 w-4" /> Reset ({activeFilterCount})
-            </Button>
-          )}
+            {activeFilterCount > 0 && (
+              <Button variant="ghost" size="sm" onClick={resetFilters}>
+                <X className="h-4 w-4" /> Reset ({activeFilterCount})
+              </Button>
+            )}
+          </div>
 
-          <div className="ml-auto flex items-center gap-2">
+          <div className="flex items-center gap-2 sm:ml-auto">
             <span className="hidden text-xs text-muted-foreground sm:inline">
               Density
             </span>
@@ -429,7 +433,7 @@ function ClientListPage() {
           serverPaginated
         />
       )}
-    </div>
+    </PageContainer>
   );
 }
 
@@ -464,13 +468,20 @@ function StatusFilter({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" className="h-9">
-          Status{" "}
-          {statuses.length > 0 && (
-            <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px]">
-              {statuses.length}
-            </Badge>
-          )}
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-9 w-full justify-between px-3 font-normal sm:w-auto sm:min-w-[7rem]"
+        >
+          <span className="flex items-center gap-1">
+            Status
+            {statuses.length > 0 && (
+              <Badge variant="secondary" className="h-4 px-1 text-[10px]">
+                {statuses.length}
+              </Badge>
+            )}
+          </span>
+          <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-50" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-48">
@@ -502,13 +513,20 @@ function SourceFilter({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" className="h-9">
-          Sumber{" "}
-          {sources.length > 0 && (
-            <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px]">
-              {sources.length}
-            </Badge>
-          )}
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-9 w-full justify-between px-3 font-normal sm:w-auto sm:min-w-[7rem]"
+        >
+          <span className="flex items-center gap-1">
+            Sumber
+            {sources.length > 0 && (
+              <Badge variant="secondary" className="h-4 px-1 text-[10px]">
+                {sources.length}
+              </Badge>
+            )}
+          </span>
+          <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-50" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-52">

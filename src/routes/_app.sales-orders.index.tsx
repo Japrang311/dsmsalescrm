@@ -75,6 +75,7 @@ import {
   type SalesOrdersExportContext,
 } from "@/lib/export-sales-orders";
 import { EmptyExportError } from "@/lib/export-csv";
+import { PageContainer } from "@/components/layout/PageContainer";
 
 export const Route = createFileRoute("/_app/sales-orders/")({
   head: () => ({ meta: [{ title: "Sales Orders & Revenue · DSM" }] }),
@@ -304,9 +305,9 @@ function SalesOrdersRevenuePage() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <PageContainer size="wide">
       <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-        <div>
+        <div className="min-w-0">
           <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
             <Receipt className="h-5 w-5 text-primary" /> Sales Orders & Revenue
           </h1>
@@ -317,7 +318,7 @@ function SalesOrdersRevenuePage() {
               " · SO FOC ditampilkan sebagai Rp0 dan tidak masuk ke revenue."}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           {canShowDeletedMode(role) && (
             <label className="flex items-center gap-2 rounded-md border bg-card px-2.5 py-1.5 text-xs font-medium">
               <Switch
@@ -397,7 +398,10 @@ function SalesOrdersRevenuePage() {
 
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+              <CardTitle
+                as="h2"
+                className="flex items-center gap-2 text-sm font-semibold"
+              >
                 <TrendingUp className="h-4 w-4 text-primary" /> Revenue by
                 Source
               </CardTitle>
@@ -435,7 +439,7 @@ function SalesOrdersRevenuePage() {
       ) : (
         <Card>
           <CardContent className="p-0">
-            <div className="overflow-x-auto">
+            <div className="scroll-x">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -496,7 +500,7 @@ function SalesOrdersRevenuePage() {
                               }
                         }
                       >
-                        <TableCell className="font-mono text-xs">
+                        <TableCell className="whitespace-nowrap font-mono text-xs">
                           {so.soNumber}
                         </TableCell>
                         <TableCell className="whitespace-nowrap text-xs">
@@ -627,7 +631,7 @@ function SalesOrdersRevenuePage() {
           </Button>
         </div>
       )}
-    </div>
+    </PageContainer>
   );
 }
 

@@ -29,7 +29,10 @@ export function ReportsPerformanceSection({
     <div className="grid gap-4 lg:grid-cols-2">
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+          <CardTitle
+            as="h2"
+            className="flex items-center gap-2 text-sm font-semibold"
+          >
             <Trophy className="h-4 w-4 text-primary" /> Top 5 Customers YTD
           </CardTitle>
         </CardHeader>
@@ -90,7 +93,10 @@ export function ReportsPerformanceSection({
 
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+          <CardTitle
+            as="h2"
+            className="flex items-center gap-2 text-sm font-semibold"
+          >
             <Users className="h-4 w-4 text-primary" /> Sales Performance
           </CardTitle>
           <p className="text-[11px] text-muted-foreground">

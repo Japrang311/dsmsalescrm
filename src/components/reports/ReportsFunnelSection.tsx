@@ -42,7 +42,7 @@ export function ReportsFunnelSection({
     <div className="grid gap-4 lg:grid-cols-2">
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-semibold">
+          <CardTitle as="h2" className="text-sm font-semibold">
             Quotation Funnel & Open Pipeline
           </CardTitle>
           <p className="text-[11px] text-muted-foreground">
@@ -83,7 +83,10 @@ export function ReportsFunnelSection({
 
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+          <CardTitle
+            as="h2"
+            className="flex items-center gap-2 text-sm font-semibold"
+          >
             <Target className="h-4 w-4 text-primary" /> Task Control
           </CardTitle>
         </CardHeader>
@@ -119,7 +122,7 @@ export function ReportsFunnelSection({
 
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-semibold">
+          <CardTitle as="h2" className="text-sm font-semibold">
             Waiting PO — Nilai & Aging
           </CardTitle>
           <p className="text-[11px] text-muted-foreground">

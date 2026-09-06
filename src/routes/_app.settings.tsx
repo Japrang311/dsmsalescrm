@@ -3,6 +3,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { getErrorMessage } from "@/lib/utils";
+import { supabase } from "@/lib/supabase";
+import { isValidPassword } from "@/lib/auth/password-validation";
 import {
   Pencil,
   Plus,
@@ -16,6 +18,7 @@ import {
   Target as TargetIcon,
   Database,
   CalendarDays,
+  KeyRound,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -69,7 +72,7 @@ import {
   settingsActions,
   type UserPreferences,
 } from "@/lib/preferences-store";
-import { formatRupiahShort } from "@/lib/format";
+import { formatDateTime, formatRupiahShort } from "@/lib/format";
 import { listSalesTeamProfiles } from "@/lib/data/clients";
 import {
   listTargets,
@@ -100,6 +103,7 @@ import {
   getCurrentProfileId,
   formatBlockingReferenceCounts,
   formatOwnedActiveCounts,
+  resetTeamMemberPassword,
   TeamAdminError,
   type AppRole,
   type TeamMember,
@@ -198,6 +202,9 @@ function SettingsPage() {
           <TabsTrigger value="profile" className="gap-1.5">
             <User2 className="h-3.5 w-3.5" /> Profil
           </TabsTrigger>
+          <TabsTrigger value="account" className="gap-1.5">
+            <KeyRound className="h-3.5 w-3.5" /> Akun
+          </TabsTrigger>
           {canViewTeam && (
             <TabsTrigger value="team" className="gap-1.5">
               <Users className="h-3.5 w-3.5" /> Tim &amp; Role
@@ -221,6 +228,9 @@ function SettingsPage() {
             defaultName={defaultProfile.name}
             defaultEmail={defaultProfile.email}
           />
+        </TabsContent>
+        <TabsContent value="account">
+          <AccountTab email={realProfile?.email ?? defaultProfile.email} />
         </TabsContent>
         {canViewTeam && (
           <TabsContent value="team">
@@ -284,7 +294,7 @@ function ProfileTab({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Profil &amp; Preferensi</CardTitle>
+        <CardTitle as="h2">Profil &amp; Preferensi</CardTitle>
         <CardDescription>
           Preferensi tampilan dan informasi akun untuk user saat ini.
         </CardDescription>
@@ -339,39 +349,6 @@ function ProfileTab({
               </SelectContent>
             </Select>
           </Field>
-          <Field label="Format tanggal">
-            <Select
-              value={form.dateFormat}
-              onValueChange={(v: UserPreferences["dateFormat"]) =>
-                setForm({ ...form, dateFormat: v })
-              }
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="dd/MM/yyyy">17/07/2026</SelectItem>
-                <SelectItem value="yyyy-MM-dd">2026-07-17</SelectItem>
-                <SelectItem value="dd MMM yyyy">17 Jul 2026</SelectItem>
-              </SelectContent>
-            </Select>
-          </Field>
-          <Field label="Format mata uang">
-            <Select
-              value={form.currencyFormat}
-              onValueChange={(v: UserPreferences["currencyFormat"]) =>
-                setForm({ ...form, currencyFormat: v })
-              }
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="compact">Ringkas (Rp 1,4 M)</SelectItem>
-                <SelectItem value="full">Penuh (Rp 1.400.000.000)</SelectItem>
-              </SelectContent>
-            </Select>
-          </Field>
         </div>
 
         <div className="flex justify-end gap-2 pt-2">
@@ -390,6 +367,97 @@ function ProfileTab({
             }}
           >
             <Save className="mr-1.5 h-4 w-4" /> Simpan preferensi
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Account tab (self-service change password)
+// ---------------------------------------------------------------------------
+
+function AccountTab({ email }: { email: string }) {
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const valid =
+    currentPassword.length > 0 &&
+    isValidPassword(newPassword) &&
+    newPassword === confirmPassword;
+
+  async function submit() {
+    setSubmitting(true);
+    try {
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password: currentPassword,
+      });
+      if (signInError) {
+        toast.error("Kata sandi saat ini tidak sesuai");
+        return;
+      }
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+      if (updateError) {
+        toast.error("Gagal mengubah kata sandi", {
+          description: updateError.message,
+        });
+        return;
+      }
+      toast.success("Kata sandi berhasil diubah");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (error) {
+      toast.error("Gagal mengubah kata sandi", {
+        description: getErrorMessage(error),
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle as="h2">Ubah Kata Sandi</CardTitle>
+        <CardDescription>
+          Perubahan kata sandi berlaku langsung untuk akun login Anda.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="max-w-md space-y-3">
+        <Field label="Kata sandi saat ini">
+          <Input
+            type="password"
+            autoComplete="current-password"
+            value={currentPassword}
+            onChange={(e) => setCurrentPassword(e.target.value)}
+          />
+        </Field>
+        <Field label="Kata sandi baru">
+          <Input
+            type="password"
+            autoComplete="new-password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            placeholder="Minimal 8 karakter"
+          />
+        </Field>
+        <Field label="Konfirmasi kata sandi baru">
+          <Input
+            type="password"
+            autoComplete="new-password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+          />
+        </Field>
+        <div className="flex justify-end pt-2">
+          <Button disabled={!valid || submitting} onClick={() => void submit()}>
+            {submitting ? "Menyimpan…" : "Ubah kata sandi"}
           </Button>
         </div>
       </CardContent>
@@ -454,6 +522,8 @@ function TeamTab({
     kind: TeamAction;
     member: TeamMember;
   } | null>(null);
+  const [resetPasswordTarget, setResetPasswordTarget] =
+    useState<TeamMember | null>(null);
 
   const visibleTeam = team.filter(
     (member) => statusFilter === "all" || member.accountStatus === statusFilter,
@@ -466,7 +536,7 @@ function TeamTab({
     <Card>
       <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
         <div>
-          <CardTitle>Manajemen Tim &amp; Role</CardTitle>
+          <CardTitle as="h2">Manajemen Tim &amp; Role</CardTitle>
           <CardDescription>
             Super Admin dan Executive tidak menjadi owner target atau data
             Sales. Ownership aktif hanya dapat dialihkan ke Sales atau Manager
@@ -637,9 +707,9 @@ function TeamTab({
                               {m.lastAdministrativeChange.reason ?? "—"}
                             </p>
                             <p>
-                              {new Date(
+                              {formatDateTime(
                                 m.lastAdministrativeChange.createdAt,
-                              ).toLocaleString("id-ID")}
+                              )}
                             </p>
                           </div>
                         ) : (
@@ -672,6 +742,25 @@ function TeamTab({
                             >
                               <Users className="h-3.5 w-3.5" />
                             </Button>
+                            {currentProfileId !== m.id && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                disabled={
+                                  busyId === m.id ||
+                                  m.accountStatus !== "active"
+                                }
+                                onClick={() => setResetPasswordTarget(m)}
+                                title={
+                                  m.accountStatus !== "active"
+                                    ? "Akun nonaktif — aktifkan dulu untuk reset kata sandi"
+                                    : "Reset kata sandi"
+                                }
+                              >
+                                <KeyRound className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
                             <Button
                               variant="ghost"
                               size="icon"
@@ -782,8 +871,98 @@ function TeamTab({
             />
           )}
         </Dialog>
+        <Dialog
+          open={!!resetPasswordTarget}
+          onOpenChange={(open) => !open && setResetPasswordTarget(null)}
+        >
+          {resetPasswordTarget && (
+            <ResetPasswordDialog
+              member={resetPasswordTarget}
+              onClose={() => setResetPasswordTarget(null)}
+            />
+          )}
+        </Dialog>
       </CardContent>
     </Card>
+  );
+}
+
+function ResetPasswordDialog({
+  member,
+  onClose,
+}: {
+  member: TeamMember;
+  onClose: () => void;
+}) {
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [reason, setReason] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const valid =
+    isValidPassword(newPassword) &&
+    newPassword === confirmPassword &&
+    reason.trim().length > 0;
+
+  return (
+    <DialogContent>
+      <DialogHeader>
+        <DialogTitle>Reset kata sandi {member.name}</DialogTitle>
+        <DialogDescription>
+          Kata sandi baru berlaku langsung. Beritahu kata sandi ini ke anggota
+          tim secara langsung.
+        </DialogDescription>
+      </DialogHeader>
+      <div className="space-y-3">
+        <Field label="Kata sandi baru">
+          <Input
+            type="password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            placeholder="Minimal 8 karakter"
+          />
+        </Field>
+        <Field label="Konfirmasi kata sandi baru">
+          <Input
+            type="password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+          />
+        </Field>
+        <Field label="Alasan administratif">
+          <Textarea
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="cth. Reset diminta langsung oleh anggota tim"
+          />
+        </Field>
+      </div>
+      <DialogFooter>
+        <Button variant="outline" onClick={onClose} disabled={submitting}>
+          Batal
+        </Button>
+        <Button
+          disabled={!valid || submitting}
+          onClick={() => {
+            void (async () => {
+              setSubmitting(true);
+              try {
+                await resetTeamMemberPassword(member.id, newPassword, reason);
+                toast.success(`${member.name} kata sandi berhasil direset`);
+                onClose();
+              } catch (error) {
+                toast.error("Gagal mereset kata sandi", {
+                  description: getErrorMessage(error),
+                });
+              } finally {
+                setSubmitting(false);
+              }
+            })();
+          }}
+        >
+          {submitting ? "Memproses…" : "Reset kata sandi"}
+        </Button>
+      </DialogFooter>
+    </DialogContent>
   );
 }
 
@@ -811,7 +990,7 @@ function MemberDialog({
   const valid =
     name.trim().length > 1 &&
     /.+@.+\..+/.test(email) &&
-    (member || password.length >= 8);
+    (member || isValidPassword(password));
 
   return (
     <DialogContent>
@@ -1212,7 +1391,7 @@ function TargetsTab({
 
       <Card>
         <CardHeader>
-          <CardTitle>Target bulanan per sales</CardTitle>
+          <CardTitle as="h2">Target bulanan per sales</CardTitle>
           <CardDescription>
             Setiap bulan tahun {CURRENT_YEAR} bisa punya nilai berbeda. Total
             tim otomatis mengikuti perubahan.
@@ -1404,7 +1583,7 @@ function OrgTab({ canEdit }: { canEdit: boolean }) {
     <div className="space-y-4">
       <Card>
         <CardHeader>
-          <CardTitle>Organisasi &amp; Periode</CardTitle>
+          <CardTitle as="h2">Organisasi &amp; Periode</CardTitle>
           <CardDescription>
             Konfigurasi tingkat perusahaan yang dipakai lintas modul.
           </CardDescription>
@@ -1519,7 +1698,7 @@ function OrgTab({ canEdit }: { canEdit: boolean }) {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+          <CardTitle as="h2" className="flex items-center gap-2">
             <CalendarDays className="h-5 w-5 text-primary" />
             Kalender Hari Libur
           </CardTitle>
@@ -1730,7 +1909,7 @@ function OrgTab({ canEdit }: { canEdit: boolean }) {
 
       <Card>
         <CardHeader>
-          <CardTitle>Katalog referensi</CardTitle>
+          <CardTitle as="h2">Katalog referensi</CardTitle>
           <CardDescription>
             Daftar sumber lead dan stage pipeline yang dipakai sistem. Read-only
             pada prototype ini.

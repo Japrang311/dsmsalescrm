@@ -1,6 +1,7 @@
 import type { CommercialItem } from "@/lib/domain";
 import type { ActivityLogEntry } from "@/lib/data/activity-log";
 import type { FollowUpLog } from "@/lib/data/follow-ups";
+import { formatDateShort } from "@/lib/format";
 
 const CLIENT_STATUSES = new Set([
   "Prospect",
@@ -94,6 +95,49 @@ type ActivityFeedBase = Pick<
   FeedEvent,
   "id" | "at" | "clientId" | "ownerName" | "title" | "detail"
 >;
+
+// `activity_log.detail` is free text for most kinds, but a few DB functions
+// (e.g. create_sales_order) store a `jsonb_build_object(...)::text` payload
+// there. Never surface raw JSON in the feed: format the payload shapes we
+// recognise into a sentence, and drop the ones we don't.
+export function formatFeedDetail(
+  dbKind: string | null | undefined,
+  detail: string | null | undefined,
+): string | undefined {
+  const trimmed = detail?.trim();
+  if (!trimmed) return undefined;
+  if (trimmed[0] !== "{" && trimmed[0] !== "[") return trimmed;
+
+  let payload: unknown;
+  try {
+    payload = JSON.parse(trimmed);
+  } catch {
+    return trimmed; // starts with a brace but isn't JSON — leave as written
+  }
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return undefined;
+  }
+  const p = payload as Record<string, unknown>;
+  const str = (key: string) =>
+    typeof p[key] === "string" && p[key] !== ""
+      ? (p[key] as string)
+      : undefined;
+
+  if (dbKind === "sales_order_created") {
+    const soNumber = str("so_number");
+    const mode = str("number_mode");
+    const poDate = str("customer_po_date");
+    const bits = [
+      soNumber ? `No. ${soNumber}` : undefined,
+      mode && mode !== "Auto" ? `nomor ${mode.toLowerCase()}` : undefined,
+      poDate ? `PO ${formatDateShort(poDate)}` : undefined,
+    ].filter(Boolean);
+    return bits.length > 0 ? bits.join(" · ") : undefined;
+  }
+
+  // Unknown structured payload: better to show nothing than a raw object.
+  return undefined;
+}
 
 function activityFeedBase(
   entry: ActivityLogEntry,

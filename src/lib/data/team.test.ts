@@ -227,13 +227,32 @@ describe("Team lifecycle request serialization", () => {
     ]);
   });
 
+  test("serializes the reset_password action", async () => {
+    await team.resetTeamMemberPassword(
+      "member-1",
+      "new-temporary-password",
+      "Reset diminta langsung",
+      teamClient,
+    );
+
+    expect(invoke).toHaveBeenCalledWith("manage-team-member", {
+      body: {
+        action: "reset_password",
+        id: "member-1",
+        password: "new-temporary-password",
+        reason: "Reset diminta langsung",
+      },
+    });
+  });
+
   test("rejects blank administrative reasons before invoking the function", async () => {
     for (const operation of [
       () => team.changeTeamMemberRole("member-1", "manager", "  "),
       () => team.deactivateTeamMember("member-1", ""),
       () => team.reactivateTeamMember("member-1", "\t"),
       () => team.transferTeamOwnership("member-1", "member-2", " "),
-      () => team.deleteEligibleTeamMember("member-1", ""),
+      () => team.deleteEligibleTeamMember("member-1", "  "),
+      () => team.resetTeamMemberPassword("member-1", "password-baru", "  "),
     ]) {
       await expect(operation()).rejects.toMatchObject({
         name: "TeamAdminError",

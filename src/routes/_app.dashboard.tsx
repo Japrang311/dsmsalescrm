@@ -49,6 +49,7 @@ import { getSalesOrdersMetrics } from "@/lib/data/sales-orders-metrics";
 import { getPipelineMetrics } from "@/lib/data/pipeline-metrics";
 import { formatPercent, formatRupiahShort } from "@/lib/format";
 
+import { AiSummaryCard } from "@/components/dashboard/AiSummaryCard";
 import { KpiCard, KpiProgress } from "@/components/dashboard/KpiCard";
 import { TodaysFollowUpList } from "@/components/dashboard/TodaysFollowUpList";
 import { RevenueTrendChart } from "@/components/dashboard/RevenueTrendChart";
@@ -75,6 +76,7 @@ import { CalendarIncompleteWarning } from "@/components/tasks/CalendarIncomplete
 import { useState } from "react";
 import { NOW, CURRENT_YEAR } from "@/lib/domain";
 import { toast } from "sonner";
+import { PageContainer } from "@/components/layout/PageContainer";
 
 export const Route = createFileRoute("/_app/dashboard")({
   head: () => ({
@@ -270,7 +272,7 @@ function DashboardPage() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-4 p-4 md:gap-5 md:p-6">
+    <PageContainer>
       {/* Header */}
       <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-end">
         <div>
@@ -288,127 +290,135 @@ function DashboardPage() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <DateRangePicker value={period} onChange={setPeriod} />
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-8 gap-1.5"
-            onClick={() =>
-              runExport("PDF", "Laporan dashboard", () => {
-                exportDashboardPdf(exportContext);
-                return 1;
-              })
-            }
-          >
-            <Download className="h-3.5 w-3.5" />
-            Export PDF
-          </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button size="sm" variant="outline" className="h-8 gap-1.5">
-                <FileText className="h-3.5 w-3.5" />
-                Export CSV
+                <Download className="h-3.5 w-3.5" />
+                Export
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuContent align="end" className="w-72">
               <DropdownMenuLabel>
-                Download tabel (periode dipilih)
+                Download laporan (periode dipilih)
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem
+                className="gap-2"
+                onSelect={() =>
+                  runExport("PDF", "Laporan dashboard", () => {
+                    exportDashboardPdf(exportContext);
+                    return 1;
+                  })
+                }
+              >
+                <FileText className="h-4 w-4" />
+                Dashboard PDF
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+                CSV
+              </DropdownMenuLabel>
+              <DropdownMenuItem
+                className="gap-2"
                 onSelect={() =>
                   runExport("CSV", "Monthly revenue vs target", () =>
                     exportMonthlyRevenueCsv(exportContext),
                   )
                 }
               >
+                <FileText className="h-4 w-4" />
                 Monthly revenue vs target
               </DropdownMenuItem>
               <DropdownMenuItem
+                className="gap-2"
                 onSelect={() =>
                   runExport("CSV", "Today & overdue follow-ups", () =>
                     exportFollowUpsCsv(exportContext),
                   )
                 }
               >
+                <FileText className="h-4 w-4" />
                 Today &amp; overdue follow-ups
               </DropdownMenuItem>
               {(role === "manager" ||
                 role === "executive" ||
                 role === "super_admin") && (
                 <DropdownMenuItem
+                  className="gap-2"
                   onSelect={() =>
                     runExport("CSV", "Sales performance vs target", () =>
                       exportSalesPerformanceCsv(exportContext),
                     )
                   }
                 >
+                  <FileText className="h-4 w-4" />
                   Sales performance vs target
                 </DropdownMenuItem>
               )}
               {(role === "executive" || role === "super_admin") && (
                 <DropdownMenuItem
+                  className="gap-2"
                   onSelect={() =>
                     runExport("CSV", "Top customers", () =>
                       exportTopCustomersCsv(exportContext),
                     )
                   }
                 >
+                  <FileText className="h-4 w-4" />
                   Top customers
                 </DropdownMenuItem>
               )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button size="sm" variant="outline" className="h-8 gap-1.5">
-                <FileSpreadsheet className="h-3.5 w-3.5" />
-                Export Excel
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel>
-                Download .xlsx (periode dipilih)
-              </DropdownMenuLabel>
               <DropdownMenuSeparator />
+              <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+                Excel
+              </DropdownMenuLabel>
               <DropdownMenuItem
+                className="gap-2"
                 onSelect={() =>
                   runExport("Excel", "Monthly revenue vs target", () =>
                     exportMonthlyRevenueXlsx(exportContext),
                   )
                 }
               >
+                <FileSpreadsheet className="h-4 w-4" />
                 Monthly revenue vs target
               </DropdownMenuItem>
               <DropdownMenuItem
+                className="gap-2"
                 onSelect={() =>
                   runExport("Excel", "Today & overdue follow-ups", () =>
                     exportFollowUpsXlsx(exportContext),
                   )
                 }
               >
+                <FileSpreadsheet className="h-4 w-4" />
                 Today &amp; overdue follow-ups
               </DropdownMenuItem>
               {(role === "manager" ||
                 role === "executive" ||
                 role === "super_admin") && (
                 <DropdownMenuItem
+                  className="gap-2"
                   onSelect={() =>
                     runExport("Excel", "Sales performance vs target", () =>
                       exportSalesPerformanceXlsx(exportContext),
                     )
                   }
                 >
+                  <FileSpreadsheet className="h-4 w-4" />
                   Sales performance vs target
                 </DropdownMenuItem>
               )}
               {(role === "executive" || role === "super_admin") && (
                 <DropdownMenuItem
+                  className="gap-2"
                   onSelect={() =>
                     runExport("Excel", "Top customers", () =>
                       exportTopCustomersXlsx(exportContext),
                     )
                   }
                 >
+                  <FileSpreadsheet className="h-4 w-4" />
                   Top customers
                 </DropdownMenuItem>
               )}
@@ -420,7 +430,10 @@ function DashboardPage() {
       <CalendarIncompleteWarning tasks={allTasks} metrics={taskMetrics} />
 
       {/* KPI row */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <section
+        aria-label="Ringkasan pencapaian"
+        className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4"
+      >
         <KpiCard
           label="Achievement YTD vs Yearly Target"
           value={formatRupiahShort(ytd)}
@@ -430,9 +443,9 @@ function DashboardPage() {
               Target <span className="num">{formatRupiahShort(yearlyTgt)}</span>{" "}
               · Variance{" "}
               <span
-                className={
+                className={`num ${
                   ytd - yearlyTgt >= 0 ? "text-success" : "text-destructive"
-                }
+                }`}
               >
                 {formatRupiahShort(ytd - yearlyTgt)}
               </span>
@@ -520,10 +533,13 @@ function DashboardPage() {
             </>
           }
         />
-      </div>
+      </section>
 
       {/* Second row: revenue source + prototype + task counters */}
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <section
+        aria-label="Ringkasan operasional"
+        className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4"
+      >
         <KpiCard
           label="Revenue Source YTD"
           value={formatRupiahShort(
@@ -625,7 +641,11 @@ function DashboardPage() {
               : "Semua terkendali"
           }
         />
-      </div>
+      </section>
+
+      {/* AI summary sits below the metrics it summarises — until generated it's
+          just a prompt, so it shouldn't push the numbers down. */}
+      <AiSummaryCard />
 
       {/* Sales-only: single-sales target chart */}
       {role === "sales" ? <SingleSalesTargetChart /> : null}
@@ -686,7 +706,7 @@ function DashboardPage() {
           </p>
         </>
       ) : null}
-    </div>
+    </PageContainer>
   );
 }
 

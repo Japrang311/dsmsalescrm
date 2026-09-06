@@ -48,7 +48,11 @@ import {
   listTaskTimeline,
   logActivity,
 } from "@/lib/data/activity-log";
-import { formatDateShort, formatRupiahShort } from "@/lib/format";
+import {
+  formatDateShort,
+  formatDateTime,
+  formatRupiahShort,
+} from "@/lib/format";
 
 const METHODS = ["Phone", "Email", "WhatsApp", "Visit", "Meeting"] as const;
 const PRIORITIES = ["High", "Normal", "Low"] as const;
@@ -649,12 +653,7 @@ export function TaskDetailDrawer({
                         {h.title}
                       </div>
                       <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                        {new Date(h.at).toLocaleString("id-ID", {
-                          day: "2-digit",
-                          month: "short",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
+                        {formatDateTime(h.at)}
                       </span>
                     </div>
                     {h.detail && (

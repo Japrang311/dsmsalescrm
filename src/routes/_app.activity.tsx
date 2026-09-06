@@ -15,7 +15,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { listClients, listOwners } from "@/lib/data/clients";
+import {
+  listClients,
+  listOwners,
+  listSalesTeamProfiles,
+} from "@/lib/data/clients";
 import { useRole } from "@/context/role-context-core";
 import {
   Activity,
@@ -62,6 +66,7 @@ import {
 } from "@/lib/data/activity-feed-page";
 import { listQueryKey, serializeListFilters } from "@/lib/pagination-contracts";
 import { toLocalIsoDate } from "@/lib/domain";
+import { formatDateShort } from "@/lib/format";
 
 export const Route = createFileRoute("/_app/activity")({
   head: () => ({
@@ -177,6 +182,16 @@ function ActivityPage() {
   const { data: clientList = [] } = useQuery({
     queryKey: ["clients", "all"],
     queryFn: listClients,
+    enabled: authReady,
+  });
+  // Owner filter options, deliberately NOT `owners`: that lookup is every
+  // profile (needed so a row logged by a deactivated account still renders a
+  // name instead of a raw id). Offering all of them as filters listed people
+  // who can't own anything — a director, deactivated reps, a QA account —
+  // and picking one always returned an empty feed.
+  const { data: salesTeam = [] } = useQuery({
+    queryKey: ["profiles", "sales-team"],
+    queryFn: listSalesTeamProfiles,
     enabled: authReady,
   });
 
@@ -300,8 +315,8 @@ function ActivityPage() {
   const rangeLabel = useMemo(() => {
     if (rangePreset === "all") return "Semua waktu";
     if (rangePreset === "custom") {
-      const f = customRange.from.toLocaleDateString("id-ID");
-      const t = customRange.to.toLocaleDateString("id-ID");
+      const f = formatDateShort(customRange.from);
+      const t = formatDateShort(customRange.to);
       return `${f} – ${t}`;
     }
     return `${rangePreset} hari terakhir`;
@@ -428,7 +443,9 @@ function ActivityPage() {
 
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Filter</CardTitle>
+          <CardTitle as="h2" className="text-base">
+            Filter
+          </CardTitle>
         </CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-3 lg:grid-cols-4">
           <Input
@@ -456,9 +473,9 @@ function ActivityPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Semua owner</SelectItem>
-                {Object.entries(owners).map(([id, m]) => (
-                  <SelectItem key={id} value={id}>
-                    {m.name}
+                {salesTeam.map((member) => (
+                  <SelectItem key={member.id} value={member.id}>
+                    {member.name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -488,8 +505,8 @@ function ActivityPage() {
             {totalCount} aktivitas
             {activeRange && (
               <span className="ml-2 text-xs">
-                · {activeRange.from.toLocaleDateString("id-ID")} —{" "}
-                {activeRange.to.toLocaleDateString("id-ID")}
+                · {formatDateShort(activeRange.from)} —{" "}
+                {formatDateShort(activeRange.to)}
               </span>
             )}
           </div>

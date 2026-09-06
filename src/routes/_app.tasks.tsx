@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import {
   Search,
@@ -87,6 +87,7 @@ import {
   PipelineStageMoveDialog,
   type PendingPipelineMove,
 } from "@/components/pipeline/PipelineStageMoveDialog";
+import { PageContainer } from "@/components/layout/PageContainer";
 
 export const Route = createFileRoute("/_app/tasks")({
   head: () => ({
@@ -359,6 +360,21 @@ function TasksInboxPage() {
     });
   }, [commonFiltered, completedTotal, archivedTotal]);
 
+  // T1: don't land the user on an empty "Today" bucket while other buckets
+  // have work waiting. Once counts are loaded, jump once to the most urgent
+  // non-empty active bucket. Runs a single time so it never fights a later
+  // manual selection.
+  const autoBucketPicked = useRef(false);
+  useEffect(() => {
+    if (autoBucketPicked.current || tasksLoading) return;
+    autoBucketPicked.current = true;
+    if (viewCounts.today > 0) return;
+    const fallback = (["overdue", "upcoming"] as const).find(
+      (v) => viewCounts[v] > 0,
+    );
+    if (fallback) setActiveView(fallback);
+  }, [tasksLoading, viewCounts]);
+
   const filtered = useMemo(
     () =>
       commonFiltered.filter(
@@ -520,7 +536,7 @@ function TasksInboxPage() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <PageContainer>
       <header className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex flex-col gap-1">
           <h1 className="text-xl font-semibold tracking-tight text-foreground">
@@ -531,7 +547,9 @@ function TasksInboxPage() {
               ? "Sales-owned task yang sudah melewati threshold eskalasi."
               : role === "executive"
                 ? "Manager-owned task yang sudah tereskalasi. Detail bersifat read-only."
-                : "Task & follow-up terhubung ke klien serta commercial item aktif."}
+                : role === "manager"
+                  ? "Hanya task yang ditugaskan ke Anda — angka tim ada di Dashboard & Team Exceptions."
+                  : "Hanya task yang ditugaskan ke Anda. Follow-up terhubung ke klien serta commercial item aktif."}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 self-start">
@@ -928,6 +946,6 @@ function TasksInboxPage() {
           </div>
         </div>
       )}
-    </div>
+    </PageContainer>
   );
 }

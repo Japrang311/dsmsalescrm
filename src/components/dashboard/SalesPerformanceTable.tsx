@@ -41,7 +41,7 @@ export function SalesPerformanceTable() {
   return (
     <Card className="border-border shadow-none">
       <CardHeader className="pb-3">
-        <CardTitle className="text-sm font-semibold text-foreground">
+        <CardTitle as="h2" className="text-sm font-semibold text-foreground">
           Sales Performance vs Target YTD
         </CardTitle>
         <p className="text-xs text-muted-foreground">

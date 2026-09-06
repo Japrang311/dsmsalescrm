@@ -5,8 +5,6 @@ export type UserPreferences = {
   email: string;
   language: "id" | "en";
   timezone: "WIB" | "WITA" | "WIT";
-  dateFormat: "dd/MM/yyyy" | "yyyy-MM-dd" | "dd MMM yyyy";
-  currencyFormat: "compact" | "full";
 };
 
 type PreferencesState = {
@@ -26,8 +24,6 @@ export function defaultUserPreferences(
     email,
     language: "id",
     timezone: "WIB",
-    dateFormat: "dd/MM/yyyy",
-    currencyFormat: "compact",
   };
 }
 

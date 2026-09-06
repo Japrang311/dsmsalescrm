@@ -11,6 +11,7 @@ import {
 import { listTargets } from "@/lib/data/targets";
 import { companyMonthlyTarget } from "@/lib/data/dashboard-selectors";
 import { getCurrentActorId } from "@/lib/data/activity-log";
+import { useRealtimeSync } from "@/hooks/use-realtime-sync";
 
 // Shared real-data fetch for every dashboard/reports/activity component.
 // Each query reuses the same queryKey used elsewhere in the app (Clients
@@ -18,6 +19,8 @@ import { getCurrentActorId } from "@/lib/data/activity-log";
 // of firing duplicate network requests.
 export function useDashboardData() {
   const { authReady, role } = useRole();
+  // Live dashboard: new tasks and sales orders appear without a refresh.
+  useRealtimeSync(["tasks", "sales_orders"], authReady);
 
   const orders = useQuery({
     queryKey: ["sales-orders", "all"],
@@ -88,6 +91,18 @@ export function useDashboardData() {
     targetsByMember,
     companyTarget: companyMonthlyTarget(targetsByMember),
     currentUserId: currentUserId.data ?? undefined,
+    // Additive signal for consumers that must not present stale/empty data as
+    // real (see src/lib/ai/summary-readiness.ts). `isLoading` alone goes false
+    // on a failed query while the data getters still return empty arrays.
+    hasError:
+      orders.isError ||
+      tasks.isError ||
+      (role !== "sales" && taskMetrics.isError) ||
+      items.isError ||
+      clients.isError ||
+      owners.isError ||
+      salesTeam.isError ||
+      targets.isError,
     isLoading:
       !authReady ||
       orders.isLoading ||

@@ -124,6 +124,7 @@ export function TasksAgendaView({
           <Card key={b} className="border-border shadow-none">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle
+                as="h2"
                 className={`flex items-center gap-2 text-sm font-semibold ${meta.tone}`}
               >
                 <Checkbox
@@ -237,6 +238,7 @@ export function TaskHistorySection({
     <Card className="border-border shadow-none">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle
+          as="h2"
           className={`flex items-center gap-2 text-sm font-semibold ${tone}`}
         >
           {title}
@@ -596,7 +598,10 @@ export function TasksCalendarView({
   return (
     <Card className="border-border shadow-none">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-semibold capitalize text-foreground">
+        <CardTitle
+          as="h2"
+          className="text-sm font-semibold capitalize text-foreground"
+        >
           {monthLabel}
         </CardTitle>
         <div className="flex items-center gap-1">

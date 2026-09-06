@@ -12,9 +12,10 @@ import {
   YAxis,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatRupiahShort } from "@/lib/format";
+import { formatRupiahAxis, formatRupiahShort } from "@/lib/format";
 import { CURRENT_YEAR } from "@/lib/domain";
 import { ChartEmpty } from "./ReportPrimitives";
+import { CHART_COLORS } from "./chart-colors";
 
 type TrendPoint = { month: string; achievement: number; target: number };
 type MonthlyPoint = { month: string; revenue: number; target: number };
@@ -30,7 +31,7 @@ export function ReportsTrendCharts({
     <div className="grid gap-4 lg:grid-cols-2">
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-semibold">
+          <CardTitle as="h2" className="text-sm font-semibold">
             Achievement YTD vs Target YTD
           </CardTitle>
           <p className="text-[11px] text-muted-foreground">
@@ -48,47 +49,57 @@ export function ReportsTrendCharts({
           {cumulativeTrend.length === 0 ? (
             <ChartEmpty />
           ) : (
-            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart
-                data={cumulativeTrend}
-                margin={{ top: 8, right: 16, left: 0, bottom: 4 }}
-              >
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke="var(--color-border)"
-                  opacity={0.5}
-                />
-                <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-                <YAxis
-                  tickFormatter={(v) => formatRupiahShort(v)}
-                  tick={{ fontSize: 10 }}
-                  width={70}
-                />
-                <Tooltip formatter={(v: number) => formatRupiahShort(v)} />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
-                <Bar
-                  dataKey="achievement"
-                  name="Achievement"
-                  fill="#0176D3"
-                  radius={[4, 4, 0, 0]}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="target"
-                  name="Target"
-                  stroke="#F59E0B"
-                  strokeWidth={2}
-                  dot={{ r: 3 }}
-                />
-              </ComposedChart>
-            </ResponsiveContainer>
+            <div
+              className="h-full w-full"
+              role="img"
+              aria-label={`Grafik: akumulasi achievement vs target YTD ${CURRENT_YEAR}. Achievement ${formatRupiahShort(
+                cumulativeTrend[cumulativeTrend.length - 1]?.achievement ?? 0,
+              )} dari target ${formatRupiahShort(
+                cumulativeTrend[cumulativeTrend.length - 1]?.target ?? 0,
+              )}.`}
+            >
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart
+                  data={cumulativeTrend}
+                  margin={{ top: 16, right: 16, left: 0, bottom: 4 }}
+                >
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke="var(--color-border)"
+                    opacity={0.5}
+                  />
+                  <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                  <YAxis
+                    tickFormatter={formatRupiahAxis}
+                    tick={{ fontSize: 10 }}
+                    width={54}
+                  />
+                  <Tooltip formatter={(v: number) => formatRupiahShort(v)} />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Bar
+                    dataKey="achievement"
+                    name="Achievement"
+                    fill={CHART_COLORS[0]}
+                    radius={[4, 4, 0, 0]}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="target"
+                    name="Target"
+                    stroke={CHART_COLORS[2]}
+                    strokeWidth={2}
+                    dot={{ r: 3 }}
+                  />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
           )}
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-semibold">
+          <CardTitle as="h2" className="text-sm font-semibold">
             Monthly Achievement vs Monthly Target
           </CardTitle>
           <p className="text-[11px] text-muted-foreground">
@@ -106,38 +117,48 @@ export function ReportsTrendCharts({
           {monthlyTrend.length === 0 ? (
             <ChartEmpty />
           ) : (
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={monthlyTrend}
-                margin={{ top: 8, right: 16, left: 0, bottom: 4 }}
-              >
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke="var(--color-border)"
-                  opacity={0.5}
-                />
-                <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-                <YAxis
-                  tickFormatter={(v) => formatRupiahShort(v)}
-                  tick={{ fontSize: 10 }}
-                  width={70}
-                />
-                <Tooltip formatter={(v: number) => formatRupiahShort(v)} />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
-                <Bar
-                  dataKey="target"
-                  name="Target"
-                  fill="#CBD5E1"
-                  radius={[4, 4, 0, 0]}
-                />
-                <Bar
-                  dataKey="revenue"
-                  name="Revenue"
-                  fill="#0176D3"
-                  radius={[4, 4, 0, 0]}
-                />
-              </BarChart>
-            </ResponsiveContainer>
+            <div
+              className="h-full w-full"
+              role="img"
+              aria-label={`Grafik batang: revenue vs target per bulan. Total revenue ${formatRupiahShort(
+                monthlyTrend.reduce((s, d) => s + d.revenue, 0),
+              )} dari target ${formatRupiahShort(
+                monthlyTrend.reduce((s, d) => s + d.target, 0),
+              )}.`}
+            >
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={monthlyTrend}
+                  margin={{ top: 16, right: 16, left: 0, bottom: 4 }}
+                >
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke="var(--color-border)"
+                    opacity={0.5}
+                  />
+                  <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                  <YAxis
+                    tickFormatter={formatRupiahAxis}
+                    tick={{ fontSize: 10 }}
+                    width={54}
+                  />
+                  <Tooltip formatter={(v: number) => formatRupiahShort(v)} />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Bar
+                    dataKey="target"
+                    name="Target"
+                    fill="var(--color-border-strong)"
+                    radius={[4, 4, 0, 0]}
+                  />
+                  <Bar
+                    dataKey="revenue"
+                    name="Revenue"
+                    fill={CHART_COLORS[0]}
+                    radius={[4, 4, 0, 0]}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           )}
         </CardContent>
       </Card>

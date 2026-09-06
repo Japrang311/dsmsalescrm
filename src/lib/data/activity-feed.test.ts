@@ -1,6 +1,57 @@
 import { describe, expect, test } from "bun:test";
-import { buildActivityFeed } from "@/lib/data/activity-feed";
+import { buildActivityFeed, formatFeedDetail } from "@/lib/data/activity-feed";
 import type { ActivityLogEntry } from "@/lib/data/activity-log";
+
+describe("formatFeedDetail", () => {
+  test("passes plain-text detail through unchanged", () => {
+    expect(formatFeedDetail("client_status_change", "Prospect → Active")).toBe(
+      "Prospect → Active",
+    );
+  });
+
+  test("returns undefined for empty or missing detail", () => {
+    expect(formatFeedDetail("sales_order_created", null)).toBeUndefined();
+    expect(formatFeedDetail("sales_order_created", "   ")).toBeUndefined();
+  });
+
+  test("turns a sales_order_created JSON payload into a sentence", () => {
+    const payload = JSON.stringify({
+      so_number: "DSM-26SO181",
+      number_mode: "Manual",
+      backdate_reason: null,
+      source_commercial_document_id: null,
+      customer_po_date: "2026-09-04",
+    });
+    const result = formatFeedDetail("sales_order_created", payload);
+    expect(result).toContain("No. DSM-26SO181");
+    expect(result).toContain("nomor manual");
+    expect(result).toContain("PO ");
+    expect(result).not.toContain("{");
+  });
+
+  test("omits number_mode when it is the default 'Auto'", () => {
+    const payload = JSON.stringify({
+      so_number: "DSM-26SO182",
+      number_mode: "Auto",
+      customer_po_date: null,
+    });
+    expect(formatFeedDetail("sales_order_created", payload)).toBe(
+      "No. DSM-26SO182",
+    );
+  });
+
+  test("never surfaces a raw object for an unrecognised JSON payload", () => {
+    expect(
+      formatFeedDetail("some_future_kind", '{"foo":"bar","n":1}'),
+    ).toBeUndefined();
+  });
+
+  test("leaves a brace-prefixed non-JSON string as written", () => {
+    expect(formatFeedDetail(null, "{not json} but readable")).toBe(
+      "{not json} but readable",
+    );
+  });
+});
 
 describe("buildActivityFeed", () => {
   test("maps persisted sales-order creation into a linked feed event", () => {

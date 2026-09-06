@@ -446,6 +446,23 @@ export async function deleteEligibleTeamMember(
   );
 }
 
+export async function resetTeamMemberPassword(
+  id: string,
+  password: string,
+  reason: string,
+  client: TeamSupabaseClient = realTeamClient,
+): Promise<ActionResult> {
+  return invokeManageTeamMember(
+    {
+      action: "reset_password",
+      id,
+      password,
+      reason: administrativeReason(reason),
+    },
+    client,
+  );
+}
+
 export async function getTeamMemberReferenceCounts(
   id: string,
   client: TeamSupabaseClient = realTeamClient,

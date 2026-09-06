@@ -313,12 +313,14 @@ const SidebarRail = React.forwardRef<
 });
 SidebarRail.displayName = "SidebarRail";
 
+// Layout container only — not a <main> landmark. The route shell (_app.tsx)
+// owns the single <main> so it wraps page content, not the TopBar/header.
 const SidebarInset = React.forwardRef<
   HTMLDivElement,
-  React.ComponentProps<"main">
+  React.ComponentProps<"div">
 >(({ className, ...props }, ref) => {
   return (
-    <main
+    <div
       ref={ref}
       className={cn(
         "relative flex w-full flex-1 flex-col bg-background",
