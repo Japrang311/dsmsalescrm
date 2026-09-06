@@ -10,6 +10,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import type { ReactElement } from "react";
 import { Info } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -126,6 +127,28 @@ function ComparisonTooltip({
   );
 }
 
+// Every Recharts <svg> is invisible to screen readers (no accessible name).
+// ChartFrame wraps the ResponsiveContainer with role="img" + a text summary
+// so the chart has a WCAG 1.1.1 text alternative; the SVG internals are then
+// skipped by assistive tech.
+function ChartFrame({
+  height,
+  label,
+  children,
+}: {
+  height: number;
+  label: string;
+  children: ReactElement;
+}) {
+  return (
+    <div className="w-full" style={{ height }} role="img" aria-label={label}>
+      <ResponsiveContainer width="100%" height="100%">
+        {children}
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
 // Consistent responsive chart config shared by every chart card.
 function useChartConfig() {
   const isMobile = useIsMobile();
@@ -187,7 +210,10 @@ export function YtdAchievementVsTargetChart({ role }: { role: Role }) {
       <CardHeader className={chartCardHeader}>
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <CardTitle className="text-sm font-semibold text-foreground">
+            <CardTitle
+              as="h2"
+              className="text-sm font-semibold text-foreground"
+            >
               Achievement YTD vs Yearly Target
             </CardTitle>
             <p className="text-xs text-muted-foreground">
@@ -211,63 +237,68 @@ export function YtdAchievementVsTargetChart({ role }: { role: Role }) {
         </div>
       </CardHeader>
       <CardContent className={chartCardContent}>
-        <div className="w-full" style={{ height: cfg.height }}>
-          <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={data} margin={cfg.margin}>
-              <CartesianGrid
-                strokeDasharray="3 3"
-                stroke="var(--color-border)"
-                vertical={false}
-              />
-              <XAxis
-                dataKey="month"
-                tickLine={false}
-                axisLine={false}
-                tick={cfg.axisTick}
-                interval={cfg.isMobile ? 1 : 0}
-              />
-              <YAxis
-                tickFormatter={(v: number) =>
-                  formatRupiahShort(v).replace("Rp", "")
-                }
-                tickLine={false}
-                axisLine={false}
-                tick={cfg.axisTick}
-                width={cfg.yWidth}
-              />
-              <Tooltip
-                cursor={{ fill: "var(--color-primary-soft)", opacity: 0.35 }}
-                content={(props) => (
-                  <ComparisonTooltip
-                    {...props}
-                    achievementKey="achievement"
-                    targetKey="target"
-                    cumulative
-                  />
-                )}
-              />
-              <Legend
-                wrapperStyle={cfg.legendStyle}
-                iconType="circle"
-                iconSize={8}
-              />
-              <Bar
-                dataKey="achievement"
-                name="Achievement"
-                fill="var(--color-primary)"
-                radius={[4, 4, 0, 0]}
-              />
-              <Line
-                type="monotone"
-                dataKey="target"
-                name="Target"
-                stroke="var(--color-navy)"
-                strokeWidth={2}
-                dot={{ r: 2.5, fill: "var(--color-navy)" }}
-              />
-            </ComposedChart>
-          </ResponsiveContainer>
-        </div>
+        <ChartFrame
+          height={cfg.height}
+          label={`Grafik garis kumulatif achievement vs target ${
+            role === "manager" ? "tim sales" : "perusahaan"
+          } per bulan. Total achievement ${formatRupiahShort(
+            ach,
+          )} dari target ${formatRupiahShort(tgt)} (${formatPercent(pct)}).`}
+        >
+          <ComposedChart data={data} margin={cfg.margin}>
+            <CartesianGrid
+              strokeDasharray="3 3"
+              stroke="var(--color-border)"
+              vertical={false}
+            />
+            <XAxis
+              dataKey="month"
+              tickLine={false}
+              axisLine={false}
+              tick={cfg.axisTick}
+              interval={cfg.isMobile ? 1 : 0}
+            />
+            <YAxis
+              tickFormatter={(v: number) =>
+                formatRupiahShort(v).replace("Rp", "")
+              }
+              tickLine={false}
+              axisLine={false}
+              tick={cfg.axisTick}
+              width={cfg.yWidth}
+            />
+            <Tooltip
+              cursor={{ fill: "var(--color-primary-soft)", opacity: 0.35 }}
+              content={(props) => (
+                <ComparisonTooltip
+                  {...props}
+                  achievementKey="achievement"
+                  targetKey="target"
+                  cumulative
+                />
+              )}
+            />
+            <Legend
+              wrapperStyle={cfg.legendStyle}
+              iconType="circle"
+              iconSize={8}
+            />
+            <Bar
+              dataKey="achievement"
+              name="Achievement"
+              fill="var(--color-primary)"
+              radius={[4, 4, 0, 0]}
+            />
+            <Line
+              type="monotone"
+              dataKey="target"
+              name="Target"
+              stroke="var(--color-navy)"
+              strokeWidth={2}
+              dot={{ r: 2.5, fill: "var(--color-navy)" }}
+            />
+          </ComposedChart>
+        </ChartFrame>
       </CardContent>
     </Card>
   );
@@ -295,7 +326,7 @@ export function MonthlyAchievementVsTargetChart({ role }: { role: Role }) {
   return (
     <Card className="border-border shadow-none">
       <CardHeader className={chartCardHeader}>
-        <CardTitle className="text-sm font-semibold text-foreground">
+        <CardTitle as="h2" className="text-sm font-semibold text-foreground">
           Achievement Monthly vs Target Monthly
         </CardTitle>
         <p className="text-xs text-muted-foreground">
@@ -313,64 +344,69 @@ export function MonthlyAchievementVsTargetChart({ role }: { role: Role }) {
         )}
       </CardHeader>
       <CardContent className={chartCardContent}>
-        <div className="w-full" style={{ height: cfg.height }}>
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={data}
-              margin={cfg.margin}
-              barCategoryGap={cfg.isMobile ? "12%" : "20%"}
-            >
-              <CartesianGrid
-                strokeDasharray="3 3"
-                stroke="var(--color-border)"
-                vertical={false}
-              />
-              <XAxis
-                dataKey="month"
-                tickLine={false}
-                axisLine={false}
-                tick={cfg.axisTick}
-                interval={cfg.isMobile ? 1 : 0}
-              />
-              <YAxis
-                tickFormatter={(v: number) =>
-                  formatRupiahShort(v).replace("Rp", "")
-                }
-                tickLine={false}
-                axisLine={false}
-                tick={cfg.axisTick}
-                width={cfg.yWidth}
-              />
-              <Tooltip
-                cursor={{ fill: "var(--color-primary-soft)", opacity: 0.35 }}
-                content={(props) => (
-                  <ComparisonTooltip
-                    {...props}
-                    achievementKey="revenue"
-                    targetKey="target"
-                  />
-                )}
-              />
-              <Legend
-                wrapperStyle={cfg.legendStyle}
-                iconType="circle"
-                iconSize={8}
-              />
-              <Bar
-                dataKey="target"
-                name="Target"
-                fill="var(--color-navy)"
-                radius={[3, 3, 0, 0]}
-              />
-              <Bar
-                dataKey="revenue"
-                name="Achievement"
-                fill="var(--color-primary)"
-                radius={[3, 3, 0, 0]}
-              />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+        <ChartFrame
+          height={cfg.height}
+          label={`Grafik batang: achievement vs target per bulan, Januari sampai bulan berjalan. Total achievement ${formatRupiahShort(
+            data.reduce((s, d) => s + d.revenue, 0),
+          )} dari target ${formatRupiahShort(
+            data.reduce((s, d) => s + d.target, 0),
+          )}.`}
+        >
+          <BarChart
+            data={data}
+            margin={cfg.margin}
+            barCategoryGap={cfg.isMobile ? "12%" : "20%"}
+          >
+            <CartesianGrid
+              strokeDasharray="3 3"
+              stroke="var(--color-border)"
+              vertical={false}
+            />
+            <XAxis
+              dataKey="month"
+              tickLine={false}
+              axisLine={false}
+              tick={cfg.axisTick}
+              interval={cfg.isMobile ? 1 : 0}
+            />
+            <YAxis
+              tickFormatter={(v: number) =>
+                formatRupiahShort(v).replace("Rp", "")
+              }
+              tickLine={false}
+              axisLine={false}
+              tick={cfg.axisTick}
+              width={cfg.yWidth}
+            />
+            <Tooltip
+              cursor={{ fill: "var(--color-primary-soft)", opacity: 0.35 }}
+              content={(props) => (
+                <ComparisonTooltip
+                  {...props}
+                  achievementKey="revenue"
+                  targetKey="target"
+                />
+              )}
+            />
+            <Legend
+              wrapperStyle={cfg.legendStyle}
+              iconType="circle"
+              iconSize={8}
+            />
+            <Bar
+              dataKey="target"
+              name="Target"
+              fill="var(--color-navy)"
+              radius={[3, 3, 0, 0]}
+            />
+            <Bar
+              dataKey="revenue"
+              name="Achievement"
+              fill="var(--color-primary)"
+              radius={[3, 3, 0, 0]}
+            />
+          </BarChart>
+        </ChartFrame>
       </CardContent>
     </Card>
   );
@@ -412,7 +448,10 @@ export function SingleSalesTargetChart() {
       <CardHeader className={chartCardHeader}>
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <CardTitle className="truncate text-sm font-semibold text-foreground">
+            <CardTitle
+              as="h2"
+              className="truncate text-sm font-semibold text-foreground"
+            >
               Target {memberName}
             </CardTitle>
             <p className="text-xs text-muted-foreground">
@@ -436,64 +475,67 @@ export function SingleSalesTargetChart() {
         </div>
       </CardHeader>
       <CardContent className={chartCardContent}>
-        <div className="w-full" style={{ height: cfg.height }}>
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={data}
-              margin={cfg.margin}
-              barCategoryGap={cfg.isMobile ? "12%" : "20%"}
-            >
-              <CartesianGrid
-                strokeDasharray="3 3"
-                stroke="var(--color-border)"
-                vertical={false}
-              />
-              <XAxis
-                dataKey="month"
-                tickLine={false}
-                axisLine={false}
-                tick={cfg.axisTick}
-                interval={cfg.isMobile ? 1 : 0}
-              />
-              <YAxis
-                tickFormatter={(v: number) =>
-                  formatRupiahShort(v).replace("Rp", "")
-                }
-                tickLine={false}
-                axisLine={false}
-                tick={cfg.axisTick}
-                width={cfg.yWidth}
-              />
-              <Tooltip
-                cursor={{ fill: "var(--color-primary-soft)", opacity: 0.35 }}
-                content={(props) => (
-                  <ComparisonTooltip
-                    {...props}
-                    achievementKey="revenue"
-                    targetKey="target"
-                  />
-                )}
-              />
-              <Legend
-                wrapperStyle={cfg.legendStyle}
-                iconType="circle"
-                iconSize={8}
-              />
-              <Bar
-                dataKey="target"
-                name="Target"
-                fill="var(--color-navy)"
-                radius={[3, 3, 0, 0]}
-              />
-              <Bar
-                dataKey="revenue"
-                name="Achievement"
-                fill="var(--color-primary)"
-                radius={[3, 3, 0, 0]}
-              />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+        <ChartFrame
+          height={cfg.height}
+          label={`Grafik batang: achievement bulanan ${memberName}. YTD ${formatRupiahShort(
+            ach,
+          )} dari target ${formatRupiahShort(tgt)} (${formatPercent(pct)}).`}
+        >
+          <BarChart
+            data={data}
+            margin={cfg.margin}
+            barCategoryGap={cfg.isMobile ? "12%" : "20%"}
+          >
+            <CartesianGrid
+              strokeDasharray="3 3"
+              stroke="var(--color-border)"
+              vertical={false}
+            />
+            <XAxis
+              dataKey="month"
+              tickLine={false}
+              axisLine={false}
+              tick={cfg.axisTick}
+              interval={cfg.isMobile ? 1 : 0}
+            />
+            <YAxis
+              tickFormatter={(v: number) =>
+                formatRupiahShort(v).replace("Rp", "")
+              }
+              tickLine={false}
+              axisLine={false}
+              tick={cfg.axisTick}
+              width={cfg.yWidth}
+            />
+            <Tooltip
+              cursor={{ fill: "var(--color-primary-soft)", opacity: 0.35 }}
+              content={(props) => (
+                <ComparisonTooltip
+                  {...props}
+                  achievementKey="revenue"
+                  targetKey="target"
+                />
+              )}
+            />
+            <Legend
+              wrapperStyle={cfg.legendStyle}
+              iconType="circle"
+              iconSize={8}
+            />
+            <Bar
+              dataKey="target"
+              name="Target"
+              fill="var(--color-navy)"
+              radius={[3, 3, 0, 0]}
+            />
+            <Bar
+              dataKey="revenue"
+              name="Achievement"
+              fill="var(--color-primary)"
+              radius={[3, 3, 0, 0]}
+            />
+          </BarChart>
+        </ChartFrame>
       </CardContent>
     </Card>
   );
@@ -524,7 +566,7 @@ export function TargetAllSalesChart() {
   return (
     <Card className="border-border shadow-none">
       <CardHeader className={chartCardHeader}>
-        <CardTitle className="text-sm font-semibold text-foreground">
+        <CardTitle as="h2" className="text-sm font-semibold text-foreground">
           Target All Sales · Achievement vs Target YTD
         </CardTitle>
         <p className="text-xs text-muted-foreground">
@@ -539,69 +581,70 @@ export function TargetAllSalesChart() {
         )}
       </CardHeader>
       <CardContent className={chartCardContent}>
-        <div className="w-full" style={{ height: mobileHeight }}>
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={data}
-              margin={{ ...cfg.margin, bottom: cfg.isMobile ? 32 : 0 }}
-              barCategoryGap={cfg.isMobile ? "16%" : "24%"}
-            >
-              <CartesianGrid
-                strokeDasharray="3 3"
-                stroke="var(--color-border)"
-                vertical={false}
-              />
-              <XAxis
-                dataKey="label"
-                tickLine={false}
-                axisLine={false}
-                tick={cfg.axisTick}
-                interval={0}
-                angle={cfg.isMobile ? -30 : 0}
-                textAnchor={cfg.isMobile ? "end" : "middle"}
-                height={cfg.isMobile ? 52 : 24}
-              />
-              <YAxis
-                tickFormatter={(v: number) =>
-                  formatRupiahShort(v).replace("Rp", "")
-                }
-                tickLine={false}
-                axisLine={false}
-                tick={cfg.axisTick}
-                width={cfg.yWidth}
-              />
-              <Tooltip
-                cursor={{ fill: "var(--color-primary-soft)", opacity: 0.35 }}
-                content={(props) => (
-                  <ComparisonTooltip
-                    {...props}
-                    achievementKey="achievement"
-                    targetKey="target"
-                    achievementLabel="Achievement YTD"
-                    targetLabel="Target YTD"
-                  />
-                )}
-              />
-              <Legend
-                wrapperStyle={cfg.legendStyle}
-                iconType="circle"
-                iconSize={8}
-              />
-              <Bar
-                dataKey="target"
-                name="Target YTD"
-                fill="var(--color-navy)"
-                radius={[3, 3, 0, 0]}
-              />
-              <Bar
-                dataKey="achievement"
-                name="Achievement YTD"
-                fill="var(--color-primary)"
-                radius={[3, 3, 0, 0]}
-              />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+        <ChartFrame
+          height={mobileHeight}
+          label={`Grafik batang berkelompok: achievement vs target YTD untuk ${data.length} sales.`}
+        >
+          <BarChart
+            data={data}
+            margin={{ ...cfg.margin, bottom: cfg.isMobile ? 32 : 0 }}
+            barCategoryGap={cfg.isMobile ? "16%" : "24%"}
+          >
+            <CartesianGrid
+              strokeDasharray="3 3"
+              stroke="var(--color-border)"
+              vertical={false}
+            />
+            <XAxis
+              dataKey="label"
+              tickLine={false}
+              axisLine={false}
+              tick={cfg.axisTick}
+              interval={0}
+              angle={cfg.isMobile ? -30 : 0}
+              textAnchor={cfg.isMobile ? "end" : "middle"}
+              height={cfg.isMobile ? 52 : 24}
+            />
+            <YAxis
+              tickFormatter={(v: number) =>
+                formatRupiahShort(v).replace("Rp", "")
+              }
+              tickLine={false}
+              axisLine={false}
+              tick={cfg.axisTick}
+              width={cfg.yWidth}
+            />
+            <Tooltip
+              cursor={{ fill: "var(--color-primary-soft)", opacity: 0.35 }}
+              content={(props) => (
+                <ComparisonTooltip
+                  {...props}
+                  achievementKey="achievement"
+                  targetKey="target"
+                  achievementLabel="Achievement YTD"
+                  targetLabel="Target YTD"
+                />
+              )}
+            />
+            <Legend
+              wrapperStyle={cfg.legendStyle}
+              iconType="circle"
+              iconSize={8}
+            />
+            <Bar
+              dataKey="target"
+              name="Target YTD"
+              fill="var(--color-navy)"
+              radius={[3, 3, 0, 0]}
+            />
+            <Bar
+              dataKey="achievement"
+              name="Achievement YTD"
+              fill="var(--color-primary)"
+              radius={[3, 3, 0, 0]}
+            />
+          </BarChart>
+        </ChartFrame>
       </CardContent>
     </Card>
   );

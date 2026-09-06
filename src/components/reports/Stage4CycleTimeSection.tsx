@@ -82,7 +82,10 @@ export function Stage4CycleTimeSection({
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+        <CardTitle
+          as="h3"
+          className="flex items-center gap-2 text-sm font-semibold"
+        >
           <Timer className="h-4 w-4 text-primary" /> Cycle-Time (Quote → PO →
           Sales Order)
         </CardTitle>

@@ -19,8 +19,7 @@ import { CURRENT_MONTH, CURRENT_YEAR, NOW } from "@/lib/domain";
 import { generateAiSummary } from "@/lib/ai/summary-server";
 
 type SummaryBlock =
-  | { type: "p"; text: string }
-  | { type: "ul"; items: string[] };
+  { type: "p"; text: string } | { type: "ul"; items: string[] };
 
 // The model is asked (see summary-prompt.ts) for a short opener followed by
 // "- " bullet lines. Turn those bullets into a real list so the card is
@@ -129,7 +128,10 @@ export function AiSummaryCard() {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
-        <CardTitle className="flex items-center gap-2 text-sm font-medium">
+        <CardTitle
+          as="h2"
+          className="flex items-center gap-2 text-sm font-medium"
+        >
           <Sparkles className="h-4 w-4" />
           Ringkasan AI
         </CardTitle>

@@ -29,7 +29,7 @@ export function ReportsForecastSection({
     <div className="grid gap-4 lg:grid-cols-4">
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-semibold">
+          <CardTitle as="h2" className="text-sm font-semibold">
             Revenue Source Breakdown
           </CardTitle>
         </CardHeader>
@@ -37,31 +37,39 @@ export function ReportsForecastSection({
           {totalRevenue === 0 ? (
             <ChartEmpty />
           ) : (
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={sourceBreakdown}
-                  dataKey="value"
-                  nameKey="name"
-                  innerRadius={50}
-                  outerRadius={80}
-                  paddingAngle={2}
-                >
-                  {sourceBreakdown.map((_, i) => (
-                    <Cell key={i} fill={CHART_COLORS[i]} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(v: number) => formatRupiahShort(v)} />
-                <Legend wrapperStyle={{ fontSize: 10 }} />
-              </PieChart>
-            </ResponsiveContainer>
+            <div
+              className="h-full w-full"
+              role="img"
+              aria-label={`Diagram lingkaran: pembagian revenue per sumber. ${sourceBreakdown
+                .map((s) => `${s.name} ${formatRupiahShort(s.value)}`)
+                .join(", ")}.`}
+            >
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={sourceBreakdown}
+                    dataKey="value"
+                    nameKey="name"
+                    innerRadius={50}
+                    outerRadius={80}
+                    paddingAngle={2}
+                  >
+                    {sourceBreakdown.map((_, i) => (
+                      <Cell key={i} fill={CHART_COLORS[i]} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(v: number) => formatRupiahShort(v)} />
+                  <Legend wrapperStyle={{ fontSize: 10 }} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
           )}
         </CardContent>
       </Card>
 
       <Card className="lg:col-span-2">
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-semibold">
+          <CardTitle as="h2" className="text-sm font-semibold">
             Forecast vs Achievement vs Target YTD
           </CardTitle>
           <p className="text-[11px] text-muted-foreground">

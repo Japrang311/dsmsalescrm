@@ -294,7 +294,7 @@ function ProfileTab({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Profil &amp; Preferensi</CardTitle>
+        <CardTitle as="h2">Profil &amp; Preferensi</CardTitle>
         <CardDescription>
           Preferensi tampilan dan informasi akun untuk user saat ini.
         </CardDescription>
@@ -457,7 +457,7 @@ function AccountTab({ email }: { email: string }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Ubah Kata Sandi</CardTitle>
+        <CardTitle as="h2">Ubah Kata Sandi</CardTitle>
         <CardDescription>
           Perubahan kata sandi berlaku langsung untuk akun login Anda.
         </CardDescription>
@@ -569,7 +569,7 @@ function TeamTab({
     <Card>
       <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
         <div>
-          <CardTitle>Manajemen Tim &amp; Role</CardTitle>
+          <CardTitle as="h2">Manajemen Tim &amp; Role</CardTitle>
           <CardDescription>
             Super Admin dan Executive tidak menjadi owner target atau data
             Sales. Ownership aktif hanya dapat dialihkan ke Sales atau Manager
@@ -1424,7 +1424,7 @@ function TargetsTab({
 
       <Card>
         <CardHeader>
-          <CardTitle>Target bulanan per sales</CardTitle>
+          <CardTitle as="h2">Target bulanan per sales</CardTitle>
           <CardDescription>
             Setiap bulan tahun {CURRENT_YEAR} bisa punya nilai berbeda. Total
             tim otomatis mengikuti perubahan.
@@ -1616,7 +1616,7 @@ function OrgTab({ canEdit }: { canEdit: boolean }) {
     <div className="space-y-4">
       <Card>
         <CardHeader>
-          <CardTitle>Organisasi &amp; Periode</CardTitle>
+          <CardTitle as="h2">Organisasi &amp; Periode</CardTitle>
           <CardDescription>
             Konfigurasi tingkat perusahaan yang dipakai lintas modul.
           </CardDescription>
@@ -1731,7 +1731,7 @@ function OrgTab({ canEdit }: { canEdit: boolean }) {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+          <CardTitle as="h2" className="flex items-center gap-2">
             <CalendarDays className="h-5 w-5 text-primary" />
             Kalender Hari Libur
           </CardTitle>
@@ -1942,7 +1942,7 @@ function OrgTab({ canEdit }: { canEdit: boolean }) {
 
       <Card>
         <CardHeader>
-          <CardTitle>Katalog referensi</CardTitle>
+          <CardTitle as="h2">Katalog referensi</CardTitle>
           <CardDescription>
             Daftar sumber lead dan stage pipeline yang dipakai sistem. Read-only
             pada prototype ini.

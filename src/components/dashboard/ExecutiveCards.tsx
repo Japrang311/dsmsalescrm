@@ -82,7 +82,10 @@ export function TopCustomersCard() {
   return (
     <Card className="border-border shadow-none">
       <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-sm font-semibold text-foreground">
+        <CardTitle
+          as="h2"
+          className="flex items-center gap-2 text-sm font-semibold text-foreground"
+        >
           <Trophy className="h-4 w-4 text-warning" />
           Top 5 Customers YTD
         </CardTitle>
@@ -132,7 +135,7 @@ export function QuotationFunnelCard() {
   return (
     <Card className="border-border shadow-none">
       <CardHeader className="pb-3">
-        <CardTitle className="text-sm font-semibold text-foreground">
+        <CardTitle as="h2" className="text-sm font-semibold text-foreground">
           Quotation Funnel
         </CardTitle>
       </CardHeader>
@@ -176,7 +179,10 @@ export function RiskAlertsCard() {
   return (
     <Card className="border-border shadow-none">
       <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-sm font-semibold text-foreground">
+        <CardTitle
+          as="h2"
+          className="flex items-center gap-2 text-sm font-semibold text-foreground"
+        >
           <AlertTriangle className="h-4 w-4 text-destructive" />
           Risk Alerts
         </CardTitle>

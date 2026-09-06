@@ -57,7 +57,9 @@ function LoginPage() {
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Internal workspace
               </p>
-              <CardTitle className="mt-1 leading-tight">DSM Sales</CardTitle>
+              <CardTitle as="h1" className="mt-1 leading-tight">
+                DSM Sales
+              </CardTitle>
             </div>
           </div>
           <CardDescription>
