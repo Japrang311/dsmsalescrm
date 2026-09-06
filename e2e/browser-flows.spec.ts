@@ -27,9 +27,12 @@ test("login protects the app and dashboard export downloads a CSV", async ({
   ).toBeVisible();
 
   const downloadPromise = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Export CSV" }).click();
+  await page.getByRole("button", { name: "Export", exact: true }).click();
+  // "Monthly revenue vs target" appears once under the CSV heading and again
+  // under Excel; the CSV entry is first in the menu.
   await page
     .getByRole("menuitem", { name: "Monthly revenue vs target" })
+    .first()
     .click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toMatch(/\.csv$/);

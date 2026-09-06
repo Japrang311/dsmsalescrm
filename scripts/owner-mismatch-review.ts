@@ -104,11 +104,14 @@ function numericAmount(value: OwnerMismatchRow["amount"]): number {
 }
 
 function formatRupiah(value: OwnerMismatchRow["amount"]): string {
-  return new Intl.NumberFormat("id-ID", {
-    style: "currency",
-    currency: "IDR",
+  // Deliberately not `style: "currency"`: ICU inserts a space (U+00A0 or
+  // U+202F) between "Rp" and the digits, and which one — or none — depends
+  // on the runner's ICU build, so the currency form isn't reproducible
+  // across machines. Decimal grouping for id-ID is stable ("."), so build
+  // the "Rp" prefix ourselves.
+  return `Rp${new Intl.NumberFormat("id-ID", {
     maximumFractionDigits: 0,
-  }).format(numericAmount(value));
+  }).format(numericAmount(value))}`;
 }
 
 function escapeCell(value: string | number | null): string {
