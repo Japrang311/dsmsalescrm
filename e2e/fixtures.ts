@@ -29,13 +29,21 @@ export async function signIn(
   await page.goto("/login");
   const emailInput = page.getByLabel("Email");
   const passwordInput = page.getByLabel("Password");
+  const submit = page.getByRole("button", { name: "Sign in" });
   await expect(emailInput).toBeVisible();
-  await emailInput.fill(email);
-  await expect(emailInput).toHaveValue(email);
-  await passwordInput.fill(password);
-  await expect(passwordInput).toHaveValue(password);
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page).toHaveURL(/\/dashboard$/);
+
+  // `vite preview` serves the built bundle, so on the first navigation of a
+  // run Playwright can click "Sign in" before React has hydrated the form's
+  // onSubmit handler. The browser then does a native GET submit to
+  // `/login?`, reloads, and the click is lost — deterministically failing
+  // whichever test runs first. Retry the fill+submit until the SPA
+  // navigation to the dashboard actually lands.
+  await expect(async () => {
+    await emailInput.fill(email);
+    await passwordInput.fill(password);
+    await submit.click();
+    await expect(page).toHaveURL(/\/dashboard$/, { timeout: 7_000 });
+  }).toPass({ timeout: 30_000 });
 }
 
 export function collectConsoleIssues(page: Page) {
