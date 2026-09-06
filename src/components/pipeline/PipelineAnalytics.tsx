@@ -4,7 +4,10 @@ import { formatRupiahShort } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { COMMERCIAL_STAGES } from "@/lib/data/commercial-stages";
 import { EmptyState } from "@/components/ui/empty-state";
-import type { PipelineMetrics } from "@/lib/data/pipeline-metrics";
+import type {
+  PipelineMetrics,
+  PipelineOwnerMetrics,
+} from "@/lib/data/pipeline-metrics";
 
 const ALL_STAGES = COMMERCIAL_STAGES;
 
@@ -18,10 +21,12 @@ function pct(part: number, whole: number): number {
 
 export function PipelineAnalytics({
   metrics,
+  ownerMetrics,
   showOwners,
   scopeLabel,
 }: {
   metrics: PipelineMetrics;
+  ownerMetrics: PipelineOwnerMetrics[];
   showOwners: boolean;
   scopeLabel?: string;
 }) {
@@ -52,25 +57,10 @@ export function PipelineAnalytics({
 
   const maxStageValue = Math.max(1, ...byStage.map((s) => s.value));
 
-  // Owner performance breakdown — client-side from loaded items for v1.
-  // The aggregate RPC provides stage-level totals; per-owner granularity
-  // requires either an RPC extension or a separate per-owner query.
-  // For now we render an empty state when no items are loaded.
-  const byOwner = useMemo(() => {
-    return [] as {
-      ownerId: string;
-      name: string;
-      total: number;
-      won: number;
-      lost: number;
-      openCount: number;
-      wonCount: number;
-      lostCount: number;
-      winRate: number;
-    }[];
-  }, []);
-
-  const maxOwnerValue = Math.max(1, ...byOwner.map((o) => o.total));
+  // Owner performance breakdown comes from the pipeline_owner_metrics RPC
+  // (whole pipeline, RLS-scoped), not the paginated board slice.
+  const byOwner = ownerMetrics;
+  const maxOwnerValue = Math.max(1, ...byOwner.map((o) => o.totalValue));
 
   return (
     <div className="flex flex-col gap-3">
@@ -184,7 +174,7 @@ export function PipelineAnalytics({
               </span>
             </div>
             {byOwner.length === 0 ? (
-              <EmptyState description="Belum ada data owner." />
+              <EmptyState description="Belum ada commercial item yang cocok dengan filter." />
             ) : (
               <div className="flex flex-col gap-1.5">
                 {byOwner.map((o) => (
@@ -195,17 +185,17 @@ export function PipelineAnalytics({
                     <div className="min-w-0">
                       <div className="flex items-center justify-between gap-2">
                         <p className="truncate text-[12px] font-medium text-foreground">
-                          {o.name}
+                          {o.ownerName}
                         </p>
                         <p className="text-[11px] tabular-nums text-muted-foreground">
-                          {formatRupiahShort(o.total)}
+                          {formatRupiahShort(o.totalValue)}
                         </p>
                       </div>
                       <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-border/60">
                         <div
                           className="h-full rounded-full bg-primary transition-all"
                           style={{
-                            width: `${(o.total / maxOwnerValue) * 100}%`,
+                            width: `${(o.totalValue / maxOwnerValue) * 100}%`,
                           }}
                         />
                       </div>

@@ -91,3 +91,57 @@ export async function getPipelineMetrics(
 
   return { stages, totals };
 }
+
+export type PipelineOwnerMetrics = {
+  ownerId: string;
+  ownerName: string;
+  totalValue: number;
+  openValue: number;
+  wonValue: number;
+  lostValue: number;
+  openCount: number;
+  wonCount: number;
+  lostCount: number;
+  winRate: number;
+};
+
+type PipelineOwnerMetricsRow = {
+  owner_id: string;
+  owner_name: string;
+  total_value: string;
+  open_value: string;
+  won_value: string;
+  lost_value: string;
+  open_count: string;
+  won_count: string;
+  lost_count: string;
+};
+
+export async function getPipelineOwnerMetrics(
+  filters?: PipelineMetricsFilters,
+): Promise<PipelineOwnerMetrics[]> {
+  const { data, error } = await supabase.rpc("pipeline_owner_metrics", {
+    p_owner_id: filters?.ownerId ?? null,
+    p_client_status: filters?.clientStatus ?? null,
+  });
+  if (error) throw error;
+
+  const rows = (data ?? []) as PipelineOwnerMetricsRow[];
+  return rows.map((row) => {
+    const wonCount = Number(row.won_count);
+    const lostCount = Number(row.lost_count);
+    const decided = wonCount + lostCount;
+    return {
+      ownerId: row.owner_id,
+      ownerName: row.owner_name,
+      totalValue: Number(row.total_value),
+      openValue: Number(row.open_value),
+      wonValue: Number(row.won_value),
+      lostValue: Number(row.lost_value),
+      openCount: Number(row.open_count),
+      wonCount,
+      lostCount,
+      winRate: decided > 0 ? (wonCount / decided) * 100 : 0,
+    };
+  });
+}

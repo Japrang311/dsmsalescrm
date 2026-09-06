@@ -29,7 +29,10 @@ import {
   transitionCommercialStage,
   type CommercialDocumentPageFilters,
 } from "@/lib/data/commercial-documents";
-import { getPipelineMetrics } from "@/lib/data/pipeline-metrics";
+import {
+  getPipelineMetrics,
+  getPipelineOwnerMetrics,
+} from "@/lib/data/pipeline-metrics";
 import {
   listClients,
   listOwners,
@@ -159,6 +162,26 @@ function PipelineBoardPage({ role }: { role: Role }) {
           import("@/lib/domain").ClientStatus | undefined,
       }),
     enabled: authReady,
+  });
+
+  // Per-owner aggregate for the "Performa per owner" panel — whole pipeline,
+  // RLS-scoped server-side. Only fetched when the panel is shown (role gate).
+  const { data: ownerMetrics = [] } = useQuery({
+    queryKey: [
+      "commercial-documents",
+      "aggregate-by-owner",
+      {
+        ownerId: filters.ownerId ?? null,
+        clientStatus: filters.clientStatus ?? null,
+      },
+    ],
+    queryFn: () =>
+      getPipelineOwnerMetrics({
+        ownerId: filters.ownerId,
+        clientStatus: filters.clientStatus as
+          import("@/lib/domain").ClientStatus | undefined,
+      }),
+    enabled: authReady && role !== "sales",
   });
 
   const { data: tasks = [] } = useQuery({
@@ -537,9 +560,12 @@ function PipelineBoardPage({ role }: { role: Role }) {
       {/* Analytics */}
       <PipelineAnalytics
         metrics={nextWindowFiltered ? visibleMetrics : metrics}
+        ownerMetrics={ownerMetrics}
         showOwners={role !== "sales"}
         scopeLabel={
-          nextWindowFiltered ? "Berdasarkan card yang ditampilkan" : undefined
+          nextWindowFiltered
+            ? "Angka per stage mengikuti card yang ditampilkan; performa per owner tetap dari seluruh pipeline."
+            : undefined
         }
       />
 
