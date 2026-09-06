@@ -214,7 +214,7 @@ test("manager can reassign client owner and see ownership audit after reload", a
   const ownershipRow = page.getByRole("button").filter({ hasText: note });
   await expect(ownershipRow).toContainText(clientName);
   await expect(ownershipRow).toContainText("Perubahan Owner");
-  await expect(ownershipRow).toContainText("Owner baru: Leli Al");
+  await expect(ownershipRow).toContainText("→ Leli Al");
   await expect(ownershipRow).not.toContainText("Perubahan Status Client");
 
   expectNoConsoleIssues(consoleIssues);
