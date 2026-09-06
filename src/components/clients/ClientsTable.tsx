@@ -212,7 +212,12 @@ export function ClientsTable({
                   <td className={cn(cellPad, "text-muted-foreground")}>
                     {r.ownerName}
                   </td>
-                  <td className={cn(cellPad, "text-right font-medium")}>
+                  <td
+                    className={cn(
+                      cellPad,
+                      "num text-right font-medium whitespace-nowrap",
+                    )}
+                  >
                     {r.spendingYtd > 0 ? (
                       formatRupiahShort(r.spendingYtd)
                     ) : (
@@ -220,12 +225,18 @@ export function ClientsTable({
                     )}
                   </td>
                   <td
-                    className={cn(cellPad, "text-right text-muted-foreground")}
+                    className={cn(
+                      cellPad,
+                      "num text-right whitespace-nowrap text-muted-foreground",
+                    )}
                   >
                     {r.ppn > 0 ? formatRupiahShort(r.ppn) : "—"}
                   </td>
                   <td
-                    className={cn(cellPad, "text-right text-muted-foreground")}
+                    className={cn(
+                      cellPad,
+                      "num text-right whitespace-nowrap text-muted-foreground",
+                    )}
                   >
                     {r.nonPpn > 0 ? formatRupiahShort(r.nonPpn) : "—"}
                   </td>

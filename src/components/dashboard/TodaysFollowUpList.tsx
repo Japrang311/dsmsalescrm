@@ -4,7 +4,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Phone, Mail, MessageSquare, MapPin, Users } from "lucide-react";
+import {
+  Phone,
+  Mail,
+  MessageSquare,
+  MapPin,
+  Users,
+  ArrowUpCircle,
+  AlarmClock,
+} from "lucide-react";
 
 import { todaysFollowUps } from "@/lib/data/dashboard-selectors";
 import { listActiveTasks } from "@/lib/data/tasks";
@@ -84,15 +92,17 @@ export function TodaysFollowUpList() {
                         {task.dueState === "Escalated" ? (
                           <Badge
                             variant="outline"
-                            className="border-destructive/40 bg-destructive/10 text-[10px] font-medium text-destructive"
+                            className="gap-1 border-warning/40 bg-warning/10 text-[10px] font-medium text-warning"
                           >
+                            <ArrowUpCircle className="h-3 w-3" />
                             Escalated
                           </Badge>
                         ) : task.dueState === "Overdue" ? (
                           <Badge
                             variant="outline"
-                            className="border-destructive/40 bg-destructive/10 text-[10px] font-medium text-destructive"
+                            className="gap-1 border-destructive/40 bg-destructive/10 text-[10px] font-medium text-destructive"
                           >
+                            <AlarmClock className="h-3 w-3" />
                             Overdue
                           </Badge>
                         ) : (

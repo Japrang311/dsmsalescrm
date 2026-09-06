@@ -256,9 +256,7 @@ function KpiTile({
         {icon}
         {label}
       </div>
-      <p className={cn("mt-1 text-lg font-semibold tabular-nums", toneClass)}>
-        {value}
-      </p>
+      <p className={cn("num mt-1 text-lg font-semibold", toneClass)}>{value}</p>
       {sub && <p className="text-[11px] text-muted-foreground">{sub}</p>}
     </div>
   );

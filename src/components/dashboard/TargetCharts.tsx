@@ -30,7 +30,11 @@ import {
 } from "@/lib/data/sales-orders-trend";
 import { useDashboardData } from "@/hooks/use-dashboard-data";
 import { useRole } from "@/context/role-context-core";
-import { formatPercent, formatRupiahShort } from "@/lib/format";
+import {
+  formatPercent,
+  formatRupiahAxis,
+  formatRupiahShort,
+} from "@/lib/format";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 const tooltipStyle = {
@@ -158,13 +162,15 @@ function useChartConfig() {
       fontSize: isMobile ? 10 : 11,
       fill: "var(--color-muted-foreground)",
     } as const,
-    yWidth: isMobile ? 56 : 70,
-    // Tighter left inset on mobile so more space goes to the plot area.
+    // Axis labels are compact single tokens ("28,5 M"); this gutter fits the
+    // widest one on a single line without stealing much plot area.
+    yWidth: isMobile ? 46 : 56,
+    // `top: 16` keeps the highest Y tick from clipping against the card edge.
     margin: {
-      top: 8,
+      top: 16,
       right: isMobile ? 4 : 8,
       bottom: 0,
-      left: isMobile ? 0 : -8,
+      left: isMobile ? 0 : -4,
     } as const,
     height: isMobile ? 240 : 260,
     legendStyle: { fontSize: isMobile ? 10 : 11, paddingTop: 4 },
@@ -259,9 +265,7 @@ export function YtdAchievementVsTargetChart({ role }: { role: Role }) {
               interval={cfg.isMobile ? 1 : 0}
             />
             <YAxis
-              tickFormatter={(v: number) =>
-                formatRupiahShort(v).replace("Rp", "")
-              }
+              tickFormatter={formatRupiahAxis}
               tickLine={false}
               axisLine={false}
               tick={cfg.axisTick}
@@ -370,9 +374,7 @@ export function MonthlyAchievementVsTargetChart({ role }: { role: Role }) {
               interval={cfg.isMobile ? 1 : 0}
             />
             <YAxis
-              tickFormatter={(v: number) =>
-                formatRupiahShort(v).replace("Rp", "")
-              }
+              tickFormatter={formatRupiahAxis}
               tickLine={false}
               axisLine={false}
               tick={cfg.axisTick}
@@ -499,9 +501,7 @@ export function SingleSalesTargetChart() {
               interval={cfg.isMobile ? 1 : 0}
             />
             <YAxis
-              tickFormatter={(v: number) =>
-                formatRupiahShort(v).replace("Rp", "")
-              }
+              tickFormatter={formatRupiahAxis}
               tickLine={false}
               axisLine={false}
               tick={cfg.axisTick}
@@ -606,9 +606,7 @@ export function TargetAllSalesChart() {
               height={cfg.isMobile ? 52 : 24}
             />
             <YAxis
-              tickFormatter={(v: number) =>
-                formatRupiahShort(v).replace("Rp", "")
-              }
+              tickFormatter={formatRupiahAxis}
               tickLine={false}
               axisLine={false}
               tick={cfg.axisTick}

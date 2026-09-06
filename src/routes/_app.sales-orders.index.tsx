@@ -500,7 +500,7 @@ function SalesOrdersRevenuePage() {
                               }
                         }
                       >
-                        <TableCell className="font-mono text-xs">
+                        <TableCell className="whitespace-nowrap font-mono text-xs">
                           {so.soNumber}
                         </TableCell>
                         <TableCell className="whitespace-nowrap text-xs">

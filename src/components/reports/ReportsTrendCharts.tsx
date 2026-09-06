@@ -12,7 +12,7 @@ import {
   YAxis,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatRupiahShort } from "@/lib/format";
+import { formatRupiahAxis, formatRupiahShort } from "@/lib/format";
 import { CURRENT_YEAR } from "@/lib/domain";
 import { ChartEmpty } from "./ReportPrimitives";
 import { CHART_COLORS } from "./chart-colors";
@@ -61,7 +61,7 @@ export function ReportsTrendCharts({
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart
                   data={cumulativeTrend}
-                  margin={{ top: 8, right: 16, left: 0, bottom: 4 }}
+                  margin={{ top: 16, right: 16, left: 0, bottom: 4 }}
                 >
                   <CartesianGrid
                     strokeDasharray="3 3"
@@ -70,9 +70,9 @@ export function ReportsTrendCharts({
                   />
                   <XAxis dataKey="month" tick={{ fontSize: 11 }} />
                   <YAxis
-                    tickFormatter={(v) => formatRupiahShort(v)}
+                    tickFormatter={formatRupiahAxis}
                     tick={{ fontSize: 10 }}
-                    width={70}
+                    width={54}
                   />
                   <Tooltip formatter={(v: number) => formatRupiahShort(v)} />
                   <Legend wrapperStyle={{ fontSize: 11 }} />
@@ -129,7 +129,7 @@ export function ReportsTrendCharts({
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
                   data={monthlyTrend}
-                  margin={{ top: 8, right: 16, left: 0, bottom: 4 }}
+                  margin={{ top: 16, right: 16, left: 0, bottom: 4 }}
                 >
                   <CartesianGrid
                     strokeDasharray="3 3"
@@ -138,9 +138,9 @@ export function ReportsTrendCharts({
                   />
                   <XAxis dataKey="month" tick={{ fontSize: 11 }} />
                   <YAxis
-                    tickFormatter={(v) => formatRupiahShort(v)}
+                    tickFormatter={formatRupiahAxis}
                     tick={{ fontSize: 10 }}
-                    width={70}
+                    width={54}
                   />
                   <Tooltip formatter={(v: number) => formatRupiahShort(v)} />
                   <Legend wrapperStyle={{ fontSize: 11 }} />

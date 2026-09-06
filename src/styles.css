@@ -197,4 +197,8 @@
 @utility num {
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
+  /* Currency/metric values must never break mid-number ("Rp118,54 milyar"
+     splitting across two lines). Surrounding sentence text is not .num, so
+     it still wraps between words. */
+  white-space: nowrap;
 }

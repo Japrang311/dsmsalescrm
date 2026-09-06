@@ -445,9 +445,9 @@ function DashboardPage() {
               Target <span className="num">{formatRupiahShort(yearlyTgt)}</span>{" "}
               · Variance{" "}
               <span
-                className={
+                className={`num ${
                   ytd - yearlyTgt >= 0 ? "text-success" : "text-destructive"
-                }
+                }`}
               >
                 {formatRupiahShort(ytd - yearlyTgt)}
               </span>
