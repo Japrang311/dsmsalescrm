@@ -3,7 +3,7 @@ import { FileText } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { formatDateShort } from "@/lib/format";
+import { formatDateShort, formatDateTime } from "@/lib/format";
 import { ROLE_LABEL } from "@/context/role-context-core";
 import type { CommercialItem, Task } from "@/lib/domain";
 import type { CommercialItemHistoryEntry } from "@/lib/data/activity-log";
@@ -176,12 +176,7 @@ export function CommercialDetailSidebar({
                     <span>
                       {h.actorName} · {ROLE_LABEL[h.actorRole]}
                     </span>
-                    <span className="tabular-nums">
-                      {new Date(h.at).toLocaleString("id-ID", {
-                        dateStyle: "short",
-                        timeStyle: "short",
-                      })}
-                    </span>
+                    <span className="tabular-nums">{formatDateTime(h.at)}</span>
                   </div>
                   <div className="mt-1 flex items-start gap-1 text-[11px]">
                     <FileText className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground" />

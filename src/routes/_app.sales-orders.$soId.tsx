@@ -59,6 +59,7 @@ import {
 } from "@/lib/data/activity-log";
 import {
   formatDateShort,
+  formatDateTime,
   formatRupiahFull,
   formatRupiahShort,
 } from "@/lib/format";
@@ -352,7 +353,7 @@ function SalesOrderDetail() {
                       {a.to}
                     </Badge>
                     <span className="ml-auto text-[11px] text-muted-foreground">
-                      {new Date(a.at).toLocaleString("id-ID")}
+                      {formatDateTime(a.at)}
                     </span>
                   </div>
                   <div className="text-[11px] text-muted-foreground">

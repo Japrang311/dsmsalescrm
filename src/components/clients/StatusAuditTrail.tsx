@@ -5,17 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/clients/StatusBadges";
 import { listClientStatusHistory } from "@/lib/data/activity-log";
 import { ROLE_LABEL } from "@/context/role-context-core";
-
-function formatWhen(iso: string) {
-  const d = new Date(iso);
-  return d.toLocaleString("id-ID", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
+import { formatDateTime } from "@/lib/format";
 
 export function StatusAuditTrail({ clientId }: { clientId: string }) {
   const { data } = useQuery({
@@ -78,7 +68,7 @@ export function StatusAuditTrail({ clientId }: { clientId: string }) {
                     </span>
                     <span>{ROLE_LABEL[entry.byRole]}</span>
                     <span>·</span>
-                    <span>{formatWhen(entry.at)}</span>
+                    <span>{formatDateTime(entry.at)}</span>
                   </div>
                   {entry.note && (
                     <p className="rounded-md border border-border bg-muted/40 px-2 py-1.5 text-xs text-foreground">

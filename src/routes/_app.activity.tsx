@@ -66,6 +66,7 @@ import {
 } from "@/lib/data/activity-feed-page";
 import { listQueryKey, serializeListFilters } from "@/lib/pagination-contracts";
 import { toLocalIsoDate } from "@/lib/domain";
+import { formatDateShort } from "@/lib/format";
 
 export const Route = createFileRoute("/_app/activity")({
   head: () => ({
@@ -314,8 +315,8 @@ function ActivityPage() {
   const rangeLabel = useMemo(() => {
     if (rangePreset === "all") return "Semua waktu";
     if (rangePreset === "custom") {
-      const f = customRange.from.toLocaleDateString("id-ID");
-      const t = customRange.to.toLocaleDateString("id-ID");
+      const f = formatDateShort(customRange.from);
+      const t = formatDateShort(customRange.to);
       return `${f} – ${t}`;
     }
     return `${rangePreset} hari terakhir`;
@@ -504,8 +505,8 @@ function ActivityPage() {
             {totalCount} aktivitas
             {activeRange && (
               <span className="ml-2 text-xs">
-                · {activeRange.from.toLocaleDateString("id-ID")} —{" "}
-                {activeRange.to.toLocaleDateString("id-ID")}
+                · {formatDateShort(activeRange.from)} —{" "}
+                {formatDateShort(activeRange.to)}
               </span>
             )}
           </div>

@@ -30,9 +30,18 @@ function formatDecimal(v: number, digits: number): string {
   return s.replace(/\.?0+$/, "").replace(".", ",");
 }
 
+// `v` is a fraction (0.357 -> "36%"). id-ID uses a comma decimal separator,
+// so keep percentages consistent with the Rupiah formatters ("Rp1,5 juta").
 export function formatPercent(v: number, digits = 0): string {
   if (!Number.isFinite(v)) return "0%";
-  return `${(v * 100).toFixed(digits)}%`;
+  return `${(v * 100).toFixed(digits).replace(".", ",")}%`;
+}
+
+// Same output as formatPercent but for values already on a 0–100 scale
+// (e.g. a win-rate computed as wonCount / decided * 100).
+export function formatPercentValue(v: number, digits = 0): string {
+  if (!Number.isFinite(v)) return "0%";
+  return `${v.toFixed(digits).replace(".", ",")}%`;
 }
 
 export function formatCompactNumber(v: number): string {
@@ -49,12 +58,12 @@ export function formatRupiahAxis(value: number): string {
     return `${sign}${formatDecimal(abs / 1_000_000_000, 1)} M`;
   }
   if (abs >= 1_000_000) {
-    return `${sign}${formatDecimal(abs / 1_000_000, 0)} jt`;
+    return `${sign}${Math.round(abs / 1_000_000)} jt`;
   }
   if (abs >= 1_000) {
-    return `${sign}${(abs / 1_000).toFixed(0)} rb`;
+    return `${sign}${Math.round(abs / 1_000)} rb`;
   }
-  return `${sign}${abs}`;
+  return `${sign}${Math.round(abs)}`;
 }
 
 export function formatDateShort(d: Date | string): string {
@@ -63,6 +72,19 @@ export function formatDateShort(d: Date | string): string {
     day: "2-digit",
     month: "short",
     year: "numeric",
+  });
+}
+
+// "08 Agu 2026, 17.04" — the single date+time format for audit trails and
+// activity timestamps.
+export function formatDateTime(d: Date | string): string {
+  const date = typeof d === "string" ? new Date(d) : d;
+  return date.toLocaleString("id-ID", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
   });
 }
 
