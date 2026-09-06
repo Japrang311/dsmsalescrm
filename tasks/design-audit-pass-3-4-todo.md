@@ -228,21 +228,20 @@ Ini keputusan layout, bukan bug. **Lewati brainstorming dulu** — gunakan skill
 `superpowers:brainstorming` atau diskusi eksplisit dengan user untuk memutuskan
 pertanyaan terbuka di bawah sebelum menulis kode.
 
-### Pertanyaan terbuka (harus dijawab user sebelum implementasi)
+### Keputusan user (2026-09-06)
 
-1. **Angka inti Dashboard itu apa?** Kandidat: Achievement YTD vs target,
-   Monthly achievement, Total Revenue YTD. Pilih 1–2 untuk diangkat jadi
-   "hero band".
-2. **Chart bulanan mana yang benar-benar dipakai?** Tiga chart menunjukkan
-   progresi yang mirip. Gabung jadi satu (dengan toggle YTD/monthly), atau
-   simpan yang mana?
-3. **Follow-up list + Sales Performance table** — tetap di Dashboard, atau
-   cukup ringkasan + link ke Tasks / Reports?
-4. **Peran Dashboard vs Reports** — Dashboard = "hari ini, cepat", Reports =
-   "analisis mendalam". Mana yang duplikat dan bisa dipindah seluruhnya ke
-   Reports?
-5. **Scope Sales Manager vs Sales** — apakah layout sama untuk kedua role atau
-   berbeda?
+1. **Hero band = 3 tile:** Achievement YTD vs target · Monthly achievement ·
+   Waiting PO value. Diangkat besar di atas; sisanya jadi row stat ringkas.
+2. **Chart bulanan digabung jadi 1** dengan toggle **Kumulatif / Per-bulan**
+   (menggantikan `YtdAchievementVsTargetChart` + `MonthlyAchievementVsTargetChart`
+   + `RevenueTrendChart`). `TargetAllSalesChart` (per-sales) → pindah ke Reports.
+3. **Follow-Up Prioritas + Sales Performance table → ringkas:** 3–5 baris teratas
+   + tombol "Lihat semua" ke `/tasks` resp. `/reports`.
+4. **Dashboard = cepat, Reports = dalam.** Chart analitis (funnel, forecast,
+   per-sales, top customers, risk alerts) hidup di Reports; Dashboard menyimpan
+   hero + row stat sekunder + 1 chart tren + ringkasan follow-up.
+5. **Scope Sales Manager vs Sales:** layout sama, data tetap role-filtered
+   (default — tidak dibahas terpisah).
 
 ### Acceptance criteria (setelah pertanyaan dijawab)
 

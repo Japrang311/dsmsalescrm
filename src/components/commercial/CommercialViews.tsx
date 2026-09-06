@@ -243,18 +243,19 @@ export function CommercialViews(props: CommercialViewsProps) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-        <div>
+      <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+        <div className="min-w-0">
           <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
             {props.icon}
             {props.title}
           </h1>
           <p className="text-sm text-muted-foreground">
             {filtered.length} dokumen {deletedMode ? "terhapus" : "aktif"} ·
-            Total estimasi {formatRupiahShort(totalValue)}
+            Total estimasi{" "}
+            <span className="num">{formatRupiahShort(totalValue)}</span>
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           {canShowDeletedMode(role) && (
             <label className="flex items-center gap-2 rounded-md border bg-card px-2.5 py-1.5 text-xs font-medium">
               <Switch

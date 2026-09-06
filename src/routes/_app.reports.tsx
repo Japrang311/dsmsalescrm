@@ -479,14 +479,15 @@ function ReportsPage() {
     }
   };
 
+  // Only the filters that are actually narrowing the report — the range and
+  // "Semua …" defaults are already visible in the filter bar right above.
   const filterContext = [
-    `Rentang: ${formatDateShort(filters.range.from)} – ${formatDateShort(filters.range.to)}`,
     filters.ownerId !== "all"
       ? `Sales: ${owners[filters.ownerId]?.name ?? "-"}`
-      : "Semua sales",
+      : null,
     filters.clientId !== "all"
       ? `Klien: ${clients[filters.clientId]?.name ?? "-"}`
-      : "Semua klien",
+      : null,
     filters.source !== "all" ? `Source: ${filters.source}` : null,
     filters.taxType !== "all" ? `Pajak: ${filters.taxType}` : null,
     filters.soType !== "all" ? `Tipe: ${filters.soType}` : null,
@@ -558,13 +559,19 @@ function ReportsPage() {
         salesTeam={salesTeam}
       />
 
-      <div className="flex flex-wrap gap-1.5 text-[11px] text-muted-foreground">
-        {filterContext.map((f) => (
-          <Badge key={f as string} variant="secondary" className="font-normal">
-            {f}
-          </Badge>
-        ))}
-      </div>
+      {filterContext.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 text-[11px] text-muted-foreground">
+          {filterContext.map((f) => (
+            <Badge
+              key={f as string}
+              variant="secondary"
+              className="font-normal"
+            >
+              {f}
+            </Badge>
+          ))}
+        </div>
+      )}
 
       {/* KPI cards */}
       <ReportsKpiCards

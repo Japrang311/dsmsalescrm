@@ -72,7 +72,7 @@ import {
   settingsActions,
   type UserPreferences,
 } from "@/lib/preferences-store";
-import { formatRupiahShort } from "@/lib/format";
+import { formatDateTime, formatRupiahShort } from "@/lib/format";
 import { listSalesTeamProfiles } from "@/lib/data/clients";
 import {
   listTargets,
@@ -346,39 +346,6 @@ function ProfileTab({
                 <SelectItem value="WIB">WIB (UTC+7)</SelectItem>
                 <SelectItem value="WITA">WITA (UTC+8)</SelectItem>
                 <SelectItem value="WIT">WIT (UTC+9)</SelectItem>
-              </SelectContent>
-            </Select>
-          </Field>
-          <Field label="Format tanggal">
-            <Select
-              value={form.dateFormat}
-              onValueChange={(v: UserPreferences["dateFormat"]) =>
-                setForm({ ...form, dateFormat: v })
-              }
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="dd/MM/yyyy">17/07/2026</SelectItem>
-                <SelectItem value="yyyy-MM-dd">2026-07-17</SelectItem>
-                <SelectItem value="dd MMM yyyy">17 Jul 2026</SelectItem>
-              </SelectContent>
-            </Select>
-          </Field>
-          <Field label="Format mata uang">
-            <Select
-              value={form.currencyFormat}
-              onValueChange={(v: UserPreferences["currencyFormat"]) =>
-                setForm({ ...form, currencyFormat: v })
-              }
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="compact">Ringkas (Rp 1,4 M)</SelectItem>
-                <SelectItem value="full">Penuh (Rp 1.400.000.000)</SelectItem>
               </SelectContent>
             </Select>
           </Field>
@@ -740,9 +707,9 @@ function TeamTab({
                               {m.lastAdministrativeChange.reason ?? "—"}
                             </p>
                             <p>
-                              {new Date(
+                              {formatDateTime(
                                 m.lastAdministrativeChange.createdAt,
-                              ).toLocaleString("id-ID")}
+                              )}
                             </p>
                           </div>
                         ) : (

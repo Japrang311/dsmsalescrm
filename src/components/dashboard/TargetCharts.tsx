@@ -220,10 +220,10 @@ export function YtdAchievementVsTargetChart({ role }: { role: Role }) {
               as="h2"
               className="text-sm font-semibold text-foreground"
             >
-              Achievement YTD vs Yearly Target
+              Akumulasi capaian per bulan
             </CardTitle>
             <p className="text-xs text-muted-foreground">
-              Akumulasi bulanan —{" "}
+              Kumulatif vs target tahunan —{" "}
               {role === "manager" ? "seluruh tim sales" : "level perusahaan"}.
             </p>
           </div>

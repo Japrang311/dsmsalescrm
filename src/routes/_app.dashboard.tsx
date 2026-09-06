@@ -427,8 +427,6 @@ function DashboardPage() {
         </div>
       </div>
 
-      <AiSummaryCard />
-
       <CalendarIncompleteWarning tasks={allTasks} metrics={taskMetrics} />
 
       {/* KPI row */}
@@ -644,6 +642,10 @@ function DashboardPage() {
           }
         />
       </section>
+
+      {/* AI summary sits below the metrics it summarises — until generated it's
+          just a prompt, so it shouldn't push the numbers down. */}
+      <AiSummaryCard />
 
       {/* Sales-only: single-sales target chart */}
       {role === "sales" ? <SingleSalesTargetChart /> : null}

@@ -1,4 +1,4 @@
-import { formatDateShort } from "@/lib/format";
+import { formatDateShort, formatPercentValue } from "@/lib/format";
 import type { AnalyticsCoverage } from "@/lib/data/stage4-analytics";
 
 // Stage 4 spec 7.3/7.5: every affected metric displays its
@@ -15,7 +15,7 @@ export function CoverageNote({
   const pct = total > 0 ? (coverage.includedCount / total) * 100 : 100;
   return (
     <p className="mt-0.5 text-[10px] text-muted-foreground">
-      Cakupan: {coverage.includedCount}/{total} ({pct.toFixed(0)}%)
+      Cakupan: {coverage.includedCount}/{total} ({formatPercentValue(pct, 0)})
       {coverage.effectiveFrom
         ? ` · efektif sejak ${formatDateShort(coverage.effectiveFrom)}`
         : ""}

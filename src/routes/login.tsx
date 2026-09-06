@@ -42,8 +42,8 @@ function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-surface-muted px-4 py-8">
-      <Card className="w-full max-w-sm border-border shadow-sm">
+    <div className="flex min-h-screen justify-center bg-surface-muted px-4 pb-8 pt-[15vh] sm:items-center sm:pt-8">
+      <Card className="h-fit w-full max-w-sm border-border shadow-sm">
         <CardHeader className="space-y-4">
           <div className="flex items-center gap-3">
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-border-strong bg-card p-1.5">

@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { BarChart3 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { formatPercent, formatRupiahShort } from "@/lib/format";
 
 export function KpiTile({
@@ -15,10 +16,15 @@ export function KpiTile({
   label: string;
   value: string;
   sub?: string;
+  // Marks the primary metric of the group. A top accent rule, not a full
+  // blue border — the latter reads as a focused/selected state on a card
+  // that isn't interactive.
   accent?: boolean;
 }) {
   return (
-    <Card className={accent ? "border-primary/40 bg-primary/[0.03]" : ""}>
+    <Card
+      className={cn("overflow-hidden", accent && "border-t-2 border-t-primary")}
+    >
       <CardContent className="p-3.5">
         <div className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
           {icon}

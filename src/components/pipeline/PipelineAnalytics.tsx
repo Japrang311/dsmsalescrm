@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { TrendingUp, Target, Percent, Wallet } from "lucide-react";
-import { formatRupiahShort } from "@/lib/format";
+import { formatPercentValue, formatRupiahShort } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { COMMERCIAL_STAGES } from "@/lib/data/commercial-stages";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -94,7 +94,7 @@ export function PipelineAnalytics({
         <KpiTile
           icon={<Percent className="h-3.5 w-3.5" />}
           label="Win rate"
-          value={`${totals.winRate.toFixed(1)}%`}
+          value={formatPercentValue(totals.winRate, 1)}
           sub={`${totals.wonCount} won · ${totals.lostCount} lost`}
           tone={
             totals.wonCount + totals.lostCount === 0
@@ -154,7 +154,7 @@ export function PipelineAnalytics({
                     </div>
                   </div>
                   <span className="w-10 text-right text-[11px] tabular-nums text-muted-foreground">
-                    {s.share.toFixed(0)}%
+                    {formatPercentValue(s.share, 0)}
                   </span>
                 </div>
               );
@@ -216,7 +216,7 @@ export function PipelineAnalytics({
                     >
                       {o.wonCount + o.lostCount === 0
                         ? "—"
-                        : `${o.winRate.toFixed(0)}%`}
+                        : formatPercentValue(o.winRate, 0)}
                     </span>
                   </div>
                 ))}

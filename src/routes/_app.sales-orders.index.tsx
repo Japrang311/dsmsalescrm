@@ -307,7 +307,7 @@ function SalesOrdersRevenuePage() {
   return (
     <PageContainer size="wide">
       <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-        <div>
+        <div className="min-w-0">
           <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
             <Receipt className="h-5 w-5 text-primary" /> Sales Orders & Revenue
           </h1>
@@ -318,7 +318,7 @@ function SalesOrdersRevenuePage() {
               " · SO FOC ditampilkan sebagai Rp0 dan tidak masuk ke revenue."}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           {canShowDeletedMode(role) && (
             <label className="flex items-center gap-2 rounded-md border bg-card px-2.5 py-1.5 text-xs font-medium">
               <Switch
