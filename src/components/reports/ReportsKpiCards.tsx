@@ -24,7 +24,10 @@ export function ReportsKpiCards({
         icon={<Target className="h-4 w-4" />}
         label="Achievement YTD"
         value={formatRupiahShort(totals.revenue)}
-        sub={`${formatPercent(ytdAchievementPct)} dari target ${formatRupiahShort(yearTargetTotal)}`}
+        // yearTargetTotal is the target summed *through the current month*, not
+        // the full-year figure the Dashboard compares against — hence a
+        // different % for the same revenue. Say so.
+        sub={`${formatPercent(ytdAchievementPct)} dari target sampai bulan ini (${formatRupiahShort(yearTargetTotal)})`}
         accent
       />
       <KpiTile
