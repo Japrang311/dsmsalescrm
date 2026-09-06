@@ -398,7 +398,10 @@ function SalesOrdersRevenuePage() {
 
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+              <CardTitle
+                as="h2"
+                className="flex items-center gap-2 text-sm font-semibold"
+              >
                 <TrendingUp className="h-4 w-4 text-primary" /> Revenue by
                 Source
               </CardTitle>

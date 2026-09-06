@@ -29,7 +29,7 @@ export function StatusAuditTrail({ clientId }: { clientId: string }) {
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
         <div className="flex items-center gap-2">
           <History className="h-4 w-4 text-muted-foreground" />
-          <CardTitle className="text-sm font-semibold text-foreground">
+          <CardTitle as="h2" className="text-sm font-semibold text-foreground">
             Audit Trail Status
           </CardTitle>
         </div>

@@ -24,7 +24,10 @@ export function ReportsComplianceSection({
     <div className="grid gap-4 lg:grid-cols-3">
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+          <CardTitle
+            as="h2"
+            className="flex items-center gap-2 text-sm font-semibold"
+          >
             <ActivityIcon className="h-4 w-4 text-primary" /> Activity
             Compliance
           </CardTitle>
@@ -43,7 +46,10 @@ export function ReportsComplianceSection({
 
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+          <CardTitle
+            as="h2"
+            className="flex items-center gap-2 text-sm font-semibold"
+          >
             <FlaskConical className="h-4 w-4 text-primary" /> Prototype Report
           </CardTitle>
         </CardHeader>
@@ -77,7 +83,10 @@ export function ReportsComplianceSection({
 
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+          <CardTitle
+            as="h2"
+            className="flex items-center gap-2 text-sm font-semibold"
+          >
             <AlertTriangle className="h-4 w-4 text-amber-600" /> Risk Alerts
           </CardTitle>
         </CardHeader>

@@ -442,7 +442,9 @@ function ActivityPage() {
 
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Filter</CardTitle>
+          <CardTitle as="h2" className="text-base">
+            Filter
+          </CardTitle>
         </CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-3 lg:grid-cols-4">
           <Input

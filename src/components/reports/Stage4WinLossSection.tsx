@@ -30,7 +30,10 @@ export function Stage4WinLossSection({
     <div className="grid gap-4 lg:grid-cols-2">
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+          <CardTitle
+            as="h3"
+            className="flex items-center gap-2 text-sm font-semibold"
+          >
             <Trophy className="h-4 w-4 text-primary" /> Win/Loss Quotation
           </CardTitle>
           <CoverageNote coverage={winLossCoverage} />
@@ -71,7 +74,7 @@ export function Stage4WinLossSection({
 
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-semibold">
+          <CardTitle as="h3" className="text-sm font-semibold">
             Lost-Reason Breakdown
           </CardTitle>
           <CoverageNote coverage={lostReasonCoverage} />

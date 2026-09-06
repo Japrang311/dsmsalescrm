@@ -7,7 +7,10 @@ import {
   type RoleFixtureUsers,
 } from "../../../supabase/tests/helpers";
 import { supabase } from "@/lib/supabase";
-import { getPipelineMetrics } from "./pipeline-metrics";
+import {
+  getPipelineMetrics,
+  getPipelineOwnerMetrics,
+} from "./pipeline-metrics";
 
 let fixtures: RoleFixtureUsers;
 let clientId: string;
@@ -157,5 +160,49 @@ describe("getPipelineMetrics", () => {
     // Still sees their own seeded item (owner filter was forced back to
     // themselves), not zero and not the manager's data.
     expect(seeded?.itemCount).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe("getPipelineOwnerMetrics", () => {
+  test("a manager sees a per-owner row for the seeded document's owner", async () => {
+    const managerClient = await signInAs(fixtures.manager);
+    const managerSession = (await managerClient.auth.getSession()).data
+      .session!;
+    await supabase.auth.setSession({
+      access_token: managerSession.access_token,
+      refresh_token: managerSession.refresh_token,
+    });
+
+    const rows = await getPipelineOwnerMetrics();
+    const salesRow = rows.find((r) => r.ownerId === fixtures.sales.id);
+    expect(salesRow).toBeDefined();
+    expect(salesRow!.totalValue).toBeGreaterThanOrEqual(12_000);
+    expect(salesRow!.openCount).toBeGreaterThanOrEqual(1);
+    // Seeded document is in an open stage, so no decided deals yet.
+    expect(salesRow!.winRate).toBe(0);
+
+    // Filtering by another owner drops the seeded owner's row.
+    const other = await getPipelineOwnerMetrics({
+      ownerId: fixtures.executive.id,
+    });
+    expect(other.find((r) => r.ownerId === fixtures.sales.id)).toBeUndefined();
+
+    const salesClient = await signInAs(fixtures.sales);
+    const salesSession = (await salesClient.auth.getSession()).data.session!;
+    await supabase.auth.setSession({
+      access_token: salesSession.access_token,
+      refresh_token: salesSession.refresh_token,
+    });
+  });
+
+  // Same security-definer owner-scoping guarantee as pipeline_metrics().
+  test("a Sales caller is scoped to their own owner_id regardless of p_owner_id", async () => {
+    const rows = await getPipelineOwnerMetrics({
+      ownerId: fixtures.manager.id,
+    });
+    // Every returned row belongs to the caller, not the requested owner.
+    for (const row of rows) {
+      expect(row.ownerId).toBe(fixtures.sales.id);
+    }
   });
 });

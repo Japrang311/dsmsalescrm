@@ -46,7 +46,7 @@ export function TodaysFollowUpList() {
     <Card className="border-border shadow-none">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
         <div>
-          <CardTitle className="text-sm font-semibold text-foreground">
+          <CardTitle as="h2" className="text-sm font-semibold text-foreground">
             Follow-Up Prioritas Hari Ini
           </CardTitle>
           <p className="mt-0.5 text-xs text-muted-foreground">

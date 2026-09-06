@@ -432,7 +432,10 @@ function DashboardPage() {
       <CalendarIncompleteWarning tasks={allTasks} metrics={taskMetrics} />
 
       {/* KPI row */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <section
+        aria-label="Ringkasan pencapaian"
+        className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4"
+      >
         <KpiCard
           label="Achievement YTD vs Yearly Target"
           value={formatRupiahShort(ytd)}
@@ -532,10 +535,13 @@ function DashboardPage() {
             </>
           }
         />
-      </div>
+      </section>
 
       {/* Second row: revenue source + prototype + task counters */}
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <section
+        aria-label="Ringkasan operasional"
+        className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4"
+      >
         <KpiCard
           label="Revenue Source YTD"
           value={formatRupiahShort(
@@ -637,7 +643,7 @@ function DashboardPage() {
               : "Semua terkendali"
           }
         />
-      </div>
+      </section>
 
       {/* Sales-only: single-sales target chart */}
       {role === "sales" ? <SingleSalesTargetChart /> : null}

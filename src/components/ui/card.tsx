@@ -29,16 +29,22 @@ const CardHeader = React.forwardRef<
 ));
 CardHeader.displayName = "CardHeader";
 
-const CardTitle = React.forwardRef<
-  HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement>
->(({ className, ...props }, ref) => (
-  <div
-    ref={ref}
-    className={cn("font-semibold leading-none tracking-tight", className)}
-    {...props}
-  />
-));
+// Renders a <div> by default for backward compatibility. Pass `as="h2"` /
+// `as="h3"` (matching the surrounding page's heading hierarchy) so the card
+// title becomes a real landmark for screen-reader heading navigation.
+type CardTitleProps = React.HTMLAttributes<HTMLElement> & {
+  as?: "div" | "h1" | "h2" | "h3" | "h4" | "h5" | "h6";
+};
+
+const CardTitle = React.forwardRef<HTMLElement, CardTitleProps>(
+  ({ className, as: Component = "div", ...props }, ref) => (
+    <Component
+      ref={ref as never}
+      className={cn("font-semibold leading-none tracking-tight", className)}
+      {...props}
+    />
+  ),
+);
 CardTitle.displayName = "CardTitle";
 
 const CardDescription = React.forwardRef<
