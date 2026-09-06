@@ -112,7 +112,7 @@ export function ClientsTable({
   return (
     <div className="rounded-lg border bg-card">
       {/* Desktop table */}
-      <div className="hidden overflow-x-auto md:block">
+      <div className="scroll-x hidden md:block">
         <table className={cn("w-full border-collapse tabular-nums", textSize)}>
           <thead className="border-b bg-muted/40 text-left text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
             <tr>
@@ -193,11 +193,12 @@ export function ClientsTable({
                     }
                   }}
                 >
-                  <td className={cellPad}>
+                  <td className={cn(cellPad, "max-w-[15rem]")}>
                     <Link
                       to="/clients/$clientId"
                       params={{ clientId: r.client.id }}
-                      className="font-medium text-foreground hover:text-primary hover:underline"
+                      title={r.client.name}
+                      className="block truncate font-medium text-foreground hover:text-primary hover:underline"
                       onClick={(e) => e.stopPropagation()}
                     >
                       {r.client.name}
@@ -206,10 +207,20 @@ export function ClientsTable({
                   <td className={cellPad}>
                     <StatusBadge status={r.client.status} variant="inline" />
                   </td>
-                  <td className={cn(cellPad, "text-muted-foreground")}>
+                  <td
+                    className={cn(
+                      cellPad,
+                      "whitespace-nowrap text-muted-foreground",
+                    )}
+                  >
                     {r.client.source}
                   </td>
-                  <td className={cn(cellPad, "text-muted-foreground")}>
+                  <td
+                    className={cn(
+                      cellPad,
+                      "whitespace-nowrap text-muted-foreground",
+                    )}
+                  >
                     {r.ownerName}
                   </td>
                   <td

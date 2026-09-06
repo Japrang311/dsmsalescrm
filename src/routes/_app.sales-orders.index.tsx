@@ -439,7 +439,7 @@ function SalesOrdersRevenuePage() {
       ) : (
         <Card>
           <CardContent className="p-0">
-            <div className="overflow-x-auto">
+            <div className="scroll-x">
               <Table>
                 <TableHeader>
                   <TableRow>
