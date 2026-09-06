@@ -1,15 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import {
-  Activity,
-  AlertTriangle,
-  Boxes,
-  CheckCircle2,
   Clock,
   Download,
   FileSpreadsheet,
   FileText,
-  ListChecks,
   Target,
   Wallet,
 } from "lucide-react";
@@ -52,22 +47,8 @@ import { formatPercent, formatRupiahShort } from "@/lib/format";
 import { AiSummaryCard } from "@/components/dashboard/AiSummaryCard";
 import { KpiCard, KpiProgress } from "@/components/dashboard/KpiCard";
 import { TodaysFollowUpList } from "@/components/dashboard/TodaysFollowUpList";
-import { RevenueTrendChart } from "@/components/dashboard/RevenueTrendChart";
 import { SalesPerformanceTable } from "@/components/dashboard/SalesPerformanceTable";
-import { ActivityComplianceCard } from "@/components/dashboard/ActivityComplianceCard";
-import {
-  ForecastVsAchievementCard,
-  QuotationFunnelCard,
-  RiskAlertsCard,
-  TopCustomersCard,
-} from "@/components/dashboard/ExecutiveCards";
-import {
-  MonthlyAchievementVsTargetChart,
-  SingleSalesTargetChart,
-  TargetAllSalesChart,
-  YtdAchievementVsTargetChart,
-} from "@/components/dashboard/TargetCharts";
-import { Badge } from "@/components/ui/badge";
+import { AchievementTrendChart } from "@/components/dashboard/AchievementTrendChart";
 import {
   DateRangePicker,
   type PeriodRange,
@@ -244,6 +225,9 @@ function DashboardPage() {
     existing: ytdMetrics?.existingValue ?? 0,
     prototypePaid: ytdMetrics?.prototypePaidValue ?? 0,
   };
+  const srcTotal = src.newProduct + src.existing + src.prototypePaid;
+  const sourcePct = (value: number) =>
+    srcTotal > 0 ? `${Math.round((value / srcTotal) * 100)}%` : "0%";
   const proto = {
     paidValue: ytdMetrics?.prototypePaidValue ?? 0,
     focCount: ytdMetrics?.focCount ?? 0,
@@ -429,13 +413,14 @@ function DashboardPage() {
 
       <CalendarIncompleteWarning tasks={allTasks} metrics={taskMetrics} />
 
-      {/* KPI row */}
+      {/* Hero — the three numbers this page exists to answer */}
       <section
-        aria-label="Ringkasan pencapaian"
-        className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4"
+        aria-label="Metrik utama"
+        className="grid grid-cols-1 gap-3 md:grid-cols-3"
       >
         <KpiCard
-          label="Achievement YTD vs Yearly Target"
+          accent
+          label="Achievement YTD vs Target Setahun"
           value={formatRupiahShort(ytd)}
           right={<Target className="h-4 w-4 text-primary" />}
           sub={
@@ -467,12 +452,14 @@ function DashboardPage() {
         </KpiCard>
 
         <KpiCard
-          label={`Monthly Achievement · ${monthName}`}
+          accent
+          label={`Achievement ${monthName}`}
           value={formatRupiahShort(monthRev)}
           right={<Wallet className="h-4 w-4 text-primary" />}
           sub={
             <>
-              Target <span className="num">{formatRupiahShort(monthTgt)}</span>
+              Target bulan ini{" "}
+              <span className="num">{formatRupiahShort(monthTgt)}</span>
             </>
           }
         >
@@ -495,32 +482,7 @@ function DashboardPage() {
         </KpiCard>
 
         <KpiCard
-          label="Total Revenue YTD"
-          value={formatRupiahShort(tax.total)}
-          right={<FileText className="h-4 w-4 text-primary" />}
-          sub="PPN & Non-PPN gabungan"
-        >
-          <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
-            <div className="rounded-md border border-border bg-surface-muted px-2 py-1.5">
-              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                PPN
-              </div>
-              <div className="num text-sm font-semibold text-foreground">
-                {formatRupiahShort(tax.ppn)}
-              </div>
-            </div>
-            <div className="rounded-md border border-border bg-surface-muted px-2 py-1.5">
-              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                Non-PPN
-              </div>
-              <div className="num text-sm font-semibold text-foreground">
-                {formatRupiahShort(tax.nonPpn)}
-              </div>
-            </div>
-          </div>
-        </KpiCard>
-
-        <KpiCard
+          accent
           label="Waiting PO Value"
           value={formatRupiahShort(waitingPo)}
           right={<Clock className="h-4 w-4 text-warning" />}
@@ -529,85 +491,49 @@ function DashboardPage() {
               <span className="num font-medium text-foreground">
                 {activeCi}
               </span>{" "}
-              commercial items aktif
+              commercial items aktif di pipeline
             </>
           }
         />
       </section>
 
-      {/* Second row: revenue source + prototype + task counters */}
+      {/* Secondary stats — one compact line each */}
       <section
         aria-label="Ringkasan operasional"
-        className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4"
+        className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5"
       >
         <KpiCard
+          compact
+          label="Total Revenue YTD"
+          value={formatRupiahShort(tax.total)}
+          sub={
+            <>
+              PPN <span className="num">{formatRupiahShort(tax.ppn)}</span> ·
+              Non-PPN{" "}
+              <span className="num">{formatRupiahShort(tax.nonPpn)}</span>
+            </>
+          }
+        />
+        <KpiCard
+          compact
           label="Revenue Source YTD"
           value={formatRupiahShort(
             src.newProduct + src.existing + src.prototypePaid,
           )}
-          right={<Boxes className="h-4 w-4 text-primary" />}
-        >
-          <div className="mt-2 space-y-1.5 text-xs">
-            <SourceRow
-              label="New Product"
-              value={src.newProduct}
-              color="bg-primary"
-            />
-            <SourceRow
-              label="Existing / Repeat Order"
-              value={src.existing}
-              color="bg-success"
-            />
-            <SourceRow
-              label="Prototype Paid"
-              value={src.prototypePaid}
-              color="bg-warning"
-            />
-          </div>
-        </KpiCard>
-
+          sub={`New ${sourcePct(src.newProduct)} · Existing ${sourcePct(
+            src.existing,
+          )} · Proto ${sourcePct(src.prototypePaid)}`}
+        />
         <KpiCard
-          label="Prototype Summary"
+          compact
+          label="Prototype Paid YTD"
           value={formatRupiahShort(proto.paidValue)}
-          right={<CheckCircle2 className="h-4 w-4 text-primary" />}
-          sub="Prototype Paid contribution"
-        >
-          <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
-            <div className="rounded-md border border-border bg-surface-muted px-2 py-1.5">
-              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                Paid
-              </div>
-              <div className="num text-sm font-semibold text-foreground">
-                {proto.paidCount}
-              </div>
-            </div>
-            <div className="rounded-md border border-warning/30 bg-warning/5 px-2 py-1.5">
-              <div className="flex items-center justify-between">
-                <div className="text-[10px] uppercase tracking-wide text-warning">
-                  FOC
-                </div>
-                <Badge
-                  variant="outline"
-                  className="border-warning/40 bg-warning/10 text-[9px] text-warning"
-                >
-                  Rp0
-                </Badge>
-              </div>
-              <div className="num text-sm font-semibold text-foreground">
-                {proto.focCount}
-              </div>
-            </div>
-          </div>
-          <p className="mt-2 text-[11px] leading-snug text-muted-foreground">
-            FOC prototype tercatat sebagai support activity; nilai Rp0 dan tidak
-            menambah achievement.
-          </p>
-        </KpiCard>
-
+          sub={`${proto.paidCount} paid · ${proto.focCount} FOC (Rp0, tidak dihitung)`}
+        />
         <KpiCard
+          compact
           label="Open Tasks"
           value={tasks.open}
-          right={<ListChecks className="h-4 w-4 text-primary" />}
           sub={
             <>
               <span className="num font-medium text-foreground">
@@ -621,20 +547,11 @@ function DashboardPage() {
             </>
           }
         />
-
         <KpiCard
+          compact
           label="Overdue Follow-Ups"
           value={overdueAttention}
           tone={overdueAttention > 0 ? "destructive" : "default"}
-          right={
-            <AlertTriangle
-              className={
-                overdueAttention > 0
-                  ? "h-4 w-4 text-destructive"
-                  : "h-4 w-4 text-muted-foreground"
-              }
-            />
-          }
           sub={
             overdueAttention > 0
               ? `${tasks.escalated} escalated · ${tasks.overdue} overdue`
@@ -643,91 +560,15 @@ function DashboardPage() {
         />
       </section>
 
-      {/* AI summary sits below the metrics it summarises — until generated it's
-          just a prompt, so it shouldn't push the numbers down. */}
-      <AiSummaryCard />
+      <AchievementTrendChart role={role} />
 
-      {/* Sales-only: single-sales target chart */}
-      {role === "sales" ? <SingleSalesTargetChart /> : null}
-
-      {/* Manager & Executive: YTD cumulative + Monthly bar chart */}
-      {role !== "sales" ? (
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-          <YtdAchievementVsTargetChart role={role} />
-          <MonthlyAchievementVsTargetChart role={role} />
-        </div>
-      ) : null}
-
-      {/* Manager & Executive: Target ALL Sales */}
-      {role !== "sales" ? <TargetAllSalesChart /> : null}
-
-      {/* Main grid: trend + follow-ups (all roles) */}
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-        <div className="xl:col-span-2">
-          <RevenueTrendChart role={role} />
-        </div>
-        <div>
-          <TodaysFollowUpList />
-        </div>
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        <TodaysFollowUpList />
+        {role !== "sales" ? <SalesPerformanceTable /> : null}
       </div>
 
-      {/* Manager-specific */}
-      {role === "manager" ? (
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-          <div className="xl:col-span-2">
-            <SalesPerformanceTable />
-          </div>
-          <div>
-            <ActivityComplianceCard />
-          </div>
-        </div>
-      ) : null}
-
-      {/* Executive-specific (Super Admin sees the same read-only view) */}
-      {role === "executive" || role === "super_admin" ? (
-        <>
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-            <ForecastVsAchievementCard />
-            <div className="md:col-span-2">
-              <QuotationFunnelCard />
-            </div>
-          </div>
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-            <div className="xl:col-span-2">
-              <TopCustomersCard />
-            </div>
-            <div>
-              <RiskAlertsCard />
-            </div>
-          </div>
-          <p className="rounded-md border border-border bg-surface-muted px-3 py-2 text-xs text-muted-foreground">
-            <Activity className="mr-1.5 inline h-3.5 w-3.5 -translate-y-0.5" />
-            Read-only view · tidak ada aksi create, edit, archive, atau delete.
-          </p>
-        </>
-      ) : null}
+      {/* AI summary sits below the metrics it summarises. */}
+      <AiSummaryCard />
     </PageContainer>
-  );
-}
-
-function SourceRow({
-  label,
-  value,
-  color,
-}: {
-  label: string;
-  value: number;
-  color: string;
-}) {
-  return (
-    <div className="flex items-center gap-2">
-      <span className={`h-2 w-2 shrink-0 rounded-sm ${color}`} />
-      <span className="min-w-0 flex-1 truncate text-muted-foreground">
-        {label}
-      </span>
-      <span className="num shrink-0 font-medium text-foreground">
-        {formatRupiahShort(value)}
-      </span>
-    </div>
   );
 }

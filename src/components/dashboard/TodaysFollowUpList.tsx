@@ -42,12 +42,13 @@ export function TodaysFollowUpList() {
     queryFn: listActiveTasks,
     enabled: authReady,
   });
-  const rows = todaysFollowUps(
+  const allRows = todaysFollowUps(
     activeTasksQuery.data ?? [],
     clients,
     items,
     ownersById,
-  ).slice(0, 8);
+  );
+  const rows = allRows.slice(0, 5);
   const canCompleteTasks = role !== "executive";
 
   return (
@@ -58,11 +59,15 @@ export function TodaysFollowUpList() {
             Follow-Up Prioritas Hari Ini
           </CardTitle>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            {rows.length} aktivitas menunggu tindak lanjut
+            {allRows.length} aktivitas menunggu tindak lanjut
           </p>
         </div>
         <Button variant="outline" size="sm" className="h-8" asChild>
-          <Link to="/tasks">Lihat semua</Link>
+          <Link to="/tasks">
+            {allRows.length > rows.length
+              ? `Lihat semua (${allRows.length})`
+              : "Lihat semua"}
+          </Link>
         </Button>
       </CardHeader>
       <CardContent className="p-0">

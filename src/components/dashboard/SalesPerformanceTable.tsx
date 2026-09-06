@@ -1,5 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -31,23 +33,33 @@ export function SalesPerformanceTable() {
     queryFn: () => getSalesTaskClientMetrics(),
     enabled: authReady,
   });
-  const rows = salesPerformanceFromRpc(
+  const allRows = salesPerformanceFromRpc(
     ownerYtdQuery.data ?? [],
     taskClientQuery.data ?? [],
     salesTeam,
     targetsByMember,
   );
+  const rows = allRows.slice(0, 5);
 
   return (
     <Card className="border-border shadow-none">
-      <CardHeader className="pb-3">
-        <CardTitle as="h2" className="text-sm font-semibold text-foreground">
-          Sales Performance vs Target YTD
-        </CardTitle>
-        <p className="text-xs text-muted-foreground">
-          {salesTeam.length} anggota tim sales aktif. FOC prototype tidak
-          dihitung dalam revenue.
-        </p>
+      <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-3">
+        <div className="min-w-0">
+          <CardTitle as="h2" className="text-sm font-semibold text-foreground">
+            Sales Performance vs Target YTD
+          </CardTitle>
+          <p className="text-xs text-muted-foreground">
+            {salesTeam.length} anggota tim sales aktif. FOC prototype tidak
+            dihitung dalam revenue.
+          </p>
+        </div>
+        <Button variant="outline" size="sm" className="h-8 shrink-0" asChild>
+          <Link to="/reports">
+            {allRows.length > rows.length
+              ? `Lihat semua (${allRows.length})`
+              : "Lihat semua"}
+          </Link>
+        </Button>
       </CardHeader>
       <CardContent className="p-0">
         <Table>
