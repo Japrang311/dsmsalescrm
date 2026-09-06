@@ -1,8 +1,7 @@
 import { useMemo, useState } from "react";
 import {
   Check,
-  ChevronsUpDown,
-  Filter,
+  ChevronDown,
   User2,
   Building2,
   Receipt,
@@ -30,6 +29,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { FilterBar, FILTER_TRIGGER_CLASS } from "@/components/shell/FilterBar";
 import { DateRangePicker } from "@/components/dashboard/DateRangePicker";
 import type { Client } from "@/lib/domain";
 import type { Role } from "@/lib/domain";
@@ -68,11 +68,7 @@ export function ReportFilterBar({
   };
 
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-card p-2.5">
-      <span className="flex items-center gap-1 pl-1 pr-2 text-xs font-medium text-muted-foreground">
-        <Filter className="h-3.5 w-3.5" /> Filter
-      </span>
-
+    <FilterBar>
       <DateRangePicker
         value={value.range}
         onChange={(r) => onChange({ range: r })}
@@ -83,7 +79,7 @@ export function ReportFilterBar({
           value={value.ownerId}
           onValueChange={(v) => onChange({ ownerId: v })}
         >
-          <SelectTrigger className="h-8 w-[180px] text-xs">
+          <SelectTrigger className={FILTER_TRIGGER_CLASS}>
             <User2 className="h-3.5 w-3.5" />
             <SelectValue placeholder="Sales owner" />
           </SelectTrigger>
@@ -110,7 +106,7 @@ export function ReportFilterBar({
               role="combobox"
               aria-expanded={clientPickerOpen}
               aria-label="Filter klien"
-              className="h-8 w-[220px] justify-between px-3 text-xs font-normal"
+              className={cn(FILTER_TRIGGER_CLASS, "px-3 font-normal")}
             >
               <span className="flex min-w-0 items-center gap-2">
                 <Building2 className="h-3.5 w-3.5 shrink-0" />
@@ -118,7 +114,7 @@ export function ReportFilterBar({
                   {selectedClient?.name ?? "Semua klien"}
                 </span>
               </span>
-              <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
+              <ChevronDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-(--radix-popover-trigger-width) p-0">
@@ -181,7 +177,7 @@ export function ReportFilterBar({
         value={value.taxType}
         onValueChange={(v) => onChange({ taxType: v })}
       >
-        <SelectTrigger className="h-8 w-[140px] text-xs">
+        <SelectTrigger className={FILTER_TRIGGER_CLASS}>
           <Receipt className="h-3.5 w-3.5" />
           <SelectValue placeholder="Pajak" />
         </SelectTrigger>
@@ -196,7 +192,7 @@ export function ReportFilterBar({
         value={value.source}
         onValueChange={(v) => onChange({ source: v })}
       >
-        <SelectTrigger className="h-8 w-[190px] text-xs">
+        <SelectTrigger className={FILTER_TRIGGER_CLASS}>
           <Layers className="h-3.5 w-3.5" />
           <SelectValue placeholder="Revenue source" />
         </SelectTrigger>
@@ -215,7 +211,7 @@ export function ReportFilterBar({
         value={value.soType}
         onValueChange={(v) => onChange({ soType: v })}
       >
-        <SelectTrigger className="h-8 w-[140px] text-xs">
+        <SelectTrigger className={FILTER_TRIGGER_CLASS}>
           <PackageSearch className="h-3.5 w-3.5" />
           <SelectValue placeholder="Tipe SO" />
         </SelectTrigger>
@@ -225,6 +221,6 @@ export function ReportFilterBar({
           <SelectItem value="Prototype">Prototype</SelectItem>
         </SelectContent>
       </Select>
-    </div>
+    </FilterBar>
   );
 }
