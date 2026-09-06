@@ -112,7 +112,7 @@ export function ClientsTable({
   return (
     <div className="rounded-lg border bg-card">
       {/* Desktop table */}
-      <div className="hidden overflow-x-auto md:block">
+      <div className="scroll-x hidden md:block">
         <table className={cn("w-full border-collapse tabular-nums", textSize)}>
           <thead className="border-b bg-muted/40 text-left text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
             <tr>
@@ -193,26 +193,42 @@ export function ClientsTable({
                     }
                   }}
                 >
-                  <td className={cellPad}>
+                  <td className={cn(cellPad, "max-w-[15rem]")}>
                     <Link
                       to="/clients/$clientId"
                       params={{ clientId: r.client.id }}
-                      className="font-medium text-foreground hover:text-primary hover:underline"
+                      title={r.client.name}
+                      className="block truncate font-medium text-foreground hover:text-primary hover:underline"
                       onClick={(e) => e.stopPropagation()}
                     >
                       {r.client.name}
                     </Link>
                   </td>
                   <td className={cellPad}>
-                    <StatusBadge status={r.client.status} />
+                    <StatusBadge status={r.client.status} variant="inline" />
                   </td>
-                  <td className={cn(cellPad, "text-muted-foreground")}>
+                  <td
+                    className={cn(
+                      cellPad,
+                      "whitespace-nowrap text-muted-foreground",
+                    )}
+                  >
                     {r.client.source}
                   </td>
-                  <td className={cn(cellPad, "text-muted-foreground")}>
+                  <td
+                    className={cn(
+                      cellPad,
+                      "whitespace-nowrap text-muted-foreground",
+                    )}
+                  >
                     {r.ownerName}
                   </td>
-                  <td className={cn(cellPad, "text-right font-medium")}>
+                  <td
+                    className={cn(
+                      cellPad,
+                      "num text-right font-medium whitespace-nowrap",
+                    )}
+                  >
                     {r.spendingYtd > 0 ? (
                       formatRupiahShort(r.spendingYtd)
                     ) : (
@@ -220,12 +236,18 @@ export function ClientsTable({
                     )}
                   </td>
                   <td
-                    className={cn(cellPad, "text-right text-muted-foreground")}
+                    className={cn(
+                      cellPad,
+                      "num text-right whitespace-nowrap text-muted-foreground",
+                    )}
                   >
                     {r.ppn > 0 ? formatRupiahShort(r.ppn) : "—"}
                   </td>
                   <td
-                    className={cn(cellPad, "text-right text-muted-foreground")}
+                    className={cn(
+                      cellPad,
+                      "num text-right whitespace-nowrap text-muted-foreground",
+                    )}
                   >
                     {r.nonPpn > 0 ? formatRupiahShort(r.nonPpn) : "—"}
                   </td>
@@ -298,7 +320,7 @@ export function ClientsTable({
                   {r.ownerName} · {r.client.source}
                 </p>
               </div>
-              <StatusBadge status={r.client.status} />
+              <StatusBadge status={r.client.status} variant="inline" />
             </div>
             <div className="flex items-center justify-between text-xs">
               <span className="tabular-nums font-medium">
@@ -324,6 +346,7 @@ export function ClientsTable({
           <Button
             variant="ghost"
             size="sm"
+            aria-label="Halaman sebelumnya"
             disabled={currentPage <= 1}
             onClick={() => onPageChange(currentPage - 1)}
           >
@@ -335,6 +358,7 @@ export function ClientsTable({
           <Button
             variant="ghost"
             size="sm"
+            aria-label="Halaman berikutnya"
             disabled={
               serverPaginated ? !hasNextPage : currentPage >= totalPages
             }
@@ -397,7 +421,12 @@ function RowActions({
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" className="h-7 w-7">
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Aksi klien"
+            className="h-7 w-7"
+          >
             <MoreHorizontal className="h-4 w-4" />
           </Button>
         </DropdownMenuTrigger>

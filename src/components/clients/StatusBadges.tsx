@@ -9,13 +9,44 @@ const STATUS_STYLES: Record<ClientStatus, string> = {
   Lost: "bg-zinc-200 text-zinc-700 border-zinc-300",
 };
 
+const STATUS_DOT: Record<ClientStatus, string> = {
+  Prospect: "bg-sky-500",
+  "Active Customer": "bg-emerald-500",
+  "Repeat Order": "bg-primary",
+  Dormant: "bg-amber-500",
+  Lost: "bg-zinc-400",
+};
+
 export function StatusBadge({
   status,
   className,
+  variant = "pill",
 }: {
   status: ClientStatus;
   className?: string;
+  // "pill" — filled, for a single prominent placement (detail headers, dialogs).
+  // "inline" — a quiet dot + label, for list rows where a wall of filled pills
+  //   would drown out the row's real status (pipeline stage, task urgency).
+  variant?: "pill" | "inline";
 }) {
+  if (variant === "inline") {
+    return (
+      <span
+        className={cn(
+          "inline-flex items-center gap-1.5 whitespace-nowrap text-[11px] font-medium text-muted-foreground",
+          className,
+        )}
+      >
+        <span
+          className={cn(
+            "h-1.5 w-1.5 shrink-0 rounded-full",
+            STATUS_DOT[status],
+          )}
+        />
+        {status}
+      </span>
+    );
+  }
   return (
     <span
       className={cn(

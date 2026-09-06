@@ -39,6 +39,24 @@ export function formatCompactNumber(v: number): string {
   return v.toLocaleString("id-ID");
 }
 
+// Compact single-token label for chart axis ticks — never wraps or clips.
+// 1_500_000_000 -> "1,5 M", 450_000_000 -> "450 jt", 0 -> "0".
+export function formatRupiahAxis(value: number): string {
+  if (!Number.isFinite(value) || value === 0) return "0";
+  const abs = Math.abs(value);
+  const sign = value < 0 ? "-" : "";
+  if (abs >= 1_000_000_000) {
+    return `${sign}${formatDecimal(abs / 1_000_000_000, 1)} M`;
+  }
+  if (abs >= 1_000_000) {
+    return `${sign}${formatDecimal(abs / 1_000_000, 0)} jt`;
+  }
+  if (abs >= 1_000) {
+    return `${sign}${(abs / 1_000).toFixed(0)} rb`;
+  }
+  return `${sign}${abs}`;
+}
+
 export function formatDateShort(d: Date | string): string {
   const date = typeof d === "string" ? new Date(d) : d;
   return date.toLocaleDateString("id-ID", {

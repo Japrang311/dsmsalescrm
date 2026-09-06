@@ -16,7 +16,7 @@ import { monthlyRevenueTrendFromRpc } from "@/lib/data/dashboard-selectors";
 import { getSalesOrdersMonthlyTrend } from "@/lib/data/sales-orders-trend";
 import { useDashboardData } from "@/hooks/use-dashboard-data";
 import { useRole } from "@/context/role-context-core";
-import { formatRupiahShort } from "@/lib/format";
+import { formatRupiahAxis, formatRupiahShort } from "@/lib/format";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 export function RevenueTrendChart({ role }: { role: Role }) {
@@ -65,7 +65,7 @@ export function RevenueTrendChart({ role }: { role: Role }) {
             <ComposedChart
               data={data}
               margin={{
-                top: 8,
+                top: 16,
                 right: isMobile ? 4 : 8,
                 bottom: 0,
                 left: isMobile ? 0 : -8,
@@ -84,11 +84,11 @@ export function RevenueTrendChart({ role }: { role: Role }) {
                 interval={isMobile ? 1 : 0}
               />
               <YAxis
-                tickFormatter={(v) => formatRupiahShort(v).replace("Rp", "")}
+                tickFormatter={formatRupiahAxis}
                 tickLine={false}
                 axisLine={false}
                 tick={tick}
-                width={isMobile ? 56 : 70}
+                width={isMobile ? 46 : 56}
               />
               <Tooltip
                 cursor={{ fill: "var(--color-primary-soft)" }}

@@ -439,7 +439,7 @@ function SalesOrdersRevenuePage() {
       ) : (
         <Card>
           <CardContent className="p-0">
-            <div className="overflow-x-auto">
+            <div className="scroll-x">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -500,7 +500,7 @@ function SalesOrdersRevenuePage() {
                               }
                         }
                       >
-                        <TableCell className="font-mono text-xs">
+                        <TableCell className="whitespace-nowrap font-mono text-xs">
                           {so.soNumber}
                         </TableCell>
                         <TableCell className="whitespace-nowrap text-xs">

@@ -1,4 +1,4 @@
-import { Filter, User2, CalendarClock } from "lucide-react";
+import { User2, CalendarClock } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -6,6 +6,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { FilterBar, FILTER_TRIGGER_CLASS } from "@/components/shell/FilterBar";
 import type { Role } from "@/lib/domain";
 import type { PipelineNextWindow } from "@/lib/pipeline-next-action-filter";
 
@@ -31,14 +32,10 @@ export function PipelineFilterBar({
   salesTeam,
 }: Props) {
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-card p-2.5">
-      <span className="flex items-center gap-1 pl-1 pr-2 text-xs font-medium text-muted-foreground">
-        <Filter className="h-3.5 w-3.5" /> Filter
-      </span>
-
+    <FilterBar>
       {role !== "sales" && (
         <Select value={owner} onValueChange={onOwnerChange}>
-          <SelectTrigger className="h-8 w-[180px] text-xs">
+          <SelectTrigger className={FILTER_TRIGGER_CLASS}>
             <User2 className="h-3.5 w-3.5" />
             <SelectValue placeholder="Owner" />
           </SelectTrigger>
@@ -54,7 +51,7 @@ export function PipelineFilterBar({
       )}
 
       <Select value={status} onValueChange={onStatusChange}>
-        <SelectTrigger className="h-8 w-[170px] text-xs">
+        <SelectTrigger className={FILTER_TRIGGER_CLASS}>
           <SelectValue placeholder="Client status" />
         </SelectTrigger>
         <SelectContent>
@@ -71,7 +68,7 @@ export function PipelineFilterBar({
         value={nextWindow}
         onValueChange={(v) => onNextWindowChange(v as PipelineNextWindow)}
       >
-        <SelectTrigger className="h-8 w-[180px] text-xs">
+        <SelectTrigger className={FILTER_TRIGGER_CLASS}>
           <CalendarClock className="h-3.5 w-3.5" />
           <SelectValue placeholder="Next action" />
         </SelectTrigger>
@@ -83,6 +80,6 @@ export function PipelineFilterBar({
           <SelectItem value="none">Tanpa next action</SelectItem>
         </SelectContent>
       </Select>
-    </div>
+    </FilterBar>
   );
 }

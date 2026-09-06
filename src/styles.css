@@ -197,4 +197,30 @@
 @utility num {
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
+  /* Currency/metric values must never break mid-number ("Rp118,54 milyar"
+     splitting across two lines). Surrounding sentence text is not .num, so
+     it still wraps between words. */
+  white-space: nowrap;
+}
+
+/* Horizontal scroll container for wide tables. Keeps a thin, always-visible
+   scrollbar so it's obvious the table scrolls sideways when columns are
+   clipped (the default `overflow-x: auto` hides the bar until you scroll). */
+@utility scroll-x {
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-strong) transparent;
+}
+
+@layer base {
+  .scroll-x::-webkit-scrollbar {
+    height: 0.5rem;
+  }
+  .scroll-x::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scroll-x::-webkit-scrollbar-thumb {
+    background: var(--color-border-strong);
+    border-radius: 9999px;
+  }
 }
