@@ -4,7 +4,7 @@ import {
   DateRangePicker,
   type PeriodRange,
 } from "@/components/dashboard/DateRangePicker";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -34,8 +34,21 @@ import {
   GitBranch,
   Download,
   FileDown,
+  ChevronRight,
+  Table2,
+  ListTree,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { cn } from "@/lib/utils";
 import {
   Sheet,
   SheetContent,
@@ -165,6 +178,86 @@ function methodIcon(method: string) {
   }
 }
 
+// Left-rule accent per activity type — the one spot of colour in the ledger.
+// Fixed hues (work in both themes as a 2–3px rule / dot, not a fill).
+const ACCENT: Record<FeedEvent["kind"], string> = {
+  client_created: "bg-cyan-500",
+  follow_up: "bg-blue-500",
+  status_change: "bg-amber-500",
+  ownership_change: "bg-sky-500",
+  commercial_history: "bg-violet-500",
+  task_history: "bg-slate-400",
+  commercial_created: "bg-emerald-500",
+  order_created: "bg-teal-500",
+  task_created: "bg-indigo-500",
+  so_tax_change: "bg-rose-500",
+  record_lifecycle: "bg-orange-500",
+  team_admin: "bg-cyan-500",
+};
+
+// Follow-up rows arrive as "Phone · No Response" — English enum pairs that
+// mean little at a glance. Turn them into a plain Indonesian sentence.
+const METHOD_ID: Record<string, string> = {
+  Phone: "Telepon",
+  Email: "Email",
+  Visit: "Kunjungan",
+  WhatsApp: "WhatsApp",
+  Meeting: "Meeting",
+};
+const RESULT_ID: Record<string, string> = {
+  "No Response": "belum ada respons",
+  Interested: "tertarik",
+  "Need Quotation": "minta penawaran",
+  "Quotation Sent": "penawaran dikirim",
+  Negotiation: "negosiasi",
+  "Waiting PO": "menunggu PO",
+  "PO Confirmed": "PO dikonfirmasi",
+  "Not Interested": "tidak tertarik",
+  "Follow-up Later": "tindak lanjut menyusul",
+  "Progress Update": "update progres",
+};
+
+// One human sentence for the "Aktivitas" column / timeline headline.
+// Follow-up rows are the only ones stored as an opaque enum pair; every
+// other kind already logs a readable Indonesian title.
+function describeActivity(e: FeedEvent): string {
+  if (e.kind !== "follow_up") return e.title;
+  const [rawMethod, rawResult] = e.title.split("·").map((s) => s.trim());
+  const method = METHOD_ID[rawMethod] ?? rawMethod ?? "Follow-up";
+  const result = RESULT_ID[rawResult] ?? rawResult?.toLowerCase();
+  return result ? `${method} — ${result}` : method;
+}
+
+// "Oleh" column — who did it, and to whom when that matters.
+function actorLine(e: FeedEvent): string {
+  if (e.kind === "team_admin")
+    return `${e.actorName ?? "Sistem"} → ${e.targetName ?? "—"}`;
+  if (e.kind === "ownership_change")
+    return `${e.ownerName ?? "Sistem"} → ${e.targetName ?? "—"}`;
+  return e.ownerName ?? "Sistem";
+}
+
+function timeOfDay(at: string): string {
+  return new Date(at).toLocaleTimeString("id-ID", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+type ActivityView = "table" | "timeline";
+const VIEW_STORAGE_KEY = "dsm.activity.view.v1";
+
+function loadView(): ActivityView {
+  if (typeof window === "undefined") return "table";
+  try {
+    return window.localStorage.getItem(VIEW_STORAGE_KEY) === "timeline"
+      ? "timeline"
+      : "table";
+  } catch {
+    return "table";
+  }
+}
+
 const PAGE_SIZE = 25;
 
 function ActivityPage() {
@@ -205,6 +298,15 @@ function ActivityPage() {
     from.setDate(to.getDate() - 29);
     return { from, to };
   });
+
+  const [view, setView] = useState<ActivityView>(loadView);
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(VIEW_STORAGE_KEY, view);
+    } catch {
+      // Storage blocked — the choice just won't persist across reloads.
+    }
+  }, [view]);
 
   const activeRange = useMemo<PeriodRange | null>(() => {
     if (rangePreset === "all") return null;
@@ -423,6 +525,30 @@ function ActivityPage() {
             dan dokumen komersial.
           </p>
         </div>
+        <ToggleGroup
+          type="single"
+          size="sm"
+          value={view}
+          onValueChange={(v) => v && setView(v as ActivityView)}
+          className="rounded-md border p-0.5"
+        >
+          <ToggleGroupItem
+            value="table"
+            aria-label="Tampilan tabel"
+            className="h-7 gap-1.5 px-2 text-xs"
+          >
+            <Table2 className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Tabel</span>
+          </ToggleGroupItem>
+          <ToggleGroupItem
+            value="timeline"
+            aria-label="Tampilan timeline"
+            className="h-7 gap-1.5 px-2 text-xs"
+          >
+            <ListTree className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Timeline</span>
+          </ToggleGroupItem>
+        </ToggleGroup>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button size="sm" variant="outline" className="h-8 gap-1.5">
@@ -521,93 +647,234 @@ function ActivityPage() {
         </Card>
       ) : (
         <div className="space-y-6">
-          {grouped.map(([day, items]) => (
-            <div key={day} className="space-y-2">
-              <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                {new Date(day).toLocaleDateString("id-ID", {
-                  weekday: "long",
-                  day: "numeric",
-                  month: "long",
-                  year: "numeric",
-                })}
-              </div>
-              <Card>
-                <CardContent className="divide-y p-0">
-                  {items.map((e) => {
-                    const meta = KIND_META[e.kind];
-                    const Icon =
-                      e.kind === "follow_up"
-                        ? methodIcon(e.title.split(" ")[0])
-                        : meta.icon;
-                    const cName = clientName(e.clientId);
-                    return (
-                      <button
-                        key={e.id}
-                        type="button"
-                        onClick={() => setSelected(e)}
-                        className="flex w-full gap-3 p-4 text-left transition-colors hover:bg-muted/40 focus:outline-none focus-visible:bg-muted/60"
-                      >
-                        <div
-                          className={`h-9 w-9 shrink-0 rounded-full ${meta.color} flex items-center justify-center`}
-                        >
-                          <Icon className="h-4 w-4" />
-                        </div>
-                        <div className="min-w-0 flex-1 space-y-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Badge variant="secondary" className="text-[10px]">
-                              {e.kindLabel ?? meta.label}
-                            </Badge>
-                            <span className="text-sm font-medium">
-                              {e.title}
-                            </span>
-                            {cName && e.clientId && (
-                              <Link
-                                to="/clients/$clientId"
-                                params={{ clientId: e.clientId }}
-                                onClick={(ev) => ev.stopPropagation()}
-                                className="text-sm text-primary hover:underline"
-                              >
-                                {cName}
-                              </Link>
-                            )}
-                          </div>
-                          {e.detail && (
-                            <p className="text-sm text-muted-foreground line-clamp-2">
-                              {e.detail}
-                            </p>
-                          )}
-                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                            <span>
-                              {e.kind === "team_admin"
-                                ? `Aktor: ${e.actorName ?? "Tidak tersedia"} · Target: ${e.targetName ?? "Tidak tersedia"}`
-                                : e.kind === "ownership_change"
-                                  ? `Aktor: ${e.ownerName ?? "Tidak tersedia"} · Owner baru: ${e.targetName ?? "Tidak tersedia"}`
-                                  : (e.ownerName ?? "System")}{" "}
-                              {" · "}
-                              {new Date(e.at).toLocaleTimeString("id-ID", {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })}
-                            </span>
-                            {e.link && (
-                              <Link
-                                to={e.link.to as never}
-                                params={(e.link.params ?? {}) as never}
-                                onClick={(ev) => ev.stopPropagation()}
-                                className="font-medium text-primary hover:underline"
-                              >
-                                {e.link.label} →
-                              </Link>
-                            )}
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </CardContent>
-              </Card>
+          {view === "table" ? (
+            <Card>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="w-[7.5rem] pl-4">Waktu</TableHead>
+                      <TableHead>Aktivitas</TableHead>
+                      <TableHead className="hidden md:table-cell">
+                        Client
+                      </TableHead>
+                      <TableHead className="hidden lg:table-cell">
+                        Oleh
+                      </TableHead>
+                      <TableHead className="w-8" />
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {grouped.map(([day, items]) => (
+                      <Fragment key={day}>
+                        <TableRow className="hover:bg-transparent">
+                          <TableCell
+                            colSpan={5}
+                            className="bg-muted/40 py-1.5 pl-4 text-[11px] font-medium uppercase tracking-wider text-muted-foreground"
+                          >
+                            {new Date(day).toLocaleDateString("id-ID", {
+                              weekday: "long",
+                              day: "numeric",
+                              month: "long",
+                              year: "numeric",
+                            })}
+                          </TableCell>
+                        </TableRow>
+                        {items.map((e) => {
+                          const meta = KIND_META[e.kind];
+                          const Icon =
+                            e.kind === "follow_up"
+                              ? methodIcon(e.title.split(" ")[0])
+                              : meta.icon;
+                          const cName = clientName(e.clientId);
+                          return (
+                            <TableRow
+                              key={e.id}
+                              role="button"
+                              tabIndex={0}
+                              aria-label={`Detail: ${describeActivity(e)}`}
+                              onClick={() => setSelected(e)}
+                              onKeyDown={(ev) => {
+                                if (ev.key === "Enter" || ev.key === " ") {
+                                  ev.preventDefault();
+                                  setSelected(e);
+                                }
+                              }}
+                              className="relative cursor-pointer align-top outline-none transition-colors focus-visible:bg-muted/60 focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring"
+                            >
+                              <TableCell className="relative whitespace-nowrap py-3 pl-4 font-mono text-xs text-muted-foreground">
+                                <span
+                                  aria-hidden
+                                  className={cn(
+                                    "absolute left-0 top-0 h-full w-[3px]",
+                                    ACCENT[e.kind],
+                                  )}
+                                />
+                                <div className="text-foreground">
+                                  {formatDateShort(e.at)}
+                                </div>
+                                <div>{timeOfDay(e.at)}</div>
+                              </TableCell>
+                              <TableCell className="py-3">
+                                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                  <span
+                                    className={cn(
+                                      "inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-[11px] font-medium",
+                                      meta.color,
+                                    )}
+                                  >
+                                    <Icon className="h-3 w-3" />
+                                    {e.kindLabel ?? meta.label}
+                                  </span>
+                                  <span className="text-sm font-medium">
+                                    {describeActivity(e)}
+                                  </span>
+                                </div>
+                                {e.detail && (
+                                  <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
+                                    {e.detail}
+                                  </p>
+                                )}
+                                <div className="mt-1 flex flex-wrap items-center gap-x-3 text-xs text-muted-foreground md:hidden">
+                                  {cName && <span>{cName}</span>}
+                                  <span>{actorLine(e)}</span>
+                                </div>
+                                {e.link && (
+                                  <Link
+                                    to={e.link.to as never}
+                                    params={(e.link.params ?? {}) as never}
+                                    onClick={(ev) => ev.stopPropagation()}
+                                    className="mt-1 inline-block text-xs font-medium text-primary hover:underline"
+                                  >
+                                    {e.link.label} →
+                                  </Link>
+                                )}
+                              </TableCell>
+                              <TableCell className="hidden py-3 text-sm md:table-cell">
+                                {cName && e.clientId ? (
+                                  <Link
+                                    to="/clients/$clientId"
+                                    params={{ clientId: e.clientId }}
+                                    onClick={(ev) => ev.stopPropagation()}
+                                    className="text-primary hover:underline"
+                                  >
+                                    {cName}
+                                  </Link>
+                                ) : (
+                                  <span className="text-muted-foreground">
+                                    —
+                                  </span>
+                                )}
+                              </TableCell>
+                              <TableCell className="hidden py-3 text-xs text-muted-foreground lg:table-cell">
+                                {actorLine(e)}
+                              </TableCell>
+                              <TableCell className="py-3 pr-3 text-muted-foreground">
+                                <ChevronRight className="h-4 w-4" />
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </Fragment>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-6">
+              {grouped.map(([day, items]) => (
+                <div key={day} className="space-y-2">
+                  <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    {new Date(day).toLocaleDateString("id-ID", {
+                      weekday: "long",
+                      day: "numeric",
+                      month: "long",
+                      year: "numeric",
+                    })}
+                  </div>
+                  <Card>
+                    <CardContent className="divide-y p-0">
+                      {items.map((e) => {
+                        const meta = KIND_META[e.kind];
+                        const Icon =
+                          e.kind === "follow_up"
+                            ? methodIcon(e.title.split(" ")[0])
+                            : meta.icon;
+                        const cName = clientName(e.clientId);
+                        return (
+                          <button
+                            key={e.id}
+                            type="button"
+                            onClick={() => setSelected(e)}
+                            className="relative flex w-full gap-3 py-4 pl-5 pr-4 text-left transition-colors hover:bg-muted/40 focus:outline-none focus-visible:bg-muted/60"
+                          >
+                            <span
+                              aria-hidden
+                              className={cn(
+                                "absolute left-0 top-0 h-full w-[3px]",
+                                ACCENT[e.kind],
+                              )}
+                            />
+                            <div
+                              className={`h-9 w-9 shrink-0 rounded-full ${meta.color} flex items-center justify-center`}
+                            >
+                              <Icon className="h-4 w-4" />
+                            </div>
+                            <div className="min-w-0 flex-1 space-y-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <Badge
+                                  variant="secondary"
+                                  className="text-[10px]"
+                                >
+                                  {e.kindLabel ?? meta.label}
+                                </Badge>
+                                <span className="text-sm font-medium">
+                                  {describeActivity(e)}
+                                </span>
+                                {cName && e.clientId && (
+                                  <Link
+                                    to="/clients/$clientId"
+                                    params={{ clientId: e.clientId }}
+                                    onClick={(ev) => ev.stopPropagation()}
+                                    className="text-sm text-primary hover:underline"
+                                  >
+                                    {cName}
+                                  </Link>
+                                )}
+                              </div>
+                              {e.detail && (
+                                <p className="text-sm text-muted-foreground line-clamp-2">
+                                  {e.detail}
+                                </p>
+                              )}
+                              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                                <span>
+                                  {actorLine(e)}
+                                  {" · "}
+                                  {timeOfDay(e.at)}
+                                </span>
+                                {e.link && (
+                                  <Link
+                                    to={e.link.to as never}
+                                    params={(e.link.params ?? {}) as never}
+                                    onClick={(ev) => ev.stopPropagation()}
+                                    className="font-medium text-primary hover:underline"
+                                  >
+                                    {e.link.label} →
+                                  </Link>
+                                )}
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </CardContent>
+                  </Card>
+                </div>
+              ))}
             </div>
-          ))}
+          )}
           <div ref={sentinelRef} />
           <div className="pt-2 text-center text-xs text-muted-foreground">
             {hasMore
@@ -644,7 +911,7 @@ function ActivityPage() {
                       </Badge>
                     </div>
                     <SheetTitle className="text-left text-base">
-                      {selected.title}
+                      {describeActivity(selected)}
                     </SheetTitle>
                     <SheetDescription className="text-left">
                       {new Date(selected.at).toLocaleString("id-ID", {
@@ -770,7 +1037,7 @@ function ActivityPage() {
                                       {r.kindLabel ?? rMeta.label}
                                     </Badge>
                                     <span className="text-sm font-medium">
-                                      {r.title}
+                                      {describeActivity(r)}
                                     </span>
                                   </div>
                                   {r.detail && (
