@@ -204,7 +204,7 @@ export function ClientsTable({
                     </Link>
                   </td>
                   <td className={cellPad}>
-                    <StatusBadge status={r.client.status} />
+                    <StatusBadge status={r.client.status} variant="inline" />
                   </td>
                   <td className={cn(cellPad, "text-muted-foreground")}>
                     {r.client.source}
@@ -309,7 +309,7 @@ export function ClientsTable({
                   {r.ownerName} · {r.client.source}
                 </p>
               </div>
-              <StatusBadge status={r.client.status} />
+              <StatusBadge status={r.client.status} variant="inline" />
             </div>
             <div className="flex items-center justify-between text-xs">
               <span className="tabular-nums font-medium">

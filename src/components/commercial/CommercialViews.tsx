@@ -451,7 +451,10 @@ export function CommercialViews(props: CommercialViewsProps) {
                           </div>
                           {client && (
                             <div className="mt-0.5">
-                              <StatusBadge status={client.status} />
+                              <StatusBadge
+                                status={client.status}
+                                variant="inline"
+                              />
                             </div>
                           )}
                         </TableCell>
@@ -632,7 +635,12 @@ export function CommercialViews(props: CommercialViewsProps) {
                             <span className="text-[12px] font-semibold tabular-nums text-foreground">
                               {formatRupiahShort(it.estimatedValue)}
                             </span>
-                            {client && <StatusBadge status={client.status} />}
+                            {client && (
+                              <StatusBadge
+                                status={client.status}
+                                variant="inline"
+                              />
+                            )}
                           </div>
                           <p className="text-[11px] text-muted-foreground">
                             {it.itemCount ?? 0} item

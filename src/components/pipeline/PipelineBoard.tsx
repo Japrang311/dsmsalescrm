@@ -204,7 +204,12 @@ export function PipelineBoard({
                           <span className="text-[12px] font-semibold tabular-nums text-foreground">
                             {formatRupiahShort(it.estimatedValue)}
                           </span>
-                          {client && <StatusBadge status={client.status} />}
+                          {client && (
+                            <StatusBadge
+                              status={client.status}
+                              variant="inline"
+                            />
+                          )}
                         </div>
                         <div className="flex items-center justify-between text-[11px] text-muted-foreground">
                           <span className="truncate">{ownerName}</span>
