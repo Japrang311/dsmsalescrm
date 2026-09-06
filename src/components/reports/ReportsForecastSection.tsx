@@ -54,8 +54,12 @@ export function ReportsForecastSection({
                     outerRadius={80}
                     paddingAngle={2}
                   >
-                    {sourceBreakdown.map((_, i) => (
-                      <Cell key={i} fill={CHART_COLORS[i]} />
+                    {sourceBreakdown.map((s, i) => (
+                      <Cell
+                        key={i}
+                        fill={CHART_COLORS[i]}
+                        aria-label={`${s.name}: ${formatRupiahShort(s.value)}`}
+                      />
                     ))}
                   </Pie>
                   <Tooltip formatter={(v: number) => formatRupiahShort(v)} />

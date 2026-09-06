@@ -55,19 +55,19 @@ export function Stage4FunnelDwellSection({
                   <div className="w-32 truncate text-muted-foreground">
                     {stage}
                   </div>
-                  <div className="flex-1">
-                    <div className="h-6 overflow-hidden rounded-md bg-muted/60">
+                  <div className="flex flex-1 items-center gap-2">
+                    <div className="h-6 flex-1 overflow-hidden rounded-md bg-muted/60">
                       <div
-                        className="flex h-full items-center justify-end whitespace-nowrap pr-2 text-[10px] font-medium text-white"
+                        className="h-full rounded-md"
                         style={{
-                          width: `${count > 0 ? Math.max(6, pct) : 0}%`,
-                          minWidth: count > 0 ? "3rem" : 0,
+                          width: `${count > 0 ? Math.max(2, pct) : 0}%`,
                           background: CHART_COLORS[i % CHART_COLORS.length],
                         }}
-                      >
-                        {count > 0 ? count : ""}
-                      </div>
+                      />
                     </div>
+                    <span className="w-10 shrink-0 text-right text-[10px] font-medium tabular-nums text-foreground">
+                      {count > 0 ? count : ""}
+                    </span>
                   </div>
                 </div>
               );
