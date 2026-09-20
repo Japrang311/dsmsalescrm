@@ -42,7 +42,11 @@ import {
 import { useDashboardData } from "@/hooks/use-dashboard-data";
 import { getSalesOrdersMetrics } from "@/lib/data/sales-orders-metrics";
 import { getPipelineMetrics } from "@/lib/data/pipeline-metrics";
-import { formatPercent, formatRupiahShort } from "@/lib/format";
+import {
+  formatPercent,
+  formatPercentValue,
+  formatRupiahShort,
+} from "@/lib/format";
 
 import { AiSummaryCard } from "@/components/dashboard/AiSummaryCard";
 import { KpiCard, KpiProgress } from "@/components/dashboard/KpiCard";
@@ -215,11 +219,6 @@ function DashboardPage() {
   );
   const monthPct = monthTgt > 0 ? monthRev / monthTgt : 0;
 
-  const tax = {
-    ppn: ytdMetrics?.ppnValue ?? 0,
-    nonPpn: ytdMetrics?.nonPpnValue ?? 0,
-    total: ytd,
-  };
   const src = {
     newProduct: ytdMetrics?.newProductValue ?? 0,
     existing: ytdMetrics?.existingValue ?? 0,
@@ -241,6 +240,10 @@ function DashboardPage() {
   const waitingPo =
     pipelineMetrics?.stages.find((s) => s.stage === "Commit")?.totalValue ?? 0;
   const activeCi = pipelineMetrics?.totals.itemCount ?? 0;
+  const pipelineWon = pipelineMetrics?.totals.wonCount ?? 0;
+  const pipelineLost = pipelineMetrics?.totals.lostCount ?? 0;
+  const pipelineDecided = pipelineWon + pipelineLost;
+  const pipelineWinRate = pipelineMetrics?.totals.winRate ?? 0;
 
   if (
     isLoading ||
@@ -504,14 +507,14 @@ function DashboardPage() {
       >
         <KpiCard
           compact
-          label="Total Revenue YTD"
-          value={formatRupiahShort(tax.total)}
+          label="Pipeline Win Rate"
+          value={
+            pipelineDecided > 0 ? formatPercentValue(pipelineWinRate) : "—"
+          }
           sub={
-            <>
-              PPN <span className="num">{formatRupiahShort(tax.ppn)}</span> ·
-              Non-PPN{" "}
-              <span className="num">{formatRupiahShort(tax.nonPpn)}</span>
-            </>
+            pipelineDecided > 0
+              ? `${pipelineWon} won · ${pipelineLost} lost`
+              : "Belum ada deal diputuskan"
           }
         />
         <KpiCard
