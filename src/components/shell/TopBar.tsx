@@ -377,8 +377,11 @@ export function TopBar() {
   const currentUser = realProfile ?? { name: "—", initials: "—", email: "—" };
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-border bg-background/95 px-3 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:px-4">
-      <SidebarTrigger className="text-foreground" />
+    <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-border bg-card px-3 md:px-4">
+      <SidebarTrigger className="hidden text-foreground md:inline-flex" />
+      <span className="mr-auto font-semibold tracking-tight md:hidden">
+        DSM<span className="ml-1 font-normal text-muted-foreground">Sales</span>
+      </span>
 
       {authReady && <GlobalSearch />}
       {authReady && <MobileSearch />}

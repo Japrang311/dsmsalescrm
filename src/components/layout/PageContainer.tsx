@@ -13,7 +13,7 @@ export function PageContainer({
   return (
     <div
       className={cn(
-        "mx-auto flex w-full flex-col gap-4 p-4 md:gap-5 md:p-6",
+        "mx-auto flex min-w-0 w-full flex-col gap-4 p-4 md:gap-6 md:p-6 xl:p-8",
         size === "default" && "max-w-[1440px]",
         size === "wide" && "max-w-[1600px]",
         size === "full" && "max-w-none",

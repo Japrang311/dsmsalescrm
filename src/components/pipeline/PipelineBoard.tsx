@@ -1,3 +1,11 @@
+import { useState } from "react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ChevronDown, GripVertical } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,6 +25,7 @@ export type PipelineColumnData = {
 };
 
 type Props = {
+  view?: "board" | "list";
   columns: PipelineColumnData[];
   canDrag: boolean;
   canMoveItem: (item: CommercialItem) => boolean;
@@ -37,6 +46,7 @@ type Props = {
 };
 
 export function PipelineBoard({
+  view = "board",
   columns,
   canDrag,
   canMoveItem,
@@ -53,10 +63,43 @@ export function PipelineBoard({
   pendingSoItemIds,
   onCreateSoForItem,
 }: Props) {
+  const [selectedStage, setSelectedStage] =
+    useState<CommercialStage>("Quotes Sent");
+  const isList = view === "list";
+  const displayedColumns = isList
+    ? columns.filter((column) => column.stage === selectedStage)
+    : columns;
   return (
-    <div className="relative">
-      <div className="flex gap-3 overflow-x-auto pb-3">
-        {columns.map((column) => {
+    <div className="relative min-w-0 space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        {isList && (
+          <Select
+            value={selectedStage}
+            onValueChange={(value) =>
+              setSelectedStage(value as CommercialStage)
+            }
+          >
+            <SelectTrigger
+              aria-label="Stage pipeline"
+              className="w-full sm:w-64"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {columns.map((column) => (
+                <SelectItem key={column.stage} value={column.stage}>
+                  {column.stage}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+        <p className="text-xs text-muted-foreground">
+          Jumlah dan nilai di bawah berdasarkan kartu yang dimuat.
+        </p>
+      </div>
+      <div className={cn("flex gap-3 pb-3", !isList && "overflow-x-auto")}>
+        {displayedColumns.map((column) => {
           const { stage, items: col, sum, hasMore, isFetching } = column;
           const isDropTarget = dragOverStage === stage && draggingId !== null;
           const tone = stageTone(stage);
@@ -81,7 +124,8 @@ export function PipelineBoard({
                 onDrop(stage);
               }}
               className={cn(
-                "flex w-[280px] shrink-0 flex-col overflow-hidden rounded-lg border bg-muted/30 transition-colors",
+                "flex shrink-0 flex-col overflow-hidden rounded-xl border bg-muted/30 transition-colors",
+                isList ? "w-full" : "w-[300px]",
                 isDropTarget &&
                   "border-primary bg-primary-soft/60 ring-2 ring-primary/30",
               )}
@@ -113,7 +157,12 @@ export function PipelineBoard({
                 </span>
               </div>
 
-              <div className="flex flex-col gap-2 p-2 min-h-[80px]">
+              <div
+                className={cn(
+                  "flex min-h-20 flex-col gap-2 p-2",
+                  !isList && "max-h-[65vh] overflow-y-auto overscroll-contain",
+                )}
+              >
                 {col.length === 0 ? (
                   <div
                     className={cn(
@@ -138,9 +187,9 @@ export function PipelineBoard({
                         key={it.id}
                         data-testid="pipeline-card"
                         data-commercial-document-id={it.id}
-                        draggable={canMoveThis}
+                        draggable={canMoveThis && !isList}
                         onDragStart={(e) => {
-                          if (!canMoveThis) return;
+                          if (!canMoveThis || isList) return;
                           onDraggingChange(it.id);
                           e.dataTransfer.effectAllowed = "move";
                           e.dataTransfer.setData("text/plain", it.id);
@@ -153,25 +202,31 @@ export function PipelineBoard({
                         role="button"
                         tabIndex={0}
                         onKeyDown={(e) => {
+                          if (e.target !== e.currentTarget) return;
                           if (e.key === "Enter" || e.key === " ") {
                             e.preventDefault();
                             onCardClick(it.id);
                           }
                         }}
                         className={cn(
-                          "group relative flex flex-col gap-1.5 rounded-md border bg-card p-2.5 pl-6 shadow-sm transition-all hover:border-primary/50 hover:shadow-md",
+                          "group relative flex flex-col gap-2 rounded-lg border bg-card p-4 transition-colors duration-150 hover:border-primary/50 focus-visible:ring-2 focus-visible:ring-ring",
+                          isList
+                            ? "md:grid md:grid-cols-[2fr_1fr] md:gap-x-8"
+                            : "pl-6",
                           "before:absolute before:inset-y-2 before:left-0 before:w-1 before:rounded-r-full before:bg-border-strong",
                           tone.cardRail,
-                          canMoveThis && "cursor-grab active:cursor-grabbing",
-                          !canMoveThis && "cursor-pointer",
+                          canMoveThis &&
+                            !isList &&
+                            "cursor-grab active:cursor-grabbing",
+                          (!canMoveThis || isList) && "cursor-pointer",
                           isDragging && "opacity-40",
                         )}
                       >
-                        {canMoveThis && (
+                        {canMoveThis && !isList && (
                           <GripVertical className="pointer-events-none absolute left-1 top-2.5 h-3.5 w-3.5 text-muted-foreground/50 group-hover:text-muted-foreground" />
                         )}
                         <div className="flex items-start justify-between gap-2">
-                          <p className="min-w-0 truncate text-[11px] font-medium text-muted-foreground">
+                          <p className="min-w-0 line-clamp-2 text-sm font-semibold text-foreground">
                             {client?.name ?? "-"}
                           </p>
                           <Badge
@@ -184,21 +239,16 @@ export function PipelineBoard({
                         {/* The project/product line is what tells one card from
                             another when a client has many quotations — keep it
                             the visual anchor, with the spec detail muted below. */}
-                        <p className="line-clamp-2 text-[13px] font-medium text-foreground group-hover:text-primary">
+                        <p className="line-clamp-2 text-sm text-muted-foreground md:col-start-1">
                           {it.projectName ?? it.description}
                         </p>
-                        {it.projectName && it.description ? (
-                          <p className="line-clamp-1 text-[11px] text-muted-foreground">
-                            {it.description}
-                          </p>
-                        ) : null}
                         {pendingSoItemIds.has(it.id) && (
                           <div className="flex items-center justify-between gap-2 rounded-md border border-warning/35 bg-warning/10 px-2 py-1 text-[10px] text-warning">
                             <span className="font-medium">SO belum dibuat</span>
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="h-5 px-1.5 text-[10px] text-warning hover:text-warning"
+                              className="min-h-9 px-2 text-xs text-warning hover:text-warning"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 onCreateSoForItem(it.id);
@@ -208,8 +258,8 @@ export function PipelineBoard({
                             </Button>
                           </div>
                         )}
-                        <div className="flex items-center justify-between pt-0.5">
-                          <span className="text-[12px] font-semibold tabular-nums text-foreground">
+                        <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5">
+                          <span className="text-base font-semibold tabular-nums text-foreground">
                             {formatRupiahShort(it.estimatedValue)}
                           </span>
                           {client && (
@@ -219,7 +269,7 @@ export function PipelineBoard({
                             />
                           )}
                         </div>
-                        <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-2 text-xs text-muted-foreground md:col-span-2">
                           <span className="truncate">{ownerName}</span>
                           {next ? (
                             <span
@@ -230,14 +280,14 @@ export function PipelineBoard({
                               )}
                             >
                               {overdue
-                                ? `overdue ${Math.abs(nextDays!)}h`
+                                ? `Terlambat ${Math.abs(nextDays!)} hari`
                                 : today
                                   ? "hari ini"
                                   : formatDateShort(next)}
                             </span>
                           ) : (
                             <span className="text-muted-foreground/70">
-                              no next action
+                              Belum dijadwalkan
                             </span>
                           )}
                         </div>
@@ -264,7 +314,6 @@ export function PipelineBoard({
           );
         })}
       </div>
-      <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-background to-transparent" />
     </div>
   );
 }

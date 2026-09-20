@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Filter } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -14,11 +14,52 @@ export function FilterBar({
   children,
   label = true,
   className,
+  collapsible = false,
+  activeCount = 0,
+  onReset,
 }: {
   children: ReactNode;
   label?: boolean;
   className?: string;
+  collapsible?: boolean;
+  activeCount?: number;
+  onReset?: () => void;
 }) {
+  const [open, setOpen] = useState(false);
+  if (collapsible) {
+    return (
+      <div className={cn("rounded-lg border bg-card", className)}>
+        <div className="flex items-center justify-between gap-3 px-3">
+          <button
+            type="button"
+            aria-expanded={open}
+            onClick={() => setOpen(!open)}
+            className="flex min-h-11 items-center gap-2 text-sm font-medium text-foreground"
+          >
+            <Filter className="h-4 w-4" aria-hidden="true" />
+            Filter{activeCount > 0 ? ` (${activeCount} aktif)` : ""}
+            <span className="text-xs font-normal text-muted-foreground">
+              {open ? "Tutup" : "Tampilkan"}
+            </span>
+          </button>
+          {activeCount > 0 && onReset && (
+            <button
+              type="button"
+              onClick={onReset}
+              className="min-h-11 text-xs font-medium text-primary"
+            >
+              Reset filter
+            </button>
+          )}
+        </div>
+        {open && (
+          <div className="precision-enter flex flex-col gap-2 border-t p-3 sm:flex-row sm:flex-wrap sm:items-center">
+            {children}
+          </div>
+        )}
+      </div>
+    );
+  }
   return (
     <div
       className={cn(

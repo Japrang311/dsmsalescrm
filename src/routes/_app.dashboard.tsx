@@ -1,13 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import {
-  Clock,
-  Download,
-  FileSpreadsheet,
-  FileText,
-  Target,
-  Wallet,
-} from "lucide-react";
+import { Download, FileSpreadsheet, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -42,14 +35,11 @@ import {
 import { useDashboardData } from "@/hooks/use-dashboard-data";
 import { getSalesOrdersMetrics } from "@/lib/data/sales-orders-metrics";
 import { getPipelineMetrics } from "@/lib/data/pipeline-metrics";
-import {
-  formatPercent,
-  formatPercentValue,
-  formatRupiahShort,
-} from "@/lib/format";
+import { formatPercentValue, formatRupiahShort } from "@/lib/format";
 
 import { AiSummaryCard } from "@/components/dashboard/AiSummaryCard";
-import { KpiCard, KpiProgress } from "@/components/dashboard/KpiCard";
+import { DashboardOverview } from "@/components/dashboard/DashboardOverview";
+import { KpiCard } from "@/components/dashboard/KpiCard";
 import { TodaysFollowUpList } from "@/components/dashboard/TodaysFollowUpList";
 import { SalesPerformanceTable } from "@/components/dashboard/SalesPerformanceTable";
 import { AchievementTrendChart } from "@/components/dashboard/AchievementTrendChart";
@@ -61,6 +51,14 @@ import { CalendarIncompleteWarning } from "@/components/tasks/CalendarIncomplete
 import { useState } from "react";
 import { NOW, CURRENT_YEAR } from "@/lib/domain";
 import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { PageSkeleton } from "@/components/layout/PageSkeleton";
 import { PageContainer } from "@/components/layout/PageContainer";
 
 export const Route = createFileRoute("/_app/dashboard")({
@@ -79,6 +77,7 @@ export const Route = createFileRoute("/_app/dashboard")({
 
 function DashboardPage() {
   const { role, authReady } = useRole();
+  const [exportPeriodOpen, setExportPeriodOpen] = useState(false);
   const {
     orders,
     tasks: allTasks,
@@ -251,11 +250,7 @@ function DashboardPage() {
     monthMetricsQuery.isLoading ||
     pipelineMetricsQuery.isLoading
   ) {
-    return (
-      <div className="flex items-center justify-center rounded-lg border border-dashed py-16 text-sm text-muted-foreground">
-        Loading dashboard…
-      </div>
-    );
+    return <PageSkeleton label="Memuat dashboard…" />;
   }
 
   return (
@@ -276,7 +271,6 @@ function DashboardPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <DateRangePicker value={period} onChange={setPeriod} />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button size="sm" variant="outline" className="h-8 gap-1.5">
@@ -285,9 +279,15 @@ function DashboardPage() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-72">
-              <DropdownMenuLabel>
-                Download laporan (periode dipilih)
-              </DropdownMenuLabel>
+              <DropdownMenuLabel>Download laporan</DropdownMenuLabel>
+              <DropdownMenuItem onSelect={() => setExportPeriodOpen(true)}>
+                Atur periode export
+              </DropdownMenuItem>
+              <p className="px-2 pb-2 text-xs text-muted-foreground">
+                {period.from.toLocaleDateString("id-ID")} —{" "}
+                {period.to.toLocaleDateString("id-ID")} · hanya untuk export
+              </p>
+              <DropdownMenuSeparator />
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 className="gap-2"
@@ -416,89 +416,28 @@ function DashboardPage() {
 
       <CalendarIncompleteWarning tasks={allTasks} metrics={taskMetrics} />
 
-      {/* Hero — the three numbers this page exists to answer */}
-      <section
-        aria-label="Metrik utama"
-        className="grid grid-cols-1 gap-3 md:grid-cols-3"
+      <DashboardOverview
+        monthName={monthName}
+        monthRev={monthRev}
+        monthPct={monthPct}
+        monthTgt={monthTgt}
+        ytd={ytd}
+        ytdPct={ytdPct}
+        yearlyTgt={yearlyTgt}
+        waitingPo={waitingPo}
+        activeCi={activeCi}
+      />
+
+      <div
+        className={
+          role === "sales"
+            ? "grid gap-5"
+            : "grid items-start gap-5 xl:grid-cols-[1.1fr_1fr]"
+        }
       >
-        <KpiCard
-          accent
-          label="Achievement YTD vs Target Setahun"
-          value={formatRupiahShort(ytd)}
-          right={<Target className="h-4 w-4 text-primary" />}
-          sub={
-            <>
-              Target <span className="num">{formatRupiahShort(yearlyTgt)}</span>{" "}
-              · Variance{" "}
-              <span
-                className={`num ${
-                  ytd - yearlyTgt >= 0 ? "text-success" : "text-destructive"
-                }`}
-              >
-                {formatRupiahShort(ytd - yearlyTgt)}
-              </span>
-            </>
-          }
-        >
-          <div className="mt-1 flex items-center justify-between text-xs">
-            <span className="text-muted-foreground">Progress</span>
-            <span className="num font-medium text-foreground">
-              {formatPercent(ytdPct)}
-            </span>
-          </div>
-          <KpiProgress
-            pct={ytdPct}
-            tone={
-              ytdPct >= 1 ? "success" : ytdPct >= 0.8 ? "primary" : "warning"
-            }
-          />
-        </KpiCard>
-
-        <KpiCard
-          accent
-          label={`Achievement ${monthName}`}
-          value={formatRupiahShort(monthRev)}
-          right={<Wallet className="h-4 w-4 text-primary" />}
-          sub={
-            <>
-              Target bulan ini{" "}
-              <span className="num">{formatRupiahShort(monthTgt)}</span>
-            </>
-          }
-        >
-          <div className="mt-1 flex items-center justify-between text-xs">
-            <span className="text-muted-foreground">Progress</span>
-            <span className="num font-medium text-foreground">
-              {formatPercent(monthPct)}
-            </span>
-          </div>
-          <KpiProgress
-            pct={monthPct}
-            tone={
-              monthPct >= 1
-                ? "success"
-                : monthPct >= 0.8
-                  ? "primary"
-                  : "warning"
-            }
-          />
-        </KpiCard>
-
-        <KpiCard
-          accent
-          label="Waiting PO Value"
-          value={formatRupiahShort(waitingPo)}
-          right={<Clock className="h-4 w-4 text-warning" />}
-          sub={
-            <>
-              <span className="num font-medium text-foreground">
-                {activeCi}
-              </span>{" "}
-              commercial items aktif di pipeline
-            </>
-          }
-        />
-      </section>
+        <TodaysFollowUpList />
+        <AchievementTrendChart role={role} />
+      </div>
 
       {/* Secondary stats — one compact line each */}
       <section
@@ -563,15 +502,23 @@ function DashboardPage() {
         />
       </section>
 
-      <AchievementTrendChart role={role} />
-
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-        <TodaysFollowUpList />
-        {role !== "sales" ? <SalesPerformanceTable /> : null}
-      </div>
+      {role !== "sales" ? <SalesPerformanceTable /> : null}
 
       {/* AI summary sits below the metrics it summarises. */}
       <AiSummaryCard />
+      <Dialog open={exportPeriodOpen} onOpenChange={setExportPeriodOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Periode export</DialogTitle>
+            <DialogDescription>
+              Rentang ini berlaku untuk PDF, CSV, dan Excel. Angka dashboard
+              tetap mengikuti YTD dan bulan berjalan.
+            </DialogDescription>
+          </DialogHeader>
+          <DateRangePicker value={period} onChange={setPeriod} />
+          <Button onClick={() => setExportPeriodOpen(false)}>Selesai</Button>
+        </DialogContent>
+      </Dialog>
     </PageContainer>
   );
 }

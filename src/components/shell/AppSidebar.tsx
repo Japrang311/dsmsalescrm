@@ -22,6 +22,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
+import { useSidebar } from "@/components/ui/sidebar-context";
 import { useRole } from "@/context/role-context-core";
 import dsmMarkUrl from "/dsm-mark.png";
 
@@ -50,6 +51,7 @@ const COMMERCIAL_ITEMS_NAV = [
 
 export function AppSidebar() {
   const { role } = useRole();
+  const { setOpenMobile } = useSidebar();
   const pathname = useRouterState({ select: (r) => r.location.pathname });
   const items = role === "executive" ? NAV_EXECUTIVE : NAV_FULL;
 
@@ -91,7 +93,11 @@ export function AppSidebar() {
                       isActive={active}
                       tooltip={item.title}
                     >
-                      <Link to={item.url}>
+                      <Link
+                        to={item.url}
+                        aria-current={active ? "page" : undefined}
+                        onClick={() => setOpenMobile(false)}
+                      >
                         <item.icon className="h-4 w-4" />
                         <span>{item.title}</span>
                       </Link>
@@ -119,7 +125,11 @@ export function AppSidebar() {
                         isActive={active}
                         tooltip={item.title}
                       >
-                        <Link to={item.url}>
+                        <Link
+                          to={item.url}
+                          aria-current={active ? "page" : undefined}
+                          onClick={() => setOpenMobile(false)}
+                        >
                           <item.icon className="h-4 w-4" />
                           <span>{item.title}</span>
                         </Link>

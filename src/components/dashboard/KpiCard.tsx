@@ -34,7 +34,7 @@ export function KpiCard({
       <CardHeader
         className={cn(
           "flex flex-row items-start justify-between space-y-0",
-          compact ? "pb-1.5" : "pb-2",
+          compact ? "p-4 pb-1.5" : "pb-2",
         )}
       >
         <CardTitle className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -42,7 +42,7 @@ export function KpiCard({
         </CardTitle>
         {right}
       </CardHeader>
-      <CardContent className="space-y-1.5">
+      <CardContent className={cn("space-y-1.5", compact && "p-4 pt-0")}>
         <div
           className={cn(
             "num font-semibold leading-tight text-foreground",
@@ -90,8 +90,11 @@ export function KpiProgress({
   return (
     <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-border/60">
       <div
-        className={cn("h-full rounded-full transition-all", bg)}
-        style={{ width: `${clamped * 100}%` }}
+        className={cn(
+          "h-full w-full origin-left rounded-full transition-transform duration-200",
+          bg,
+        )}
+        style={{ transform: `scaleX(${clamped})` }}
       />
     </div>
   );

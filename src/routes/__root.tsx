@@ -11,7 +11,7 @@ import {
 import { SpeedInsights } from "@vercel/speed-insights/react";
 import { useEffect, type ReactNode } from "react";
 
-import "@fontsource-variable/inter";
+import "@fontsource-variable/manrope";
 import appCss from "../styles.css?url";
 import { Toaster } from "@/components/ui/sonner";
 import {

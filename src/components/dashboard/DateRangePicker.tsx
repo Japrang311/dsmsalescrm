@@ -11,6 +11,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { formatDateShort } from "@/lib/format";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { CURRENT_YEAR, NOW } from "@/lib/domain";
 
 export type PeriodRange = { from: Date; to: Date };
@@ -49,6 +50,7 @@ const PRESETS: Array<{ label: string; range: () => PeriodRange }> = [
 ];
 
 export function DateRangePicker({ value, onChange }: Props) {
+  const isMobile = useIsMobile();
   const [open, setOpen] = React.useState(false);
   const [draft, setDraft] = React.useState<RdpDateRange | undefined>({
     from: value.from,
@@ -74,7 +76,9 @@ export function DateRangePicker({ value, onChange }: Props) {
           title="Periode ini hanya mengatur rentang data untuk Export PDF/CSV/Excel, tidak mengubah angka KPI di layar"
         >
           <CalendarIcon className="h-3.5 w-3.5" />
-          <span className="tabular-nums">Periode Export: {label}</span>
+          <span className="whitespace-normal text-left tabular-nums">
+            Periode Export: {label}
+          </span>
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0 pointer-events-auto" align="end">
@@ -107,7 +111,7 @@ export function DateRangePicker({ value, onChange }: Props) {
           <div className="flex flex-col">
             <Calendar
               mode="range"
-              numberOfMonths={2}
+              numberOfMonths={isMobile ? 1 : 2}
               defaultMonth={value.from}
               selected={draft}
               onSelect={setDraft}

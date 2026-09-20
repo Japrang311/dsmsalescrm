@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -53,10 +54,10 @@ export function TodaysFollowUpList() {
 
   return (
     <Card className="border-border shadow-none">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+      <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3 space-y-0 p-4 md:p-5">
         <div>
           <CardTitle as="h2" className="text-sm font-semibold text-foreground">
-            Follow-Up Prioritas Hari Ini
+            Prioritas tindak lanjut
           </CardTitle>
           <p className="mt-0.5 text-xs text-muted-foreground">
             {allRows.length} aktivitas menunggu tindak lanjut
@@ -71,7 +72,26 @@ export function TodaysFollowUpList() {
         </Button>
       </CardHeader>
       <CardContent className="p-0">
-        {rows.length === 0 ? (
+        {activeTasksQuery.isLoading ? (
+          <div
+            className="space-y-3 p-4"
+            role="status"
+            aria-label="Memuat prioritas"
+          >
+            <Skeleton className="h-16" />
+            <Skeleton className="h-16" />
+          </div>
+        ) : activeTasksQuery.isError ? (
+          <p role="alert" className="p-4 text-sm text-destructive">
+            Prioritas belum dapat dimuat.{" "}
+            <button
+              className="underline"
+              onClick={() => void activeTasksQuery.refetch()}
+            >
+              Coba lagi
+            </button>
+          </p>
+        ) : rows.length === 0 ? (
           <EmptyState
             className="m-4 py-10"
             description="Tidak ada follow-up prioritas hari ini."
@@ -157,8 +177,8 @@ export function TodaysFollowUpList() {
                       </div>
                     </div>
                     {canCompleteTasks ? (
-                      <Button size="sm" variant="secondary" className="h-8">
-                        Mark Done
+                      <Button size="sm" variant="secondary" asChild>
+                        <Link to="/tasks">Buka tugas</Link>
                       </Button>
                     ) : null}
                   </div>

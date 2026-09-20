@@ -63,6 +63,9 @@ import {
   pipelineMetricsFromItems,
   type PipelineNextWindow,
 } from "@/lib/pipeline-next-action-filter";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { PageSkeleton } from "@/components/layout/PageSkeleton";
 import { PageContainer } from "@/components/layout/PageContainer";
 
 export const Route = createFileRoute("/_app/pipeline")({
@@ -108,6 +111,11 @@ function PipelineBoardPage({ role }: { role: Role }) {
   const { authReady } = useRole();
   const queryClient = useQueryClient();
 
+  const isMobile = useIsMobile();
+  const [chosenView, setChosenView] = useState<
+    "board" | "list" | "analytics" | null
+  >(null);
+  const pipelineView = chosenView ?? (isMobile ? "list" : "board");
   const [owner, setOwner] = useState<string>("all");
   const [status, setStatus] = useState<string>("all");
   const [nextWindow, setNextWindow] = useState<PipelineNextWindow>("all");
@@ -499,11 +507,7 @@ function PipelineBoardPage({ role }: { role: Role }) {
     !authReady || stageQueries.some((q) => q.isLoading) || !metrics;
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center rounded-lg border border-dashed py-16 text-sm text-muted-foreground">
-        Loading pipeline…
-      </div>
-    );
+    return <PageSkeleton label="Memuat pipeline…" />;
   }
 
   return (
@@ -524,7 +528,7 @@ function PipelineBoardPage({ role }: { role: Role }) {
                 dari data yang sudah dimuat
               </span>
             )}
-            {canDrag && (
+            {canDrag && pipelineView === "board" && (
               <span className="ml-2 hidden md:inline text-muted-foreground/70">
                 · Drag kartu untuk pindah stage
               </span>
@@ -546,6 +550,27 @@ function PipelineBoardPage({ role }: { role: Role }) {
         )}
       </div>
 
+      <ToggleGroup
+        type="single"
+        aria-label="Tampilan pipeline"
+        value={pipelineView}
+        onValueChange={(value) => {
+          if (value === "board" || value === "list" || value === "analytics")
+            setChosenView(value);
+        }}
+        className="w-fit rounded-lg border bg-card p-1"
+      >
+        <ToggleGroupItem value="board" className="px-4">
+          Board
+        </ToggleGroupItem>
+        <ToggleGroupItem value="list" className="px-4">
+          Daftar
+        </ToggleGroupItem>
+        <ToggleGroupItem value="analytics" className="px-4">
+          Analitik
+        </ToggleGroupItem>
+      </ToggleGroup>
+
       <PipelineFilterBar
         role={role}
         owner={owner}
@@ -558,37 +583,42 @@ function PipelineBoardPage({ role }: { role: Role }) {
       />
 
       {/* Analytics */}
-      <PipelineAnalytics
-        metrics={nextWindowFiltered ? visibleMetrics : metrics}
-        ownerMetrics={ownerMetrics}
-        showOwners={role !== "sales"}
-        scopeLabel={
-          nextWindowFiltered
-            ? "Angka per stage mengikuti card yang ditampilkan; performa per owner tetap dari seluruh pipeline."
-            : undefined
-        }
-      />
+      {pipelineView === "analytics" && (
+        <PipelineAnalytics
+          metrics={nextWindowFiltered ? visibleMetrics : metrics}
+          ownerMetrics={ownerMetrics}
+          showOwners={role !== "sales"}
+          scopeLabel={
+            nextWindowFiltered
+              ? "Angka per stage mengikuti card yang ditampilkan; performa per owner tetap dari seluruh pipeline."
+              : undefined
+          }
+        />
+      )}
 
       {/* Board -- more stage columns than fit most viewports; the edge
           fade hints at the horizontal scroll so it doesn't look like the
           board simply ends at "Commit". */}
-      <PipelineBoard
-        columns={stageColumns}
-        canDrag={canDrag}
-        canMoveItem={canMoveItem}
-        draggingId={draggingId}
-        dragOverStage={dragOverStage}
-        onDragOverStage={setDragOverStage}
-        onDraggingChange={setDraggingId}
-        clientById={clientById}
-        ownerById={ownerById}
-        nextByItem={nextByItem}
-        onDrop={(stage: CommercialStage) => handleDrop(stage)}
-        onLoadMore={(stage: CommercialStage) => loadMore(stage)}
-        onCardClick={setDrawerItemId}
-        pendingSoItemIds={pendingSoItemIds}
-        onCreateSoForItem={openCreateSoForItem}
-      />
+      {pipelineView !== "analytics" && (
+        <PipelineBoard
+          view={pipelineView}
+          columns={stageColumns}
+          canDrag={canDrag}
+          canMoveItem={canMoveItem}
+          draggingId={draggingId}
+          dragOverStage={dragOverStage}
+          onDragOverStage={setDragOverStage}
+          onDraggingChange={setDraggingId}
+          clientById={clientById}
+          ownerById={ownerById}
+          nextByItem={nextByItem}
+          onDrop={(stage: CommercialStage) => handleDrop(stage)}
+          onLoadMore={(stage: CommercialStage) => loadMore(stage)}
+          onCardClick={setDrawerItemId}
+          pendingSoItemIds={pendingSoItemIds}
+          onCreateSoForItem={openCreateSoForItem}
+        />
+      )}
 
       <PipelineStageMoveDialog
         pendingMove={pendingMove}

@@ -16,7 +16,6 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -87,6 +86,8 @@ import {
   PipelineStageMoveDialog,
   type PendingPipelineMove,
 } from "@/components/pipeline/PipelineStageMoveDialog";
+import { FilterBar } from "@/components/shell/FilterBar";
+import { PageSkeleton } from "@/components/layout/PageSkeleton";
 import { PageContainer } from "@/components/layout/PageContainer";
 
 export const Route = createFileRoute("/_app/tasks")({
@@ -528,11 +529,7 @@ function TasksInboxPage() {
           : "Team Tasks (read-only)";
 
   if (!authReady || tasksLoading) {
-    return (
-      <div className="flex items-center justify-center rounded-lg border border-dashed py-16 text-sm text-muted-foreground">
-        Loading tasks…
-      </div>
-    );
+    return <PageSkeleton label="Memuat tugas…" />;
   }
 
   return (
@@ -617,138 +614,128 @@ function TasksInboxPage() {
 
       <CalendarIncompleteWarning tasks={activeTasks} />
 
-      {/* View segmented control — Today / Upcoming / Overdue / Completed / Archived */}
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-        {(Object.keys(VIEW_META) as ViewKey[]).map((v) => {
-          const meta = VIEW_META[v];
-          const Icon = meta.icon;
-          const active = activeView === v;
-          const isOverdue = v === "overdue";
-          const count = viewCounts[v];
-          return (
-            <button
-              key={v}
-              type="button"
-              onClick={() => setActiveView(v)}
-              aria-pressed={active}
-              className={cn(
-                "flex items-center gap-3 rounded-md border p-3 text-left transition-colors",
-                active
-                  ? "border-primary bg-primary/5 shadow-sm"
-                  : "border-border bg-card hover:border-primary/40 hover:bg-muted/40",
-                isOverdue && count > 0 && !active && "border-destructive/40",
-              )}
-            >
-              <div
-                className={cn(
-                  "flex h-8 w-8 items-center justify-center rounded-md bg-muted",
-                  meta.tone,
-                  isOverdue &&
-                    count > 0 &&
-                    "bg-destructive/10 text-destructive",
-                )}
-              >
-                <Icon className="h-4 w-4" />
-              </div>
-              <div>
-                <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                  {meta.title}
-                </div>
-                <div
-                  className={cn(
-                    "num text-lg font-semibold text-foreground",
-                    isOverdue && count > 0 && "text-destructive",
-                  )}
-                >
-                  {count}
-                </div>
-              </div>
-            </button>
-          );
-        })}
+      <div
+        role="group"
+        aria-label="Status tugas"
+        className="flex gap-1 overflow-x-auto border-b pb-2"
+      >
+        {(Object.keys(VIEW_META) as ViewKey[]).map((v) => (
+          <button
+            key={v}
+            type="button"
+            onClick={() => setActiveView(v)}
+            aria-pressed={activeView === v}
+            className={cn(
+              "flex min-h-11 shrink-0 items-center gap-2 rounded-md px-3 text-sm transition-colors",
+              activeView === v
+                ? "bg-navy font-semibold text-navy-foreground"
+                : "text-muted-foreground hover:bg-muted",
+              v === "overdue" &&
+                viewCounts[v] > 0 &&
+                activeView !== v &&
+                "text-destructive",
+            )}
+          >
+            {VIEW_META[v].title}
+            <span className="num rounded bg-current/10 px-1.5 text-xs">
+              {viewCounts[v]}
+            </span>
+          </button>
+        ))}
       </div>
 
-      <Card className="border-border shadow-none">
-        <CardContent className="flex flex-col gap-2 p-3 md:flex-row md:flex-wrap md:items-center">
-          <div className="relative flex-1 min-w-[200px]">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Cari task atau nama klien…"
-              className="h-9 pl-8"
-            />
-          </div>
-
-          {role !== "sales" && (
-            <Select value={ownerId} onValueChange={setOwnerId}>
-              <SelectTrigger className="h-9 w-full md:w-[180px]">
-                <SelectValue placeholder="Owner" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Semua owner</SelectItem>
-                {salesTeam.map((m) => (
-                  <SelectItem key={m.id} value={m.id}>
-                    {m.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-
-          <Select
-            value={method}
-            onValueChange={(v) => setMethod(v as typeof method)}
-          >
-            <SelectTrigger className="h-9 w-full md:w-[150px]">
-              <SelectValue placeholder="Metode" />
+      <div className="relative">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          aria-label="Cari task atau nama klien"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Cari task atau nama klien…"
+          className="bg-card pl-9"
+        />
+      </div>
+      <FilterBar
+        collapsible
+        activeCount={
+          [ownerId, method, priority, commercialType].filter(
+            (value) => value !== "all",
+          ).length
+        }
+        onReset={() => {
+          setOwnerId("all");
+          setMethod("all");
+          setPriority("all");
+          setCommercialType("all");
+        }}
+      >
+        {role !== "sales" && (
+          <Select value={ownerId} onValueChange={setOwnerId}>
+            <SelectTrigger className="h-9 w-full md:w-[180px]">
+              <SelectValue placeholder="Owner" />
             </SelectTrigger>
             <SelectContent>
-              {METHOD_OPTIONS.map((m) => (
-                <SelectItem key={m} value={m}>
-                  {m === "all" ? "Semua metode" : m}
+              <SelectItem value="all">Semua owner</SelectItem>
+              {salesTeam.map((m) => (
+                <SelectItem key={m.id} value={m.id}>
+                  {m.name}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
+        )}
 
-          <Select
-            value={priority}
-            onValueChange={(v) => setPriority(v as typeof priority)}
-          >
-            <SelectTrigger className="h-9 w-full md:w-[170px]">
-              <SelectValue placeholder="Prioritas" />
-            </SelectTrigger>
-            <SelectContent>
-              {PRIORITY_OPTIONS.map((p) => (
-                <SelectItem key={p} value={p}>
-                  {p === "all" ? "Semua prioritas" : p}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <Select
+          value={method}
+          onValueChange={(v) => setMethod(v as typeof method)}
+        >
+          <SelectTrigger className="h-9 w-full md:w-[150px]">
+            <SelectValue placeholder="Metode" />
+          </SelectTrigger>
+          <SelectContent>
+            {METHOD_OPTIONS.map((m) => (
+              <SelectItem key={m} value={m}>
+                {m === "all" ? "Semua metode" : m}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
-          <Select
-            value={commercialType}
-            onValueChange={(v) => setCommercialType(v as typeof commercialType)}
-          >
-            <SelectTrigger className="h-9 w-full md:w-[170px]">
-              <SelectValue placeholder="Commercial" />
-            </SelectTrigger>
-            <SelectContent>
-              {COMMERCIAL_OPTIONS.map((c) => (
-                <SelectItem key={c} value={c}>
-                  {c === "all"
-                    ? "Semua tipe"
-                    : c === "none"
-                      ? "Tanpa commercial"
-                      : c}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </CardContent>
-      </Card>
+        <Select
+          value={priority}
+          onValueChange={(v) => setPriority(v as typeof priority)}
+        >
+          <SelectTrigger className="h-9 w-full md:w-[170px]">
+            <SelectValue placeholder="Prioritas" />
+          </SelectTrigger>
+          <SelectContent>
+            {PRIORITY_OPTIONS.map((p) => (
+              <SelectItem key={p} value={p}>
+                {p === "all" ? "Semua prioritas" : p}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select
+          value={commercialType}
+          onValueChange={(v) => setCommercialType(v as typeof commercialType)}
+        >
+          <SelectTrigger className="h-9 w-full md:w-[170px]">
+            <SelectValue placeholder="Commercial" />
+          </SelectTrigger>
+          <SelectContent>
+            {COMMERCIAL_OPTIONS.map((c) => (
+              <SelectItem key={c} value={c}>
+                {c === "all"
+                  ? "Semua tipe"
+                  : c === "none"
+                    ? "Tanpa commercial"
+                    : c}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </FilterBar>
 
       {view === "agenda" && isHistoryView ? (
         <TaskHistorySection

@@ -32,7 +32,19 @@ export function PipelineFilterBar({
   salesTeam,
 }: Props) {
   return (
-    <FilterBar>
+    <FilterBar
+      collapsible
+      activeCount={
+        Number(owner !== "all") +
+        Number(status !== "all") +
+        Number(nextWindow !== "all")
+      }
+      onReset={() => {
+        onOwnerChange("all");
+        onStatusChange("all");
+        onNextWindowChange("all");
+      }}
+    >
       {role !== "sales" && (
         <Select value={owner} onValueChange={onOwnerChange}>
           <SelectTrigger className={FILTER_TRIGGER_CLASS}>
