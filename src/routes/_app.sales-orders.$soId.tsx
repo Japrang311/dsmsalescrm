@@ -278,7 +278,7 @@ function SalesOrderDetail() {
               </p>
               <p className="mt-1 text-[11px] text-muted-foreground">
                 {foc
-                  ? "SO Prototype FOC tidak berkontribusi ke revenue & achievement."
+                  ? "SO Prototype FOC tidak berkontribusi ke revenue dan achievement."
                   : "Kontribusi 100% ke revenue pada periode SO."}
               </p>
             </div>

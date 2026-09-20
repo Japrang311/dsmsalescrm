@@ -254,7 +254,7 @@ function ClientInfoCard({
     <Card>
       <CardContent className="p-4">
         <div className="flex items-center justify-between">
-          <SectionTitle icon={Building2} title="Info Perusahaan & Kontak" />
+          <SectionTitle icon={Building2} title="Info Perusahaan dan Kontak" />
           {canEdit && (
             <Button variant="outline" size="sm" onClick={onEdit}>
               <Pencil className="h-3.5 w-3.5" /> Edit Info

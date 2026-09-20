@@ -159,7 +159,7 @@ const KIND_META: Record<
     color: "bg-orange-100 text-orange-700",
   },
   team_admin: {
-    label: "Administrasi Tim & Role",
+    label: "Administrasi Tim dan Role",
     icon: Users,
     color: "bg-cyan-100 text-cyan-700",
   },

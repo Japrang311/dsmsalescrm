@@ -60,6 +60,9 @@
   --font-sans:
     "Inter Variable", "Inter", ui-sans-serif, system-ui, -apple-system,
     "Segoe UI", sans-serif;
+  /* Dense operational metadata remains compact without dropping below 13px. */
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: 1.125rem;
 }
 
 :root {
@@ -179,28 +182,90 @@
   html,
   body {
     font-family: var(--font-sans);
+    font-feature-settings:
+      "kern" 1,
+      "liga" 1;
+    text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
   }
 
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
+    font-size: 1rem;
+    line-height: 1.4;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    hyphens: none;
+    page-break-after: avoid;
+  }
+
+  /* Keep page hierarchy consistent while leaving compact dialog titles alone. */
+  main h1 {
+    font-size: 1.5rem !important;
+    line-height: 2rem !important;
+    letter-spacing: normal !important;
+  }
+
+  main h2.text-sm {
+    font-size: 1.0625rem !important;
+    line-height: 1.5rem !important;
+    letter-spacing: normal !important;
+  }
+
+  main h3.text-sm {
+    font-size: 0.9375rem !important;
+    line-height: 1.25rem !important;
+    letter-spacing: normal !important;
   }
 
   /* Tabular numerals for financial displays */
   .tabular-nums {
-    font-variant-numeric: tabular-nums;
-    font-feature-settings: "tnum";
+    font-variant-numeric: tabular-nums lining-nums;
+    font-feature-settings:
+      "kern" 1,
+      "liga" 1,
+      "tnum" 1,
+      "lnum" 1;
   }
 }
 
 @utility num {
-  font-variant-numeric: tabular-nums;
-  font-feature-settings: "tnum";
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings:
+    "kern" 1,
+    "liga" 1,
+    "tnum" 1,
+    "lnum" 1;
   /* Currency/metric values must never break mid-number ("Rp118,54 milyar"
      splitting across two lines). Surrounding sentence text is not .num, so
      it still wraps between words. */
   white-space: nowrap;
+}
+
+@layer utilities {
+  /* Legacy microcopy used 10–12px in high-density views. Keep it compact but
+     readable at the same 13px floor as the shared `text-xs` token. */
+  .text-\[10px\],
+  .text-\[11px\],
+  .text-\[12px\] {
+    font-size: 0.8125rem;
+    line-height: 1.125rem;
+  }
+
+  /* Tailwind `tracking-wide` is 0.025em; capitals need at least 0.05em. */
+  .uppercase.tracking-wide {
+    letter-spacing: 0.06em;
+  }
 }
 
 /* Horizontal scroll container for wide tables. Keeps a thin, always-visible

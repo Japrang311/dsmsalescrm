@@ -43,7 +43,7 @@ export function ReportsFunnelSection({
       <Card>
         <CardHeader className="pb-2">
           <CardTitle as="h2" className="text-sm font-semibold">
-            Quotation Funnel & Open Pipeline
+            Quotation Funnel dan Open Pipeline
           </CardTitle>
           <p className="text-[11px] text-muted-foreground">
             Open Quotation Sent:{" "}
@@ -107,8 +107,8 @@ export function ReportsFunnelSection({
             tone="muted"
           />
           <StatBlock
-            label="Done / Cancelled"
-            value={`${taskSummary.done} / ${taskSummary.cancelled}`}
+            label="Done dan Cancelled"
+            value={`${taskSummary.done} · ${taskSummary.cancelled}`}
             tone="emerald"
           />
           {role === "executive" ? (
@@ -123,7 +123,7 @@ export function ReportsFunnelSection({
       <Card>
         <CardHeader className="pb-2">
           <CardTitle as="h2" className="text-sm font-semibold">
-            Waiting PO — Nilai & Aging
+            Waiting PO — Nilai dan Aging
           </CardTitle>
           <p className="text-[11px] text-muted-foreground">
             Total nilai menunggu PO:{" "}
@@ -141,7 +141,7 @@ export function ReportsFunnelSection({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="text-xs">Klien / Project</TableHead>
+                  <TableHead className="text-xs">Klien dan Project</TableHead>
                   <TableHead className="text-xs">Owner</TableHead>
                   <TableHead className="text-xs">Aging</TableHead>
                   <TableHead className="text-right text-xs">Nilai</TableHead>

@@ -113,7 +113,7 @@ export function PipelineAnalytics({
         <div className="rounded-lg border bg-card p-3">
           <div className="mb-2 flex items-center justify-between">
             <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">
-              Value & konversi per stage
+              Value dan konversi per stage
             </h3>
             <span className="text-[11px] text-muted-foreground">
               % dari total pipeline

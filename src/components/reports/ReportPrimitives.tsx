@@ -113,7 +113,7 @@ export function ChartEmpty() {
     <EmptyState
       className="h-full"
       icon={BarChart3}
-      description="Belum ada data pada rentang & filter ini."
+      description="Belum ada data pada rentang dan filter ini."
     />
   );
 }

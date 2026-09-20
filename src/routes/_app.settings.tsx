@@ -207,7 +207,7 @@ function SettingsPage() {
           </TabsTrigger>
           {canViewTeam && (
             <TabsTrigger value="team" className="gap-1.5">
-              <Users className="h-3.5 w-3.5" /> Tim &amp; Role
+              <Users className="h-3.5 w-3.5" /> Tim dan Role
             </TabsTrigger>
           )}
           {canViewBusinessSettings && (
@@ -294,7 +294,7 @@ function ProfileTab({
   return (
     <Card>
       <CardHeader>
-        <CardTitle as="h2">Profil &amp; Preferensi</CardTitle>
+        <CardTitle as="h2">Profil dan Preferensi</CardTitle>
         <CardDescription>
           Preferensi tampilan dan informasi akun untuk user saat ini.
         </CardDescription>
@@ -536,7 +536,7 @@ function TeamTab({
     <Card>
       <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
         <div>
-          <CardTitle as="h2">Manajemen Tim &amp; Role</CardTitle>
+          <CardTitle as="h2">Manajemen Tim dan Role</CardTitle>
           <CardDescription>
             Super Admin dan Executive tidak menjadi owner target atau data
             Sales. Ownership aktif hanya dapat dialihkan ke Sales atau Manager
@@ -1001,7 +1001,7 @@ function MemberDialog({
         <DialogDescription>
           {member
             ? "Perubahan nama langsung berlaku di akun login. Perubahan role dilakukan melalui aksi terpisah dan wajib disertai alasan."
-            : "Membuat akun login sungguhan — anggota tim bisa langsung masuk dengan email & kata sandi ini."}
+            : "Membuat akun login sungguhan — anggota tim bisa langsung masuk dengan email dan kata sandi ini."}
         </DialogDescription>
       </DialogHeader>
       <div className="space-y-3">
@@ -1583,7 +1583,7 @@ function OrgTab({ canEdit }: { canEdit: boolean }) {
     <div className="space-y-4">
       <Card>
         <CardHeader>
-          <CardTitle as="h2">Organisasi &amp; Periode</CardTitle>
+          <CardTitle as="h2">Organisasi dan Periode</CardTitle>
           <CardDescription>
             Konfigurasi tingkat perusahaan yang dipakai lintas modul.
           </CardDescription>

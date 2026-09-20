@@ -91,7 +91,7 @@ export function ReassignOwnerDialog({
             </Label>
             <Select value={selectedOwnerId} onValueChange={setSelectedOwnerId}>
               <SelectTrigger className="h-9 text-xs">
-                <SelectValue placeholder="Pilih sales..." />
+                <SelectValue placeholder="Pilih sales…" />
               </SelectTrigger>
               <SelectContent>
                 {teamMembers

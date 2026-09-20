@@ -30,7 +30,7 @@ const NAV_FULL = [
   { title: "My Tasks", url: "/tasks", icon: ListChecks },
   { title: "Clients", url: "/clients", icon: Users },
   { title: "Commercial Pipeline", url: "/pipeline", icon: GitBranch },
-  { title: "Sales Orders & Revenue", url: "/sales-orders", icon: Receipt },
+  { title: "Sales Orders dan Revenue", url: "/sales-orders", icon: Receipt },
   { title: "Activity Log", url: "/activity", icon: Activity },
   { title: "Reports", url: "/reports", icon: BarChart3 },
   { title: "Settings", url: "/settings", icon: Settings },
@@ -39,7 +39,7 @@ const NAV_FULL = [
 const NAV_EXECUTIVE = [
   { title: "Executive Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Clients", url: "/clients", icon: Users },
-  { title: "Sales Orders & Revenue", url: "/sales-orders", icon: Receipt },
+  { title: "Sales Orders dan Revenue", url: "/sales-orders", icon: Receipt },
   { title: "Commercial Pipeline", url: "/pipeline", icon: GitBranch },
   { title: "Reports", url: "/reports", icon: BarChart3 },
 ] as const;

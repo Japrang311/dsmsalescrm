@@ -78,7 +78,7 @@ import { EmptyExportError } from "@/lib/export-csv";
 import { PageContainer } from "@/components/layout/PageContainer";
 
 export const Route = createFileRoute("/_app/sales-orders/")({
-  head: () => ({ meta: [{ title: "Sales Orders & Revenue · DSM" }] }),
+  head: () => ({ meta: [{ title: "Sales Orders dan Revenue · DSM" }] }),
   component: SalesOrdersRevenuePage,
 });
 
@@ -309,7 +309,8 @@ function SalesOrdersRevenuePage() {
       <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
         <div className="min-w-0">
           <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
-            <Receipt className="h-5 w-5 text-primary" /> Sales Orders & Revenue
+            <Receipt className="h-5 w-5 text-primary" /> Sales Orders dan
+            Revenue
           </h1>
           <p className="text-sm text-muted-foreground">
             {totalRows} SO {deletedMode ? "terhapus" : "aktif"} · Scope:{" "}
@@ -434,7 +435,7 @@ function SalesOrdersRevenuePage() {
         <EmptyState
           className="py-14"
           icon={Search}
-          description="Tidak ada SO pada rentang & filter ini. Longgarkan filter atau pilih periode lain."
+          description="Tidak ada SO pada rentang dan filter ini. Longgarkan filter atau pilih periode lain."
         />
       ) : (
         <Card>

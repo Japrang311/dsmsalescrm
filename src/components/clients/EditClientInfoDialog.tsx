@@ -152,7 +152,7 @@ export function EditClientInfoDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Edit Info Client &amp; Kontak</DialogTitle>
+          <DialogTitle>Edit Info Client dan Kontak</DialogTitle>
           <DialogDescription>
             Nama client, info perusahaan, dan hingga 3 kontak person. Dicatat
             sebagai {actorName}.

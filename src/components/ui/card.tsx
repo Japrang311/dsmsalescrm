@@ -40,7 +40,7 @@ const CardTitle = React.forwardRef<HTMLElement, CardTitleProps>(
   ({ className, as: Component = "div", ...props }, ref) => (
     <Component
       ref={ref as never}
-      className={cn("font-semibold leading-none tracking-tight", className)}
+      className={cn("font-semibold leading-snug", className)}
       {...props}
     />
   ),

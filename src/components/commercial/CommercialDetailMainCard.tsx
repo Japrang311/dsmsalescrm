@@ -353,7 +353,7 @@ export function CommercialDetailMainCard({
         <Separator />
 
         <p className="text-xs font-semibold uppercase tracking-wide text-foreground/70">
-          Nilai &amp; Nomor Dokumen
+          Nilai dan Nomor Dokumen
         </p>
         <div className="grid gap-3 sm:grid-cols-3">
           <InfoCell label="Total">

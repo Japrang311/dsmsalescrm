@@ -319,13 +319,13 @@ function DashboardPage() {
               <DropdownMenuItem
                 className="gap-2"
                 onSelect={() =>
-                  runExport("CSV", "Today & overdue follow-ups", () =>
+                  runExport("CSV", "Today dan overdue follow-ups", () =>
                     exportFollowUpsCsv(exportContext),
                   )
                 }
               >
                 <FileText className="h-4 w-4" />
-                Today &amp; overdue follow-ups
+                Today dan overdue follow-ups
               </DropdownMenuItem>
               {(role === "manager" ||
                 role === "executive" ||
@@ -373,13 +373,13 @@ function DashboardPage() {
               <DropdownMenuItem
                 className="gap-2"
                 onSelect={() =>
-                  runExport("Excel", "Today & overdue follow-ups", () =>
+                  runExport("Excel", "Today dan overdue follow-ups", () =>
                     exportFollowUpsXlsx(exportContext),
                   )
                 }
               >
                 <FileSpreadsheet className="h-4 w-4" />
-                Today &amp; overdue follow-ups
+                Today dan overdue follow-ups
               </DropdownMenuItem>
               {(role === "manager" ||
                 role === "executive" ||

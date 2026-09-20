@@ -167,7 +167,7 @@ function ClientProfilePage() {
             Overview
           </TabsTrigger>
           <TabsTrigger value="tasks" className="shrink-0">
-            Follow-Up &amp; Tasks
+            Follow-Up dan Tasks
           </TabsTrigger>
           <TabsTrigger value="commercial" className="shrink-0">
             Commercial Items

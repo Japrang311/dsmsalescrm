@@ -27,7 +27,7 @@ export function ReportsPerformanceSection({
 }) {
   return (
     <div className="grid gap-4 lg:grid-cols-2">
-      <Card>
+      <Card className="min-w-0">
         <CardHeader className="pb-2">
           <CardTitle
             as="h2"
@@ -95,7 +95,7 @@ export function ReportsPerformanceSection({
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="min-w-0">
         <CardHeader className="pb-2">
           <CardTitle
             as="h2"

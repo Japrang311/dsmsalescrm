@@ -92,7 +92,7 @@ import { PageContainer } from "@/components/layout/PageContainer";
 export const Route = createFileRoute("/_app/tasks")({
   head: () => ({
     meta: [
-      { title: "Task & Follow-Up Inbox · DSM Sales Execution" },
+      { title: "Task dan Follow-Up Inbox · DSM Sales Execution" },
       {
         name: "description",
         content:
@@ -548,7 +548,7 @@ function TasksInboxPage() {
               : role === "executive"
                 ? "Manager-owned task yang sudah tereskalasi. Detail bersifat read-only."
                 : role === "manager"
-                  ? "Hanya task yang ditugaskan ke Anda — angka tim ada di Dashboard & Team Exceptions."
+                  ? "Hanya task yang ditugaskan ke Anda — angka tim ada di Dashboard dan Team Exceptions."
                   : "Hanya task yang ditugaskan ke Anda. Follow-up terhubung ke klien serta commercial item aktif."}
           </p>
         </div>

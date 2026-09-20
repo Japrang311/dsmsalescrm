@@ -59,7 +59,7 @@ export function QuotationPreviewDialog({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button variant="outline" className="gap-1.5">
-          <FileText className="h-4 w-4" /> Preview & Export PDF
+          <FileText className="h-4 w-4" /> Preview dan Export PDF
         </Button>
       </DialogTrigger>
       <DialogContent className="flex h-[92vh] max-h-[92vh] max-w-6xl flex-col overflow-hidden">
@@ -247,7 +247,7 @@ function PreviewBody({
 
           <Collapsible>
             <CollapsibleTrigger className="group flex w-full items-center justify-between rounded-md border px-3 py-2 text-sm font-medium">
-              Terms & penutup
+              Terms dan penutup
               <ChevronDown className="h-4 w-4 transition-transform group-data-[state=open]:rotate-180" />
             </CollapsibleTrigger>
             <CollapsibleContent className="grid gap-4 pt-3">

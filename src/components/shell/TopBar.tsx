@@ -207,7 +207,7 @@ function GlobalSearch() {
             onKeyDown={(e) => {
               if (e.key === "Escape") setOpen(false);
             }}
-            placeholder="Cari client, quotation, SO..."
+            placeholder="Cari client, quotation, SO…"
             className="h-9 pl-8 bg-surface-muted border-border"
           />
         </div>
@@ -272,7 +272,7 @@ function MobileSearch() {
               onKeyDown={(e) => {
                 if (e.key === "Escape") closeSearch();
               }}
-              placeholder="Cari client, quotation, SO..."
+              placeholder="Cari client, quotation, SO…"
               className="h-10 pl-8"
             />
           </div>
