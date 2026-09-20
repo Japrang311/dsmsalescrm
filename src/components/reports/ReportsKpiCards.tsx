@@ -1,4 +1,9 @@
-import { TrendingUp, Target, FlaskConical } from "lucide-react";
+import {
+  CircleDollarSign,
+  FileCheck2,
+  Target,
+  FlaskConical,
+} from "lucide-react";
 import { formatPercent, formatRupiahShort } from "@/lib/format";
 import { KpiTile } from "./ReportPrimitives";
 
@@ -14,10 +19,18 @@ export function ReportsKpiCards({
     protoPaid: number;
     protoFocCount: number;
     protoPaidCount: number;
+    totalCount: number;
   };
   ytdAchievementPct: number;
   yearTargetTotal: number;
 }) {
+  const revenueOrderCount = Math.max(
+    0,
+    totals.totalCount - totals.protoFocCount,
+  );
+  const averageOrderValue =
+    revenueOrderCount > 0 ? totals.revenue / revenueOrderCount : 0;
+
   return (
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       <KpiTile
@@ -31,16 +44,22 @@ export function ReportsKpiCards({
         accent
       />
       <KpiTile
-        icon={<TrendingUp className="h-4 w-4" />}
-        label="PPN Revenue"
-        value={formatRupiahShort(totals.ppn)}
-        sub={`${formatPercent(totals.revenue ? totals.ppn / totals.revenue : 0)} dari revenue`}
+        icon={<FileCheck2 className="h-4 w-4" />}
+        label="Total Sales Orders"
+        value={`${totals.totalCount.toLocaleString("id-ID")} SO`}
+        sub={`${revenueOrderCount.toLocaleString("id-ID")} revenue · ${totals.protoFocCount.toLocaleString("id-ID")} FOC`}
       />
       <KpiTile
-        icon={<TrendingUp className="h-4 w-4" />}
-        label="Non-PPN Revenue"
-        value={formatRupiahShort(totals.nonPpn)}
-        sub={`${formatPercent(totals.revenue ? totals.nonPpn / totals.revenue : 0)} dari revenue`}
+        icon={<CircleDollarSign className="h-4 w-4" />}
+        label="Average Order Value"
+        value={
+          revenueOrderCount > 0 ? formatRupiahShort(averageOrderValue) : "—"
+        }
+        sub={
+          revenueOrderCount > 0
+            ? `Rata-rata dari ${revenueOrderCount.toLocaleString("id-ID")} SO revenue`
+            : "Belum ada SO berkontribusi revenue"
+        }
       />
       <KpiTile
         icon={<FlaskConical className="h-4 w-4" />}

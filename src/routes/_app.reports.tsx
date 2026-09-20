@@ -146,6 +146,7 @@ function ReportsPage() {
       protoPaid: m?.prototypePaidValue ?? 0,
       protoFocCount: m?.focCount ?? 0,
       protoPaidCount: m?.prototypePaidCount ?? 0,
+      totalCount: m?.totalCount ?? 0,
     };
   }, [metricsQuery.data]);
 
