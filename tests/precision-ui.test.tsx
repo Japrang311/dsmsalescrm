@@ -94,7 +94,7 @@ describe("Precision operational presentation", () => {
     );
     expect(html).toContain("SO belum dibuat");
     expect(html).toContain("Buat SO");
-    expect(html).toContain("Hubungkan SO");
+    expect(html).toContain("Link SO");
   });
   test("linked Closed Won quotation exposes the released SO number", () => {
     const html = renderToStaticMarkup(
