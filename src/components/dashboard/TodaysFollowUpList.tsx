@@ -93,8 +93,16 @@ export function TodaysFollowUpList() {
           </p>
         ) : rows.length === 0 ? (
           <EmptyState
-            className="m-4 py-10"
+            className="m-4"
             description="Tidak ada follow-up prioritas hari ini."
+            action={
+              <Link
+                to="/tasks"
+                className="text-xs font-medium text-primary underline-offset-4 hover:underline"
+              >
+                Buka daftar task
+              </Link>
+            }
           />
         ) : (
           <div className="divide-y divide-border">

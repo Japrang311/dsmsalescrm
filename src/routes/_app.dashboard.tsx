@@ -32,8 +32,11 @@ import { getPipelineMetrics } from "@/lib/data/pipeline-metrics";
 import { formatPercentValue, formatRupiahShort } from "@/lib/format";
 
 import { AiSummaryCard } from "@/components/dashboard/AiSummaryCard";
+import {
+  OperationalStats,
+  type OperationalStat,
+} from "@/components/dashboard/OperationalStats";
 import { DashboardOverview } from "@/components/dashboard/DashboardOverview";
-import { KpiCard } from "@/components/dashboard/KpiCard";
 import { TodaysFollowUpList } from "@/components/dashboard/TodaysFollowUpList";
 import { SalesPerformanceTable } from "@/components/dashboard/SalesPerformanceTable";
 import {
@@ -258,6 +261,56 @@ function DashboardPage() {
     monthMetricsQuery.isLoading ||
     pipelineMetricsQuery.isLoading;
 
+  // Ordered by how much each number demands action today: overdue work first,
+  // reporting figures last.
+  const operationalStats: OperationalStat[] = [
+    {
+      label: "Overdue Follow-Ups",
+      value: overdueAttention,
+      tone: overdueAttention > 0 ? "destructive" : "default",
+      sub:
+        overdueAttention > 0
+          ? `${tasks.escalated} escalated · ${tasks.overdue} overdue`
+          : "Semua terkendali",
+    },
+    {
+      label: "Open Tasks",
+      value: tasks.open,
+      sub: (
+        <>
+          <span className="num font-medium text-foreground">{tasks.today}</span>{" "}
+          hari ini ·{" "}
+          <span className="num font-medium text-foreground">
+            {tasks.upcoming}
+          </span>{" "}
+          upcoming
+        </>
+      ),
+    },
+    {
+      label: "Pipeline Win Rate",
+      value: pipelineDecided > 0 ? formatPercentValue(pipelineWinRate) : "—",
+      sub:
+        pipelineDecided > 0
+          ? `${pipelineWon} won · ${pipelineLost} lost`
+          : "Belum ada deal diputuskan",
+    },
+    {
+      label: "Revenue Source YTD",
+      value: formatRupiahShort(
+        src.newProduct + src.existing + src.prototypePaid,
+      ),
+      sub: `New ${sourcePct(src.newProduct)} · Existing ${sourcePct(
+        src.existing,
+      )} · Proto ${sourcePct(src.prototypePaid)}`,
+    },
+    {
+      label: "Prototype Paid YTD",
+      value: formatRupiahShort(proto.paidValue),
+      sub: `${proto.paidCount} paid · ${proto.focCount} FOC (Rp0, tidak dihitung)`,
+    },
+  ];
+
   return (
     <PageContainer>
       {/* Header */}
@@ -437,8 +490,6 @@ function DashboardPage() {
         </div>
       </div>
 
-      <CalendarIncompleteWarning tasks={allTasks} metrics={taskMetrics} />
-
       {metricsLoading ? (
         <Skeleton
           role="status"
@@ -459,93 +510,32 @@ function DashboardPage() {
         />
       )}
 
-      <div
-        className={
-          role === "sales"
-            ? "grid gap-5"
-            : "grid items-start gap-5 xl:grid-cols-[1.1fr_1fr]"
-        }
-      >
-        <TodaysFollowUpList />
-        <Suspense fallback={<ChartCardSkeleton />}>
-          <AchievementTrendChart role={role} />
-        </Suspense>
-      </div>
+      {/* Caveat on the figures above, so it sits with them rather than
+          outranking them at the top of the page. */}
+      <CalendarIncompleteWarning tasks={allTasks} metrics={taskMetrics} />
 
-      {/* Secondary stats — one compact line each */}
+      {/* Operational context, led by the number that demands action. */}
       {metricsLoading ? (
         <div
           role="status"
           aria-label="Memuat ringkasan operasional…"
-          className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5"
+          className="grid grid-cols-2 gap-x-5 gap-y-4 sm:grid-cols-3 xl:grid-cols-5"
         >
           {Array.from({ length: 5 }, (_, i) => (
-            <Skeleton key={i} className="h-24 rounded-xl" />
+            <Skeleton key={i} className="h-16 rounded-lg" />
           ))}
         </div>
       ) : (
-        <section
-          aria-label="Ringkasan operasional"
-          className="precision-stagger grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5"
-        >
-          <KpiCard
-            compact
-            label="Pipeline Win Rate"
-            value={
-              pipelineDecided > 0 ? formatPercentValue(pipelineWinRate) : "—"
-            }
-            sub={
-              pipelineDecided > 0
-                ? `${pipelineWon} won · ${pipelineLost} lost`
-                : "Belum ada deal diputuskan"
-            }
-          />
-          <KpiCard
-            compact
-            label="Revenue Source YTD"
-            value={formatRupiahShort(
-              src.newProduct + src.existing + src.prototypePaid,
-            )}
-            sub={`New ${sourcePct(src.newProduct)} · Existing ${sourcePct(
-              src.existing,
-            )} · Proto ${sourcePct(src.prototypePaid)}`}
-          />
-          <KpiCard
-            compact
-            label="Prototype Paid YTD"
-            value={formatRupiahShort(proto.paidValue)}
-            sub={`${proto.paidCount} paid · ${proto.focCount} FOC (Rp0, tidak dihitung)`}
-          />
-          <KpiCard
-            compact
-            label="Open Tasks"
-            value={tasks.open}
-            sub={
-              <>
-                <span className="num font-medium text-foreground">
-                  {tasks.today}
-                </span>{" "}
-                hari ini ·{" "}
-                <span className="num font-medium text-foreground">
-                  {tasks.upcoming}
-                </span>{" "}
-                upcoming
-              </>
-            }
-          />
-          <KpiCard
-            compact
-            label="Overdue Follow-Ups"
-            value={overdueAttention}
-            tone={overdueAttention > 0 ? "destructive" : "default"}
-            sub={
-              overdueAttention > 0
-                ? `${tasks.escalated} escalated · ${tasks.overdue} overdue`
-                : "Semua terkendali"
-            }
-          />
-        </section>
+        <OperationalStats stats={operationalStats} />
       )}
+
+      {/* The work queue — what this page is opened to answer. */}
+      <TodaysFollowUpList />
+
+      {/* Analysis sits after the day's work, not beside it. */}
+      <Suspense fallback={<ChartCardSkeleton />}>
+        <AchievementTrendChart role={role} />
+      </Suspense>
 
       {role !== "sales" ? <SalesPerformanceTable /> : null}
 

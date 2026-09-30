@@ -130,7 +130,8 @@ Dari inspeksi visual Dashboard:
 - **Banner peringatan kalender** menempati posisi teratas, di atas KPI utama — cocok dipindah ke bawah header
   atau dibuat bisa ditutup.
 
-Ini semua selera/prioritas produk, bukan cacat. Tidak saya sentuh tanpa persetujuan.
+Ini semua selera/prioritas produk, bukan cacat. **Tiga dari empat dikerjakan menyusul —
+lihat "Penyesuaian hierarki Dashboard" di bawah.**
 
 ---
 
@@ -213,3 +214,60 @@ aktif — `useCountUp` mengembalikan nilai akhir langsung, dan aturan di `styles
 `src/components/ui/chart.tsx` adalah komponen shadcn yang mengimpor recharts secara statis tetapi
 **tidak dipakai di mana pun**. Karena tidak ada yang mengimpornya, ia tidak masuk bundle — jadi bukan
 masalah performa, hanya file mati. Dibiarkan sesuai aturan repo soal dead code lama.
+
+---
+
+## Penyesuaian hierarki Dashboard (2026-09-30, menyusul)
+
+Arah yang dipilih: **bobot visual + urutan aksi-dulu**, plus dua temuan kecil.
+
+### Urutan halaman — sebelum → sesudah
+
+| Sebelum                                    | Sesudah                                       |
+| ------------------------------------------ | --------------------------------------------- |
+| 1. Header                                  | 1. Header                                     |
+| 2. **Banner kalender**                     | 2. **Capaian (hero)**                         |
+| 3. Capaian (hero)                          | 3. Banner kalender                            |
+| 4. Prioritas tindak lanjut \| Tren capaian | 4. **Ringkasan operasional** (Overdue duluan) |
+| 5. Ringkasan operasional (5 kartu)         | 5. **Prioritas tindak lanjut** (lebar penuh)  |
+| 6. Sales Performance                       | 6. Tren capaian (lebar penuh)                 |
+|                                            | 7. Sales Performance                          |
+
+Dasarnya: halaman ini dibuka untuk menjawab dua hal — "apakah saya on target?" (hero) dan
+"apa yang harus saya kerjakan hari ini?" (overdue + daftar follow-up). Keduanya kini di atas lipatan
+layar. Grafik tren adalah analisis, bukan aksi, jadi turun ke bawah.
+
+### Yang berubah
+
+**Banner kalender turun ke bawah hero.** Sebelumnya peringatan kelengkapan data menempati posisi
+teratas, di atas angka yang menjadi alasan halaman ini ada. Sekarang ia berada tepat di bawah angka
+yang dikualifikasinya — tetap terbaca, tapi tidak lagi mengalahkan hero. Komponennya sendiri tidak
+disentuh (masih dipakai halaman Tasks).
+
+**Lima kartu KPI jadi baris stat.** Komponen baru `OperationalStats` menggantikan lima `KpiCard`
+berbingkai dengan sel bergaris-atas tanpa kartu. Lima kartu putih terbaca sebagai sederajat dengan
+blok hero; garis + tipografi membuatnya jelas sekunder tanpa mengurangi keterbacaan. Urutannya kini
+menurut seberapa mendesak: **Overdue Follow-Ups → Open Tasks → Win Rate → Revenue Source → Prototype**.
+
+**`KpiCard` dihapus.** Ternyata komponen ini hanya dipakai di Dashboard, 5 kali, semuanya `compact` —
+varian ukuran penuhnya sudah mati sejak lama. Karena perubahan inilah yang membuatnya tak terpakai,
+ia dihapus sesuai aturan repo soal orphan. `KpiProgress` (masih dipakai `DashboardOverview`) pindah ke
+`KpiProgress.tsx` supaya nama berkas sesuai isinya.
+
+**Bar Achievement dipertebal.** Di `SalesPerformanceTable`: tinggi 6px → 8px, lebar 96px → 112px, dan
+warna track dinaikkan dari `bg-border/60` ke `bg-border`. Sekarang terbaca sebagai grafik, bukan garis rambut.
+
+**Empty state follow-up dipadatkan.** Override `py-10` dilepas (kembali ke `py-6` bawaan `EmptyState`),
+dan ditambah tautan "Buka daftar task". `EmptyState` mendapat prop opsional `action` — lapisan yang
+tepat untuk memuat langkah berikutnya, karena di situlah pengguna diberi tahu harus ke mana.
+
+### Verifikasi
+
+| Cek                    | Hasil                                              |
+| ---------------------- | -------------------------------------------------- |
+| `bun run typecheck`    | lolos                                              |
+| `bun run lint`         | lolos                                              |
+| `bun run test`         | 711 lolos, 0 gagal                                 |
+| `bun run test:e2e`     | 12 lolos                                           |
+| Browser desktop 1440px | urutan DOM sesuai rencana, 5 sel stat, bar 8×112px |
+| Browser mobile 375px   | grid stat 2 kolom, hero tetap dominan              |

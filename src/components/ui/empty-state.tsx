@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -6,6 +7,9 @@ interface EmptyStateProps {
   icon?: LucideIcon;
   title?: string;
   description: string;
+  // Optional next step, so an empty list can point somewhere instead of just
+  // reporting that it is empty.
+  action?: ReactNode;
   className?: string;
 }
 
@@ -18,6 +22,7 @@ export function EmptyState({
   icon: Icon,
   title,
   description,
+  action,
   className,
 }: EmptyStateProps) {
   return (
@@ -30,6 +35,7 @@ export function EmptyState({
       {Icon && <Icon className="h-6 w-6 text-muted-foreground/60" />}
       {title && <p className="text-sm font-medium text-foreground">{title}</p>}
       <p className="text-xs">{description}</p>
+      {action ? <div className="mt-1">{action}</div> : null}
     </div>
   );
 }

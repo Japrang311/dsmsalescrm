@@ -1,4 +1,4 @@
-import { KpiProgress } from "./KpiCard";
+import { KpiProgress } from "./KpiProgress";
 import { useCountUp } from "@/hooks/use-count-up";
 import { formatPercent, formatRupiahShort } from "@/lib/format";
 
