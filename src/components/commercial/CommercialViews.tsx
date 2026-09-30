@@ -492,7 +492,7 @@ export function CommercialViews(props: CommercialViewsProps) {
                               className={cn(
                                 "tabular-nums",
                                 overdue && "text-rose-600 font-medium",
-                                nextDays === 0 && "text-amber-700 font-medium",
+                                nextDays === 0 && "text-warning font-medium",
                               )}
                             >
                               {overdue
@@ -663,8 +663,7 @@ export function CommercialViews(props: CommercialViewsProps) {
                                 className={cn(
                                   "tabular-nums",
                                   nextDays! < 0 && "text-rose-600 font-medium",
-                                  nextDays === 0 &&
-                                    "text-amber-700 font-medium",
+                                  nextDays === 0 && "text-warning font-medium",
                                 )}
                               >
                                 {nextDays! < 0

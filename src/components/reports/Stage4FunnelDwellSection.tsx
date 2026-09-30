@@ -104,7 +104,7 @@ export function Stage4FunnelDwellSection({
                       {d.completedCount})
                     </span>
                     <span
-                      className="text-amber-700"
+                      className="text-warning"
                       title="Open dwell (masih berjalan)"
                     >
                       Berjalan: {formatDays(d.openMedianDays)} ({d.openCount})

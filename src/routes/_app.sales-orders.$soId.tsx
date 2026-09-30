@@ -171,7 +171,7 @@ function SalesOrderDetail() {
             <Badge variant="outline">{so.type}</Badge>
             <Badge variant="secondary">{so.numberMode}</Badge>
             {foc && (
-              <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">
+              <Badge className="bg-warning/10 text-warning hover:bg-warning/10">
                 FOC
               </Badge>
             )}
@@ -661,7 +661,7 @@ function TaxCell({
   if (foc) {
     return (
       <Cell label="Pajak">
-        <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">
+        <Badge className="bg-warning/10 text-warning hover:bg-warning/10">
           FOC
         </Badge>
         <p className="mt-1 text-[11px] text-muted-foreground">

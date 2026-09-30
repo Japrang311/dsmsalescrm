@@ -46,12 +46,12 @@ export function Stage4WinLossSection({
               <StatBlock
                 label="Won"
                 value={`${winLoss!.wonCount} · ${formatRupiahShort(winLoss!.wonValue)}`}
-                tone="emerald"
+                tone="success"
               />
               <StatBlock
                 label="Lost"
                 value={`${winLoss!.lostCount} · ${formatRupiahShort(winLoss!.lostValue)}`}
-                tone="amber"
+                tone="warning"
               />
               <StatBlock
                 label="Win Rate"

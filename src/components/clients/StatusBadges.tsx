@@ -2,19 +2,21 @@ import { cn } from "@/lib/utils";
 import type { ClientStatus } from "@/lib/domain";
 
 const STATUS_STYLES: Record<ClientStatus, string> = {
+  // Prospect keeps a raw hue: "new, not yet judged" has no semantic token,
+  // and muted/primary are already taken by Lost and Repeat Order.
   Prospect: "bg-sky-100 text-sky-800 border-sky-200",
-  "Active Customer": "bg-emerald-100 text-emerald-800 border-emerald-200",
+  "Active Customer": "bg-success/10 text-success border-success/30",
   "Repeat Order": "bg-primary-soft text-primary border-primary/20",
-  Dormant: "bg-amber-100 text-amber-800 border-amber-200",
-  Lost: "bg-zinc-200 text-zinc-700 border-zinc-300",
+  Dormant: "bg-warning/10 text-warning border-warning/30",
+  Lost: "bg-muted text-muted-foreground border-border",
 };
 
 const STATUS_DOT: Record<ClientStatus, string> = {
   Prospect: "bg-sky-500",
-  "Active Customer": "bg-emerald-500",
+  "Active Customer": "bg-success",
   "Repeat Order": "bg-primary",
-  Dormant: "bg-amber-500",
-  Lost: "bg-zinc-400",
+  Dormant: "bg-warning",
+  Lost: "bg-muted-foreground",
 };
 
 export function StatusBadge({
@@ -61,13 +63,13 @@ export function StatusBadge({
 }
 
 const RISK_STYLES = {
-  Low: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  Medium: "bg-amber-50 text-amber-700 border-amber-200",
-  High: "bg-rose-50 text-rose-700 border-rose-200",
+  Low: "bg-success/10 text-success border-success/30",
+  Medium: "bg-warning/10 text-warning border-warning/30",
+  High: "bg-destructive/10 text-destructive border-destructive/30",
   // Risk needs commercial-item/advisory data that doesn't exist yet in the
   // real backend (Phase 4+) — this is an honest "not computed", not a
   // fourth real risk tier.
-  Unknown: "bg-zinc-50 text-zinc-500 border-zinc-200",
+  Unknown: "bg-muted text-muted-foreground border-border",
 } as const;
 
 export function RiskDot({
@@ -77,12 +79,12 @@ export function RiskDot({
 }) {
   const color =
     risk === "Low"
-      ? "bg-emerald-500"
+      ? "bg-success"
       : risk === "Medium"
-        ? "bg-amber-500"
+        ? "bg-warning"
         : risk === "High"
-          ? "bg-rose-500"
-          : "bg-zinc-400";
+          ? "bg-destructive"
+          : "bg-muted-foreground";
   return (
     <span
       className={cn(

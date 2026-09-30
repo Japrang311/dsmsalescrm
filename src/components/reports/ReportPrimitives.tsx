@@ -49,15 +49,15 @@ export function ForecastTile({
 }: {
   label: string;
   value: number;
-  tone: "primary" | "emerald" | "amber";
+  tone: "primary" | "success" | "warning";
   pct: number;
 }) {
   const bar =
     tone === "primary"
       ? "bg-primary"
-      : tone === "emerald"
-        ? "bg-emerald-500"
-        : "bg-amber-500";
+      : tone === "success"
+        ? "bg-success"
+        : "bg-warning";
   return (
     <div className="rounded-md border bg-muted/20 p-3">
       <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
@@ -88,15 +88,15 @@ export function StatBlock({
 }: {
   label: string;
   value: string;
-  tone: "primary" | "emerald" | "amber" | "muted";
+  tone: "primary" | "success" | "warning" | "muted";
 }) {
   const cls =
     tone === "primary"
       ? "border-primary/30 bg-primary/[0.04]"
-      : tone === "emerald"
-        ? "border-emerald-300/50 bg-emerald-50/60"
-        : tone === "amber"
-          ? "border-amber-300/50 bg-amber-50/60"
+      : tone === "success"
+        ? "border-success/30 bg-success/10"
+        : tone === "warning"
+          ? "border-warning/30 bg-warning/10"
           : "border-border bg-muted/30";
   return (
     <div className={`rounded-md border p-2 ${cls}`}>

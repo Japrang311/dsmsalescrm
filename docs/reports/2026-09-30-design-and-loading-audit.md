@@ -271,3 +271,72 @@ tepat untuk memuat langkah berikutnya, karena di situlah pengguna diberi tahu ha
 | `bun run test:e2e`     | 12 lolos                                           |
 | Browser desktop 1440px | urutan DOM sesuai rencana, 5 sel stat, bar 8×112px |
 | Browser mobile 375px   | grid stat 2 kolom, hero tetap dominan              |
+
+---
+
+## Migrasi warna amber ke token semantik (2026-09-30, menyusul)
+
+Pemicunya satu komponen (`CalendarIncompleteWarning`), tetapi penelusuran menemukan **24 pemakaian
+`amber-*` di 13 berkas** dengan tiga makna berbeda. Mengganti semuanya secara membabi buta akan
+merusak sebagian, jadi dipilah dulu.
+
+### Yang dikonversi
+
+**Callout dan badge peringatan** — maknanya memang _warning_:
+`CalendarIncompleteWarning`, banner filter di Clients, banner deleted-mode di Sales Orders, ikon
+Risk Alerts, penanda "jatuh tempo hari ini" di Commercial Views, dwell "masih berjalan", item menu
+arsip di ClientsTable, dan badge `bg-amber-100` di tiga berkas Sales Order/Commercial.
+
+Pemetaan: `bg-amber-50/100` → `bg-warning/10`, `border-amber-200/300` → `border-warning/30`,
+`text-amber-700/800/900` → `text-warning`, `bg-amber-500` → `bg-warning`.
+
+**Triad lampu-lalu-lintas** — sibling-nya ikut dikonversi, karena mengganti amber saja akan
+membuat satu warna tampak beda bobot di dalam satu set:
+
+- `RISK_STYLES` + `RiskDot`: emerald/amber/rose → `success`/`warning`/`destructive`, Unknown → `muted`
+- Achievement di `ReportsPerformanceSection`: emerald/amber/red → `success`/`warning`/`destructive`
+- Titik timeline `PipelineCardDrawer`: amber/emerald → `warning`/`success` (primary sudah token)
+- `STATUS_STYLES`/`STATUS_DOT` klien: Active→`success`, Dormant→`warning`, Lost→`muted`
+
+**API `tone` di `ReportPrimitives`** dinamai menurut warna (`"emerald" | "amber"`). Diganti jadi
+`"success" | "warning"` di 14 call site pada 6 berkas — nama prop tidak lagi mengunci implementasi
+ke satu warna.
+
+### Yang sengaja tidak disentuh
+
+| Lokasi                                       | Alasan                                                                                                                                                                                                                             |
+| -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `_app.activity.tsx:182` (`ACCENT`)           | Skala **11 warna kategorikal** (cyan/blue/sky/violet/teal/indigo/rose/orange/slate/emerald/amber). Mengubah satu jadi `bg-warning` berarti menyatakan "perubahan status = peringatan", yang tidak benar. Tidak ada token 11-nilai. |
+| `_app.activity.tsx:115` (`KIND_META`)        | Sama — pasangan dari `ACCENT`.                                                                                                                                                                                                     |
+| `SourceRow` `tone="emerald"` di Sales Orders | Skala kategorikal (New Product/Existing/Prototype), bukan semantik. Sempat ikut terganti oleh sed lalu **dikembalikan**.                                                                                                           |
+| `STATUS_STYLES.Prospect` (sky)               | "Baru, belum dinilai" tidak punya token; `muted` dan `primary` sudah dipakai Lost dan Repeat Order.                                                                                                                                |
+
+### Verifikasi kontras (diukur, bukan diperkirakan)
+
+Rasio dihitung dari nilai oklch token, lalu diperiksa ulang pada elemen yang benar-benar dirender
+(warna dinormalisasi lewat canvas, latar translusen dikomposit berlapis).
+
+| Kombinasi                                            |  Rasio | AA (4.5:1) |
+| ---------------------------------------------------- | -----: | :--------: |
+| `text-warning` di `bg-warning/10` atas kartu         | 4.98:1 |   lolos    |
+| `text-success` di `bg-success/10` atas kartu         | 4.75:1 |   lolos    |
+| `text-destructive` di `bg-destructive/10` atas kartu | 5.75:1 |   lolos    |
+| Badge "Active Customer" **terukur di browser**       | 4.70:1 |   lolos    |
+
+Audit kontras otomatis atas seluruh teks pada Dashboard, Clients, Client detail, dan Sales Orders:
+**0 kegagalan**.
+
+Catatan: `text-success` di atas tint turun ke 4.36:1 bila latarnya background halaman, bukan kartu
+putih. Pada aplikasi ini badge terisi hanya dirender di dalam kartu (baris tabel memakai varian
+titik yang transparan), jadi kasus itu tidak terjadi — terkonfirmasi pada pengukuran 4.70:1 di atas.
+
+### Temuan pre-existing (di luar lingkup, tidak diubah)
+
+Halaman Reports punya **3 label legend grafik di bawah AA**: "Target" 2.14:1 dan 3.42:1, serta
+"Prototype Paid" 3.42:1. Sumbernya `CHART_COLORS[2]` (`#C97716`) dan `--color-border-strong` yang
+dipakai sebagai warna teks — bukan bagian dari migrasi amber ini. Perlu keputusan desain tersendiri
+soal warna teks legend.
+
+Dark mode belum terpasang (tidak ada toggle maupun provider yang menambahkan kelas `.dark`), jadi
+blok token `.dark` di `styles.css` masih belum terpakai. Hitungan dark mode menunjukkan
+`text-destructive` di atas tint hanya 3.99:1 — perlu ditinjau kalau dark mode nanti diaktifkan.

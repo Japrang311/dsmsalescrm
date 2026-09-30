@@ -91,13 +91,13 @@ export function ReportsForecastSection({
           <ForecastTile
             label="Forecast (Achv + Pipeline)"
             value={forecast.total}
-            tone="emerald"
+            tone="success"
             pct={forecast.target ? forecast.total / forecast.target : 0}
           />
           <ForecastTile
             label="Target YTD"
             value={forecast.target}
-            tone="amber"
+            tone="warning"
             pct={1}
           />
         </CardContent>

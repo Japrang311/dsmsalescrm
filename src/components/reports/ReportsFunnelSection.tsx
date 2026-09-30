@@ -99,7 +99,7 @@ export function ReportsFunnelSection({
           <StatBlock
             label="Overdue"
             value={`${taskSummary.overdue}`}
-            tone="amber"
+            tone="warning"
           />
           <StatBlock
             label="Escalated"
@@ -109,7 +109,7 @@ export function ReportsFunnelSection({
           <StatBlock
             label="Done dan Cancelled"
             value={`${taskSummary.done} · ${taskSummary.cancelled}`}
-            tone="emerald"
+            tone="success"
           />
           {role === "executive" ? (
             <p className="col-span-2 text-[11px] text-muted-foreground">

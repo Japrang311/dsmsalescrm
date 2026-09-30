@@ -14,7 +14,7 @@ export function CalendarIncompleteWarning({
   if (!hasCalendarIncompleteTasks(tasks, metrics)) return null;
 
   return (
-    <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+    <div className="flex items-start gap-2 rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
       <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
       <div>
         <p className="font-medium">Kalender bisnis belum lengkap.</p>

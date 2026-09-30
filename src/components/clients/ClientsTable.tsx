@@ -455,7 +455,7 @@ function RowActions({
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
-            className="text-amber-700 focus:text-amber-800"
+            className="text-warning focus:text-warning"
             onSelect={() =>
               toast.info(`Arsip klien belum tersedia`, {
                 description: `${clientName} belum diubah. Arsip klien menunggu kontrak soft-delete client agar history commercial dan follow-up tetap aman.`,

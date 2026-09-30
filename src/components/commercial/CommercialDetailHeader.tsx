@@ -56,7 +56,7 @@ export function CommercialDetailHeader({
             </h1>
             <Badge variant="outline">{item.type}</Badge>
             {isFoc && (
-              <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">
+              <Badge className="bg-warning/10 text-warning hover:bg-warning/10">
                 FOC
               </Badge>
             )}

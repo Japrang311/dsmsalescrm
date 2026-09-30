@@ -766,8 +766,8 @@ export function PipelineCardDrawer({
                     className={cn(
                       "absolute -left-1.5 mt-1 h-3 w-3 rounded-full border-2 border-background",
                       ev.kind === "item" && "bg-primary",
-                      ev.kind === "status" && "bg-amber-500",
-                      ev.kind === "followup" && "bg-emerald-500",
+                      ev.kind === "status" && "bg-warning",
+                      ev.kind === "followup" && "bg-success",
                     )}
                   />
                   <div className="flex flex-col">

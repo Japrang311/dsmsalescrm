@@ -362,8 +362,8 @@ function SalesOrdersRevenuePage() {
       />
 
       {deletedMode ? (
-        <Card className="border-amber-200 bg-amber-50/60">
-          <CardContent className="py-3 text-sm text-amber-900">
+        <Card className="border-warning/30 bg-warning/10">
+          <CardContent className="py-3 text-sm text-warning">
             Sales Order terhapus tidak dihitung sebagai revenue dan tidak
             disertakan dalam laporan atau export aktif.
           </CardContent>
@@ -532,7 +532,7 @@ function SalesOrdersRevenuePage() {
                         </TableCell>
                         <TableCell className="text-xs">
                           {foc ? (
-                            <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">
+                            <Badge className="bg-warning/10 text-warning hover:bg-warning/10">
                               FOC
                             </Badge>
                           ) : (

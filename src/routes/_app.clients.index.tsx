@@ -411,7 +411,7 @@ function ClientListPage() {
 
       {/* Table */}
       {spendingRange[0] > 0 || spendingRange[1] < 3000 ? (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+        <div className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
           Filter Spending YTD belum diterapkan ke server pagination karena angka
           spending dihitung dari Sales Orders. Nilai spending tetap tampil,
           tetapi daftar klien tidak difilter oleh slider ini.

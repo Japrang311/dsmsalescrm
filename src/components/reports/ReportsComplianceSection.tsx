@@ -65,12 +65,12 @@ export function ReportsComplianceSection({
           <StatBlock
             label="Paid count"
             value={`${totals.protoPaidCount} SO`}
-            tone="emerald"
+            tone="success"
           />
           <StatBlock
             label="FOC count"
             value={`${totals.protoFocCount} SO`}
-            tone="amber"
+            tone="warning"
           />
           <StatBlock
             label="Support activity"
@@ -90,7 +90,7 @@ export function ReportsComplianceSection({
             as="h2"
             className="flex items-center gap-2 text-sm font-semibold"
           >
-            <AlertTriangle className="h-4 w-4 text-amber-600" /> Risk Alerts
+            <AlertTriangle className="h-4 w-4 text-warning" /> Risk Alerts
           </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-2">

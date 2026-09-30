@@ -152,7 +152,7 @@ export function ReportsPerformanceSection({
                           className="h-1.5"
                         />
                         <span
-                          className={`w-9 text-[10px] tabular-nums ${pct >= 1 ? "text-emerald-600" : pct >= 0.7 ? "text-amber-600" : "text-red-600"}`}
+                          className={`w-9 text-[10px] tabular-nums ${pct >= 1 ? "text-success" : pct >= 0.7 ? "text-warning" : "text-destructive"}`}
                         >
                           {formatPercent(pct)}
                         </span>
@@ -167,7 +167,7 @@ export function ReportsPerformanceSection({
                         <>
                           <span className="font-medium">{openTasks}</span> open
                           {overdueTasks ? (
-                            <span className="ml-1 text-amber-600">
+                            <span className="ml-1 text-warning">
                               · {overdueTasks} overdue
                             </span>
                           ) : null}
