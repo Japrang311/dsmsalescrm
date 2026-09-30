@@ -23,6 +23,7 @@ import {
   eligibleQuotationsForSalesOrder,
   eligibleSalesOrdersForQuotation,
   manualCommercialLinkErrorMessage,
+  productNameSummary,
 } from "@/lib/commercial-linking";
 import { formatDateShort, formatRupiahShort } from "@/lib/format";
 
@@ -149,11 +150,14 @@ export function LinkSalesOrderQuotationDialog(
                     />
                     <FileText className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                     <span className="min-w-0 flex-1">
-                      <span className="block font-mono text-xs font-medium">
-                        {quotation.quotationNumber ?? "Tanpa nomor quotation"}
+                      <span className="block text-xs font-medium">
+                        {productNameSummary(
+                          quotation.lineItems,
+                          quotation.projectName || quotation.description,
+                        )}
                       </span>
-                      <span className="mt-1 block truncate text-xs text-muted-foreground">
-                        {quotation.projectName || quotation.description || "—"}
+                      <span className="mt-1 block font-mono text-[11px] text-muted-foreground">
+                        {quotation.quotationNumber ?? "Tanpa nomor quotation"}
                       </span>
                       <span className="mt-1 block text-xs tabular-nums text-muted-foreground">
                         {formatRupiahShort(quotation.estimatedValue)}
@@ -174,10 +178,14 @@ export function LinkSalesOrderQuotationDialog(
                     />
                     <Receipt className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                     <span className="min-w-0 flex-1">
-                      <span className="block font-mono text-xs font-medium">
-                        {salesOrder.soNumber}
+                      <span className="block text-xs font-medium">
+                        {productNameSummary(
+                          salesOrder.items,
+                          salesOrder.soNumber,
+                        )}
                       </span>
-                      <span className="mt-1 block text-xs text-muted-foreground">
+                      <span className="mt-1 block font-mono text-[11px] text-muted-foreground">
+                        {salesOrder.soNumber} ·{" "}
                         {formatDateShort(salesOrder.date)} · {salesOrder.type}
                       </span>
                       <span className="mt-1 block text-xs tabular-nums text-muted-foreground">

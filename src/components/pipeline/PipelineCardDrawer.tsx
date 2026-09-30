@@ -7,6 +7,7 @@ import {
   ExternalLink,
   FileText,
   History,
+  Link2,
   Package,
   User2,
 } from "lucide-react";
@@ -22,6 +23,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -45,7 +47,15 @@ import {
 import { updateClientStatus } from "@/lib/data/clients";
 import { describeCommercialItemChanges } from "@/lib/data/commercial-items";
 import { transitionCommercialStage } from "@/lib/data/commercial-documents";
-import { listSalesOrders } from "@/lib/data/sales-orders";
+import {
+  linkSalesOrderToQuotation,
+  listSalesOrders,
+} from "@/lib/data/sales-orders";
+import {
+  eligibleSalesOrdersForQuotation,
+  manualCommercialLinkErrorMessage,
+  productNameSummary,
+} from "@/lib/commercial-linking";
 import { listTasks } from "@/lib/data/tasks";
 import { activeCommercialTasks } from "@/lib/data/task-relations";
 import {
@@ -160,6 +170,9 @@ export function PipelineCardDrawer({
       ? true
       : role === "sales" && item?.ownerId === currentUserId;
 
+  // Mirrors the board's own gate for the Link SO / Buat SO affordances.
+  const canMutateSalesOrders = role !== "executive";
+
   // Current values are already real (no override layer to merge anymore).
   const currentStage = item?.stage ?? "";
   const currentOwnerId = item?.ownerId ?? "";
@@ -180,6 +193,8 @@ export function PipelineCardDrawer({
     item?.lostReasonDetail ?? "",
   );
   const [lostReasonDialogOpen, setLostReasonDialogOpen] = useState(false);
+  const [salesOrderToLinkId, setSalesOrderToLinkId] = useState("");
+  const [isLinkingSalesOrder, setIsLinkingSalesOrder] = useState(false);
 
   // Reset form state when a different item opens.
   useEffect(() => {
@@ -194,6 +209,7 @@ export function PipelineCardDrawer({
     setLostReason(item.lostReason ?? "");
     setLostReasonDetail(item.lostReasonDetail ?? "");
     setLostReasonDialogOpen(false);
+    setSalesOrderToLinkId("");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, item?.id, client?.id]);
 
@@ -208,6 +224,24 @@ export function PipelineCardDrawer({
     if (!client) return [];
     return allSalesOrders.filter((o) => o.clientId === client.id);
   }, [client, allSalesOrders]);
+
+  // The only real document-to-document link in the schema is
+  // sales_orders.source_commercial_document_id -> quotation. Everything else
+  // listed above is merely "same client", so a Quotation card shows its actual
+  // counterpart instead of that client-wide dump.
+  const linkedSalesOrder = useMemo(() => {
+    if (!item || item.type !== "Quotation") return null;
+    return (
+      allSalesOrders.find(
+        (o) => o.sourceCommercialDocumentId === item.id && o.deletedAt === null,
+      ) ?? null
+    );
+  }, [item, allSalesOrders]);
+
+  const salesOrderCandidates = useMemo(() => {
+    if (!item || item.type !== "Quotation" || linkedSalesOrder) return [];
+    return eligibleSalesOrdersForQuotation(item, allSalesOrders);
+  }, [item, linkedSalesOrder, allSalesOrders]);
 
   // Merged history timeline: commercial-item changes + client status changes
   // + persisted follow_up_logs for this commercial document.
@@ -402,6 +436,27 @@ export function PipelineCardDrawer({
       toast.error("Gagal mengubah status", {
         description: getErrorMessage(error),
       });
+    }
+  }
+
+  async function linkSelectedSalesOrder() {
+    if (!item || !salesOrderToLinkId) return;
+    setIsLinkingSalesOrder(true);
+    try {
+      await linkSalesOrderToQuotation({
+        salesOrderId: salesOrderToLinkId,
+        quotationId: item.id,
+      });
+      await queryClient.invalidateQueries({ queryKey: ["sales-orders"] });
+      await invalidateCommercialStageQueries(queryClient);
+      setSalesOrderToLinkId("");
+      toast.success("Sales Order terhubung ke Quotation ini");
+    } catch (error) {
+      toast.error("Gagal menghubungkan dokumen", {
+        description: manualCommercialLinkErrorMessage(error),
+      });
+    } finally {
+      setIsLinkingSalesOrder(false);
     }
   }
 
@@ -727,26 +782,139 @@ export function PipelineCardDrawer({
           <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
             <FileText className="h-3.5 w-3.5" /> Dokumen terhubung
           </p>
-          <DocGroup
-            icon={FileText}
-            label="Quotations"
-            items={linkedQuotations.map((q) => ({
-              key: q.id,
-              primary: q.description,
-              secondary: `${q.stage} · ${formatDateShort(q.updatedAt)}`,
-              value: formatRupiahShort(q.estimatedValue),
-            }))}
-          />
-          <DocGroup
-            icon={Package}
-            label="Sales orders"
-            items={linkedOrders.map((o) => ({
-              key: o.id,
-              primary: o.soNumber,
-              secondary: `${o.source} · ${formatDateShort(o.date)}`,
-              value: o.value !== null ? formatRupiahShort(o.value) : "FOC",
-            }))}
-          />
+          {item.type === "Quotation" ? (
+            linkedSalesOrder ? (
+              <div className="rounded-md border border-success/35 bg-success/10 p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="flex items-center gap-1.5 text-[11px] font-medium text-success">
+                      <Link2 className="h-3.5 w-3.5 shrink-0" /> Sales Order
+                      terhubung
+                    </p>
+                    <p className="mt-1 font-mono text-sm font-semibold text-foreground">
+                      {linkedSalesOrder.soNumber}
+                    </p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {productNameSummary(linkedSalesOrder.items)}
+                    </p>
+                    <p className="mt-0.5 text-[11px] text-muted-foreground">
+                      {formatDateShort(linkedSalesOrder.date)} ·{" "}
+                      {linkedSalesOrder.source}
+                    </p>
+                  </div>
+                  <span className="shrink-0 text-sm font-semibold tabular-nums text-foreground">
+                    {linkedSalesOrder.value === null
+                      ? "FOC"
+                      : formatRupiahShort(linkedSalesOrder.value)}
+                  </span>
+                </div>
+                <Button
+                  asChild
+                  variant="outline"
+                  size="sm"
+                  className="mt-2.5 min-h-9 w-full border-success/35 bg-card text-xs text-success hover:text-success"
+                >
+                  <Link
+                    to="/sales-orders/$soId"
+                    params={{ soId: linkedSalesOrder.id }}
+                  >
+                    Buka Sales Order
+                    <ExternalLink className="ml-1 h-3 w-3" />
+                  </Link>
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-2 rounded-md border border-warning/35 bg-warning/10 p-3">
+                <p className="text-[11px] font-medium text-warning">
+                  Belum ada Sales Order yang terhubung ke Quotation ini
+                </p>
+                {!canMutateSalesOrders ? (
+                  <p className="text-[11px] text-muted-foreground">
+                    Anda tidak memiliki akses untuk menghubungkan dokumen.
+                  </p>
+                ) : salesOrderCandidates.length === 0 ? (
+                  <p className="text-[11px] text-muted-foreground">
+                    Tidak ada Sales Order klien ini yang masih bebas
+                    dihubungkan. Buat SO baru lewat tombol “Buat SO” di kartu.
+                  </p>
+                ) : (
+                  <>
+                    <p className="text-[11px] text-muted-foreground">
+                      Pilih Sales Order yang ingin dihubungkan:
+                    </p>
+                    <RadioGroup
+                      value={salesOrderToLinkId}
+                      onValueChange={setSalesOrderToLinkId}
+                      aria-label="Pilih Sales Order untuk dihubungkan"
+                      className="max-h-60 gap-1.5 overflow-y-auto pr-1"
+                    >
+                      {salesOrderCandidates.map((so) => (
+                        <Label
+                          key={so.id}
+                          htmlFor={`drawer-link-so-${so.id}`}
+                          className="flex cursor-pointer items-start gap-2.5 rounded-md border bg-card p-2.5 hover:border-primary/50 has-[[data-state=checked]]:border-primary has-[[data-state=checked]]:bg-primary/5"
+                        >
+                          <RadioGroupItem
+                            id={`drawer-link-so-${so.id}`}
+                            value={so.id}
+                            className="mt-0.5 shrink-0"
+                          />
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-xs font-medium text-foreground">
+                              {productNameSummary(so.items, so.soNumber)}
+                            </span>
+                            <span className="mt-0.5 block font-mono text-[10px] text-muted-foreground">
+                              {so.soNumber} · {formatDateShort(so.date)}
+                            </span>
+                          </span>
+                          <span className="shrink-0 text-[11px] font-semibold tabular-nums text-foreground">
+                            {so.value === null
+                              ? "FOC"
+                              : formatRupiahShort(so.value)}
+                          </span>
+                        </Label>
+                      ))}
+                    </RadioGroup>
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="min-h-9 w-full"
+                      disabled={!salesOrderToLinkId || isLinkingSalesOrder}
+                      onClick={() => void linkSelectedSalesOrder()}
+                    >
+                      <Link2 className="mr-1 h-3.5 w-3.5" />
+                      {isLinkingSalesOrder
+                        ? "Menghubungkan…"
+                        : "Hubungkan Sales Order"}
+                    </Button>
+                  </>
+                )}
+              </div>
+            )
+          ) : (
+            <>
+              <DocGroup
+                icon={FileText}
+                label="Quotations"
+                items={linkedQuotations.map((q) => ({
+                  key: q.id,
+                  primary: q.description,
+                  secondary: `${q.stage} · ${formatDateShort(q.updatedAt)}`,
+                  value: formatRupiahShort(q.estimatedValue),
+                }))}
+              />
+              <DocGroup
+                icon={Package}
+                label="Sales orders"
+                items={linkedOrders.map((o) => ({
+                  key: o.id,
+                  primary: o.soNumber,
+                  secondary: `${o.source} · ${formatDateShort(o.date)}`,
+                  value: o.value !== null ? formatRupiahShort(o.value) : "FOC",
+                }))}
+              />
+            </>
+          )}
         </section>
 
         {/* History timeline */}

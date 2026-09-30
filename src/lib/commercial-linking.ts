@@ -66,3 +66,24 @@ export function manualCommercialLinkErrorMessage(error: unknown): string {
   }
   return message;
 }
+
+// Sales pick a document by the product they sold, not by its number. Both
+// quotation and sales-order line items carry the same productName/description
+// pair, so one helper labels every link picker row.
+export function productNameSummary(
+  lineItems:
+    | readonly { productName: string | null; description: string | null }[]
+    | undefined,
+  fallback?: string,
+): string {
+  const names = Array.from(
+    new Set(
+      (lineItems ?? [])
+        .map((li) => li.productName?.trim() || li.description?.trim() || "")
+        .filter((name) => name.length > 0),
+    ),
+  );
+  if (names.length === 0) return fallback?.trim() || "—";
+  if (names.length <= 2) return names.join(" · ");
+  return `${names.slice(0, 2).join(" · ")} +${names.length - 2} item lain`;
+}
