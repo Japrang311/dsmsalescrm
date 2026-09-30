@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Download, FileSpreadsheet, FileText } from "lucide-react";
@@ -10,7 +11,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { exportDashboardPdf } from "@/lib/export-pdf";
 import {
   exportFollowUpsCsv,
   exportMonthlyRevenueCsv,
@@ -18,12 +18,6 @@ import {
   exportTopCustomersCsv,
   EmptyExportError,
 } from "@/lib/export-csv";
-import {
-  exportFollowUpsXlsx,
-  exportMonthlyRevenueXlsx,
-  exportSalesPerformanceXlsx,
-  exportTopCustomersXlsx,
-} from "@/lib/export-xlsx";
 
 import { useRole, ROLE_LABEL } from "@/context/role-context-core";
 import { CURRENT_MONTH } from "@/lib/domain";
@@ -42,7 +36,6 @@ import { DashboardOverview } from "@/components/dashboard/DashboardOverview";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { TodaysFollowUpList } from "@/components/dashboard/TodaysFollowUpList";
 import { SalesPerformanceTable } from "@/components/dashboard/SalesPerformanceTable";
-import { AchievementTrendChart } from "@/components/dashboard/AchievementTrendChart";
 import {
   DateRangePicker,
   type PeriodRange,
@@ -59,7 +52,17 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { PageSkeleton } from "@/components/layout/PageSkeleton";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ChartCardSkeleton } from "@/components/charts/ChartCardSkeleton";
 import { PageContainer } from "@/components/layout/PageContainer";
+
+// Recharts (~412 KB) is the single largest dependency on this page and is only
+// needed once the trend card renders, so it loads with the chart, not the route.
+const AchievementTrendChart = lazy(() =>
+  import("@/components/dashboard/AchievementTrendChart").then((m) => ({
+    default: m.AchievementTrendChart,
+  })),
+);
 
 export const Route = createFileRoute("/_app/dashboard")({
   head: () => ({
@@ -146,10 +149,10 @@ function DashboardPage() {
 
   // Wraps export handlers: validates the range, shows a loading toast, and
   // surfaces empty-data / unexpected errors to the user with actionable copy.
-  function runExport(
+  async function runExport(
     format: "PDF" | "CSV" | "Excel",
     label: string,
-    fn: () => number,
+    fn: () => number | Promise<number>,
   ) {
     if (
       !period?.from ||
@@ -170,7 +173,7 @@ function DashboardPage() {
     }
     const toastId = toast.loading(`Menyiapkan ${label} (${format})…`);
     try {
-      const count = fn();
+      const count = await fn();
       toast.success(`${label} berhasil di-export`, {
         id: toastId,
         description: `${format} · ${count.toLocaleString("id-ID")} baris data.`,
@@ -244,14 +247,16 @@ function DashboardPage() {
   const pipelineDecided = pipelineWon + pipelineLost;
   const pipelineWinRate = pipelineMetrics?.totals.winRate ?? 0;
 
-  if (
-    isLoading ||
-    ytdMetricsQuery.isLoading ||
-    monthMetricsQuery.isLoading ||
-    pipelineMetricsQuery.isLoading
-  ) {
+  if (isLoading) {
     return <PageSkeleton label="Memuat dashboard…" />;
   }
+
+  // Values above all fall back to 0 when a metric query is still in flight, so
+  // these sections wait rather than flash a misleading Rp0.
+  const metricsLoading =
+    ytdMetricsQuery.isLoading ||
+    monthMetricsQuery.isLoading ||
+    pipelineMetricsQuery.isLoading;
 
   return (
     <PageContainer>
@@ -292,7 +297,9 @@ function DashboardPage() {
               <DropdownMenuItem
                 className="gap-2"
                 onSelect={() =>
-                  runExport("PDF", "Laporan dashboard", () => {
+                  runExport("PDF", "Laporan dashboard", async () => {
+                    const { exportDashboardPdf } =
+                      await import("@/lib/export-pdf");
                     exportDashboardPdf(exportContext);
                     return 1;
                   })
@@ -362,9 +369,11 @@ function DashboardPage() {
               <DropdownMenuItem
                 className="gap-2"
                 onSelect={() =>
-                  runExport("Excel", "Monthly revenue vs target", () =>
-                    exportMonthlyRevenueXlsx(exportContext),
-                  )
+                  runExport("Excel", "Monthly revenue vs target", async () => {
+                    const { exportMonthlyRevenueXlsx } =
+                      await import("@/lib/export-xlsx");
+                    return exportMonthlyRevenueXlsx(exportContext);
+                  })
                 }
               >
                 <FileSpreadsheet className="h-4 w-4" />
@@ -373,8 +382,14 @@ function DashboardPage() {
               <DropdownMenuItem
                 className="gap-2"
                 onSelect={() =>
-                  runExport("Excel", "Today dan overdue follow-ups", () =>
-                    exportFollowUpsXlsx(exportContext),
+                  runExport(
+                    "Excel",
+                    "Today dan overdue follow-ups",
+                    async () => {
+                      const { exportFollowUpsXlsx } =
+                        await import("@/lib/export-xlsx");
+                      return exportFollowUpsXlsx(exportContext);
+                    },
                   )
                 }
               >
@@ -387,8 +402,14 @@ function DashboardPage() {
                 <DropdownMenuItem
                   className="gap-2"
                   onSelect={() =>
-                    runExport("Excel", "Sales performance vs target", () =>
-                      exportSalesPerformanceXlsx(exportContext),
+                    runExport(
+                      "Excel",
+                      "Sales performance vs target",
+                      async () => {
+                        const { exportSalesPerformanceXlsx } =
+                          await import("@/lib/export-xlsx");
+                        return exportSalesPerformanceXlsx(exportContext);
+                      },
                     )
                   }
                 >
@@ -400,9 +421,11 @@ function DashboardPage() {
                 <DropdownMenuItem
                   className="gap-2"
                   onSelect={() =>
-                    runExport("Excel", "Top customers", () =>
-                      exportTopCustomersXlsx(exportContext),
-                    )
+                    runExport("Excel", "Top customers", async () => {
+                      const { exportTopCustomersXlsx } =
+                        await import("@/lib/export-xlsx");
+                      return exportTopCustomersXlsx(exportContext);
+                    })
                   }
                 >
                   <FileSpreadsheet className="h-4 w-4" />
@@ -416,17 +439,25 @@ function DashboardPage() {
 
       <CalendarIncompleteWarning tasks={allTasks} metrics={taskMetrics} />
 
-      <DashboardOverview
-        monthName={monthName}
-        monthRev={monthRev}
-        monthPct={monthPct}
-        monthTgt={monthTgt}
-        ytd={ytd}
-        ytdPct={ytdPct}
-        yearlyTgt={yearlyTgt}
-        waitingPo={waitingPo}
-        activeCi={activeCi}
-      />
+      {metricsLoading ? (
+        <Skeleton
+          role="status"
+          aria-label="Memuat capaian…"
+          className="h-32 w-full rounded-xl"
+        />
+      ) : (
+        <DashboardOverview
+          monthName={monthName}
+          monthRev={monthRev}
+          monthPct={monthPct}
+          monthTgt={monthTgt}
+          ytd={ytd}
+          ytdPct={ytdPct}
+          yearlyTgt={yearlyTgt}
+          waitingPo={waitingPo}
+          activeCi={activeCi}
+        />
+      )}
 
       <div
         className={
@@ -436,71 +467,85 @@ function DashboardPage() {
         }
       >
         <TodaysFollowUpList />
-        <AchievementTrendChart role={role} />
+        <Suspense fallback={<ChartCardSkeleton />}>
+          <AchievementTrendChart role={role} />
+        </Suspense>
       </div>
 
       {/* Secondary stats — one compact line each */}
-      <section
-        aria-label="Ringkasan operasional"
-        className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5"
-      >
-        <KpiCard
-          compact
-          label="Pipeline Win Rate"
-          value={
-            pipelineDecided > 0 ? formatPercentValue(pipelineWinRate) : "—"
-          }
-          sub={
-            pipelineDecided > 0
-              ? `${pipelineWon} won · ${pipelineLost} lost`
-              : "Belum ada deal diputuskan"
-          }
-        />
-        <KpiCard
-          compact
-          label="Revenue Source YTD"
-          value={formatRupiahShort(
-            src.newProduct + src.existing + src.prototypePaid,
-          )}
-          sub={`New ${sourcePct(src.newProduct)} · Existing ${sourcePct(
-            src.existing,
-          )} · Proto ${sourcePct(src.prototypePaid)}`}
-        />
-        <KpiCard
-          compact
-          label="Prototype Paid YTD"
-          value={formatRupiahShort(proto.paidValue)}
-          sub={`${proto.paidCount} paid · ${proto.focCount} FOC (Rp0, tidak dihitung)`}
-        />
-        <KpiCard
-          compact
-          label="Open Tasks"
-          value={tasks.open}
-          sub={
-            <>
-              <span className="num font-medium text-foreground">
-                {tasks.today}
-              </span>{" "}
-              hari ini ·{" "}
-              <span className="num font-medium text-foreground">
-                {tasks.upcoming}
-              </span>{" "}
-              upcoming
-            </>
-          }
-        />
-        <KpiCard
-          compact
-          label="Overdue Follow-Ups"
-          value={overdueAttention}
-          tone={overdueAttention > 0 ? "destructive" : "default"}
-          sub={
-            overdueAttention > 0
-              ? `${tasks.escalated} escalated · ${tasks.overdue} overdue`
-              : "Semua terkendali"
-          }
-        />
-      </section>
+      {metricsLoading ? (
+        <div
+          role="status"
+          aria-label="Memuat ringkasan operasional…"
+          className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5"
+        >
+          {Array.from({ length: 5 }, (_, i) => (
+            <Skeleton key={i} className="h-24 rounded-xl" />
+          ))}
+        </div>
+      ) : (
+        <section
+          aria-label="Ringkasan operasional"
+          className="precision-stagger grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5"
+        >
+          <KpiCard
+            compact
+            label="Pipeline Win Rate"
+            value={
+              pipelineDecided > 0 ? formatPercentValue(pipelineWinRate) : "—"
+            }
+            sub={
+              pipelineDecided > 0
+                ? `${pipelineWon} won · ${pipelineLost} lost`
+                : "Belum ada deal diputuskan"
+            }
+          />
+          <KpiCard
+            compact
+            label="Revenue Source YTD"
+            value={formatRupiahShort(
+              src.newProduct + src.existing + src.prototypePaid,
+            )}
+            sub={`New ${sourcePct(src.newProduct)} · Existing ${sourcePct(
+              src.existing,
+            )} · Proto ${sourcePct(src.prototypePaid)}`}
+          />
+          <KpiCard
+            compact
+            label="Prototype Paid YTD"
+            value={formatRupiahShort(proto.paidValue)}
+            sub={`${proto.paidCount} paid · ${proto.focCount} FOC (Rp0, tidak dihitung)`}
+          />
+          <KpiCard
+            compact
+            label="Open Tasks"
+            value={tasks.open}
+            sub={
+              <>
+                <span className="num font-medium text-foreground">
+                  {tasks.today}
+                </span>{" "}
+                hari ini ·{" "}
+                <span className="num font-medium text-foreground">
+                  {tasks.upcoming}
+                </span>{" "}
+                upcoming
+              </>
+            }
+          />
+          <KpiCard
+            compact
+            label="Overdue Follow-Ups"
+            value={overdueAttention}
+            tone={overdueAttention > 0 ? "destructive" : "default"}
+            sub={
+              overdueAttention > 0
+                ? `${tasks.escalated} escalated · ${tasks.overdue} overdue`
+                : "Semua terkendali"
+            }
+          />
+        </section>
+      )}
 
       {role !== "sales" ? <SalesPerformanceTable /> : null}
 

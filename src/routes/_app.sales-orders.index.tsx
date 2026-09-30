@@ -69,13 +69,10 @@ import {
   serializeListFilters,
 } from "@/lib/pagination-contracts";
 import { canShowDeletedMode } from "@/components/commercial/deleted-mode";
-import {
-  exportSalesOrdersPdf,
-  exportSalesOrdersXlsx,
-  type SalesOrdersExportContext,
-} from "@/lib/export-sales-orders";
+import type { SalesOrdersExportContext } from "@/lib/export-sales-orders";
 import { EmptyExportError } from "@/lib/export-csv";
 import { PageContainer } from "@/components/layout/PageContainer";
+import { PageSkeleton } from "@/components/layout/PageSkeleton";
 
 export const Route = createFileRoute("/_app/sales-orders/")({
   head: () => ({ meta: [{ title: "Sales Orders dan Revenue · DSM" }] }),
@@ -216,6 +213,8 @@ function SalesOrdersRevenuePage() {
       };
 
       if (format === "xlsx") {
+        const { exportSalesOrdersXlsx } =
+          await import("@/lib/export-sales-orders");
         const rowCount = exportSalesOrdersXlsx(exportContext);
         toast.success("Sales Orders Excel dibuat", {
           description: `${rowCount} SO · ${formatRupiahShort(summary.total)}.`,
@@ -223,6 +222,8 @@ function SalesOrdersRevenuePage() {
         return;
       }
 
+      const { exportSalesOrdersPdf } =
+        await import("@/lib/export-sales-orders");
       exportSalesOrdersPdf(exportContext);
       toast.success("Sales Orders PDF dibuat", {
         description: `${exportRows.length} SO · ${formatRupiahShort(summary.total)}.`,
@@ -271,11 +272,7 @@ function SalesOrdersRevenuePage() {
   }
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center rounded-lg border border-dashed py-16 text-sm text-muted-foreground">
-        Loading sales orders…
-      </div>
-    );
+    return <PageSkeleton label="Memuat sales order…" variant="table" />;
   }
 
   if (ordersPage.isError) {
@@ -373,7 +370,7 @@ function SalesOrdersRevenuePage() {
         </Card>
       ) : (
         <>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="precision-stagger grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <KpiTile
               label="Total Revenue"
               value={formatRupiahShort(summary.total)}

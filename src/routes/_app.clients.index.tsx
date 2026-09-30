@@ -57,6 +57,7 @@ import { formatRupiahShort } from "@/lib/format";
 import type { ClientSource, ClientStatus } from "@/lib/domain";
 import { listQueryKey } from "@/lib/pagination-contracts";
 import { PageContainer } from "@/components/layout/PageContainer";
+import { TableRowsSkeleton } from "@/components/layout/PageSkeleton";
 
 const SOURCES: ClientSource[] = [
   "Referral",
@@ -418,9 +419,7 @@ function ClientListPage() {
       ) : null}
 
       {!authReady || clientRowsPage.isLoading ? (
-        <div className="flex items-center justify-center rounded-lg border border-dashed py-16 text-sm text-muted-foreground">
-          Loading clients…
-        </div>
+        <TableRowsSkeleton label="Memuat klien…" rows={10} />
       ) : (
         <ClientsTable
           rows={enrichedRows}

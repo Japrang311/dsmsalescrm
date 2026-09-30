@@ -40,6 +40,7 @@ import { ClientOrdersTab } from "@/components/clients/ClientOrdersTab";
 import { ClientRevenueTab } from "@/components/clients/ClientRevenueTab";
 import { useState } from "react";
 import type { ClientStatus } from "@/lib/domain";
+import { PageSkeleton } from "@/components/layout/PageSkeleton";
 
 export const Route = createFileRoute("/_app/clients/$clientId")({
   head: () => ({ meta: [{ title: "Client · DSM Sales Execution" }] }),
@@ -110,11 +111,7 @@ function ClientProfilePage() {
   const canReassign = role === "manager" || role === "super_admin";
 
   if (!authReady || isLoading) {
-    return (
-      <div className="mx-auto max-w-md p-8 text-center text-sm text-muted-foreground">
-        Loading client…
-      </div>
-    );
+    return <PageSkeleton label="Memuat klien…" />;
   }
 
   if (!client) {

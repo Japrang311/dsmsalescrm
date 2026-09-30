@@ -64,11 +64,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { EmptyExportError } from "@/lib/export-csv";
-import {
-  exportActivityCsv,
-  exportActivityPdf,
-  type ActivityExportEvent,
-} from "@/lib/export-activity";
+import type { ActivityExportEvent } from "@/lib/export-activity";
 import type { FeedEvent } from "@/lib/data/activity-feed";
 import {
   listActivityFeedPage,
@@ -462,6 +458,8 @@ function ActivityPage() {
         fromISO: toLocalIsoDate(activeRange?.from ?? new Date(0)),
         toISO: toLocalIsoDate(activeRange?.to ?? new Date()),
       };
+      const { exportActivityCsv, exportActivityPdf } =
+        await import("@/lib/export-activity");
       const count =
         format === "CSV"
           ? exportActivityCsv(payload, meta)

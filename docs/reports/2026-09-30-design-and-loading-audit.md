@@ -1,0 +1,215 @@
+# Audit Desain & Loading — DSM Sales CRM
+
+Tanggal: 2026-09-30 · Basis: build produksi (`bun run build`) + inspeksi visual di `localhost:8080` dengan data seed lokal.
+
+---
+
+## Ringkasan
+
+Desainnya **tidak bermasalah secara visual** — tema "DSM Precision" koheren, tipografi Manrope enak dibaca,
+palet industrial konsisten, token warna rapi. Yang bikin aplikasi **terasa berat bukan desainnya, tapi
+tiga hal teknis** yang semuanya bisa diperbaiki tanpa mengubah tampilan:
+
+1. Setiap halaman mengunduh kode export PDF/Excel yang belum tentu dipakai.
+2. Halaman baru muncul setelah **semua** query selesai — bukan bertahap.
+3. Empat halaman terberat memakai teks "Loading…" polos, bukan kerangka (skeleton).
+
+---
+
+## 1. Berat loading — angka nyata
+
+JS yang harus diunduh & dijalankan sebelum satu halaman bisa tampil (hasil build produksi):
+
+| Halaman          | Chunk |       Mentah | Terkompresi (gzip) |
+| ---------------- | ----: | -----------: | -----------------: |
+| **Dashboard**    |    55 | **2.049 KB** |         **623 KB** |
+| **Reports**      |    60 |     2.127 KB |             645 KB |
+| **Sales Orders** |    48 |     1.648 KB |             520 KB |
+| Pipeline         |    61 |       998 KB |             310 KB |
+| Clients          |    52 |       969 KB |             301 KB |
+| Login            |    17 |       620 KB |             187 KB |
+
+Anggaran wajar untuk aplikasi internal: **±300–400 KB gzip**. Dashboard sekarang **1,5–2× di atas itu**.
+
+### Penyebabnya: 4 pustaka besar ikut terunduh walau belum diklik
+
+Ditelusuri dari isi chunk Dashboard:
+
+| Pustaka                    |       Ukuran | Dipakai kapan                      |
+| -------------------------- | -----------: | ---------------------------------- |
+| `recharts` (ComposedChart) |       412 KB | saat grafik digambar               |
+| `jspdf`                    |       390 KB | **hanya saat klik "Export PDF"**   |
+| `xlsx` (SheetJS)           |       324 KB | **hanya saat klik "Export Excel"** |
+| `jspdf-autotable`          |       104 KB | **hanya saat klik "Export PDF"**   |
+| **Total**                  | **1.230 KB** | **60% dari bobot Dashboard**       |
+
+Sebabnya di kode: modul export diimpor secara statis di file route, jadi ikut terbundel dari awal.
+
+```
+src/routes/_app.dashboard.tsx:13      import { exportDashboardPdf } from "@/lib/export-pdf"    -> jspdf
+src/routes/_app.dashboard.tsx:26      import { ... } from "@/lib/export-xlsx"                   -> xlsx
+src/routes/_app.reports.tsx:56-57     export-xlsx + export-pdf
+src/routes/_app.sales-orders.index.tsx:76   export-sales-orders                                 -> xlsx + jspdf
+src/routes/_app.activity.tsx:71       export-activity                                           -> jspdf
+```
+
+**Perbaikan:** ubah jadi dynamic import di dalam handler tombol (`await import("@/lib/export-pdf")`),
+dan `lazy()` untuk komponen grafik. Perkiraan hasil: **Dashboard turun ±60%, dari 623 KB ke ±200 KB gzip.**
+Tidak ada perubahan tampilan sama sekali.
+
+### Catatan: font sudah benar
+
+`@fontsource-variable/manrope` mendeklarasikan 6 subset, tapi tiap subset punya `unicode-range`,
+jadi browser hanya mengunduh latin + latin-ext (±40 KB) dan sudah `font-display: swap`. **Tidak perlu diubah.**
+
+---
+
+## 2. Render "semua atau tidak sama sekali"
+
+Dashboard dan Reports menahan seluruh halaman di balik rantai `isLoading`:
+
+- `src/routes/_app.dashboard.tsx:247-253` — 4 query digabung
+- `src/routes/_app.reports.tsx:499-514` — **11 query digabung**
+
+Artinya: satu query paling lambat menahan _seluruh_ halaman. Angka KPI yang sudah siap dalam 200 ms
+tetap tidak tampil karena menunggu grafik funnel yang butuh 3 detik.
+
+**Perbaikan:** render per-bagian. KPI muncul begitu datanya siap; tiap kartu grafik punya skeleton sendiri.
+Ini perubahan yang paling besar efeknya pada _rasa_ cepat, walaupun total waktu muat sama.
+
+---
+
+## 3. Loading state tidak konsisten
+
+Sudah ada komponen `PageSkeleton` (`src/components/layout/PageSkeleton.tsx`) yang bagus, tapi baru dipakai
+di 3 halaman. Empat halaman lain jatuh ke teks polos di tengah kotak putus-putus:
+
+| Halaman                    | Sekarang                   |
+| -------------------------- | -------------------------- |
+| Dashboard, Tasks, Pipeline | ✅ `PageSkeleton`          |
+| **Sales Orders** (`:276`)  | ❌ "Loading sales orders…" |
+| **Reports** (`:514`)       | ❌ "Loading reports…"      |
+| **Clients** (`:422`)       | ❌ "Loading clients…"      |
+| **Client detail** (`:115`) | ❌ "Loading client…"       |
+
+Terlihat langsung saat diuji: membuka Sales Orders menampilkan halaman kosong dengan satu baris teks
+selama beberapa detik, lalu konten muncul mendadak — persis sensasi "berat" yang dirasakan.
+
+---
+
+## 4. Animasi — memang kurang
+
+Inventaris motion saat ini:
+
+- `precision-enter` (fade + geser 4px, 180 ms) sudah didefinisikan di `styles.css:294` tapi **dipakai satu kali saja**, di `FilterBar.tsx:56`.
+- `animate-in` / `animate-out` semuanya bawaan shadcn (dialog, dropdown) — bukan pilihan desain.
+- `transition-colors` 26×, dipakai wajar untuk hover.
+
+Jadi konten halaman **muncul mendadak tanpa transisi**. Menambahkan reveal bertahap bukan sekadar hiasan —
+ini menutupi jeda muat dan membuat aplikasi terasa jauh lebih ringan.
+
+**Usulan (hemat, sesuai karakter "Precision", dan sudah ada fondasinya):**
+
+- Pakai ulang `precision-enter` untuk kartu KPI dengan `animation-delay` bertingkat 40 ms — satu gelombang
+  reveal singkat (total < 300 ms), bukan animasi di mana-mana.
+- Transisi angka KPI (count-up singkat) pada metrik utama saja.
+- Bar "Achievement" di tabel Sales Performance: isi bar dianimasikan dari 0 ke nilainya.
+- `@media (prefers-reduced-motion)` sudah ditangani di `styles.css:334` — otomatis aman.
+
+---
+
+## 5. Temuan desain (kecil, opsional)
+
+Dari inspeksi visual Dashboard:
+
+- **Hierarki terbalik.** Enam kartu KPI sekunder (Pipeline Win Rate, Revenue Source YTD, dst.) punya bobot
+  visual setara dengan kartu capaian utama, tapi letaknya di bawah lipatan layar.
+- **Bar "Achievement" terlalu tipis** di tabel Sales Performance — nyaris tak terbaca sebagai grafik.
+- **Kartu "Prioritas tindak lanjut" saat kosong** menyisakan kotak besar kosong; empty state-nya bisa lebih
+  padat dan menawarkan aksi.
+- **Banner peringatan kalender** menempati posisi teratas, di atas KPI utama — cocok dipindah ke bawah header
+  atau dibuat bisa ditutup.
+
+Ini semua selera/prioritas produk, bukan cacat. Tidak saya sentuh tanpa persetujuan.
+
+---
+
+## Prioritas yang saya sarankan
+
+| #   | Perbaikan                         | Dampak                     | Risiko     | Tampilan berubah?        |
+| --- | --------------------------------- | -------------------------- | ---------- | ------------------------ |
+| 1   | Lazy-load export PDF/Excel        | −818 KB per halaman        | Rendah     | Tidak                    |
+| 2   | Lazy-load grafik recharts         | −412 KB                    | Rendah     | Tidak (skeleton sekejap) |
+| 3   | Skeleton di 4 halaman yang kurang | Rasa cepat                 | Rendah     | Ya, ke arah lebih baik   |
+| 4   | Render bertahap Dashboard/Reports | Rasa cepat (paling terasa) | **Sedang** | Ya                       |
+| 5   | Animasi reveal + count-up         | Polesan                    | Rendah     | Ya                       |
+| 6   | Penyesuaian hierarki Dashboard    | Selera                     | Rendah     | Ya                       |
+
+Nomor 1–3 adalah pekerjaan mekanis dengan hasil terukur. Nomor 4 menyentuh logika render halaman —
+perlu pengujian lebih hati-hati.
+
+---
+
+## Hasil implementasi (2026-09-30)
+
+Perbaikan 1–5 dikerjakan; penyesuaian desain (bagian 5) ditunda atas permintaan.
+
+### Bobot JS per halaman — sebelum → sesudah
+
+| Halaman                    |                    Mentah |                    Gzip |
+| -------------------------- | ------------------------: | ----------------------: |
+| **Dashboard**              | 2.049 → **892 KB** (−56%) | 623 → **279 KB** (−55%) |
+| **Reports**                | 2.127 → **950 KB** (−55%) | 645 → **297 KB** (−54%) |
+| **Sales Orders**           | 1.648 → **905 KB** (−45%) | 520 → **283 KB** (−46%) |
+| Clients / Pipeline / Login |             tidak berubah |           tidak berubah |
+
+Ketiga halaman terberat kini di bawah anggaran ±300 KB gzip.
+
+### Yang diubah
+
+**Lazy-load export** — `jspdf`, `jspdf-autotable`, dan `xlsx` dipindah ke dynamic import di dalam
+handler tombol. `runExport` di Dashboard kini `async`; `handleExport` di Reports/Sales Orders/Activity
+sudah async sejak awal. Loading toast yang sudah ada menutupi jeda pengunduhan modul, jadi tidak ada
+UI tambahan. Diverifikasi di browser: `jspdf` dan `xlsx` **0 request** saat Dashboard dimuat, dan
+kedelapan fungsi export tetap resolve lewat jalur dynamic import.
+
+**Lazy-load grafik** — `AchievementTrendChart`, `ReportsTrendCharts`, dan `ReportsForecastSection`
+dibungkus `React.lazy` + `Suspense`, dengan placeholder baru `ChartCardSkeleton` yang menahan tinggi
+slot supaya layout tidak melompat.
+
+**Skeleton konsisten** — `PageSkeleton` mendapat varian `"table"`, plus `TableRowsSkeleton` untuk
+halaman yang header dan filternya sudah tampil (Clients) sehingga kontrol tetap bisa dipakai saat
+baris dimuat. Empat halaman yang sebelumnya menampilkan teks polos kini memakai skeleton.
+
+**Render bertahap**
+
+- Dashboard: gerbang halaman tinggal `isLoading` data inti. Tiga query metrik kini menahan bagiannya
+  sendiri, jadi daftar follow-up dan grafik tren langsung tampil.
+- Reports: rantai 11 query dipecah jadi gerbang inti (`metricsQuery`) + tiga gerbang per-bagian
+  (tren, performance, product intelligence). KPI dan filter bisa dipakai saat 6 RPC analitik masih jalan.
+
+Bagian yang masih memuat sengaja menampilkan skeleton, bukan Rp0 — semua nilai turunan memakai
+fallback `?? 0`, jadi merender lebih awal akan menampilkan angka yang salah sesaat.
+
+**Animasi** — `precision-stagger` ditambahkan di `styles.css` (memakai ulang keyframe `precision-enter`
+yang sudah ada): anak elemen muncul berurutan 40 ms, total di bawah 300 ms. Dipakai di tiga kelompok
+kartu KPI. `KpiProgress` kini tumbuh dari 0 saat mount. Hook baru `useCountUp` menganimasikan dua angka
+utama Dashboard saja, agar ada satu titik fokus. Semuanya otomatis mati saat `prefers-reduced-motion`
+aktif — `useCountUp` mengembalikan nilai akhir langsung, dan aturan di `styles.css:334` menangani CSS.
+
+### Verifikasi
+
+| Cek                       | Hasil                                                                   |
+| ------------------------- | ----------------------------------------------------------------------- |
+| `bun run typecheck`       | lolos                                                                   |
+| `bun run lint`            | lolos                                                                   |
+| `bun run test`            | 711 lolos, 0 gagal                                                      |
+| `bun run test:e2e`        | 12 lolos (termasuk uji unduh export Dashboard)                          |
+| `bun run build`           | lolos                                                                   |
+| Browser (data seed lokal) | 6 halaman dirender; Reports menampilkan seluruh 18 bagian dan 10 grafik |
+
+### Catatan sampingan (tidak disentuh)
+
+`src/components/ui/chart.tsx` adalah komponen shadcn yang mengimpor recharts secara statis tetapi
+**tidak dipakai di mana pun**. Karena tidak ada yang mengimpornya, ia tidak masuk bundle — jadi bukan
+masalah performa, hanya file mati. Dibiarkan sesuai aturan repo soal dead code lama.

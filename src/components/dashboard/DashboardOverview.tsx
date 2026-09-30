@@ -1,4 +1,5 @@
 import { KpiProgress } from "./KpiCard";
+import { useCountUp } from "@/hooks/use-count-up";
 import { formatPercent, formatRupiahShort } from "@/lib/format";
 
 type Props = {
@@ -23,6 +24,10 @@ export function DashboardOverview({
   waitingPo,
   activeCi,
 }: Props) {
+  // Only the two hero figures count up; the supporting numbers stay static so
+  // the card has one focal point rather than a screen of moving digits.
+  const monthRevDisplay = useCountUp(monthRev);
+  const ytdDisplay = useCountUp(ytd);
   return (
     <section
       aria-label="Metrik utama"
@@ -34,7 +39,7 @@ export function DashboardOverview({
         </p>
         <div className="mt-2 flex flex-wrap items-baseline gap-x-4 gap-y-1">
           <p className="num text-3xl font-semibold tracking-tight md:text-4xl">
-            {formatRupiahShort(monthRev)}
+            {formatRupiahShort(monthRevDisplay)}
           </p>
           <span className="num text-sm font-semibold text-primary">
             {formatPercent(monthPct)} dari target
@@ -55,7 +60,7 @@ export function DashboardOverview({
         <div className="flex flex-col justify-center gap-1 p-4 md:p-5">
           <p className="text-xs text-muted-foreground">Capaian YTD</p>
           <p className="num text-base font-semibold md:text-xl">
-            {formatRupiahShort(ytd)}
+            {formatRupiahShort(ytdDisplay)}
           </p>
           <p className="text-xs text-muted-foreground">
             {formatPercent(ytdPct)} dari target setahun

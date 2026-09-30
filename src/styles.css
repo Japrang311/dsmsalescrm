@@ -305,6 +305,39 @@
   animation: precision-enter 180ms ease-out both;
 }
 
+/* One short reveal wave for a group of cards. Children enter in sequence at
+   40ms apart; capped at 8 so a long grid still finishes inside ~300ms and the
+   page never feels like it is waiting on the animation. */
+@utility precision-stagger {
+  & > * {
+    animation: precision-enter 180ms ease-out both;
+  }
+  & > *:nth-child(1) {
+    animation-delay: 0ms;
+  }
+  & > *:nth-child(2) {
+    animation-delay: 40ms;
+  }
+  & > *:nth-child(3) {
+    animation-delay: 80ms;
+  }
+  & > *:nth-child(4) {
+    animation-delay: 120ms;
+  }
+  & > *:nth-child(5) {
+    animation-delay: 160ms;
+  }
+  & > *:nth-child(6) {
+    animation-delay: 200ms;
+  }
+  & > *:nth-child(7) {
+    animation-delay: 240ms;
+  }
+  & > *:nth-child(n + 8) {
+    animation-delay: 280ms;
+  }
+}
+
 @layer base {
   :where(button, a, [role="button"], summary):focus-visible {
     outline: 2px solid var(--ring);

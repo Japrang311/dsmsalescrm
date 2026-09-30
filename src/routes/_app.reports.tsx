@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { lazy, Suspense, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { BarChart3, Download, FileSpreadsheet, FileText } from "lucide-react";
@@ -53,13 +53,9 @@ import {
   filterSalesOrders,
   reportSalesPerformanceFromRpc,
 } from "@/lib/report-selectors";
-import { exportExecutiveReportXlsx } from "@/lib/export-xlsx";
-import { exportExecutiveReportPdf } from "@/lib/export-pdf";
 import type { DashboardExportContext } from "@/lib/dashboard-export-data";
 import { EmptyExportError } from "@/lib/export-csv";
 import { ReportsKpiCards } from "@/components/reports/ReportsKpiCards";
-import { ReportsTrendCharts } from "@/components/reports/ReportsTrendCharts";
-import { ReportsForecastSection } from "@/components/reports/ReportsForecastSection";
 import { ReportsFunnelSection } from "@/components/reports/ReportsFunnelSection";
 import { ReportsPerformanceSection } from "@/components/reports/ReportsPerformanceSection";
 import { ReportsComplianceSection } from "@/components/reports/ReportsComplianceSection";
@@ -67,6 +63,21 @@ import { Stage4WinLossSection } from "@/components/reports/Stage4WinLossSection"
 import { Stage4CycleTimeSection } from "@/components/reports/Stage4CycleTimeSection";
 import { Stage4FunnelDwellSection } from "@/components/reports/Stage4FunnelDwellSection";
 import { PageContainer } from "@/components/layout/PageContainer";
+import { PageSkeleton } from "@/components/layout/PageSkeleton";
+import { ChartCardSkeleton } from "@/components/charts/ChartCardSkeleton";
+
+// Both sections pull recharts (~412 KB). Loading them with the chart instead of
+// the route keeps the report tables and KPI tiles paintable without it.
+const ReportsTrendCharts = lazy(() =>
+  import("@/components/reports/ReportsTrendCharts").then((m) => ({
+    default: m.ReportsTrendCharts,
+  })),
+);
+const ReportsForecastSection = lazy(() =>
+  import("@/components/reports/ReportsForecastSection").then((m) => ({
+    default: m.ReportsForecastSection,
+  })),
+);
 
 export const Route = createFileRoute("/_app/reports")({
   head: () => ({ meta: [{ title: "Executive Reports · DSM" }] }),
@@ -452,9 +463,10 @@ function ReportsPage() {
     ],
   );
 
-  const handleExport = (format: "xlsx" | "pdf") => {
+  const handleExport = async (format: "xlsx" | "pdf") => {
     try {
       if (format === "xlsx") {
+        const { exportExecutiveReportXlsx } = await import("@/lib/export-xlsx");
         const rowCount = exportExecutiveReportXlsx(exportContext);
         toast.success("Executive Report Excel dibuat", {
           description: `Rentang ${formatDateShort(filters.range.from)} – ${formatDateShort(filters.range.to)} · ${rowCount} baris laporan.`,
@@ -462,6 +474,7 @@ function ReportsPage() {
         return;
       }
 
+      const { exportExecutiveReportPdf } = await import("@/lib/export-pdf");
       exportExecutiveReportPdf(exportContext);
       toast.success("Executive Report PDF dibuat", {
         description: `Rentang ${formatDateShort(filters.range.from)} – ${formatDateShort(filters.range.to)} · ${rows.length} SO · ${formatRupiahShort(totals.revenue)}.`,
@@ -494,27 +507,25 @@ function ReportsPage() {
     filters.soType !== "all" ? `Tipe: ${filters.soType}` : null,
   ].filter(Boolean);
 
-  if (
-    !authReady ||
-    isLoading ||
-    metricsQuery.isLoading ||
-    monthlyTrendQuery.isLoading ||
+  // Only the core row-level data and the headline metrics hold back the page.
+  // Every other query now gates just the section it feeds, so the KPI cards and
+  // filters are usable while the slower analytics RPCs are still in flight.
+  if (!authReady || isLoading || metricsQuery.isLoading) {
+    return <PageSkeleton label="Memuat laporan…" />;
+  }
+
+  const trendLoading = monthlyTrendQuery.isLoading;
+  const performanceLoading =
     ownerYtdQuery.isLoading ||
     topCustomersQuery.isLoading ||
-    taskClientMetricsQuery.isLoading ||
+    taskClientMetricsQuery.isLoading;
+  const productIntelligenceLoading =
     winLossQuery.isLoading ||
     lostReasonQuery.isLoading ||
     cycleTimeQuery.isLoading ||
     stageFunnelQuery.isLoading ||
     stageDwellQuery.isLoading ||
-    analyticsCoverageQuery.isLoading
-  ) {
-    return (
-      <div className="flex items-center justify-center rounded-lg border border-dashed py-16 text-sm text-muted-foreground">
-        Loading reports…
-      </div>
-    );
-  }
+    analyticsCoverageQuery.isLoading;
 
   return (
     <PageContainer>
@@ -582,17 +593,25 @@ function ReportsPage() {
       />
 
       {/* Achievement YTD vs Target */}
-      <ReportsTrendCharts
-        cumulativeTrend={cumulativeTrend}
-        monthlyTrend={monthlyTrend}
-      />
+      {trendLoading ? (
+        <ChartCardSkeleton count={2} />
+      ) : (
+        <Suspense fallback={<ChartCardSkeleton count={2} />}>
+          <ReportsTrendCharts
+            cumulativeTrend={cumulativeTrend}
+            monthlyTrend={monthlyTrend}
+          />
+        </Suspense>
+      )}
 
       {/* Source breakdown + Forecast */}
-      <ReportsForecastSection
-        totalRevenue={totals.revenue}
-        sourceBreakdown={sourceBreakdown}
-        forecast={forecast}
-      />
+      <Suspense fallback={<ChartCardSkeleton />}>
+        <ReportsForecastSection
+          totalRevenue={totals.revenue}
+          sourceBreakdown={sourceBreakdown}
+          forecast={forecast}
+        />
+      </Suspense>
 
       {/* Quotation funnel + Waiting PO */}
       <ReportsFunnelSection
@@ -607,11 +626,15 @@ function ReportsPage() {
       />
 
       {/* Top customers + Sales perf */}
-      <ReportsPerformanceSection
-        topCustomers={topCustomers}
-        totalRevenue={totals.revenue}
-        salesPerf={salesPerf}
-      />
+      {performanceLoading ? (
+        <ChartCardSkeleton count={2} />
+      ) : (
+        <ReportsPerformanceSection
+          topCustomers={topCustomers}
+          totalRevenue={totals.revenue}
+          salesPerf={salesPerf}
+        />
+      )}
 
       {/* Stage 4: Product intelligence — win/loss, cycle-time, funnel, dwell */}
       <div className="pt-1">
@@ -623,20 +646,26 @@ function ReportsPage() {
           lihat catatan cakupan pada tiap kartu.
         </p>
       </div>
-      <Stage4WinLossSection
-        winLoss={winLossQuery.data}
-        lostReasons={lostReasonQuery.data ?? []}
-        coverage={analyticsCoverageQuery.data ?? []}
-      />
-      <Stage4CycleTimeSection
-        cycleTime={cycleTimeQuery.data ?? []}
-        coverage={analyticsCoverageQuery.data ?? []}
-      />
-      <Stage4FunnelDwellSection
-        funnel={stageFunnelQuery.data ?? []}
-        dwell={stageDwellQuery.data ?? []}
-        coverage={analyticsCoverageQuery.data ?? []}
-      />
+      {productIntelligenceLoading ? (
+        <ChartCardSkeleton count={3} />
+      ) : (
+        <>
+          <Stage4WinLossSection
+            winLoss={winLossQuery.data}
+            lostReasons={lostReasonQuery.data ?? []}
+            coverage={analyticsCoverageQuery.data ?? []}
+          />
+          <Stage4CycleTimeSection
+            cycleTime={cycleTimeQuery.data ?? []}
+            coverage={analyticsCoverageQuery.data ?? []}
+          />
+          <Stage4FunnelDwellSection
+            funnel={stageFunnelQuery.data ?? []}
+            dwell={stageDwellQuery.data ?? []}
+            coverage={analyticsCoverageQuery.data ?? []}
+          />
+        </>
+      )}
 
       {/* Compliance + Prototype + Alerts */}
       <ReportsComplianceSection
