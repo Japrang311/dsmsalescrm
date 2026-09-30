@@ -149,10 +149,14 @@
   --muted-foreground: oklch(0.72 0.02 250);
   --accent: oklch(0.3 0.06 258);
   --accent-foreground: oklch(0.97 0.005 250);
-  --destructive: oklch(0.62 0.2 25);
-  --destructive-foreground: oklch(1 0 0);
-  --success: oklch(0.62 0.13 150);
-  --success-foreground: oklch(1 0 0);
+  /* Lightness lifted so `text-*` clears AA on its own /10 tint over --card
+     (destructive was 3.99:1, success 4.45:1). The -foreground values flip to
+     near-black: on these lifted surfaces white measures only 2.9-3.2:1, while
+     near-black gives 6.0-7.3:1. */
+  --destructive: oklch(0.68 0.2 25);
+  --destructive-foreground: oklch(0.18 0.03 258);
+  --success: oklch(0.66 0.13 150);
+  --success-foreground: oklch(0.18 0.03 258);
   --warning: oklch(0.72 0.15 55);
   --warning-foreground: oklch(0.18 0.03 258);
   --border: oklch(1 0 0 / 10%);

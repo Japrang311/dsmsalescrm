@@ -199,7 +199,7 @@ export function ClientOverviewTab({
                     className="flex items-start gap-2 rounded-md border bg-muted/30 p-2.5 text-xs"
                   >
                     {t.dueState === "Overdue" || t.dueState === "Escalated" ? (
-                      <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-rose-500" />
+                      <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-destructive" />
                     ) : (
                       <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                     )}

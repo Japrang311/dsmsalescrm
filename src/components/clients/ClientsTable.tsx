@@ -264,7 +264,7 @@ export function ClientsTable({
                       <span
                         className={
                           overdue
-                            ? "text-rose-600 font-medium"
+                            ? "text-destructive font-medium"
                             : "text-muted-foreground"
                         }
                       >

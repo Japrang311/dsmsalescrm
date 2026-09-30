@@ -4,7 +4,8 @@ import type { ClientStatus } from "@/lib/domain";
 const STATUS_STYLES: Record<ClientStatus, string> = {
   // Prospect keeps a raw hue: "new, not yet judged" has no semantic token,
   // and muted/primary are already taken by Lost and Repeat Order.
-  Prospect: "bg-sky-100 text-sky-800 border-sky-200",
+  Prospect:
+    "bg-sky-100 text-sky-800 border-sky-200 dark:bg-sky-400/15 dark:text-sky-300 dark:border-sky-400/30",
   "Active Customer": "bg-success/10 text-success border-success/30",
   "Repeat Order": "bg-primary-soft text-primary border-primary/20",
   Dormant: "bg-warning/10 text-warning border-warning/30",

@@ -172,7 +172,7 @@ export function ReportsPerformanceSection({
                             </span>
                           ) : null}
                           {escalatedTasks ? (
-                            <span className="ml-1 text-red-600">
+                            <span className="ml-1 text-destructive">
                               · {escalatedTasks} escalated
                             </span>
                           ) : null}

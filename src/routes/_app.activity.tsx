@@ -102,62 +102,68 @@ const KIND_META: Record<
   client_created: {
     label: "Client Baru",
     icon: Users,
-    color: "bg-cyan-100 text-cyan-700",
+    color: "bg-cyan-100 text-cyan-700 dark:bg-cyan-400/15 dark:text-cyan-300",
   },
   follow_up: {
     label: "Follow-Up",
     icon: Phone,
-    color: "bg-blue-100 text-blue-700",
+    color: "bg-blue-100 text-blue-700 dark:bg-blue-400/15 dark:text-blue-300",
   },
   status_change: {
     label: "Perubahan Status",
     icon: ArrowRightLeft,
-    color: "bg-amber-100 text-amber-700",
+    color:
+      "bg-amber-100 text-amber-700 dark:bg-amber-400/15 dark:text-amber-300",
   },
   ownership_change: {
     label: "Perubahan Owner",
     icon: Users,
-    color: "bg-sky-100 text-sky-700",
+    color: "bg-sky-100 text-sky-700 dark:bg-sky-400/15 dark:text-sky-300",
   },
   commercial_history: {
     label: "Pipeline Update",
     icon: GitBranch,
-    color: "bg-violet-100 text-violet-700",
+    color:
+      "bg-violet-100 text-violet-700 dark:bg-violet-400/15 dark:text-violet-300",
   },
   task_history: {
     label: "Task Update",
     icon: CheckSquare,
-    color: "bg-slate-100 text-slate-700",
+    color:
+      "bg-slate-100 text-slate-700 dark:bg-slate-400/15 dark:text-slate-300",
   },
   commercial_created: {
     label: "Commercial Baru",
     icon: FileText,
-    color: "bg-emerald-100 text-emerald-700",
+    color:
+      "bg-emerald-100 text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-300",
   },
   order_created: {
     label: "Sales Order",
     icon: ShoppingCart,
-    color: "bg-teal-100 text-teal-700",
+    color: "bg-teal-100 text-teal-700 dark:bg-teal-400/15 dark:text-teal-300",
   },
   task_created: {
     label: "Task Baru",
     icon: Users,
-    color: "bg-indigo-100 text-indigo-700",
+    color:
+      "bg-indigo-100 text-indigo-700 dark:bg-indigo-400/15 dark:text-indigo-300",
   },
   so_tax_change: {
     label: "Koreksi Pajak SO",
     icon: ShoppingCart,
-    color: "bg-rose-100 text-rose-700",
+    color: "bg-rose-100 text-rose-700 dark:bg-rose-400/15 dark:text-rose-300",
   },
   record_lifecycle: {
     label: "Hapus / Pulihkan",
     icon: ArrowRightLeft,
-    color: "bg-orange-100 text-orange-700",
+    color:
+      "bg-orange-100 text-orange-700 dark:bg-orange-400/15 dark:text-orange-300",
   },
   team_admin: {
     label: "Administrasi Tim dan Role",
     icon: Users,
-    color: "bg-cyan-100 text-cyan-700",
+    color: "bg-cyan-100 text-cyan-700 dark:bg-cyan-400/15 dark:text-cyan-300",
   },
 };
 

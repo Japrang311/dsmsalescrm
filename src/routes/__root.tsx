@@ -117,7 +117,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         },
         { property: "og:type", content: "website" },
         { name: "twitter:card", content: "summary_large_image" },
-        { name: "theme-color", content: "#ffffff" },
         { name: "apple-mobile-web-app-title", content: "DSM Sales" },
         { name: "apple-mobile-web-app-capable", content: "yes" },
       ],
@@ -135,11 +134,29 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   },
 );
 
+// Applies the stored theme before the first paint. Without this the SSR markup
+// renders light and the correct theme only lands after hydration, which reads
+// as a flash on every navigation-free load.
+const themeBootScript = `(function(){try{var m=localStorage.getItem("dsm.theme.v1");if(m!=="light"&&m!=="dark"&&m!=="system")m="system";var d=m==="dark"||(m==="system"&&window.matchMedia("(prefers-color-scheme: dark)").matches);var e=document.documentElement;if(d)e.classList.add("dark");e.style.colorScheme=d?"dark":"light";}catch(e){}})();`;
+
 function RootShell({ children }: { children: ReactNode }) {
   return (
     <html lang="id">
       <head>
         <HeadContent />
+        {/* Rendered here rather than through `head.meta`: that path keys tags
+            by `name`, so the two media-scoped theme-colors collapse into one. */}
+        <meta
+          name="theme-color"
+          content="#f5f5f2"
+          media="(prefers-color-scheme: light)"
+        />
+        <meta
+          name="theme-color"
+          content="#09121f"
+          media="(prefers-color-scheme: dark)"
+        />
+        <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
       </head>
       <body>
         {children}

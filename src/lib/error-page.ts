@@ -14,6 +14,14 @@ export function renderErrorPage(): string {
       a, button { padding: 0.5rem 1rem; border-radius: 0.375rem; font: inherit; cursor: pointer; text-decoration: none; border: 1px solid transparent; }
       .primary { background: #111; color: #fff; }
       .secondary { background: #fff; color: #111; border-color: #d1d5db; }
+      /* This fallback ships without JS, so it cannot read the stored theme
+         preference; following the OS is the closest it can get. */
+      @media (prefers-color-scheme: dark) {
+        body { background: #09121f; color: #f2f5f8; }
+        p { color: #9aa7b4; }
+        .primary { background: #f2f5f8; color: #09121f; }
+        .secondary { background: transparent; color: #f2f5f8; border-color: #35404d; }
+      }
     </style>
   </head>
   <body>

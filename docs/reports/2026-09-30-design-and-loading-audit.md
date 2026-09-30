@@ -334,9 +334,7 @@ titik yang transparan), jadi kasus itu tidak terjadi — terkonfirmasi pada peng
 
 ~~Halaman Reports punya 3 label legend grafik di bawah AA.~~ **Diperbaiki — lihat bagian berikutnya.**
 
-Dark mode belum terpasang (tidak ada toggle maupun provider yang menambahkan kelas `.dark`), jadi
-blok token `.dark` di `styles.css` masih belum terpakai. Hitungan dark mode menunjukkan
-`text-destructive` di atas tint hanya 3.99:1 — perlu ditinjau kalau dark mode nanti diaktifkan.
+~~Dark mode belum terpasang.~~ **Diaktifkan — lihat bagian terakhir laporan ini.**
 
 ---
 
@@ -399,3 +397,84 @@ Diverifikasi pada kedua state toggle grafik (satu legend hanya dirender per stat
 | Per-bulan | Target      |  5,17:1 | **13,3:1** |
 
 Swatch tetap utuh di kedua state (2 elemen `recharts-surface` per view).
+
+---
+
+## Dark mode diaktifkan (2026-09-30, menyusul)
+
+Token `.dark` sudah lengkap sejak awal (42 dari 43 token; hanya `--radius` yang tidak ada, dan itu
+ukuran bukan warna sehingga diwarisi dari `:root`). Yang belum ada: state tema, pencegah flash,
+toggle, dan sejumlah warna yang masih terkunci ke light.
+
+### Mekanisme
+
+**`src/lib/theme-store.ts`** — `light | dark | system`, default `system`, disimpan di
+`localStorage` (`dsm.theme.v1`). Sengaja **terpisah** dari `preferences-store.ts`: store itu
+dikunci per user id dan disimpan lewat tombol Simpan, sedangkan tema harus sudah aktif sebelum auth
+selesai dan harus langsung berlaku saat dipilih. Saat mode `system`, ada listener
+`prefers-color-scheme` supaya ikut berubah ketika OS berganti.
+
+**Pencegah flash** — skrip inline di `<head>` (`__root.tsx`) membaca `localStorage` dan memasang
+kelas `.dark` **sebelum paint pertama**. Terverifikasi pada HTML hasil SSR: skrip ada di indeks 1466,
+sedangkan bundle hidrasi pertama baru di 6093 — jadi benar-benar berjalan lebih dulu.
+
+**Toggle** — `ThemeToggle` di menu avatar TopBar, tiga tombol ikon (Terang / Gelap / Ikuti sistem).
+Dibuat sebagai `ToggleGroup`, bukan item menu, supaya memilih tema tidak menutup menu dan hasilnya
+langsung terlihat.
+
+### Koreksi token dark
+
+Dua token gagal AA pada tint `/10`-nya sendiri, dan dua `-foreground` salah arah:
+
+| Token                      | Sebelum           | Sesudah                 | Alasan                               |
+| -------------------------- | ----------------- | ----------------------- | ------------------------------------ |
+| `--destructive`            | `L 0.62` (3,99:1) | `L 0.68` (**4,95:1**)   | di bawah AA pada tint sendiri        |
+| `--success`                | `L 0.62` (4,45:1) | `L 0.66` (**5,11:1**)   | di bawah AA pada tint sendiri        |
+| `--destructive-foreground` | putih (3,16:1)    | near-black (**5,96:1**) | putih gagal di atas permukaan terang |
+| `--success-foreground`     | putih (2,94:1)    | near-black (**6,39:1**) | idem                                 |
+
+`--warning-foreground` sudah near-black sejak awal — itu sudah benar.
+
+### Warna yang masih terkunci ke light
+
+**`CHART_COLORS` ternyata duplikat hex dari token `--chart-*`** yang sudah didefinisikan untuk kedua
+tema. Diganti jadi `var(--color-chart-N)`, sehingga grafik mengikuti dark mode tanpa kode tambahan.
+Efek samping: warna grafik di light mode bergeser sedikit (token jadi satu-satunya sumber kebenaran,
+bukan salinannya). Kelima token dark terukur 4,29–6,68:1 di atas kartu gelap — di atas ambang 3:1
+untuk elemen grafis.
+
+**Warna "overdue / danger"** di enam berkas (`text-rose-600`, `text-red-600`, `text-rose-500`)
+disatukan ke `text-destructive`.
+
+**Activity Log** — 12 chip kategorikal dapat varian dark (`dark:bg-X-400/15 dark:text-X-300`).
+Titik aksen `bg-X-500` **dibiarkan**: komentar di kode mengklaim warna-warna itu bekerja di kedua
+tema, dan pengukuran membenarkannya — terendah `bg-violet-500` di 3,93:1, di atas ambang 3:1.
+
+**`StatusBadges.Prospect`** (satu-satunya hue mentah yang tersisa) dapat varian dark.
+
+**Halaman error SSR** (`error-page.ts`) dapat blok `@media (prefers-color-scheme: dark)`. Halaman itu
+dikirim tanpa JS sehingga tidak bisa membaca preferensi tersimpan; mengikuti OS adalah pendekatan
+terdekat yang mungkin.
+
+**`theme-color`** dipindah dari `head.meta` ke `<head>` di RootShell — jalur `head.meta` mengunci tag
+berdasarkan `name`, sehingga dua varian media tadinya runtuh jadi satu (bug ini sempat lolos dan
+tertangkap saat memeriksa HTML SSR).
+
+### Verifikasi
+
+Audit kontras otomatis atas **seluruh teks** dalam mode gelap:
+
+| Halaman                                                                            | Kegagalan |
+| ---------------------------------------------------------------------------------- | --------- |
+| Dashboard, Activity Log, Reports, Clients, Pipeline, Sales Orders, Tasks, Settings | **0**     |
+
+Ketiga mode diuji lewat UI: Terang → kelas dibersihkan; Gelap → `.dark`; Ikuti sistem → tersimpan
+`"system"` dan resolve ke gelap sesuai OS penguji. Login page diperiksa terpisah karena berada di
+luar layout `_app`.
+
+| Cek                          | Hasil                                             |
+| ---------------------------- | ------------------------------------------------- |
+| `bun run typecheck` / `lint` | lolos                                             |
+| `bun run test`               | 711 lolos, 0 gagal                                |
+| `bun run test:e2e`           | 12 lolos                                          |
+| HTML SSR                     | skrip tema sebelum bundle, dua `theme-color` utuh |

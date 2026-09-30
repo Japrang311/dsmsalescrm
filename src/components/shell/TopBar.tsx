@@ -42,6 +42,7 @@ import {
 } from "@/lib/data/dashboard-selectors";
 import { AddClientDialog } from "@/components/clients/AddClientDialog";
 import { AddFollowUpDialog } from "@/components/clients/AddFollowUpDialog";
+import { ThemeToggle } from "@/components/shell/ThemeToggle";
 import {
   CreateQuotationDialog,
   CreateSalesOrderDialog,
@@ -469,6 +470,13 @@ export function TopBar() {
             <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
               {ROLE_LABEL[role]}
             </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <div className="px-2 py-1.5">
+              <p className="mb-1.5 text-xs font-normal text-muted-foreground">
+                Tampilan
+              </p>
+              <ThemeToggle />
+            </div>
             <DropdownMenuSeparator />
             <DropdownMenuItem>Profile</DropdownMenuItem>
             <DropdownMenuItem>Preferences</DropdownMenuItem>

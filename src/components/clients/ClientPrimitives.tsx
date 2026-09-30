@@ -38,7 +38,7 @@ export function MiniStat({
       <p
         className={cn(
           "text-sm font-semibold tabular-nums",
-          tone === "danger" ? "text-rose-600" : "text-foreground",
+          tone === "danger" ? "text-destructive" : "text-foreground",
         )}
       >
         {value}

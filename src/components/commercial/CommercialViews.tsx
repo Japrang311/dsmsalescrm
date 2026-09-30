@@ -491,7 +491,7 @@ export function CommercialViews(props: CommercialViewsProps) {
                             <span
                               className={cn(
                                 "tabular-nums",
-                                overdue && "text-rose-600 font-medium",
+                                overdue && "text-destructive font-medium",
                                 nextDays === 0 && "text-warning font-medium",
                               )}
                             >
@@ -662,7 +662,8 @@ export function CommercialViews(props: CommercialViewsProps) {
                               <span
                                 className={cn(
                                   "tabular-nums",
-                                  nextDays! < 0 && "text-rose-600 font-medium",
+                                  nextDays! < 0 &&
+                                    "text-destructive font-medium",
                                   nextDays === 0 && "text-warning font-medium",
                                 )}
                               >
