@@ -381,9 +381,21 @@ Tidak ada warna grafik yang berubah.
 Ketujuh swatch tetap berwarna seri (terverifikasi: 7 elemen `recharts-surface` utuh). Audit kontras
 otomatis seluruh teks halaman Reports: **0 kegagalan**.
 
-### Belum diterapkan
+### Diseragamkan ke Dashboard
 
-Dua legend di `AchievementTrendChart` (Dashboard) masih memakai warna seri untuk teks. Keduanya
-**lolos AA** (`--color-primary` dan `--color-navy` cukup gelap), jadi tidak disentuh agar tidak
-mengubah tampilan yang tidak diminta. Kalau ingin seragam, tinggal menambahkan `formatter={legendLabel}`
-di kedua tempat.
+Dua legend di `AchievementTrendChart` awalnya dibiarkan karena sudah lolos AA (`--color-primary` dan
+`--color-navy` cukup gelap). Menyusul permintaan, keduanya ikut memakai `formatter={legendLabel}`.
+
+**Seluruh 5 legend di aplikasi kini memakai formatter yang sama** — tidak ada lagi tempat yang bisa
+memunculkan ulang masalah ini saat warna seri berubah.
+
+Diverifikasi pada kedua state toggle grafik (satu legend hanya dirender per state):
+
+| View      | Label       | Sebelum |    Sesudah |
+| --------- | ----------- | ------: | ---------: |
+| Kumulatif | Achievement |  5,17:1 | **13,3:1** |
+| Kumulatif | Target      |  5,17:1 | **13,3:1** |
+| Per-bulan | Achievement |  5,17:1 | **13,3:1** |
+| Per-bulan | Target      |  5,17:1 | **13,3:1** |
+
+Swatch tetap utuh di kedua state (2 elemen `recharts-surface` per view).

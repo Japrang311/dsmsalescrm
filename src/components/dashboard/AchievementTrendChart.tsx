@@ -39,6 +39,7 @@ import {
   chartCardHeader,
   useChartConfig,
 } from "@/components/dashboard/chart-config";
+import { legendLabel } from "@/components/charts/chart-legend";
 
 // One chart replacing the old YTD-cumulative + monthly-bar + revenue-trend
 // trio — a segmented toggle switches between the accumulation view and the
@@ -193,6 +194,7 @@ export function AchievementTrendChart({ role }: { role: Role }) {
                 wrapperStyle={cfg.legendStyle}
                 iconType="circle"
                 iconSize={8}
+                formatter={legendLabel}
               />
               <Bar
                 dataKey="achievement"
@@ -248,6 +250,7 @@ export function AchievementTrendChart({ role }: { role: Role }) {
                 wrapperStyle={cfg.legendStyle}
                 iconType="circle"
                 iconSize={8}
+                formatter={legendLabel}
               />
               <Bar
                 dataKey="target"
