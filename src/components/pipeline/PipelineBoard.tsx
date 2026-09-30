@@ -6,7 +6,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ChevronDown, GripVertical } from "lucide-react";
+import { ChevronDown, GripVertical, Link2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/clients/StatusBadges";
@@ -42,7 +42,12 @@ type Props = {
   // Derived live, not stored: Closed Won Quotations with no linked Sales
   // Order yet.
   pendingSoItemIds: Set<string>;
+  salesOrderLinksUnavailable: boolean;
+  canMutateSalesOrders: boolean;
   onCreateSoForItem: (itemId: string) => void;
+  linkedSalesOrderByItemId: Map<string, { id: string; soNumber: string }>;
+  onLinkSoForItem: (itemId: string) => void;
+  onOpenSalesOrder: (salesOrderId: string) => void;
 };
 
 export function PipelineBoard({
@@ -61,7 +66,12 @@ export function PipelineBoard({
   onLoadMore,
   onCardClick,
   pendingSoItemIds,
+  salesOrderLinksUnavailable,
+  canMutateSalesOrders,
   onCreateSoForItem,
+  linkedSalesOrderByItemId,
+  onLinkSoForItem,
+  onOpenSalesOrder,
 }: Props) {
   const [selectedStage, setSelectedStage] =
     useState<CommercialStage>("Quotes Sent");
@@ -182,6 +192,9 @@ export function PipelineBoard({
                     const today = nextDays === 0;
                     const isDragging = draggingId === it.id;
                     const canMoveThis = canMoveItem(it);
+                    const linkedSalesOrder = linkedSalesOrderByItemId.get(
+                      it.id,
+                    );
                     return (
                       <div
                         key={it.id}
@@ -242,22 +255,66 @@ export function PipelineBoard({
                         <p className="line-clamp-2 text-sm text-muted-foreground md:col-start-1">
                           {it.projectName ?? it.description}
                         </p>
-                        {pendingSoItemIds.has(it.id) && (
-                          <div className="flex items-center justify-between gap-2 rounded-md border border-warning/35 bg-warning/10 px-2 py-1 text-[10px] text-warning">
-                            <span className="font-medium">SO belum dibuat</span>
+                        {salesOrderLinksUnavailable &&
+                          it.stage === "Closed Won" &&
+                          it.type === "Quotation" && (
+                            <p className="rounded-md border border-destructive/30 bg-destructive/5 p-2 text-[11px] font-medium text-destructive">
+                              Status Sales Order tidak dapat dimuat.
+                            </p>
+                          )}
+                        {!salesOrderLinksUnavailable &&
+                          pendingSoItemIds.has(it.id) && (
+                            <div className="space-y-1.5 rounded-md border border-warning/35 bg-warning/10 p-2 text-warning">
+                              <span className="block text-[11px] font-medium">
+                                SO belum dibuat atau dihubungkan
+                              </span>
+                              {canMutateSalesOrders && (
+                                <div className="grid grid-cols-2 gap-1.5">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="min-h-9 border-warning/35 bg-card px-2 text-xs text-warning hover:text-warning"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onLinkSoForItem(it.id);
+                                    }}
+                                  >
+                                    <Link2 className="mr-1 h-3.5 w-3.5" />
+                                    Hubungkan SO
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="min-h-9 px-2 text-xs text-warning hover:text-warning"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onCreateSoForItem(it.id);
+                                    }}
+                                  >
+                                    Buat SO
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        {linkedSalesOrder &&
+                          it.stage === "Closed Won" &&
+                          it.type === "Quotation" && (
                             <Button
-                              variant="ghost"
+                              variant="outline"
                               size="sm"
-                              className="min-h-9 px-2 text-xs text-warning hover:text-warning"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onCreateSoForItem(it.id);
+                              className="min-h-9 justify-between border-success/35 bg-success/10 px-2 text-xs text-success hover:text-success"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                onOpenSalesOrder(linkedSalesOrder.id);
                               }}
                             >
-                              Buat SO
+                              <span>SO released</span>
+                              <span className="font-mono">
+                                {linkedSalesOrder.soNumber}
+                              </span>
                             </Button>
-                          </div>
-                        )}
+                          )}
                         <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5">
                           <span className="text-base font-semibold tabular-nums text-foreground">
                             {formatRupiahShort(it.estimatedValue)}

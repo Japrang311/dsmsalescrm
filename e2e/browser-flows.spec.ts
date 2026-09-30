@@ -197,7 +197,7 @@ test("manager can reassign client owner and see ownership audit after reload", a
     name: "Reassign / Handover Klien",
   });
   await expect(reassignDialog).toBeVisible();
-  await reassignDialog.getByText("Pilih sales...").click();
+  await reassignDialog.getByRole("combobox", { name: "Pilih sales…" }).click();
   await page.getByRole("option", { name: "Leli Al" }).click();
   await reassignDialog.getByLabel("Alasan / catatan (opsional)").fill(note);
   await reassignDialog
@@ -303,6 +303,132 @@ test("sales can create normalized Quotation and Sales Order records", async ({
 
   await page.goto("/sales-orders");
   await expect(page.getByText(soNumber)).toBeVisible();
+
+  expectNoConsoleIssues(consoleIssues);
+});
+
+test("sales can manually link released Sales Orders and Closed Won Quotations from both entry points", async ({
+  page,
+}) => {
+  const consoleIssues = collectConsoleIssues(page);
+  const sales = await authenticatedSupabaseClient(USERS.sales);
+  const documentDate = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jakarta",
+  }).format(new Date());
+
+  async function createUnlinkedPair(label: string) {
+    const productName = uniqueToken(`E2E manual link ${label}`);
+    const { data: quotation, error: quotationError } = await sales.rpc(
+      "create_quotation",
+      {
+        p_client_id: NUR_CLIENT_ID,
+        p_document_date: documentDate,
+        p_client_address: null,
+        p_stage: "Closed Won",
+        p_so_number: null,
+        p_note: "Browser verification for manual document linking",
+        p_items: [
+          {
+            productName,
+            description: `${productName} description`,
+            qty: 1,
+            uom: "Unit",
+            unitPrice: 456789,
+          },
+        ],
+        p_next_action: "Verify manual Sales Order link",
+        p_next_action_date: tomorrowIsoDate(),
+      },
+    );
+    expect(quotationError).toBeNull();
+
+    const soNumber = `E2E-LINK-SO-${Date.now()}-${label}`;
+    const { data: salesOrder, error: salesOrderError } = await sales.rpc(
+      "create_sales_order",
+      {
+        p_client_id: NUR_CLIENT_ID,
+        p_date: documentDate,
+        p_customer_po_number: `E2E-LINK-PO-${Date.now()}-${label}`,
+        p_customer_po_date: documentDate,
+        p_type: "Regular",
+        p_tax_type: "PPN",
+        p_prototype_status: null,
+        p_source: "Existing / Repeat Order",
+        p_number_mode: "Manual",
+        p_manual_so_number: soNumber,
+        p_backdate_reason: null,
+        p_items: [
+          {
+            productName,
+            description: `${productName} Sales Order item`,
+            qty: 1,
+            uom: "Unit",
+            unitPrice: 456789,
+          },
+        ],
+        p_source_commercial_document_id: null,
+      },
+    );
+    expect(salesOrderError).toBeNull();
+
+    return {
+      productName,
+      quotation: quotation as { id: string; quotation_number: string },
+      salesOrder: salesOrder as { id: string },
+      soNumber,
+    };
+  }
+
+  const fromSalesOrder = await createUnlinkedPair("SO");
+  const fromQuotation = await createUnlinkedPair("QUO");
+
+  await signIn(page, USERS.sales);
+  await page.goto(`/sales-orders/${fromSalesOrder.salesOrder.id}`);
+  await page.getByRole("button", { name: "Hubungkan Quotation" }).click();
+  const quotationDialog = page.getByRole("dialog", {
+    name: "Hubungkan Quotation",
+  });
+  await quotationDialog
+    .getByText(fromSalesOrder.quotation.quotation_number)
+    .click();
+  await quotationDialog
+    .getByRole("button", { name: "Hubungkan", exact: true })
+    .click();
+  await expect(
+    page.getByText("Quotation dan Sales Order terhubung"),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", {
+      name: fromSalesOrder.quotation.quotation_number,
+      exact: true,
+    }),
+  ).toBeVisible();
+
+  await page.goto("/pipeline");
+  const closedWonColumn = page
+    .getByTestId("pipeline-column")
+    .filter({ hasText: "Closed Won" });
+  const quotationCard = closedWonColumn
+    .getByTestId("pipeline-card")
+    .filter({ hasText: fromQuotation.productName });
+  await quotationCard.getByRole("button", { name: "Hubungkan SO" }).click();
+  const salesOrderDialog = page.getByRole("dialog", {
+    name: "Hubungkan Sales Order",
+  });
+  await salesOrderDialog.getByText(fromQuotation.soNumber).click();
+  await salesOrderDialog
+    .getByRole("button", { name: "Hubungkan", exact: true })
+    .click();
+  await expect(
+    page.getByText("Quotation dan Sales Order terhubung"),
+  ).toBeVisible();
+  await expect(quotationCard.getByText("SO released")).toBeVisible();
+  await quotationCard
+    .getByRole("button", { name: new RegExp(fromQuotation.soNumber) })
+    .click();
+  await expect(page).toHaveURL(
+    new RegExp(`/sales-orders/${fromQuotation.salesOrder.id}$`),
+  );
 
   expectNoConsoleIssues(consoleIssues);
 });

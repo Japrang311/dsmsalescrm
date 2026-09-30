@@ -287,3 +287,154 @@ calendar, escalation, migration/backfill, RLS, and notification decisions.
       executed only after exact owner approval for linked project
       `qhtfixgbcpcitokeryxb`. Future remote mutations still require fresh
       exact-target approval.
+
+## Proposed Feature: Manual Quotation ↔ Released Sales Order Link
+
+**Status:** Implemented and verified locally 2026-09-30 after Product Owner
+approved assumptions 1–5. The new migration has not been applied to any remote
+environment; remote migration/deployment still requires separate approval.
+
+### Objective
+
+Allow Sales, Manager, and Super Admin to repair or complete missing lineage
+between an existing released Sales Order and the Closed Won Quotation that
+produced it, from either surface:
+
+1. Sales Order detail → `Linked Commercial Items` → choose an eligible
+   Quotation manually.
+2. Pipeline `Closed Won` quotation card → link to an existing released Sales
+   Order, while retaining the existing `Buat SO` path.
+
+The resulting link must drive every existing consumer of
+`sales_orders.source_commercial_document_id`: Sales Order detail, Quotation
+detail, the Pipeline Closed Won state, revision lock, and cycle-time/reporting
+coverage.
+
+### Assumptions Requiring Approval
+
+1. In the current model, an existing row in `sales_orders` is already a
+   released SO; there is no separate SO release-status column.
+2. “Commercial item” in this feature means the current, non-deleted
+   `Quotation` revision in stage `Closed Won`, not Direct Order, Prototype,
+   Customer PO, or historical/superseded quotation rows.
+3. Preserve the existing one-to-one lineage contract: one Quotation can link
+   to at most one SO, and one SO stores at most one source Quotation.
+4. A link is eligible only when SO and Quotation belong to the same client.
+5. This scope adds initial linking only. Unlinking/replacing an existing link
+   remains out of scope until its correction/audit policy is explicitly
+   approved.
+
+If assumptions 2 or 3 are wrong, implementation must stop because supporting
+multiple commercial items per SO requires a junction table and changes the
+analytics contract.
+
+### Existing Contract and Gap
+
+- Canonical relation: nullable, unique
+  `sales_orders.source_commercial_document_id` → `commercial_documents.id`.
+- Existing create-from-Closed-Won flow fills the relation only while creating
+  a new SO.
+- Existing Sales Order detail reads the relation (plus a legacy `so_number`
+  fallback) but provides no manual link control.
+- Existing Closed Won card only distinguishes linked/unlinked. When unlinked,
+  it offers `Buat SO`; when linked, it does not expose the released SO directly
+  on the card.
+- The database currently relies on the caller to send a suitable document ID;
+  a dedicated atomic command is needed to enforce type, stage, current
+  revision, client, ownership, soft-delete, and uniqueness rules together.
+
+### Architecture Decisions
+
+- Add one additive SECURITY DEFINER RPC, for example
+  `link_sales_order_to_quotation(p_sales_order_id, p_quotation_id)`, rather
+  than exposing `source_commercial_document_id` to unrestricted browser
+  updates.
+- The RPC locks both rows, validates active role and ownership, requires the
+  same `client_id`, requires an active current `Quotation` in `Closed Won`,
+  rejects an already-linked SO or quotation, updates the SO, and appends an
+  auditable `sales_order_header_change` event containing both IDs/numbers.
+- Reuse the existing unique constraint as the concurrency backstop and return
+  stable business errors for UI copy.
+- Add focused data helpers to list eligible same-client candidates and execute
+  the RPC. Do not add a dependency or a new global state abstraction.
+- Reuse one controlled selection dialog from both entry points so eligibility,
+  empty/error states, confirmation copy, and cache invalidation stay identical.
+- On the Closed Won card, replace the binary warning with three explicit
+  states: unlinked (`Buat SO` + `Hubungkan SO`), linked (clickable SO number),
+  and loading/error without claiming no SO exists.
+
+### Dependency Graph
+
+```text
+Atomic DB link contract + tests
+    └── data-layer candidate/query/link helpers
+          └── shared manual-link dialog
+                ├── Sales Order detail entry point
+                └── Closed Won card linked/unlinked states
+                      └── browser and regression verification
+```
+
+### Project Structure and Likely Files
+
+- `supabase/migrations/<timestamp>_add_manual_so_quotation_link.sql`
+- `supabase/tests/sales-orders.test.ts` or a focused link-contract test file
+- `src/lib/data/sales-orders.ts`
+- `src/components/sales-orders/LinkQuotationToSalesOrderDialog.tsx` (new)
+- `src/routes/_app.sales-orders.$soId.tsx`
+- `src/routes/_app.pipeline.tsx`
+- `src/components/pipeline/PipelineBoard.tsx`
+- focused component/data tests under existing `src/**` or `tests/**` patterns
+
+### Commands and Verification
+
+- Focused DB/data tests: `bun --env-file=.env.local test <focused-test-files>`
+- Type safety: `bun run typecheck`
+- Lint: `bun run lint`
+- Application tests/build: `bun run test` and `bun run build`
+- Migration/local DB gate: `bun run verify:db`
+- Diff hygiene: `git diff --check`
+- Runtime: authenticated desktop/mobile browser checks for Sales and Manager,
+  including same-client filtering, duplicate/race rejection, and navigation in
+  both directions.
+
+### Boundaries
+
+- **Always:** validate eligibility server-side; keep cache invalidation scoped;
+  preserve the existing create-SO flow, analytics relation, revision lock, RLS,
+  soft-delete rules, legacy imports, and unrelated UI.
+- **Ask first:** any many-to-one/many-to-many model, unlink/replace behavior,
+  linking non-Quotation types, or remote Supabase migration/deployment.
+- **Never:** infer lineage by matching values/names; allow cross-client links;
+  loosen RLS; rewrite historical migrations; treat Git push as production proof.
+
+### Success Criteria
+
+- An authorized user can link an unlinked SO to one eligible same-client
+  Closed Won current Quotation from the SO detail page.
+- An authorized user can link an unlinked Closed Won Quotation to one eligible
+  same-client released SO from its Pipeline card without creating a duplicate
+  SO.
+- Linked state is visible and navigable from both the Sales Order and Quotation
+  surfaces immediately after success.
+- Server rejects cross-client, non-Quotation, non-Closed-Won, superseded,
+  deleted, unauthorized, and already-linked attempts atomically.
+- Existing `Buat SO`, quotation revision lock, reports/cycle-time calculations,
+  role access, soft deletion, and legacy records do not regress.
+
+### Risks and Mitigations
+
+| Risk | Impact | Mitigation |
+| --- | --- | --- |
+| “Commercial items” actually means multiple/non-Quotation records | High | Resolve assumptions 2–3 before implementation; do not force the current FK beyond its semantics. |
+| Cross-client or wrong-owner linkage corrupts lineage/analytics | High | Same-client and role/ownership checks in one locked RPC; UI filtering is convenience only. |
+| Concurrent users link the same quotation twice | High | Row locking plus existing unique constraint; map collision to stable error copy. |
+| Pipeline pagination hides the linked SO state | Medium | Resolve linked IDs from the SO query, not only loaded quotation cards; add focused derived-state tests. |
+| Legacy `commercial_documents.so_number` conflicts with canonical FK | Medium | Treat the FK as authoritative for new links; preserve legacy display fallback without writing new text links. |
+
+### Approval Gate
+
+Product Owner approved assumptions 1–5 on 2026-09-30. Local implementation and
+verification are complete: 711 application/database tests, 12 authenticated
+Chromium E2E flows, lint, typecheck, production build, and local migration reset
+passed. Remote migration, push, deployment, and production UAT remain separate
+explicit gates.

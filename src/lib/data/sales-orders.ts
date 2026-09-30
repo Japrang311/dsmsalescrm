@@ -337,6 +337,17 @@ export async function createSalesOrder(
   return toSalesOrder(data as SalesOrderRow);
 }
 
+export async function linkSalesOrderToQuotation(input: {
+  salesOrderId: string;
+  quotationId: string;
+}): Promise<void> {
+  const { error } = await supabase.rpc("link_sales_order_to_quotation", {
+    p_sales_order_id: input.salesOrderId,
+    p_quotation_id: input.quotationId,
+  });
+  if (error) throw error;
+}
+
 export async function updateSalesOrderTax(
   id: string,
   taxType: TaxType,

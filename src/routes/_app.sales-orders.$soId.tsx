@@ -1,6 +1,15 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, Check, Lock, Pencil, Plus, Receipt, X } from "lucide-react";
+import {
+  ArrowLeft,
+  Check,
+  Link2,
+  Lock,
+  Pencil,
+  Plus,
+  Receipt,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { Card, CardContent } from "@/components/ui/card";
@@ -67,6 +76,7 @@ import { ClientPickerField } from "@/components/clients/ClientPicker";
 import { StatusBadge } from "@/components/clients/StatusBadges";
 import { useRole, ROLE_LABEL } from "@/context/role-context-core";
 import { useDashboardData } from "@/hooks/use-dashboard-data";
+import { LinkSalesOrderQuotationDialog } from "@/components/commercial/LinkSalesOrderQuotationDialog";
 
 export const Route = createFileRoute("/_app/sales-orders/$soId")({
   head: () => ({ meta: [{ title: "Sales Order Detail · DSM" }] }),
@@ -78,12 +88,14 @@ function SalesOrderDetail() {
   const navigate = useNavigate();
   const { role, authReady } = useRole();
   const queryClient = useQueryClient();
+  const [linkQuotationOpen, setLinkQuotationOpen] = useState(false);
   const {
     orders,
     clients: clientList,
     items,
     ownersById,
     currentUserId,
+    hasError,
     isLoading,
   } = useDashboardData();
   const { data: audit = [] } = useQuery({
@@ -299,31 +311,52 @@ function SalesOrderDetail() {
 
         <Card>
           <CardContent className="p-4">
-            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Linked Commercial Items
-            </p>
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Linked Commercial Items
+              </p>
+              {canEditOwnSo && !so.sourceCommercialDocumentId && !hasError && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 px-2 text-xs"
+                  onClick={() => setLinkQuotationOpen(true)}
+                >
+                  <Link2 className="mr-1 h-3.5 w-3.5" />
+                  Hubungkan Quotation
+                </Button>
+              )}
+            </div>
             {linkedItems.length === 0 ? (
               <p className="text-xs text-muted-foreground">
-                Tidak ada item pipeline yang direferensikan ke SO ini.
+                {hasError
+                  ? "Data hubungan Commercial Item tidak dapat dimuat."
+                  : "Tidak ada item pipeline yang direferensikan ke SO ini."}
               </p>
             ) : (
               <ul className="flex flex-col gap-1.5">
                 {linkedItems.map((it) => (
-                  <li
-                    key={it.id}
-                    className="rounded-md border bg-muted/30 p-2 text-xs"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium">
-                        {it.projectName ?? it.description}
-                      </span>
-                      <Badge variant="outline" className="text-[10px]">
-                        {it.type}
-                      </Badge>
-                    </div>
-                    <div className="mt-1 text-[11px] text-muted-foreground">
-                      {it.stage}
-                    </div>
+                  <li key={it.id}>
+                    <Link
+                      to="/quotations/$id"
+                      params={{ id: it.id }}
+                      className="block rounded-md border bg-muted/30 p-2 text-xs hover:border-primary/40"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="min-w-0 truncate font-medium">
+                          {it.quotationNumber ??
+                            it.projectName ??
+                            it.description}
+                        </span>
+                        <Badge variant="outline" className="text-[10px]">
+                          {it.type}
+                        </Badge>
+                      </div>
+                      <div className="mt-1 text-[11px] text-muted-foreground">
+                        {it.stage}
+                      </div>
+                    </Link>
                   </li>
                 ))}
               </ul>
@@ -365,6 +398,17 @@ function SalesOrderDetail() {
             </ul>
           </CardContent>
         </Card>
+      )}
+
+      {canEditOwnSo && !so.sourceCommercialDocumentId && (
+        <LinkSalesOrderQuotationDialog
+          mode="sales-order"
+          open={linkQuotationOpen}
+          onOpenChange={setLinkQuotationOpen}
+          salesOrder={so}
+          quotations={items}
+          allSalesOrders={orders}
+        />
       )}
     </div>
   );

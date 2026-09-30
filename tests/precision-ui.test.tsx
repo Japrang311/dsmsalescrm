@@ -29,7 +29,14 @@ const columns: PipelineColumnData[] = [
   },
   {
     stage: "Closed Won",
-    items: [{ ...quotation, id: "won-preview", projectName: "Won fixture" }],
+    items: [
+      {
+        ...quotation,
+        id: "won-preview",
+        stage: "Closed Won",
+        projectName: "Won fixture",
+      },
+    ],
     sum: 125000000,
     hasMore: false,
     isFetching: false,
@@ -50,7 +57,12 @@ const props = {
   onLoadMore: () => {},
   onCardClick: () => {},
   pendingSoItemIds: new Set<string>(),
+  salesOrderLinksUnavailable: false,
+  canMutateSalesOrders: true,
   onCreateSoForItem: () => {},
+  linkedSalesOrderByItemId: new Map<string, { id: string; soNumber: string }>(),
+  onLinkSoForItem: () => {},
+  onOpenSalesOrder: () => {},
 };
 
 describe("Precision operational presentation", () => {
@@ -71,6 +83,58 @@ describe("Precision operational presentation", () => {
     expect(html).toContain("Won fixture");
     expect(html).toContain('tabindex="0"');
     expect(html).toContain("Belum dijadwalkan");
+  });
+  test("unlinked Closed Won quotation offers create and manual-link actions", () => {
+    const html = renderToStaticMarkup(
+      <PipelineBoard
+        {...props}
+        view="board"
+        pendingSoItemIds={new Set(["won-preview"])}
+      />,
+    );
+    expect(html).toContain("SO belum dibuat");
+    expect(html).toContain("Buat SO");
+    expect(html).toContain("Hubungkan SO");
+  });
+  test("linked Closed Won quotation exposes the released SO number", () => {
+    const html = renderToStaticMarkup(
+      <PipelineBoard
+        {...props}
+        view="board"
+        linkedSalesOrderByItemId={
+          new Map([
+            ["won-preview", { id: "so-preview", soNumber: "DSM-26SO777" }],
+          ])
+        }
+      />,
+    );
+    expect(html).toContain("SO released");
+    expect(html).toContain("DSM-26SO777");
+  });
+  test("does not claim an SO is missing when link status cannot be loaded", () => {
+    const html = renderToStaticMarkup(
+      <PipelineBoard
+        {...props}
+        view="board"
+        pendingSoItemIds={new Set(["won-preview"])}
+        salesOrderLinksUnavailable
+      />,
+    );
+    expect(html).toContain("Status Sales Order tidak dapat dimuat");
+    expect(html).not.toContain("SO belum dibuat atau dihubungkan");
+  });
+  test("read-only roles see missing SO status without mutation actions", () => {
+    const html = renderToStaticMarkup(
+      <PipelineBoard
+        {...props}
+        view="board"
+        pendingSoItemIds={new Set(["won-preview"])}
+        canMutateSalesOrders={false}
+      />,
+    );
+    expect(html).toContain("SO belum dibuat atau dihubungkan");
+    expect(html).not.toContain("Hubungkan SO");
+    expect(html).not.toContain("Buat SO");
   });
   test("overview distinguishes monthly, yearly and waiting PO amounts without relabeling scope", () => {
     const html = renderToStaticMarkup(

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { GitBranch } from "lucide-react";
 import { toast } from "sonner";
 import { PipelineCardDrawer } from "@/components/pipeline/PipelineCardDrawer";
@@ -14,6 +14,7 @@ import {
   type PendingPipelineMove,
 } from "@/components/pipeline/PipelineStageMoveDialog";
 import { CreateSalesOrderDialog } from "@/components/clients/CreateRecordDialogs";
+import { LinkSalesOrderQuotationDialog } from "@/components/commercial/LinkSalesOrderQuotationDialog";
 
 import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRole } from "@/context/role-context-core";
@@ -110,6 +111,7 @@ function PipelinePage() {
 function PipelineBoardPage({ role }: { role: Role }) {
   const { authReady } = useRole();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const isMobile = useIsMobile();
   const [chosenView, setChosenView] = useState<
@@ -140,7 +142,7 @@ function PipelineBoardPage({ role }: { role: Role }) {
 
   // Live board: a stage change made by another user (or in another tab) shows
   // up here without a manual refresh.
-  useRealtimeSync(["commercial_documents"], authReady);
+  useRealtimeSync(["commercial_documents", "sales_orders"], authReady);
 
   // Per-stage paginated queries (6 columns, fetched in parallel)
   const stageQueries = useQueries({
@@ -197,11 +199,15 @@ function PipelineBoardPage({ role }: { role: Role }) {
     queryFn: listTasks,
     enabled: authReady,
   });
-  const { data: allSalesOrders = [] } = useQuery({
+  const salesOrdersQuery = useQuery({
     queryKey: ["sales-orders", "all"],
     queryFn: () => listSalesOrders(),
     enabled: authReady,
   });
+  const allSalesOrders = useMemo(
+    () => salesOrdersQuery.data ?? [],
+    [salesOrdersQuery.data],
+  );
 
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverStage, setDragOverStage] = useState<Stage | null>(null);
@@ -225,6 +231,9 @@ function PipelineBoardPage({ role }: { role: Role }) {
     clientName: string;
     ownerId: string;
   } | null>(null);
+  const [quotationToLinkId, setQuotationToLinkId] = useState<string | null>(
+    null,
+  );
 
   const { data: clientList = [] } = useQuery({
     queryKey: ["clients", "all"],
@@ -319,20 +328,35 @@ function PipelineBoardPage({ role }: { role: Role }) {
       ),
     [allSalesOrders],
   );
-  const pendingSoItemIds = useMemo(
+  const linkedSalesOrderByQuotationId = useMemo(
     () =>
-      new Set(
-        allLoadedItems
-          .filter(
-            (it) =>
-              it.stage === "Closed Won" &&
-              it.type === "Quotation" &&
-              !linkedQuotationIds.has(it.id),
-          )
-          .map((it) => it.id),
+      new Map(
+        allSalesOrders.flatMap((salesOrder) =>
+          salesOrder.sourceCommercialDocumentId
+            ? [
+                [
+                  salesOrder.sourceCommercialDocumentId,
+                  { id: salesOrder.id, soNumber: salesOrder.soNumber },
+                ] as const,
+              ]
+            : [],
+        ),
       ),
-    [allLoadedItems, linkedQuotationIds],
+    [allSalesOrders],
   );
+  const pendingSoItemIds = useMemo(() => {
+    if (salesOrdersQuery.isError) return new Set<string>();
+    return new Set(
+      allLoadedItems
+        .filter(
+          (it) =>
+            it.stage === "Closed Won" &&
+            it.type === "Quotation" &&
+            !linkedQuotationIds.has(it.id),
+        )
+        .map((it) => it.id),
+    );
+  }, [allLoadedItems, linkedQuotationIds, salesOrdersQuery.isError]);
 
   function openCreateSoForItem(itemId: string) {
     const item = allLoadedItems.find((i) => i.id === itemId);
@@ -347,6 +371,10 @@ function PipelineBoardPage({ role }: { role: Role }) {
       ownerId: item.ownerId,
     });
   }
+
+  const quotationToLink = quotationToLinkId
+    ? (allLoadedItems.find((item) => item.id === quotationToLinkId) ?? null)
+    : null;
 
   const activeFilters =
     (owner !== "all" ? 1 : 0) +
@@ -504,7 +532,10 @@ function PipelineBoardPage({ role }: { role: Role }) {
   }
 
   const isLoading =
-    !authReady || stageQueries.some((q) => q.isLoading) || !metrics;
+    !authReady ||
+    stageQueries.some((q) => q.isLoading) ||
+    salesOrdersQuery.isLoading ||
+    !metrics;
 
   if (isLoading) {
     return <PageSkeleton label="Memuat pipeline…" />;
@@ -616,7 +647,14 @@ function PipelineBoardPage({ role }: { role: Role }) {
           onLoadMore={(stage: CommercialStage) => loadMore(stage)}
           onCardClick={setDrawerItemId}
           pendingSoItemIds={pendingSoItemIds}
+          salesOrderLinksUnavailable={salesOrdersQuery.isError}
+          canMutateSalesOrders={role !== "executive"}
           onCreateSoForItem={openCreateSoForItem}
+          linkedSalesOrderByItemId={linkedSalesOrderByQuotationId}
+          onLinkSoForItem={setQuotationToLinkId}
+          onOpenSalesOrder={(soId) =>
+            void navigate({ to: "/sales-orders/$soId", params: { soId } })
+          }
         />
       )}
 
@@ -667,6 +705,18 @@ function PipelineBoardPage({ role }: { role: Role }) {
           });
         }}
       />
+
+      {quotationToLink && (
+        <LinkSalesOrderQuotationDialog
+          mode="quotation"
+          open={quotationToLinkId !== null}
+          onOpenChange={(open) => {
+            if (!open) setQuotationToLinkId(null);
+          }}
+          quotation={quotationToLink}
+          salesOrders={allSalesOrders}
+        />
+      )}
 
       <PipelineCardDrawer
         open={drawerItemId !== null}

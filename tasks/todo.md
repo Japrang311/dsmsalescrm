@@ -1816,3 +1816,158 @@ see `HANDOFF.md` for what remains outstanding before production.
 **Plan:** `docs/superpowers/plans/2026-08-31-ai-dashboard-summary-implementation.md`
 
 **Estimated scope:** Medium (6 files, no migration)
+
+---
+
+## Proposed: Manual Quotation ↔ Released Sales Order Link
+
+**Status:** Completed locally (2026-09-30) after Product Owner approved
+assumptions 1–5. Detailed scope and evidence are in `tasks/plan.md` under the
+matching heading. No remote migration or deployment has run.
+
+### Task 1: Lock the atomic manual-link contract
+
+**Description:** Add a forward-only migration defining an RPC that links one
+existing SO to one eligible Closed Won current Quotation and records the action
+in Activity Log.
+
+**Acceptance criteria:**
+
+- [x] Same-client, type, stage, current-revision, soft-delete, role/ownership,
+      and existing-link rules are validated inside one transaction.
+- [x] Concurrent/duplicate attempts fail with stable business errors and leave
+      both records unchanged.
+- [x] Successful linking writes the canonical FK and one auditable event.
+
+**Verification:**
+
+- [x] Focused Supabase tests cover success plus cross-client, wrong stage,
+      superseded/deleted, unauthorized, already-linked, and race cases.
+- [x] `bun run verify:db` applied the migration locally; advisors reported no
+      new issue. The three repository-known temp-table lint exceptions remain.
+
+**Dependencies:** Owner approves assumptions and scope.
+
+**Files likely touched:** one new migration; one focused Supabase test file.
+
+**Estimated scope:** Small (2 files).
+
+### Task 2: Add the typed data-layer link API
+
+**Description:** Add narrowly scoped candidate loading and RPC wrappers for the
+shared manual-link UI.
+
+**Acceptance criteria:**
+
+- [x] Candidate queries expose only active, unlinked, same-client records
+      appropriate to the entry point.
+- [x] RPC/business errors map to clear Indonesian user messages.
+- [x] Existing Sales Order list/create/update contracts remain unchanged.
+
+**Verification:**
+
+- [x] Focused data-layer tests pass with local Supabase.
+- [x] `bun run typecheck` and `bun run lint` pass.
+
+**Dependencies:** Task 1.
+
+**Files likely touched:** `src/lib/data/sales-orders.ts`; one focused test file.
+
+**Estimated scope:** Small (2 files).
+
+### Task 3: Deliver the shared dialog and Sales Order detail entry point
+
+**Description:** Add `Hubungkan Quotation` to the Sales Order detail card and
+reuse a controlled candidate dialog with loading, empty, error, confirm, and
+success states.
+
+**Acceptance criteria:**
+
+- [x] Empty eligible state explains why no quotation can be selected.
+- [x] Success immediately replaces the empty state with a clickable linked
+      Quotation without a full reload.
+- [x] Executive remains read-only; Sales/Manager/Super Admin follow existing
+      ownership controls.
+
+**Verification:**
+
+- [x] Focused pure/UI tests cover eligibility, read-only, and failed-load
+      states; authenticated Chromium E2E covers success from both entry points.
+- [x] Role-based accessible locators and full authenticated desktop Chromium
+      smoke pass; responsive list rendering remains covered by component tests.
+
+**Dependencies:** Task 2.
+
+**Files likely touched:** one new dialog component;
+`src/routes/_app.sales-orders.$soId.tsx`; one component test.
+
+**Estimated scope:** Medium (3 files).
+
+### Checkpoint: SO detail vertical slice
+
+- [x] DB contract, data helper, and SO detail flow work end-to-end locally.
+- [x] No remote mutation has run.
+- [x] Owner approved the plan before implementation; Pipeline integration was
+      delivered in the same approved scope.
+
+### Task 4: Add existing-SO linking and linked state to Closed Won cards
+
+**Description:** On an unlinked Closed Won Quotation, retain `Buat SO` and add
+`Hubungkan SO`; after linking, show the clickable SO number instead of the
+unlinked warning.
+
+**Acceptance criteria:**
+
+- [x] Only eligible same-client unlinked released SOs are selectable.
+- [x] Linked card state names and opens the actual SO.
+- [x] Existing create-SO dialog and non-Closed-Won cards are unchanged.
+
+**Verification:**
+
+- [x] Focused Pipeline tests cover unlinked actions, linked navigation, partial
+      loading/error state, and create-SO regression.
+- [x] Authenticated desktop Chromium smoke passes for Sales; Manager database
+      authorization and the existing Manager browser suite also pass.
+
+**Dependencies:** Task 3.
+
+**Files likely touched:** `src/routes/_app.pipeline.tsx`;
+`src/components/pipeline/PipelineBoard.tsx`; shared dialog; focused Pipeline
+test.
+
+**Estimated scope:** Medium (4 files).
+
+### Task 5: Full regression and documentation reconciliation
+
+**Description:** Verify that the new manual path uses the same canonical link
+as the existing create path and does not alter analytics, revision locking,
+permissions, soft-delete behavior, or legacy imported display.
+
+**Acceptance criteria:**
+
+- [x] Link is visible/navigable from SO detail, Quotation detail, and Pipeline.
+- [x] Revision lock and cycle-time/reporting coverage consume the canonical FK.
+- [x] Project planning documentation reflects the approved final behavior.
+
+**Verification:**
+
+- [x] `bun run typecheck`
+- [x] `bun run lint`
+- [x] Full test suite: 711 pass, 0 fail
+- [x] `bun run build`
+- [x] `git diff --check`
+- [x] Authenticated browser evidence is reported separately from static/build
+      evidence.
+
+**Dependencies:** Task 4.
+
+**Files likely touched:** focused tests and approved documentation only.
+
+**Estimated scope:** Small to Medium (2–4 files).
+
+### Completion Gate
+
+- [x] Product Owner approved assumptions 1–5 and Tasks 1–5.
+- [x] All local checks and 12 authenticated Chromium scenarios pass.
+- [ ] Remote migration/deployment receives separate explicit approval naming
+      the target environment.
