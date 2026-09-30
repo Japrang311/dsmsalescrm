@@ -37,8 +37,10 @@ lerna-debug.log*
 
 # Generated/reproducible artifacts and sensitive working data — not source
 graphify-out/
+output/
 outputs/
 artifacts/
+tmp/
 .claude/settings.local.json
 .vercel
 .env*
