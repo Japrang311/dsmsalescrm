@@ -273,25 +273,25 @@ export function PipelineBoard({
                                   <Button
                                     variant="outline"
                                     size="sm"
-                                    className="min-h-9 border-warning/35 bg-card px-2 text-xs text-warning hover:text-warning"
+                                    className="min-h-9 w-full min-w-0 justify-center border-warning/35 bg-card px-2 text-xs text-warning hover:text-warning"
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       onLinkSoForItem(it.id);
                                     }}
                                   >
-                                    <Link2 className="mr-1 h-3.5 w-3.5" />
-                                    Hubungkan SO
+                                    <Link2 className="mr-1 h-3.5 w-3.5 shrink-0" />
+                                    <span className="truncate">Link SO</span>
                                   </Button>
                                   <Button
-                                    variant="ghost"
+                                    variant="outline"
                                     size="sm"
-                                    className="min-h-9 px-2 text-xs text-warning hover:text-warning"
+                                    className="min-h-9 w-full min-w-0 justify-center border-warning/35 bg-card px-2 text-xs text-warning hover:text-warning"
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       onCreateSoForItem(it.id);
                                     }}
                                   >
-                                    Buat SO
+                                    <span className="truncate">Buat SO</span>
                                   </Button>
                                 </div>
                               )}

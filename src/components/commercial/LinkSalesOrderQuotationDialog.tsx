@@ -114,8 +114,8 @@ export function LinkSalesOrderQuotationDialog(
         <DialogHeader>
           <DialogTitle>
             {props.mode === "sales-order"
-              ? "Hubungkan Quotation"
-              : "Hubungkan Sales Order"}
+              ? "Link Quotation"
+              : "Link Sales Order"}
           </DialogTitle>
           <DialogDescription>
             {props.mode === "sales-order"
@@ -211,7 +211,7 @@ export function LinkSalesOrderQuotationDialog(
             onClick={() => void submit()}
             disabled={!selectedId || isSubmitting}
           >
-            {isSubmitting ? "Menghubungkan…" : "Hubungkan"}
+            {isSubmitting ? "Memproses…" : "Link"}
           </Button>
         </DialogFooter>
       </DialogContent>
