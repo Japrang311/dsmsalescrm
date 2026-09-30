@@ -332,11 +332,58 @@ titik yang transparan), jadi kasus itu tidak terjadi — terkonfirmasi pada peng
 
 ### Temuan pre-existing (di luar lingkup, tidak diubah)
 
-Halaman Reports punya **3 label legend grafik di bawah AA**: "Target" 2.14:1 dan 3.42:1, serta
-"Prototype Paid" 3.42:1. Sumbernya `CHART_COLORS[2]` (`#C97716`) dan `--color-border-strong` yang
-dipakai sebagai warna teks — bukan bagian dari migrasi amber ini. Perlu keputusan desain tersendiri
-soal warna teks legend.
+~~Halaman Reports punya 3 label legend grafik di bawah AA.~~ **Diperbaiki — lihat bagian berikutnya.**
 
 Dark mode belum terpasang (tidak ada toggle maupun provider yang menambahkan kelas `.dark`), jadi
 blok token `.dark` di `styles.css` masih belum terpakai. Hitungan dark mode menunjukkan
 `text-destructive` di atas tint hanya 3.99:1 — perlu ditinjau kalau dark mode nanti diaktifkan.
+
+---
+
+## Perbaikan warna legend grafik Reports (2026-09-30, menyusul)
+
+### Diagnosis
+
+Warna serinya **tidak salah**. Recharts memakai warna seri untuk dua hal sekaligus: swatch dan teks
+label. Sebagai elemen grafis, ambang AA hanya 3:1 — dan garis/batangnya lolos:
+
+| Warna seri                  | Sebagai garis/batang (butuh 3:1) | Sebagai teks 10–11px (butuh 4.5:1) |
+| --------------------------- | -------------------------------: | ---------------------------------: |
+| `CHART_COLORS[2]` `#C97716` |                     3,42:1 lolos |                   3,42:1 **gagal** |
+| `--color-border-strong`     |     2,14:1 — batang besar, wajar |                   2,14:1 **gagal** |
+
+Jadi menggelapkan warna seri justru salah sasaran: itu akan mengubah tampilan grafik (dan
+`--color-border-strong` memang sengaja pucat sebagai batang referensi target) demi memperbaiki teks.
+
+### Perbaikan
+
+Memisahkan warna teks dari warna seri lewat helper baru `src/components/charts/chart-legend.tsx`:
+
+```tsx
+<Legend wrapperStyle={{ fontSize: 11 }} formatter={legendLabel} />
+```
+
+Swatch tetap memakai warna seri sebagai penanda data; labelnya memakai `--color-foreground`.
+Tidak ada warna grafik yang berubah.
+
+### Hasil (diukur di browser)
+
+| Label                   | Sebelum |    Sesudah |
+| ----------------------- | ------: | ---------: |
+| Achievement             |  5,17:1 | **13,3:1** |
+| Target (kumulatif)      |  3,42:1 | **13,3:1** |
+| Target (bulanan)        |  2,14:1 | **13,3:1** |
+| Revenue                 |  5,17:1 | **13,3:1** |
+| New Product             |  5,17:1 | **13,3:1** |
+| Existing / Repeat Order |  5,04:1 | **13,3:1** |
+| Prototype Paid          |  3,42:1 | **13,3:1** |
+
+Ketujuh swatch tetap berwarna seri (terverifikasi: 7 elemen `recharts-surface` utuh). Audit kontras
+otomatis seluruh teks halaman Reports: **0 kegagalan**.
+
+### Belum diterapkan
+
+Dua legend di `AchievementTrendChart` (Dashboard) masih memakai warna seri untuk teks. Keduanya
+**lolos AA** (`--color-primary` dan `--color-navy` cukup gelap), jadi tidak disentuh agar tidak
+mengubah tampilan yang tidak diminta. Kalau ingin seragam, tinggal menambahkan `formatter={legendLabel}`
+di kedua tempat.

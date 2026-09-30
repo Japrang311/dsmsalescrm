@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatRupiahShort } from "@/lib/format";
 import { ChartEmpty, ForecastTile } from "./ReportPrimitives";
 import { CHART_COLORS } from "./chart-colors";
+import { legendLabel } from "@/components/charts/chart-legend";
 
 export function ReportsForecastSection({
   totalRevenue,
@@ -63,7 +64,10 @@ export function ReportsForecastSection({
                     ))}
                   </Pie>
                   <Tooltip formatter={(v: number) => formatRupiahShort(v)} />
-                  <Legend wrapperStyle={{ fontSize: 10 }} />
+                  <Legend
+                    wrapperStyle={{ fontSize: 10 }}
+                    formatter={legendLabel}
+                  />
                 </PieChart>
               </ResponsiveContainer>
             </div>

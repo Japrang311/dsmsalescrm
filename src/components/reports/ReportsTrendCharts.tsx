@@ -16,6 +16,7 @@ import { formatRupiahAxis, formatRupiahShort } from "@/lib/format";
 import { CURRENT_YEAR } from "@/lib/domain";
 import { ChartEmpty } from "./ReportPrimitives";
 import { CHART_COLORS } from "./chart-colors";
+import { legendLabel } from "@/components/charts/chart-legend";
 
 type TrendPoint = { month: string; achievement: number; target: number };
 type MonthlyPoint = { month: string; revenue: number; target: number };
@@ -75,7 +76,10 @@ export function ReportsTrendCharts({
                     width={54}
                   />
                   <Tooltip formatter={(v: number) => formatRupiahShort(v)} />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Legend
+                    wrapperStyle={{ fontSize: 11 }}
+                    formatter={legendLabel}
+                  />
                   <Bar
                     dataKey="achievement"
                     name="Achievement"
@@ -143,7 +147,10 @@ export function ReportsTrendCharts({
                     width={54}
                   />
                   <Tooltip formatter={(v: number) => formatRupiahShort(v)} />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Legend
+                    wrapperStyle={{ fontSize: 11 }}
+                    formatter={legendLabel}
+                  />
                   <Bar
                     dataKey="target"
                     name="Target"
