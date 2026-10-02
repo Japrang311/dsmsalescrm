@@ -1,4 +1,4 @@
-import { lazy, Suspense, useMemo, useState } from "react";
+import { lazy, Suspense, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { BarChart3, Download, FileSpreadsheet, FileText } from "lucide-react";
@@ -25,6 +25,7 @@ import {
 } from "@/lib/data/dashboard-selectors";
 import { forecastValue } from "@/lib/data/commercial-stages";
 import { useDashboardData } from "@/hooks/use-dashboard-data";
+import { useEntryState } from "@/hooks/use-entry-state";
 import { getSalesOrdersMetrics } from "@/lib/data/sales-orders-metrics";
 import {
   getSalesOrdersMonthlyTrend,
@@ -101,8 +102,9 @@ function ReportsPage() {
     isLoading,
   } = useDashboardData();
 
-  const [filters, setFilters] = useState<ReportFilters>(() =>
-    defaultReportFilters({ from: new Date(CURRENT_YEAR, 0, 1), to: NOW }),
+  const [filters, setFilters] = useEntryState<ReportFilters>(
+    "reports.filters",
+    () => defaultReportFilters({ from: new Date(CURRENT_YEAR, 0, 1), to: NOW }),
   );
   const patch = (p: Partial<ReportFilters>) =>
     setFilters((s) => ({ ...s, ...p }));

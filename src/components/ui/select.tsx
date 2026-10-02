@@ -5,8 +5,13 @@ import * as SelectPrimitive from "@radix-ui/react-select";
 import { Check, ChevronDown, ChevronUp } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { useBackDismissibleOpen } from "@/hooks/use-back-dismiss";
 
-const Select = SelectPrimitive.Root;
+// Back closes the open select instead of leaving the page.
+function Select(props: React.ComponentProps<typeof SelectPrimitive.Root>) {
+  const overlay = useBackDismissibleOpen(props);
+  return <SelectPrimitive.Root {...props} {...overlay} />;
+}
 
 const SelectGroup = SelectPrimitive.Group;
 

@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { Filter } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useBackDismiss } from "@/hooks/use-back-dismiss";
 
 // Shared trigger sizing for every filter control (Select triggers, combobox
 // buttons) so the app's filter bars read as one system: one height, and
@@ -26,6 +27,7 @@ export function FilterBar({
   onReset?: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  useBackDismiss(collapsible && open, () => setOpen(false));
   if (collapsible) {
     return (
       <div className={cn("rounded-lg border bg-card", className)}>

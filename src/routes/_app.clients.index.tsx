@@ -36,6 +36,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Slider } from "@/components/ui/slider";
+import { useEntryState } from "@/hooks/use-entry-state";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -85,22 +86,44 @@ export const Route = createFileRoute("/_app/clients/")({
 function ClientListPage() {
   const { role, authReady } = useRole();
 
-  const [search, setSearch] = useState("");
-  const [statuses, setStatuses] = useState<ClientStatus[]>([]);
-  const [sources, setSources] = useState<ClientSource[]>([]);
-  const [ownerId, setOwnerId] = useState<string>("all");
-  const [commercialTypes, setCommercialTypes] = useState<string[]>([]);
-  const [overdueOnly, setOverdueOnly] = useState(false);
-  const [nextFuWindow, setNextFuWindow] = useState<string>("all");
-  const [spendingRange, setSpendingRange] = useState<[number, number]>([
-    0, 3000,
-  ]); // in juta (Rp M)
-  const [density, setDensity] = useState<"compact" | "comfortable">("compact");
+  const [search, setSearch] = useEntryState("clients.search", "");
+  const [statuses, setStatuses] = useEntryState<ClientStatus[]>(
+    "clients.statuses",
+    [],
+  );
+  const [sources, setSources] = useEntryState<ClientSource[]>(
+    "clients.sources",
+    [],
+  );
+  const [ownerId, setOwnerId] = useEntryState<string>("clients.ownerId", "all");
+  const [commercialTypes, setCommercialTypes] = useEntryState<string[]>(
+    "clients.commercialTypes",
+    [],
+  );
+  const [overdueOnly, setOverdueOnly] = useEntryState(
+    "clients.overdueOnly",
+    false,
+  );
+  const [nextFuWindow, setNextFuWindow] = useEntryState<string>(
+    "clients.nextFuWindow",
+    "all",
+  );
+  const [spendingRange, setSpendingRange] = useEntryState<[number, number]>(
+    "clients.spendingRange",
+    [0, 3000],
+  ); // in juta (Rp M)
+  const [density, setDensity] = useEntryState<"compact" | "comfortable">(
+    "clients.density",
+    "compact",
+  );
   const [page, setPage] = useState(1);
   const [pageCursors, setPageCursors] = useState<Record<number, string | null>>(
     { 1: null },
   );
-  const [savedView, setSavedView] = useState<SavedView>(SAVED_VIEWS[0]);
+  const [savedView, setSavedView] = useEntryState<SavedView>(
+    "clients.savedView",
+    SAVED_VIEWS[0],
+  );
   const pageSize = 10;
 
   const clientFilters = useMemo<ClientListFilters>(

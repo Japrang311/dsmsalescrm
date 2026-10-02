@@ -27,6 +27,7 @@ import {
   ytdTargetValue,
 } from "@/lib/data/dashboard-selectors";
 import { useDashboardData } from "@/hooks/use-dashboard-data";
+import { useEntryState } from "@/hooks/use-entry-state";
 import { getSalesOrdersMetrics } from "@/lib/data/sales-orders-metrics";
 import { getPipelineMetrics } from "@/lib/data/pipeline-metrics";
 import { formatPercentValue, formatRupiahShort } from "@/lib/format";
@@ -131,7 +132,7 @@ function DashboardPage() {
   const pipelineMetrics = pipelineMetricsQuery.data;
 
   // Reporting period (drives the PDF export). Default: Year to date.
-  const [period, setPeriod] = useState<PeriodRange>({
+  const [period, setPeriod] = useEntryState<PeriodRange>("dashboard.period", {
     from: new Date(CURRENT_YEAR, 0, 1),
     to: NOW,
   });

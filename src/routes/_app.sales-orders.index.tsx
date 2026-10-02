@@ -42,6 +42,7 @@ import { cn } from "@/lib/utils";
 
 import { useRole } from "@/context/role-context-core";
 import { NOW, CURRENT_YEAR } from "@/lib/domain";
+import { useEntryState } from "@/hooks/use-entry-state";
 import { ReportFilterBar } from "@/components/reports/ReportFilterBar";
 import {
   defaultReportFilters,
@@ -83,12 +84,16 @@ function SalesOrdersRevenuePage() {
   const { role, authReady } = useRole();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [showDeleted, setShowDeleted] = useState(false);
+  const [showDeleted, setShowDeleted] = useEntryState(
+    "sales-orders.showDeleted",
+    false,
+  );
   const [restoringId, setRestoringId] = useState<string>();
   const deletedMode = showDeleted && canShowDeletedMode(role);
 
-  const [filters, setFilters] = useState<ReportFilters>(() =>
-    defaultReportFilters({ from: new Date(CURRENT_YEAR, 0, 1), to: NOW }),
+  const [filters, setFilters] = useEntryState<ReportFilters>(
+    "sales-orders.filters",
+    () => defaultReportFilters({ from: new Date(CURRENT_YEAR, 0, 1), to: NOW }),
   );
   const patch = (p: Partial<ReportFilters>) =>
     setFilters((s) => ({ ...s, ...p }));

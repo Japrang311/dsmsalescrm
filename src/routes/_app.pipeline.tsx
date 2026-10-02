@@ -65,6 +65,7 @@ import {
   type PipelineNextWindow,
 } from "@/lib/pipeline-next-action-filter";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useEntryState } from "@/hooks/use-entry-state";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { PageSkeleton } from "@/components/layout/PageSkeleton";
 import { PageContainer } from "@/components/layout/PageContainer";
@@ -114,13 +115,16 @@ function PipelineBoardPage({ role }: { role: Role }) {
   const navigate = useNavigate();
 
   const isMobile = useIsMobile();
-  const [chosenView, setChosenView] = useState<
+  const [chosenView, setChosenView] = useEntryState<
     "board" | "list" | "analytics" | null
-  >(null);
+  >("pipeline.view", null);
   const pipelineView = chosenView ?? (isMobile ? "list" : "board");
-  const [owner, setOwner] = useState<string>("all");
-  const [status, setStatus] = useState<string>("all");
-  const [nextWindow, setNextWindow] = useState<PipelineNextWindow>("all");
+  const [owner, setOwner] = useEntryState<string>("pipeline.owner", "all");
+  const [status, setStatus] = useEntryState<string>("pipeline.status", "all");
+  const [nextWindow, setNextWindow] = useEntryState<PipelineNextWindow>(
+    "pipeline.nextWindow",
+    "all",
+  );
 
   // Per-stage cursors for "load more" pagination
   const [stageCursors, setStageCursors] = useState<

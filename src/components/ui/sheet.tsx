@@ -6,8 +6,13 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { useBackDismissibleOpen } from "@/hooks/use-back-dismiss";
 
-const Sheet = SheetPrimitive.Root;
+// Back closes the open sheet instead of leaving the page.
+function Sheet(props: React.ComponentProps<typeof SheetPrimitive.Root>) {
+  const overlay = useBackDismissibleOpen(props);
+  return <SheetPrimitive.Root {...props} {...overlay} />;
+}
 
 const SheetTrigger = SheetPrimitive.Trigger;
 

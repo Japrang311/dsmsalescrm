@@ -75,6 +75,7 @@ import {
 } from "@/lib/data/activity-feed-page";
 import { listQueryKey, serializeListFilters } from "@/lib/pagination-contracts";
 import { toLocalIsoDate } from "@/lib/domain";
+import { useEntryState } from "@/hooks/use-entry-state";
 import { formatDateShort } from "@/lib/format";
 
 export const Route = createFileRoute("/_app/activity")({
@@ -290,16 +291,28 @@ function ActivityPage() {
     enabled: authReady,
   });
 
-  const [kindFilter, setKindFilter] = useState<string>("all");
-  const [ownerFilter, setOwnerFilter] = useState<string>("all");
-  const [query, setQuery] = useState("");
-  const [rangePreset, setRangePreset] = useState<string>("30");
-  const [customRange, setCustomRange] = useState<PeriodRange>(() => {
-    const to = new Date();
-    const from = new Date();
-    from.setDate(to.getDate() - 29);
-    return { from, to };
-  });
+  const [kindFilter, setKindFilter] = useEntryState<string>(
+    "activity.kindFilter",
+    "all",
+  );
+  const [ownerFilter, setOwnerFilter] = useEntryState<string>(
+    "activity.ownerFilter",
+    "all",
+  );
+  const [query, setQuery] = useEntryState("activity.query", "");
+  const [rangePreset, setRangePreset] = useEntryState<string>(
+    "activity.rangePreset",
+    "30",
+  );
+  const [customRange, setCustomRange] = useEntryState<PeriodRange>(
+    "activity.customRange",
+    () => {
+      const to = new Date();
+      const from = new Date();
+      from.setDate(to.getDate() - 29);
+      return { from, to };
+    },
+  );
 
   const [view, setView] = useState<ActivityView>(loadView);
   useEffect(() => {

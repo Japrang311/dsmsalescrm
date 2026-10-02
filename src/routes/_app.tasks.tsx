@@ -33,6 +33,7 @@ import {
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRole } from "@/context/role-context-core";
 import { NOW, toLocalIsoDate } from "@/lib/domain";
+import { useEntryState } from "@/hooks/use-entry-state";
 import type { Task } from "@/lib/domain";
 import { listActiveTasks, type TaskListFilters } from "@/lib/data/tasks";
 import {
@@ -179,18 +180,32 @@ function TasksInboxPage() {
 
   const canEdit = role !== "executive";
 
-  const [query, setQuery] = useState("");
-  const [ownerId, setOwnerId] = useState<string>("all");
-  const [method, setMethod] = useState<(typeof METHOD_OPTIONS)[number]>("all");
-  const [priority, setPriority] =
-    useState<(typeof PRIORITY_OPTIONS)[number]>("all");
-  const [commercialType, setCommercialType] =
-    useState<(typeof COMMERCIAL_OPTIONS)[number]>("all");
-  const [activeView, setActiveView] = useState<ViewKey>("today");
-  const [managerTaskMode, setManagerTaskMode] =
-    useState<ManagerTaskMode>("my-tasks");
-  const [view, setView] = useState<"agenda" | "calendar">("agenda");
-  const [calendarMonth, setCalendarMonth] = useState<Date>(
+  const [query, setQuery] = useEntryState("tasks.query", "");
+  const [ownerId, setOwnerId] = useEntryState<string>("tasks.ownerId", "all");
+  const [method, setMethod] = useEntryState<(typeof METHOD_OPTIONS)[number]>(
+    "tasks.method",
+    "all",
+  );
+  const [priority, setPriority] = useEntryState<
+    (typeof PRIORITY_OPTIONS)[number]
+  >("tasks.priority", "all");
+  const [commercialType, setCommercialType] = useEntryState<
+    (typeof COMMERCIAL_OPTIONS)[number]
+  >("tasks.commercialType", "all");
+  const [activeView, setActiveView] = useEntryState<ViewKey>(
+    "tasks.activeView",
+    "today",
+  );
+  const [managerTaskMode, setManagerTaskMode] = useEntryState<ManagerTaskMode>(
+    "tasks.managerTaskMode",
+    "my-tasks",
+  );
+  const [view, setView] = useEntryState<"agenda" | "calendar">(
+    "tasks.view",
+    "agenda",
+  );
+  const [calendarMonth, setCalendarMonth] = useEntryState<Date>(
+    "tasks.calendarMonth",
     () => new Date(NOW.getFullYear(), NOW.getMonth(), 1),
   );
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
@@ -216,7 +231,7 @@ function TasksInboxPage() {
   const isHistoryView = activeView === "completed" || activeView === "archived";
   useEffect(() => {
     if (isHistoryView && view === "calendar") setView("agenda");
-  }, [isHistoryView, view]);
+  }, [isHistoryView, view, setView]);
 
   const toggleSelected = (id: string) => {
     setSelected((prev) => {
@@ -243,7 +258,7 @@ function TasksInboxPage() {
     if (role === "manager" && managerTaskMode === "team-exceptions") {
       setActiveView("overdue");
     }
-  }, [role, managerTaskMode]);
+  }, [role, managerTaskMode, setActiveView]);
 
   const scopedTasks = useMemo(() => {
     if (role === "executive") {
@@ -365,7 +380,8 @@ function TasksInboxPage() {
   // have work waiting. Once counts are loaded, jump once to the most urgent
   // non-empty active bucket. Runs a single time so it never fights a later
   // manual selection.
-  const autoBucketPicked = useRef(false);
+  // A tab restored via Back is the user's own pick; never override it.
+  const autoBucketPicked = useRef(activeView !== "today");
   useEffect(() => {
     if (autoBucketPicked.current || tasksLoading) return;
     autoBucketPicked.current = true;
@@ -374,7 +390,7 @@ function TasksInboxPage() {
       (v) => viewCounts[v] > 0,
     );
     if (fallback) setActiveView(fallback);
-  }, [tasksLoading, viewCounts]);
+  }, [tasksLoading, viewCounts, setActiveView]);
 
   const filtered = useMemo(
     () =>

@@ -2,8 +2,13 @@ import * as React from "react";
 import * as PopoverPrimitive from "@radix-ui/react-popover";
 
 import { cn } from "@/lib/utils";
+import { useBackDismissibleOpen } from "@/hooks/use-back-dismiss";
 
-const Popover = PopoverPrimitive.Root;
+// Back closes the open popover instead of leaving the page.
+function Popover(props: React.ComponentProps<typeof PopoverPrimitive.Root>) {
+  const overlay = useBackDismissibleOpen(props);
+  return <PopoverPrimitive.Root {...props} {...overlay} />;
+}
 
 const PopoverTrigger = PopoverPrimitive.Trigger;
 

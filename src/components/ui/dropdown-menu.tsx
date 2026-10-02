@@ -5,8 +5,15 @@ import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu";
 import { Check, ChevronRight, Circle } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { useBackDismissibleOpen } from "@/hooks/use-back-dismiss";
 
-const DropdownMenu = DropdownMenuPrimitive.Root;
+// Back closes the open dropdown menu instead of leaving the page.
+function DropdownMenu(
+  props: React.ComponentProps<typeof DropdownMenuPrimitive.Root>,
+) {
+  const overlay = useBackDismissibleOpen(props);
+  return <DropdownMenuPrimitive.Root {...props} {...overlay} />;
+}
 
 const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger;
 

@@ -2,9 +2,16 @@ import * as React from "react";
 import * as AlertDialogPrimitive from "@radix-ui/react-alert-dialog";
 
 import { cn } from "@/lib/utils";
+import { useBackDismissibleOpen } from "@/hooks/use-back-dismiss";
 import { buttonVariants } from "@/components/ui/button-variants";
 
-const AlertDialog = AlertDialogPrimitive.Root;
+// Back closes the open alert dialog instead of leaving the page.
+function AlertDialog(
+  props: React.ComponentProps<typeof AlertDialogPrimitive.Root>,
+) {
+  const overlay = useBackDismissibleOpen(props);
+  return <AlertDialogPrimitive.Root {...props} {...overlay} />;
+}
 
 const AlertDialogTrigger = AlertDialogPrimitive.Trigger;
 

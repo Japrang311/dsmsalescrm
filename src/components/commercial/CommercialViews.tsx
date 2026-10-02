@@ -36,6 +36,7 @@ import {
 import { cn } from "@/lib/utils";
 import { formatRupiahShort, formatDateShort, daysBetween } from "@/lib/format";
 import { NOW } from "@/lib/domain";
+import { useEntryState } from "@/hooks/use-entry-state";
 import { useRole } from "@/context/role-context-core";
 import type { CommercialItem } from "@/lib/domain";
 import { StatusBadge } from "@/components/clients/StatusBadges";
@@ -77,7 +78,10 @@ export function CommercialViews(props: CommercialViewsProps) {
   const { role, authReady } = useRole();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [showDeleted, setShowDeleted] = useState(false);
+  const [showDeleted, setShowDeleted] = useEntryState(
+    "commercial.showDeleted",
+    false,
+  );
   const [restoringId, setRestoringId] = useState<string>();
   const deletedMode = showDeleted && canShowDeletedMode(role);
   const activeItems = useQuery({
@@ -97,10 +101,16 @@ export function CommercialViews(props: CommercialViewsProps) {
   const isLoading = deletedMode
     ? deletedItems.isLoading
     : activeItems.isLoading;
-  const [view, setView] = useState<ViewMode>("table");
-  const [q, setQ] = useState("");
-  const [ownerFilter, setOwnerFilter] = useState<string>("all");
-  const [stageFilter, setStageFilter] = useState<string>("all");
+  const [view, setView] = useEntryState<ViewMode>("commercial.view", "table");
+  const [q, setQ] = useEntryState("commercial.q", "");
+  const [ownerFilter, setOwnerFilter] = useEntryState<string>(
+    "commercial.ownerFilter",
+    "all",
+  );
+  const [stageFilter, setStageFilter] = useEntryState<string>(
+    "commercial.stageFilter",
+    "all",
+  );
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 20;
 

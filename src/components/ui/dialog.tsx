@@ -5,8 +5,13 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { useBackDismissibleOpen } from "@/hooks/use-back-dismiss";
 
-const Dialog = DialogPrimitive.Root;
+// Back closes the open dialog instead of leaving the page.
+function Dialog(props: React.ComponentProps<typeof DialogPrimitive.Root>) {
+  const overlay = useBackDismissibleOpen(props);
+  return <DialogPrimitive.Root {...props} {...overlay} />;
+}
 
 const DialogTrigger = DialogPrimitive.Trigger;
 
