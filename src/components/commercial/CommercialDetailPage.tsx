@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { formatRupiahFull, daysBetween } from "@/lib/format";
 import { getErrorMessage } from "@/lib/utils";
+import { useBackTo } from "@/hooks/use-back-to";
 import { invalidateCommercialStageQueries } from "@/lib/query-invalidation";
 import { stagesForFlow } from "@/lib/business-rules";
 import type { CommercialItem, QuotationLostReason } from "@/lib/domain";
@@ -97,6 +98,7 @@ export function CommercialDetailPage({
 }) {
   const { role, authReady } = useRole();
   const navigate = useNavigate();
+  const backToList = useBackTo(backHref);
   const queryClient = useQueryClient();
 
   const { data: items = [] } = useQuery({
@@ -615,7 +617,7 @@ export function CommercialDetailPage({
         isFoc={isFoc}
         deleteLabel={deleteLabel}
         backLabel={backLabel}
-        onBack={() => navigate({ to: backHref })}
+        onBack={backToList}
         onDelete={() => deleteItem(item.id)}
         onDeleted={() => {
           toast.success(`${item.type} dihapus`);

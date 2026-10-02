@@ -76,6 +76,7 @@ import { ClientPickerField } from "@/components/clients/ClientPicker";
 import { StatusBadge } from "@/components/clients/StatusBadges";
 import { useRole, ROLE_LABEL } from "@/context/role-context-core";
 import { useDashboardData } from "@/hooks/use-dashboard-data";
+import { useBackTo } from "@/hooks/use-back-to";
 import { LinkSalesOrderQuotationDialog } from "@/components/commercial/LinkSalesOrderQuotationDialog";
 
 export const Route = createFileRoute("/_app/sales-orders/$soId")({
@@ -86,6 +87,7 @@ export const Route = createFileRoute("/_app/sales-orders/$soId")({
 function SalesOrderDetail() {
   const { soId } = Route.useParams();
   const navigate = useNavigate();
+  const backToList = useBackTo("/sales-orders");
   const { role, authReady } = useRole();
   const queryClient = useQueryClient();
   const [linkQuotationOpen, setLinkQuotationOpen] = useState(false);
@@ -157,11 +159,7 @@ function SalesOrderDetail() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-3">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => navigate({ to: "/sales-orders" })}
-        >
+        <Button variant="ghost" size="icon" onClick={backToList}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div className="flex-1">

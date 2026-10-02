@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft } from "lucide-react";
+import { useBackTo } from "@/hooks/use-back-to";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -50,6 +51,7 @@ export const Route = createFileRoute("/_app/clients/$clientId")({
 function ClientProfilePage() {
   const { clientId } = Route.useParams();
   const { role, authReady, realProfile } = useRole();
+  const backToList = useBackTo("/clients");
   const queryClient = useQueryClient();
 
   const { data: client, isLoading } = useQuery({
@@ -138,6 +140,11 @@ function ClientProfilePage() {
       <div>
         <Link
           to="/clients"
+          onClick={(e) => {
+            if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+            e.preventDefault();
+            backToList();
+          }}
           className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary"
         >
           <ArrowLeft className="h-3 w-3" /> Semua klien

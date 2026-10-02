@@ -6,12 +6,14 @@ import { RoleProvider } from "@/context/role-context";
 import { AppSidebar } from "@/components/shell/AppSidebar";
 import { MobileNavigation } from "@/components/shell/MobileNavigation";
 import { TopBar } from "@/components/shell/TopBar";
+import { useRecordVisitedPaths } from "@/hooks/use-back-to";
 
 export const Route = createFileRoute("/_app")({
   component: AppLayout,
 });
 
 function AppLayout() {
+  useRecordVisitedPaths();
   return (
     <RoleProvider>
       <TooltipProvider delayDuration={200}>
