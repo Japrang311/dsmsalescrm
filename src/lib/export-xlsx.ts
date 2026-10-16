@@ -156,9 +156,9 @@ export function exportSalesPerformanceXlsx(
   const ws = buildSheet(
     [
       { header: "Sales", key: "name", width: 22 },
-      { header: "Revenue", key: "revenue", type: "idr", width: 18 },
+      { header: "Nilai SO", key: "revenue", type: "idr", width: 18 },
       { header: "Target", key: "target", type: "idr", width: 18 },
-      { header: "Achievement %", key: "pct", type: "pct", width: 15 },
+      { header: "Pencapaian SO %", key: "pct", type: "pct", width: 15 },
       { header: "Open Tasks", key: "open", type: "int", width: 12 },
       { header: "Overdue", key: "overdue", type: "int", width: 10 },
     ],
@@ -170,13 +170,13 @@ export function exportSalesPerformanceXlsx(
   return rows.length;
 }
 
-// ---- Monthly revenue trend ----
+// ---- Monthly SO value trend ----
 export function exportMonthlyRevenueXlsx(
   context: DashboardExportContext,
 ): number {
   const source = assertRows(
     dashboardExportMonthlyTrend(context),
-    "revenue bulanan",
+    "Nilai SO bulanan",
   );
   const rows = source.map((r) => ({
     month: r.month,
@@ -187,14 +187,14 @@ export function exportMonthlyRevenueXlsx(
   const ws = buildSheet(
     [
       { header: "Month", key: "month", width: 14 },
-      { header: "Revenue", key: "revenue", type: "idr", width: 18 },
+      { header: "Nilai SO", key: "revenue", type: "idr", width: 18 },
       { header: "Target (prorated)", key: "target", type: "idr", width: 20 },
-      { header: "Achievement %", key: "pct", type: "pct", width: 15 },
+      { header: "Pencapaian SO %", key: "pct", type: "pct", width: 15 },
     ],
     rows,
   );
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Monthly Revenue");
+  XLSX.utils.book_append_sheet(wb, ws, "Monthly Nilai SO");
   downloadWorkbook(
     wb,
     `dsm-monthly-revenue-${context.role}-${stamp(context.range)}.xlsx`,
@@ -220,7 +220,7 @@ export function exportTopCustomersXlsx(
     [
       { header: "Rank", key: "rank", type: "int", width: 6 },
       { header: "Client", key: "client", width: 32 },
-      { header: "Revenue", key: "revenue", type: "idr", width: 20 },
+      { header: "Nilai SO", key: "revenue", type: "idr", width: 20 },
     ],
     rows,
   );
@@ -237,41 +237,66 @@ export function exportExecutiveReportXlsx(
   const metrics = dashboardExportMetrics(context);
   const wb = XLSX.utils.book_new();
 
+  const snapshot = context.reportSnapshot;
+  const comparable = snapshot?.context.targetComparable ?? true;
+  if (snapshot)
+    XLSX.utils.book_append_sheet(
+      wb,
+      XLSX.utils.aoa_to_sheet([
+        ["Metadata", "Nilai"],
+        [
+          "Basis",
+          "Nilai SO: nilai order berbayar tercatat, bukan konfirmasi pembayaran diterima",
+        ],
+        ["Periode dari", snapshot.context.scope.from],
+        ["Periode sampai", snapshot.context.scope.to],
+        ["Snapshot", snapshot.context.fetchedAt],
+        ["Filters", JSON.stringify(snapshot.context.scope)],
+        ["Target comparable", comparable ? "Ya" : "Tidak"],
+        ["Alasan target", snapshot.targetReason ?? "—"],
+        ["Nilai SO exact", snapshot.metrics.total],
+      ]),
+      "Metadata",
+    );
+
   const summaryRows = [
     {
-      metric: "Achievement (periode)",
+      metric: "Pencapaian SO (periode)",
       value: formatRupiahShort(metrics.revenue),
-      reference: `Target ${formatRupiahShort(metrics.target)}`,
+      reference: comparable
+        ? `Target ${formatRupiahShort(metrics.target)}`
+        : (snapshot?.targetReason ?? "Target tidak sebanding"),
     },
     {
-      metric: "Achievement %",
-      value: formatPercent(
-        metrics.target ? metrics.revenue / metrics.target : 0,
-      ),
-      reference: "Revenue / target",
+      metric: "Pencapaian SO %",
+      value:
+        comparable && metrics.target > 0
+          ? formatPercent(metrics.revenue / metrics.target)
+          : "—",
+      reference: "Nilai SO / target",
     },
     {
-      metric: "Revenue PPN",
+      metric: "Nilai SO PPN",
       value: formatRupiahShort(metrics.revenueByTax.ppn),
       reference: "Termasuk pajak",
     },
     {
-      metric: "Revenue Non-PPN",
+      metric: "Nilai SO Non-PPN",
       value: formatRupiahShort(metrics.revenueByTax.nonPpn),
       reference: "Tanpa pajak",
     },
     {
-      metric: "Revenue New Product",
+      metric: "Nilai SO New Product",
       value: formatRupiahShort(metrics.revenueBySource.newProduct),
       reference: "Dalam periode",
     },
     {
-      metric: "Revenue Existing / Repeat",
+      metric: "Nilai SO Existing / Repeat",
       value: formatRupiahShort(metrics.revenueBySource.existing),
       reference: "Dalam periode",
     },
     {
-      metric: "Revenue Prototype Paid",
+      metric: "Nilai SO Prototype Paid",
       value: formatRupiahShort(metrics.revenueBySource.prototypePaid),
       reference: "Dalam periode",
     },
@@ -320,17 +345,17 @@ export function exportExecutiveReportXlsx(
   const monthlyTrendRows = dashboardExportMonthlyTrend(context).map((r) => ({
     month: r.month,
     revenue: r.revenue,
-    target: r.target,
-    pct: r.target ? r.revenue / r.target : 0,
+    target: comparable ? r.target : null,
+    pct: comparable && r.target > 0 ? r.revenue / r.target : null,
   }));
   XLSX.utils.book_append_sheet(
     wb,
     buildSheet(
       [
         { header: "Month", key: "month", width: 14 },
-        { header: "Revenue", key: "revenue", type: "idr", width: 18 },
-        { header: "Target (prorated)", key: "target", type: "idr", width: 20 },
-        { header: "Achievement %", key: "pct", type: "pct", width: 15 },
+        { header: "Nilai SO", key: "revenue", type: "idr", width: 18 },
+        { header: "Target periode", key: "target", type: "idr", width: 20 },
+        { header: "Pencapaian SO %", key: "pct", type: "pct", width: 15 },
       ],
       monthlyTrendRows,
     ),
@@ -340,8 +365,8 @@ export function exportExecutiveReportXlsx(
   const salesRows = dashboardExportSalesPerformance(context).map((r) => ({
     name: r.member.name,
     revenue: r.revenue,
-    target: r.target,
-    pct: r.pct,
+    target: comparable ? r.target : null,
+    pct: comparable && r.target > 0 ? r.pct : null,
     open: r.openTasks,
     overdue: r.overdue,
   }));
@@ -350,9 +375,9 @@ export function exportExecutiveReportXlsx(
     buildSheet(
       [
         { header: "Sales", key: "name", width: 22 },
-        { header: "Revenue", key: "revenue", type: "idr", width: 18 },
+        { header: "Nilai SO", key: "revenue", type: "idr", width: 18 },
         { header: "Target", key: "target", type: "idr", width: 18 },
-        { header: "Achievement %", key: "pct", type: "pct", width: 15 },
+        { header: "Pencapaian SO %", key: "pct", type: "pct", width: 15 },
         { header: "Open Tasks", key: "open", type: "int", width: 12 },
         { header: "Overdue", key: "overdue", type: "int", width: 10 },
       ],
@@ -374,7 +399,7 @@ export function exportExecutiveReportXlsx(
       [
         { header: "Rank", key: "rank", type: "int", width: 6 },
         { header: "Client", key: "client", width: 32 },
-        { header: "Revenue", key: "revenue", type: "idr", width: 20 },
+        { header: "Nilai SO", key: "revenue", type: "idr", width: 20 },
       ],
       topCustomerRows,
     ),

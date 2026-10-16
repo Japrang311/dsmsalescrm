@@ -11,6 +11,7 @@ export function ReportsKpiCards({
   totals,
   ytdAchievementPct,
   yearTargetTotal,
+  targetReason,
 }: {
   totals: {
     revenue: number;
@@ -21,8 +22,9 @@ export function ReportsKpiCards({
     protoPaidCount: number;
     totalCount: number;
   };
-  ytdAchievementPct: number;
+  ytdAchievementPct: number | null;
   yearTargetTotal: number;
+  targetReason?: string;
 }) {
   const revenueOrderCount = Math.max(
     0,
@@ -35,19 +37,23 @@ export function ReportsKpiCards({
     <div className="precision-stagger grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       <KpiTile
         icon={<Target className="h-4 w-4" />}
-        label="Achievement YTD"
+        label="Nilai SO · periode terpilih"
         value={formatRupiahShort(totals.revenue)}
         // yearTargetTotal is the target summed *through the current month*, not
         // the full-year figure the Dashboard compares against — hence a
         // different % for the same revenue. Say so.
-        sub={`${formatPercent(ytdAchievementPct)} dari target sampai bulan ini (${formatRupiahShort(yearTargetTotal)})`}
+        sub={
+          ytdAchievementPct === null
+            ? `— · ${targetReason ?? "Target tidak sebanding."}`
+            : `${formatPercent(ytdAchievementPct)} dari target periode (${formatRupiahShort(yearTargetTotal)})`
+        }
         accent
       />
       <KpiTile
         icon={<FileCheck2 className="h-4 w-4" />}
         label="Total Sales Orders"
         value={`${totals.totalCount.toLocaleString("id-ID")} SO`}
-        sub={`${revenueOrderCount.toLocaleString("id-ID")} revenue · ${totals.protoFocCount.toLocaleString("id-ID")} FOC`}
+        sub={`${revenueOrderCount.toLocaleString("id-ID")} SO berbayar · ${totals.protoFocCount.toLocaleString("id-ID")} FOC`}
       />
       <KpiTile
         icon={<CircleDollarSign className="h-4 w-4" />}
@@ -57,15 +63,15 @@ export function ReportsKpiCards({
         }
         sub={
           revenueOrderCount > 0
-            ? `Rata-rata dari ${revenueOrderCount.toLocaleString("id-ID")} SO revenue`
-            : "Belum ada SO berkontribusi revenue"
+            ? `Rata-rata dari ${revenueOrderCount.toLocaleString("id-ID")} SO berbayar`
+            : "Belum ada SO berkontribusi Nilai SO"
         }
       />
       <KpiTile
         icon={<FlaskConical className="h-4 w-4" />}
         label="Prototype"
         value={`${formatRupiahShort(totals.protoPaid)} · ${totals.protoFocCount} FOC`}
-        sub={`${totals.protoPaidCount} Paid berkontribusi revenue`}
+        sub={`${totals.protoPaidCount} order berbayar berkontribusi Nilai SO`}
       />
     </div>
   );

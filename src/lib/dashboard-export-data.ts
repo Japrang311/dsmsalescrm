@@ -8,6 +8,8 @@ import type {
   Task,
 } from "@/lib/domain";
 import type { TargetsByMember } from "@/lib/data/targets";
+import type { MetricContext } from "@/lib/report-metric-scope";
+import type { ReportMetricSnapshot } from "@/lib/data/sales-performance-metrics";
 import {
   activeCommercialCount,
   monthlyRevenueTrendInRange,
@@ -64,9 +66,18 @@ export type DashboardExportContext = {
   companyTarget: MonthlyTarget[];
   taskMetrics?: TaskControlLoopMetrics;
   stage4?: Stage4ExportData;
+  reportSnapshot?: {
+    context: MetricContext;
+    metrics: ReportMetricSnapshot;
+    target: number;
+    targetReason: string | null;
+    trend: ReturnType<typeof monthlyRevenueTrendInRange>;
+    performance: ReturnType<typeof salesPerformanceInRange>;
+  };
 };
 
 export function dashboardExportMonthlyTrend(context: DashboardExportContext) {
+  if (context.reportSnapshot) return context.reportSnapshot.trend;
   return monthlyRevenueTrendInRange(
     context.orders,
     context.role,
@@ -80,6 +91,7 @@ export function dashboardExportMonthlyTrend(context: DashboardExportContext) {
 export function dashboardExportSalesPerformance(
   context: DashboardExportContext,
 ) {
+  if (context.reportSnapshot) return context.reportSnapshot.performance;
   return salesPerformanceInRange(
     context.orders,
     context.tasks,
@@ -123,6 +135,15 @@ export function dashboardExportTopCustomers(
   context: DashboardExportContext,
   limit = 5,
 ) {
+  if (context.reportSnapshot) {
+    return context.reportSnapshot.metrics.customers
+      .slice(0, limit)
+      .map((row) => ({
+        client: context.clients.find((client) => client.id === row.clientId)!,
+        revenue: row.revenue,
+      }))
+      .filter((row) => row.client);
+  }
   return topCustomersInRange(
     context.orders,
     context.clients,
@@ -137,12 +158,31 @@ export function dashboardExportMetrics(context: DashboardExportContext) {
       ? targetsFor(context.targetsByMember, context.salesUserId)
       : context.companyTarget;
 
+  const snapshot = context.reportSnapshot;
+  const m = snapshot?.metrics;
   return {
-    revenue: revenueInRange(context.orders, context.range),
-    target: sumMonthlyProrated(targetRows, context.range),
-    revenueByTax: revenueByTaxInRange(context.orders, context.range),
-    revenueBySource: revenueBySourceInRange(context.orders, context.range),
-    prototype: prototypeSummaryInRange(context.orders, context.range),
+    revenue: m ? m.total : revenueInRange(context.orders, context.range),
+    target: snapshot
+      ? snapshot.target
+      : sumMonthlyProrated(targetRows, context.range),
+    revenueByTax: m
+      ? { ppn: m.ppn, nonPpn: m.nonPpn }
+      : revenueByTaxInRange(context.orders, context.range),
+    revenueBySource: m
+      ? {
+          newProduct: m.newProduct,
+          existing: m.existing,
+          prototypePaid: m.protoPaid,
+        }
+      : revenueBySourceInRange(context.orders, context.range),
+    prototype: m
+      ? {
+          paidCount: m.protoPaidCount,
+          paidValue: m.protoPaid,
+          focCount: m.protoFocCount,
+          supportActivity: m.protoPaidCount + m.protoFocCount,
+        }
+      : prototypeSummaryInRange(context.orders, context.range),
     tasks: taskCounts(
       context.tasks,
       context.role === "sales" ? undefined : context.taskMetrics,

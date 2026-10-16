@@ -13,27 +13,19 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { formatDateShort, formatRupiahShort } from "@/lib/format";
 import { useRole, ROLE_LABEL } from "@/context/role-context-core";
-import { CURRENT_MONTH, CURRENT_YEAR, NOW } from "@/lib/domain";
+import { CURRENT_YEAR, NOW } from "@/lib/domain";
 import {
   activityCompliance,
   quotationFunnel,
   riskAlerts,
-  sumTargetsThroughMonth,
   taskCounts,
-  targetForMonth,
-  targetsFor,
 } from "@/lib/data/dashboard-selectors";
 import { forecastValue } from "@/lib/data/commercial-stages";
 import { useDashboardData } from "@/hooks/use-dashboard-data";
 import { useEntryState } from "@/hooks/use-entry-state";
-import { getSalesOrdersMetrics } from "@/lib/data/sales-orders-metrics";
-import {
-  getSalesOrdersMonthlyTrend,
-  getSalesOrdersOwnerYtd,
-} from "@/lib/data/sales-orders-trend";
 import {
   getSalesTaskClientMetrics,
-  getTopCustomers,
+  getReportMetricSnapshot,
 } from "@/lib/data/sales-performance-metrics";
 import {
   getAnalyticsCoverage,
@@ -66,6 +58,8 @@ import { Stage4FunnelDwellSection } from "@/components/reports/Stage4FunnelDwell
 import { PageContainer } from "@/components/layout/PageContainer";
 import { PageSkeleton } from "@/components/layout/PageSkeleton";
 import { ChartCardSkeleton } from "@/components/charts/ChartCardSkeleton";
+import { metricScope, targetComparison } from "@/lib/report-metric-scope";
+import { listPeriodTargets } from "@/lib/data/targets";
 
 // Both sections pull recharts (~412 KB). Loading them with the chart instead of
 // the route keeps the report tables and KPI tiles paintable without it.
@@ -100,6 +94,7 @@ function ReportsPage() {
     currentUserId,
     taskMetrics,
     isLoading,
+    hasError,
   } = useDashboardData();
 
   const [filters, setFilters] = useEntryState<ReportFilters>(
@@ -145,20 +140,20 @@ function ReportsPage() {
   };
   const metricsQuery = useQuery({
     queryKey: ["sales-orders", "metrics", "reports", metricsFilters],
-    queryFn: () => getSalesOrdersMetrics(metricsFilters),
+    queryFn: () => getReportMetricSnapshot(metricScope(filters)),
     enabled: authReady,
   });
   const totals = useMemo(() => {
     const m = metricsQuery.data;
     return {
-      revenue: (m?.ppnValue ?? 0) + (m?.nonPpnValue ?? 0),
-      ppn: m?.ppnValue ?? 0,
-      nonPpn: m?.nonPpnValue ?? 0,
-      newProduct: m?.newProductValue ?? 0,
-      existing: m?.existingValue ?? 0,
-      protoPaid: m?.prototypePaidValue ?? 0,
-      protoFocCount: m?.focCount ?? 0,
-      protoPaidCount: m?.prototypePaidCount ?? 0,
+      revenue: m?.total ?? 0,
+      ppn: m?.ppn ?? 0,
+      nonPpn: m?.nonPpn ?? 0,
+      newProduct: m?.newProduct ?? 0,
+      existing: m?.existing ?? 0,
+      protoPaid: m?.protoPaid ?? 0,
+      protoFocCount: m?.protoFocCount ?? 0,
+      protoPaidCount: m?.protoPaidCount ?? 0,
       totalCount: m?.totalCount ?? 0,
     };
   }, [metricsQuery.data]);
@@ -167,27 +162,10 @@ function ReportsPage() {
   // CURRENT_YEAR-only behavior below) — a custom sub-year range in the
   // filter bar still narrows KPI totals above (date-range-aware), but the
   // trend/top-customers RPCs use the range's end year as a whole.
-  const trendFilters = {
-    year: filters.range.to.getFullYear(),
-    ownerId: filters.ownerId,
-    clientId: filters.clientId,
-    taxType: filters.taxType,
-    soType: filters.soType,
-    source: filters.source,
-  };
-  const monthlyTrendQuery = useQuery({
-    queryKey: ["sales-orders", "monthly-trend", "reports", trendFilters],
-    queryFn: () => getSalesOrdersMonthlyTrend(trendFilters),
-    enabled: authReady,
-  });
-  const ownerYtdQuery = useQuery({
-    queryKey: ["sales-orders", "owner-ytd", "reports", trendFilters],
-    queryFn: () => getSalesOrdersOwnerYtd(trendFilters),
-    enabled: authReady,
-  });
-  const topCustomersQuery = useQuery({
-    queryKey: ["sales-orders", "top-customers", "reports", trendFilters],
-    queryFn: () => getTopCustomers({ ...trendFilters, limit: 5 }),
+  const scope = metricScope(filters);
+  const periodTargetsQuery = useQuery({
+    queryKey: ["targets", "reports-period", scope.from, scope.to],
+    queryFn: () => listPeriodTargets(scope),
     enabled: authReady,
   });
   // Task/client detail is never filtered by the Reports filter bar (matches
@@ -250,67 +228,36 @@ function ReportsPage() {
   });
 
   // YTD achievement vs target (respects ownerId filter for scope) ----------
-  const yearTargetTotal = useMemo(() => {
-    if (filters.ownerId !== "all") {
-      const arr = targetsFor(targetsByMember, filters.ownerId);
-      if (arr.length === 0) return 0;
-      return sumTargetsThroughMonth(arr);
-    }
-    if (role === "sales") {
-      return sumTargetsThroughMonth(
-        targetsFor(targetsByMember, currentUserId ?? ""),
-      );
-    }
-    return sumTargetsThroughMonth(companyTarget);
-  }, [filters.ownerId, role, targetsByMember, companyTarget, currentUserId]);
-
+  const comparison = targetComparison(scope, periodTargetsQuery.data ?? []);
+  const yearTargetTotal = comparison.target ?? 0;
   const ytdAchievementPct =
-    yearTargetTotal > 0 ? totals.revenue / yearTargetTotal : 0;
-
-  // Cumulative YTD trend within range, backed by monthlyTrendQuery --------
-  const monthRevenueByIndex = useMemo(() => {
-    const arr = new Array(12).fill(0);
-    for (const point of monthlyTrendQuery.data ?? []) {
-      arr[point.month - 1] = point.revenue;
-    }
-    return arr;
-  }, [monthlyTrendQuery.data]);
-
-  const cumulativeTrend = useMemo(() => {
-    const targetsArr =
-      filters.ownerId !== "all" &&
-      targetsFor(targetsByMember, filters.ownerId).length > 0
-        ? targetsFor(targetsByMember, filters.ownerId)
-        : companyTarget;
-    let cr = 0;
-    let ct = 0;
-    return Array.from({ length: CURRENT_MONTH }, (_, i) => {
-      cr += monthRevenueByIndex[i];
-      ct += targetForMonth(targetsArr, i + 1);
-      return {
-        month: new Date(CURRENT_YEAR, i, 1).toLocaleDateString("id-ID", {
-          month: "short",
-        }),
-        achievement: cr,
-        target: ct,
-      };
-    });
-  }, [monthRevenueByIndex, filters.ownerId, targetsByMember, companyTarget]);
-
-  const monthlyTrend = useMemo(() => {
-    const targetsArr =
-      filters.ownerId !== "all" &&
-      targetsFor(targetsByMember, filters.ownerId).length > 0
-        ? targetsFor(targetsByMember, filters.ownerId)
-        : companyTarget;
-    return Array.from({ length: CURRENT_MONTH }, (_, i) => ({
-      month: new Date(CURRENT_YEAR, i, 1).toLocaleDateString("id-ID", {
-        month: "short",
-      }),
-      revenue: monthRevenueByIndex[i],
-      target: targetForMonth(targetsArr, i + 1),
-    }));
-  }, [monthRevenueByIndex, filters.ownerId, targetsByMember, companyTarget]);
+    comparison.comparable && yearTargetTotal > 0
+      ? totals.revenue / yearTargetTotal
+      : null;
+  const monthlyTrend = (metricsQuery.data?.months ?? []).map((point) => {
+    const [year, month] = point.period.split("-").map(Number);
+    return {
+      month: point.period,
+      revenue: point.revenue,
+      target: comparison.comparable
+        ? (periodTargetsQuery.data ?? [])
+            .filter(
+              (t) =>
+                t.year === year &&
+                t.month === month &&
+                (!scope.ownerId || t.ownerId === scope.ownerId),
+            )
+            .reduce((s, t) => s + t.target, 0)
+        : 0,
+    };
+  });
+  let cumulativeRevenue = 0;
+  let cumulativeTarget = 0;
+  const cumulativeTrend = monthlyTrend.map((point) => ({
+    month: point.month,
+    achievement: (cumulativeRevenue += point.revenue),
+    target: (cumulativeTarget += point.target),
+  }));
 
   const sourceBreakdown = useMemo(
     () => [
@@ -360,27 +307,46 @@ function ReportsPage() {
   );
 
   const topCustomers = useMemo(() => {
-    return (topCustomersQuery.data ?? [])
-      .map((r) => ({ client: clients[r.clientId], revenue: r.revenue }))
+    return (metricsQuery.data?.customers ?? [])
+      .slice(0, 5)
+      .map((r) => ({
+        client: clients[r.clientId] ?? {
+          id: r.clientId,
+          name: r.clientName ?? "Klien",
+          status: undefined,
+        },
+        revenue: r.revenue,
+      }))
       .filter((r) => r.client);
-  }, [topCustomersQuery.data, clients]);
+  }, [metricsQuery.data, clients]);
 
   const includeTaskDetail = role !== "executive";
   const salesPerf = useMemo(
     () =>
       reportSalesPerformanceFromRpc(
-        ownerYtdQuery.data ?? [],
+        metricsQuery.data?.owners ?? [],
         taskClientMetricsQuery.data ?? [],
         salesTeam,
         targetsByMember,
         { includeTaskDetail },
-      ),
+      )
+        .filter((row) => !scope.ownerId || row.member.id === scope.ownerId)
+        .map((row) => {
+          const target =
+            targetComparison(
+              { ...scope, ownerId: row.member.id },
+              periodTargetsQuery.data ?? [],
+            ).target ?? 0;
+          return { ...row, target, pct: target > 0 ? row.revenue / target : 0 };
+        }),
     [
-      ownerYtdQuery.data,
+      metricsQuery.data,
       taskClientMetricsQuery.data,
       salesTeam,
       targetsByMember,
       includeTaskDetail,
+      scope,
+      periodTargetsQuery.data,
     ],
   );
 
@@ -447,6 +413,28 @@ function ReportsPage() {
       companyTarget,
       taskMetrics,
       stage4: stage4Export,
+      reportSnapshot: metricsQuery.data
+        ? {
+            context: {
+              scope,
+              basis: "sales-order-value",
+              fetchedAt: metricsQuery.data.fetchedAt,
+              targetComparable: comparison.comparable,
+            },
+            metrics: metricsQuery.data,
+            target: yearTargetTotal,
+            targetReason: comparison.reason,
+            trend: monthlyTrend.map((row) => ({
+              ...row,
+              achievement: row.target > 0 ? row.revenue / row.target : 0,
+            })),
+            performance: salesPerf.map((row) => ({
+              ...row,
+              openTasks: row.openTasks ?? 0,
+              overdue: row.overdueTasks ?? 0,
+            })),
+          }
+        : undefined,
     }),
     [
       role,
@@ -462,10 +450,23 @@ function ReportsPage() {
       companyTarget,
       stage4Export,
       taskMetrics,
+      metricsQuery.data,
+      scope,
+      comparison.comparable,
+      comparison.reason,
+      yearTargetTotal,
+      monthlyTrend,
+      salesPerf,
     ],
   );
 
   const handleExport = async (format: "xlsx" | "pdf") => {
+    if (!exportReady) {
+      toast.error(
+        "Export belum siap; tunggu seluruh bagian wajib selesai dimuat.",
+      );
+      return;
+    }
     try {
       if (format === "xlsx") {
         const { exportExecutiveReportXlsx } = await import("@/lib/export-xlsx");
@@ -512,15 +513,45 @@ function ReportsPage() {
   // Only the core row-level data and the headline metrics hold back the page.
   // Every other query now gates just the section it feeds, so the KPI cards and
   // filters are usable while the slower analytics RPCs are still in flight.
-  if (!authReady || isLoading || metricsQuery.isLoading) {
+  if (
+    hasError ||
+    [
+      metricsQuery,
+      periodTargetsQuery,
+      taskClientMetricsQuery,
+      winLossQuery,
+      lostReasonQuery,
+      cycleTimeQuery,
+      stageFunnelQuery,
+      stageDwellQuery,
+      analyticsCoverageQuery,
+    ].some((query) => query.isError)
+  ) {
+    return (
+      <PageContainer>
+        <ReportFilterBar
+          role={role}
+          value={filters}
+          onChange={patch}
+          clients={clientList}
+          salesTeam={salesTeam}
+        />
+        <p role="alert">Gagal memuat laporan. Muat ulang untuk mencoba lagi.</p>
+      </PageContainer>
+    );
+  }
+  if (
+    !authReady ||
+    isLoading ||
+    metricsQuery.isLoading ||
+    periodTargetsQuery.isLoading
+  ) {
     return <PageSkeleton label="Memuat laporan…" />;
   }
 
-  const trendLoading = monthlyTrendQuery.isLoading;
+  const trendLoading = metricsQuery.isLoading || periodTargetsQuery.isLoading;
   const performanceLoading =
-    ownerYtdQuery.isLoading ||
-    topCustomersQuery.isLoading ||
-    taskClientMetricsQuery.isLoading;
+    metricsQuery.isLoading || taskClientMetricsQuery.isLoading;
   const productIntelligenceLoading =
     winLossQuery.isLoading ||
     lostReasonQuery.isLoading ||
@@ -528,6 +559,18 @@ function ReportsPage() {
     stageFunnelQuery.isLoading ||
     stageDwellQuery.isLoading ||
     analyticsCoverageQuery.isLoading;
+  const exportReady =
+    [
+      metricsQuery,
+      periodTargetsQuery,
+      taskClientMetricsQuery,
+      winLossQuery,
+      lostReasonQuery,
+      cycleTimeQuery,
+      stageFunnelQuery,
+      stageDwellQuery,
+      analyticsCoverageQuery,
+    ].every((query) => query.isSuccess && !query.isFetching) && !hasError;
 
   return (
     <PageContainer>
@@ -539,12 +582,17 @@ function ReportsPage() {
           <p className="text-sm text-muted-foreground">
             Scope: {ROLE_LABEL[role]}
             {readOnly ? " · read-only" : ""} · Semua nilai FOC dikeluarkan dari
-            revenue.
+            Nilai SO.
           </p>
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              disabled={!exportReady}
+            >
               <Download className="h-3.5 w-3.5" /> Export
             </Button>
           </DropdownMenuTrigger>
@@ -572,6 +620,12 @@ function ReportsPage() {
         clients={clientList}
         salesTeam={salesTeam}
       />
+      <p className="text-xs text-muted-foreground">
+        Nilai order berbayar yang tercatat, bukan konfirmasi pembayaran
+        diterima. Snapshot {metricsQuery.data?.fetchedAt}. Funnel, task,
+        kepatuhan, dan potensi pipeline menunjukkan kondisi saat ini; filter
+        tanggal berlaku untuk Nilai SO.
+      </p>
 
       {filterContext.length > 0 && (
         <div className="flex flex-wrap gap-1.5 text-[11px] text-muted-foreground">
@@ -588,10 +642,19 @@ function ReportsPage() {
       )}
 
       {/* KPI cards */}
+      {(metricsQuery.isError || hasError) && (
+        <p role="alert">
+          Gagal memuat laporan. Coba muat ulang; angka belum dapat dipastikan.
+        </p>
+      )}
       <ReportsKpiCards
         totals={totals}
         ytdAchievementPct={ytdAchievementPct}
         yearTargetTotal={yearTargetTotal}
+        targetReason={
+          comparison.reason ??
+          (yearTargetTotal === 0 ? "Target belum tersedia." : undefined)
+        }
       />
 
       {/* Achievement YTD vs Target */}
@@ -600,6 +663,7 @@ function ReportsPage() {
       ) : (
         <Suspense fallback={<ChartCardSkeleton count={2} />}>
           <ReportsTrendCharts
+            targetComparable={comparison.comparable}
             cumulativeTrend={cumulativeTrend}
             monthlyTrend={monthlyTrend}
           />
@@ -635,6 +699,7 @@ function ReportsPage() {
           topCustomers={topCustomers}
           totalRevenue={totals.revenue}
           salesPerf={salesPerf}
+          targetComparable={comparison.comparable}
         />
       )}
 

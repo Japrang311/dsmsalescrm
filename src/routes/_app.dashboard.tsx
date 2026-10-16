@@ -75,7 +75,7 @@ export const Route = createFileRoute("/_app/dashboard")({
       {
         name: "description",
         content:
-          "Achievement, revenue, pipeline, and follow-up priorities for the DSM sales team.",
+          "Pencapaian Nilai SO, pipeline, dan prioritas follow-up tim sales DSM.",
       },
     ],
   }),
@@ -297,7 +297,7 @@ function DashboardPage() {
           : "Belum ada deal diputuskan",
     },
     {
-      label: "Revenue Source YTD",
+      label: "Nilai SO YTD",
       value: formatRupiahShort(
         src.newProduct + src.existing + src.prototypePaid,
       ),
@@ -306,14 +306,21 @@ function DashboardPage() {
       )} · Proto ${sourcePct(src.prototypePaid)}`,
     },
     {
-      label: "Prototype Paid YTD",
+      label: "Nilai SO Prototype berbayar YTD",
       value: formatRupiahShort(proto.paidValue),
-      sub: `${proto.paidCount} paid · ${proto.focCount} FOC (Rp0, tidak dihitung)`,
+      sub: `${proto.paidCount} berbayar · ${proto.focCount} FOC (Rp0, tidak dihitung)`,
     },
   ];
 
   return (
     <PageContainer>
+      <p
+        className="text-xs text-muted-foreground"
+        title="Nilai order berbayar yang tercatat, bukan konfirmasi pembayaran diterima."
+      >
+        Basis pencapaian: Nilai SO. Prototype Paid berarti order berbayar, bukan
+        status pelunasan.
+      </p>
       {/* Header */}
       <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-end">
         <div>
@@ -369,13 +376,13 @@ function DashboardPage() {
               <DropdownMenuItem
                 className="gap-2"
                 onSelect={() =>
-                  runExport("CSV", "Monthly revenue vs target", () =>
+                  runExport("CSV", "Nilai SO bulanan vs target", () =>
                     exportMonthlyRevenueCsv(exportContext),
                   )
                 }
               >
                 <FileText className="h-4 w-4" />
-                Monthly revenue vs target
+                Nilai SO bulanan vs target
               </DropdownMenuItem>
               <DropdownMenuItem
                 className="gap-2"
@@ -423,7 +430,7 @@ function DashboardPage() {
               <DropdownMenuItem
                 className="gap-2"
                 onSelect={() =>
-                  runExport("Excel", "Monthly revenue vs target", async () => {
+                  runExport("Excel", "Nilai SO bulanan vs target", async () => {
                     const { exportMonthlyRevenueXlsx } =
                       await import("@/lib/export-xlsx");
                     return exportMonthlyRevenueXlsx(exportContext);
@@ -431,7 +438,7 @@ function DashboardPage() {
                 }
               >
                 <FileSpreadsheet className="h-4 w-4" />
-                Monthly revenue vs target
+                Nilai SO bulanan vs target
               </DropdownMenuItem>
               <DropdownMenuItem
                 className="gap-2"

@@ -13,7 +13,6 @@ import {
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatRupiahAxis, formatRupiahShort } from "@/lib/format";
-import { CURRENT_YEAR } from "@/lib/domain";
 import { ChartEmpty } from "./ReportPrimitives";
 import { CHART_COLORS } from "./chart-colors";
 import { legendLabel } from "@/components/charts/chart-legend";
@@ -24,19 +23,22 @@ type MonthlyPoint = { month: string; revenue: number; target: number };
 export function ReportsTrendCharts({
   cumulativeTrend,
   monthlyTrend,
+  targetComparable = true,
 }: {
   cumulativeTrend: TrendPoint[];
   monthlyTrend: MonthlyPoint[];
+  targetComparable?: boolean;
 }) {
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       <Card>
         <CardHeader className="pb-2">
           <CardTitle as="h2" className="text-sm font-semibold">
-            Achievement YTD vs Target YTD
+            Nilai SO kumulatif · periode terpilih
           </CardTitle>
           <p className="text-[11px] text-muted-foreground">
-            Akumulasi bulanan (kumulatif) untuk tahun {CURRENT_YEAR}.
+            Akumulasi bulan dalam rentang terpilih; target hanya untuk bulan
+            penuh dan filter sebanding.
           </p>
           {cumulativeTrend.length > 0 &&
             !cumulativeTrend.some((d) => d.achievement > 0) && (
@@ -53,7 +55,7 @@ export function ReportsTrendCharts({
             <div
               className="h-full w-full"
               role="img"
-              aria-label={`Grafik: akumulasi achievement vs target YTD ${CURRENT_YEAR}. Achievement ${formatRupiahShort(
+              aria-label={`Grafik: akumulasi Nilai SO dalam periode. Nilai SO ${formatRupiahShort(
                 cumulativeTrend[cumulativeTrend.length - 1]?.achievement ?? 0,
               )} dari target ${formatRupiahShort(
                 cumulativeTrend[cumulativeTrend.length - 1]?.target ?? 0,
@@ -82,18 +84,20 @@ export function ReportsTrendCharts({
                   />
                   <Bar
                     dataKey="achievement"
-                    name="Achievement"
+                    name="Pencapaian SO"
                     fill={CHART_COLORS[0]}
                     radius={[4, 4, 0, 0]}
                   />
-                  <Line
-                    type="monotone"
-                    dataKey="target"
-                    name="Target"
-                    stroke={CHART_COLORS[2]}
-                    strokeWidth={2}
-                    dot={{ r: 3 }}
-                  />
+                  {targetComparable && (
+                    <Line
+                      type="monotone"
+                      dataKey="target"
+                      name="Target"
+                      stroke={CHART_COLORS[2]}
+                      strokeWidth={2}
+                      dot={{ r: 3 }}
+                    />
+                  )}
                 </ComposedChart>
               </ResponsiveContainer>
             </div>
@@ -104,10 +108,10 @@ export function ReportsTrendCharts({
       <Card>
         <CardHeader className="pb-2">
           <CardTitle as="h2" className="text-sm font-semibold">
-            Monthly Achievement vs Monthly Target
+            Nilai SO bulanan vs target bulanan
           </CardTitle>
           <p className="text-[11px] text-muted-foreground">
-            Perbandingan revenue per bulan terhadap target bulanan.
+            Perbandingan Nilai SO per bulan terhadap target bulanan.
           </p>
           {monthlyTrend.length > 0 &&
             !monthlyTrend.some((d) => d.revenue > 0) && (
@@ -124,7 +128,7 @@ export function ReportsTrendCharts({
             <div
               className="h-full w-full"
               role="img"
-              aria-label={`Grafik batang: revenue vs target per bulan. Total revenue ${formatRupiahShort(
+              aria-label={`Grafik batang: Nilai SO vs target per bulan. Total Nilai SO ${formatRupiahShort(
                 monthlyTrend.reduce((s, d) => s + d.revenue, 0),
               )} dari target ${formatRupiahShort(
                 monthlyTrend.reduce((s, d) => s + d.target, 0),
@@ -151,15 +155,17 @@ export function ReportsTrendCharts({
                     wrapperStyle={{ fontSize: 11 }}
                     formatter={legendLabel}
                   />
-                  <Bar
-                    dataKey="target"
-                    name="Target"
-                    fill="var(--color-border-strong)"
-                    radius={[4, 4, 0, 0]}
-                  />
+                  {targetComparable && (
+                    <Bar
+                      dataKey="target"
+                      name="Target"
+                      fill="var(--color-border-strong)"
+                      radius={[4, 4, 0, 0]}
+                    />
+                  )}
                   <Bar
                     dataKey="revenue"
-                    name="Revenue"
+                    name="Nilai SO"
                     fill={CHART_COLORS[0]}
                     radius={[4, 4, 0, 0]}
                   />

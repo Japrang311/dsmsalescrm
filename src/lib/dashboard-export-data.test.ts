@@ -151,4 +151,60 @@ describe("dashboard export data", () => {
       cancelled: 1,
     });
   });
+
+  test("uses the exact report snapshot for metrics, trend, and customer ranking", () => {
+    const snapshotContext: DashboardExportContext = {
+      ...context,
+      orders: [],
+      reportSnapshot: {
+        context: {
+          scope: {
+            from: "2026-07-01",
+            to: "2026-07-31",
+            ownerId: "sales-1",
+          },
+          basis: "sales-order-value",
+          fetchedAt: "2026-07-31T12:00:00.000Z",
+          targetComparable: true,
+        },
+        metrics: {
+          total: 500_000_000,
+          ppn: 400_000_000,
+          nonPpn: 100_000_000,
+          newProduct: 300_000_000,
+          existing: 150_000_000,
+          protoPaid: 50_000_000,
+          totalCount: 4,
+          protoFocCount: 1,
+          protoPaidCount: 1,
+          customers: [
+            {
+              clientId: "client-1",
+              clientName: "PT Data Nyata",
+              revenue: 500_000_000,
+            },
+          ],
+          owners: [{ ownerId: "sales-1", revenue: 500_000_000 }],
+          months: [{ period: "2026-07", revenue: 500_000_000 }],
+          fetchedAt: "2026-07-31T12:00:00.000Z",
+        },
+        target: 200_000_000,
+        targetReason: null,
+        trend: [{ month: "Jul", revenue: 500_000_000, target: 200_000_000 }],
+        performance: [],
+      },
+    };
+
+    expect(dashboardExportMetrics(snapshotContext)).toMatchObject({
+      revenue: 500_000_000,
+      target: 200_000_000,
+      revenueByTax: { ppn: 400_000_000, nonPpn: 100_000_000 },
+    });
+    expect(dashboardExportMonthlyTrend(snapshotContext)).toEqual([
+      { month: "Jul", revenue: 500_000_000, target: 200_000_000 },
+    ]);
+    expect(dashboardExportTopCustomers(snapshotContext, 5)).toEqual([
+      { client: context.clients[0], revenue: 500_000_000 },
+    ]);
+  });
 });

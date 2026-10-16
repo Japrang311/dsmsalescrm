@@ -1,5 +1,43 @@
 import { supabase } from "@/lib/supabase";
 import type { ClientStatus } from "@/lib/domain";
+import { metricScopeSchema, type MetricScope } from "@/lib/report-metric-scope";
+
+export type ReportMetricSnapshot = {
+  total: number;
+  ppn: number;
+  nonPpn: number;
+  newProduct: number;
+  existing: number;
+  protoPaid: number;
+  totalCount: number;
+  protoFocCount: number;
+  protoPaidCount: number;
+  customers: { clientId: string; clientName?: string; revenue: number }[];
+  owners: { ownerId: string; revenue: number }[];
+  months: { period: string; revenue: number }[];
+  fetchedAt: string;
+};
+
+export async function getReportMetricSnapshot(
+  input: MetricScope,
+): Promise<ReportMetricSnapshot> {
+  const scope = metricScopeSchema.parse(input);
+  const { data, error } = await supabase.rpc("crm_report_metrics", {
+    p_from: scope.from,
+    p_to: scope.to,
+    p_owner_id: scope.ownerId ?? null,
+    p_client_id: scope.clientId ?? null,
+    p_tax_type: scope.taxType ?? null,
+    p_so_type: scope.soType ?? null,
+    p_source:
+      scope.source === "New Product"
+        ? "RFQ / New Product"
+        : (scope.source ?? null),
+  });
+  if (error) throw error;
+  if (!data) throw new Error("Snapshot laporan tidak tersedia");
+  return data as ReportMetricSnapshot;
+}
 
 export type OwnerTaskClientMetrics = {
   ownerId: string;

@@ -15,15 +15,21 @@ import {
 import { formatPercent, formatRupiahShort } from "@/lib/format";
 import type { Client } from "@/lib/domain";
 import type { ReportSalesPerformanceRow } from "@/lib/report-selectors";
+import { customerShare } from "@/lib/report-metric-scope";
 
 export function ReportsPerformanceSection({
   topCustomers,
   totalRevenue,
   salesPerf,
+  targetComparable = true,
 }: {
-  topCustomers: { client: Client; revenue: number }[];
+  topCustomers: {
+    client: Pick<Client, "id" | "name"> & Partial<Pick<Client, "status">>;
+    revenue: number;
+  }[];
   totalRevenue: number;
   salesPerf: ReportSalesPerformanceRow[];
+  targetComparable?: boolean;
 }) {
   return (
     <div className="grid gap-4 lg:grid-cols-2">
@@ -33,14 +39,15 @@ export function ReportsPerformanceSection({
             as="h2"
             className="flex items-center gap-2 text-sm font-semibold"
           >
-            <Trophy className="h-4 w-4 text-primary" /> Top 5 Customers YTD
+            <Trophy className="h-4 w-4 text-primary" /> Top 5 Customers ·
+            periode terpilih
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           {topCustomers.length === 0 ? (
             <EmptyState
               className="m-4"
-              description="Belum ada revenue pada scope ini."
+              description="Belum ada Nilai SO pada scope ini."
             />
           ) : (
             <Table>
@@ -48,13 +55,13 @@ export function ReportsPerformanceSection({
                 <TableRow>
                   <TableHead className="text-xs">Klien</TableHead>
                   <TableHead className="text-xs">Status</TableHead>
-                  <TableHead className="text-right text-xs">Revenue</TableHead>
+                  <TableHead className="text-right text-xs">Nilai SO</TableHead>
                   <TableHead className="text-xs">Share</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {topCustomers.map(({ client, revenue }) => {
-                  const share = totalRevenue ? revenue / totalRevenue : 0;
+                  const share = customerShare(revenue, totalRevenue);
                   return (
                     <TableRow key={client.id} className="text-xs">
                       <TableCell className="max-w-[220px] truncate">
@@ -68,7 +75,7 @@ export function ReportsPerformanceSection({
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline" className="text-[10px]">
-                          {client.status}
+                          {client.status ?? "—"}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right font-medium tabular-nums">
@@ -77,12 +84,12 @@ export function ReportsPerformanceSection({
                       <TableCell className="w-24">
                         <div className="flex items-center gap-1">
                           <Progress
-                            value={share * 100}
-                            aria-label={`Kontribusi revenue ${client.name}`}
+                            value={(share ?? 0) * 100}
+                            aria-label={`Kontribusi Nilai SO ${client.name}`}
                             className="h-1.5"
                           />
                           <span className="w-8 text-[10px] tabular-nums text-muted-foreground">
-                            {formatPercent(share)}
+                            {share === null ? "—" : formatPercent(share)}
                           </span>
                         </div>
                       </TableCell>
@@ -101,7 +108,7 @@ export function ReportsPerformanceSection({
             as="h2"
             className="flex items-center gap-2 text-sm font-semibold"
           >
-            <Users className="h-4 w-4 text-primary" /> Sales Performance
+            <Users className="h-4 w-4 text-primary" /> Pencapaian Sales
           </CardTitle>
           <p className="text-[11px] text-muted-foreground">
             1 Manager · {salesPerf.length} Sales
@@ -112,7 +119,7 @@ export function ReportsPerformanceSection({
             <TableHeader>
               <TableRow>
                 <TableHead className="text-xs">Sales</TableHead>
-                <TableHead className="text-right text-xs">Revenue</TableHead>
+                <TableHead className="text-right text-xs">Nilai SO</TableHead>
                 <TableHead className="text-right text-xs">Target</TableHead>
                 <TableHead className="text-xs">Achv</TableHead>
                 <TableHead className="text-xs">Task</TableHead>
@@ -142,19 +149,23 @@ export function ReportsPerformanceSection({
                       {formatRupiahShort(revenue)}
                     </TableCell>
                     <TableCell className="text-right tabular-nums text-muted-foreground">
-                      {formatRupiahShort(target)}
+                      {targetComparable ? formatRupiahShort(target) : "—"}
                     </TableCell>
                     <TableCell className="w-24">
                       <div className="flex items-center gap-1">
                         <Progress
-                          value={Math.min(100, pct * 100)}
-                          aria-label={`Achievement vs target ${member.name}`}
+                          value={
+                            targetComparable ? Math.min(100, pct * 100) : 0
+                          }
+                          aria-label={`Pencapaian SO vs target ${member.name}`}
                           className="h-1.5"
                         />
                         <span
                           className={`w-9 text-[10px] tabular-nums ${pct >= 1 ? "text-success" : pct >= 0.7 ? "text-warning" : "text-destructive"}`}
                         >
-                          {formatPercent(pct)}
+                          {targetComparable && target > 0
+                            ? formatPercent(pct)
+                            : "—"}
                         </span>
                       </div>
                     </TableCell>

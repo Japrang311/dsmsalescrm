@@ -1,5 +1,23 @@
 import { supabase } from "@/lib/supabase";
 import { CURRENT_YEAR } from "@/lib/domain";
+import type { MetricScope, PeriodTarget } from "@/lib/report-metric-scope";
+
+export async function listPeriodTargets(
+  scope: MetricScope,
+): Promise<PeriodTarget[]> {
+  const { data, error } = await supabase
+    .from("targets")
+    .select("sales_id, year, month, target")
+    .gte("year", Number(scope.from.slice(0, 4)))
+    .lte("year", Number(scope.to.slice(0, 4)));
+  if (error) throw error;
+  return (data ?? []).map((row) => ({
+    ownerId: row.sales_id,
+    year: row.year,
+    month: row.month,
+    target: Number(row.target),
+  }));
+}
 
 export type MonthlyTarget = { month: number; target: number };
 export type TargetsByMember = Record<string, MonthlyTarget[]>;

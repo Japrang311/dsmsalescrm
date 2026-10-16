@@ -50,7 +50,7 @@ export function SalesPerformanceTable() {
           </CardTitle>
           <p className="text-xs text-muted-foreground">
             {salesTeam.length} anggota tim sales aktif. FOC prototype tidak
-            dihitung dalam revenue.
+            dihitung dalam Nilai SO.
           </p>
         </div>
         <Button variant="outline" size="sm" className="h-8 shrink-0" asChild>
@@ -66,9 +66,9 @@ export function SalesPerformanceTable() {
           <TableHeader>
             <TableRow className="hover:bg-transparent">
               <TableHead className="w-[220px]">Sales</TableHead>
-              <TableHead className="text-right">Revenue YTD</TableHead>
+              <TableHead className="text-right">Nilai SO YTD</TableHead>
               <TableHead className="text-right">Target YTD</TableHead>
-              <TableHead className="text-right">Achievement</TableHead>
+              <TableHead className="text-right">Pencapaian SO</TableHead>
               <TableHead className="text-right">Open</TableHead>
               <TableHead className="text-right">Overdue</TableHead>
             </TableRow>

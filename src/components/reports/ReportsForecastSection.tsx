@@ -31,7 +31,7 @@ export function ReportsForecastSection({
       <Card>
         <CardHeader className="pb-2">
           <CardTitle as="h2" className="text-sm font-semibold">
-            Revenue Source Breakdown
+            Komposisi sumber Nilai SO
           </CardTitle>
         </CardHeader>
         <CardContent className="h-[240px] px-2 pb-3">
@@ -41,7 +41,7 @@ export function ReportsForecastSection({
             <div
               className="h-full w-full"
               role="img"
-              aria-label={`Diagram lingkaran: pembagian revenue per sumber. ${sourceBreakdown
+              aria-label={`Diagram lingkaran: pembagian Nilai SO per sumber. ${sourceBreakdown
                 .map((s) => `${s.name} ${formatRupiahShort(s.value)}`)
                 .join(", ")}.`}
             >
@@ -78,16 +78,16 @@ export function ReportsForecastSection({
       <Card className="lg:col-span-2">
         <CardHeader className="pb-2">
           <CardTitle as="h2" className="text-sm font-semibold">
-            Forecast vs Achievement vs Target YTD
+            Forecast vs Pencapaian SO vs Target YTD
           </CardTitle>
           <p className="text-[11px] text-muted-foreground">
-            Forecast = Achievement + nilai pipeline terbobot per stage (Client
+            Forecast = Pencapaian SO + nilai pipeline terbobot per stage (Client
             Request for Quotes 15% s/d Commit 90%).
           </p>
         </CardHeader>
         <CardContent className="grid gap-3 sm:grid-cols-3">
           <ForecastTile
-            label="Achievement"
+            label="Pencapaian SO"
             value={forecast.achievement}
             tone="primary"
             pct={forecast.target ? forecast.achievement / forecast.target : 0}

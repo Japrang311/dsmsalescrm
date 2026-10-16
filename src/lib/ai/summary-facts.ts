@@ -26,6 +26,7 @@ export type SummaryAudience = "manager" | "executive";
  * all-strings rule, so adding a numeric field here will fail the suite.
  */
 export type SummaryFacts = {
+  metricBasis?: string;
   audience: SummaryAudience;
   periodLabel: string;
   generatedAtLabel: string;
@@ -135,6 +136,8 @@ export function buildSummaryFacts(input: SummaryFactsInput): SummaryFacts {
   const actual = revenueTotals.ppn + revenueTotals.nonPpn;
 
   const facts: SummaryFacts = {
+    metricBasis:
+      "Nilai SO: nilai order berbayar yang tercatat, bukan konfirmasi pembayaran diterima. Prototype Paid berarti berbayar, bukan status pelunasan.",
     audience,
     periodLabel: `${MONTHS[now.getMonth()]} ${now.getFullYear()}`,
     generatedAtLabel: `${formatDateShort(now)}, ${now

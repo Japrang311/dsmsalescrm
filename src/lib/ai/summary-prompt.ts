@@ -1,6 +1,7 @@
 import type { SummaryFacts } from "./summary-facts";
 
 const SHARED_RULES = [
+  "Semua angka revenue/achievement adalah Nilai SO: nilai order berbayar yang tercatat, bukan konfirmasi pembayaran diterima. Jangan menyatakan kas diterima, sudah dibayar, sudah lunas, atau pendapatan akuntansi. Prototype Paid berarti order berbayar, bukan status pelunasan.",
   "Kamu menulis ringkasan kinerja penjualan dalam bahasa Indonesia yang lugas dan profesional.",
   "Gunakan HANYA angka yang diberikan, disalin persis seperti tertulis. Jangan menghitung, menjumlahkan, membandingkan, atau memperkirakan angka apa pun sendiri.",
   "Jika sebuah informasi tidak diberikan, jangan menyebutnya dan jangan menebak.",

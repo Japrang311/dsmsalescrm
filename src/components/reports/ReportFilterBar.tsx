@@ -70,6 +70,7 @@ export function ReportFilterBar({
   return (
     <FilterBar>
       <DateRangePicker
+        affectsReport
         value={value.range}
         onChange={(r) => onChange({ range: r })}
       />
@@ -194,7 +195,7 @@ export function ReportFilterBar({
       >
         <SelectTrigger className={FILTER_TRIGGER_CLASS}>
           <Layers className="h-3.5 w-3.5" />
-          <SelectValue placeholder="Revenue source" />
+          <SelectValue placeholder="Sumber Nilai SO" />
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">Semua source</SelectItem>

@@ -58,12 +58,12 @@ export function ReportsComplianceSection({
         </CardHeader>
         <CardContent className="grid grid-cols-2 gap-2 text-xs">
           <StatBlock
-            label="Paid value"
+            label="Nilai SO Prototype Paid"
             value={formatRupiahShort(totals.protoPaid)}
             tone="primary"
           />
           <StatBlock
-            label="Paid count"
+            label="Jumlah Prototype Paid"
             value={`${totals.protoPaidCount} SO`}
             tone="success"
           />
@@ -79,7 +79,7 @@ export function ReportsComplianceSection({
           />
           <p className="col-span-2 text-[11px] text-muted-foreground">
             <Info className="mr-1 inline h-3 w-3" /> Prototype FOC tidak pernah
-            masuk ke chart revenue.
+            masuk ke chart Nilai SO.
           </p>
         </CardContent>
       </Card>

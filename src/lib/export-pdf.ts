@@ -84,6 +84,23 @@ function exportReportPdf(
   doc.text(stamp, pageW - MARGIN_X, 50, { align: "right" });
 
   let y = 96;
+  const snapshot = context.reportSnapshot;
+  const comparable = snapshot?.context.targetComparable ?? true;
+  doc.setTextColor(MUTED.r, MUTED.g, MUTED.b);
+  doc.text(
+    "Nilai SO: order berbayar tercatat; bukan konfirmasi pembayaran diterima.",
+    MARGIN_X,
+    y,
+  );
+  y += 14;
+  if (snapshot) {
+    const metadata = doc.splitTextToSize(
+      `Snapshot ${snapshot.context.fetchedAt} | Filter ${JSON.stringify(snapshot.context.scope)}`,
+      pageW - MARGIN_X * 2,
+    );
+    doc.text(metadata, MARGIN_X, y);
+    y += metadata.length * 12 + 10;
+  }
 
   // ---- KPI summary ----
   const metrics = dashboardExportMetrics(context);
@@ -105,24 +122,26 @@ function exportReportPdf(
     head: [["Metric", "Value", "Reference"]],
     body: [
       [
-        "Achievement (periode)",
+        "Pencapaian SO (periode)",
         formatRupiahShort(rev),
-        `Target ${formatRupiahShort(tgt)} · ${formatPercent(tgt ? rev / tgt : 0)}`,
+        comparable && tgt > 0
+          ? `Target ${formatRupiahShort(tgt)} · ${formatPercent(rev / tgt)}`
+          : `— · ${snapshot?.targetReason ?? "Target tidak tersedia"}`,
       ],
-      ["Revenue PPN", formatRupiahShort(tax.ppn), "Termasuk pajak"],
-      ["Revenue Non-PPN", formatRupiahShort(tax.nonPpn), "Tanpa pajak"],
+      ["Nilai SO PPN", formatRupiahShort(tax.ppn), "Termasuk pajak"],
+      ["Nilai SO Non-PPN", formatRupiahShort(tax.nonPpn), "Tanpa pajak"],
       [
-        "Revenue from New Product",
+        "Nilai SO from New Product",
         formatRupiahShort(src.newProduct),
         "Dalam periode",
       ],
       [
-        "Revenue from Existing / Repeat",
+        "Nilai SO from Existing / Repeat",
         formatRupiahShort(src.existing),
         "Dalam periode",
       ],
       [
-        "Revenue from Prototype Paid",
+        "Nilai SO Prototype Paid",
         formatRupiahShort(src.prototypePaid),
         "Dalam periode",
       ],
@@ -153,8 +172,8 @@ function exportReportPdf(
   });
   y = getLastY(doc) + 20;
 
-  // ---- Revenue trend ----
-  y = section(doc, "Monthly Revenue vs Target (dalam periode)", y);
+  // ---- Nilai SO trend ----
+  y = section(doc, "Monthly Nilai SO vs Target (dalam periode)", y);
   const trend = dashboardExportMonthlyTrend(context);
   if (trend.length === 0) {
     doc.setFont("helvetica", "italic");
@@ -168,12 +187,14 @@ function exportReportPdf(
       startY: y,
       theme: "striped",
       styles: { fontSize: 9, cellPadding: 5 },
-      head: [["Month", "Revenue", "Target (prorata)", "Achievement"]],
+      head: [["Month", "Nilai SO", "Target periode", "Pencapaian SO"]],
       body: trend.map((row) => [
         row.month,
         formatRupiahShort(row.revenue),
-        formatRupiahShort(row.target),
-        formatPercent(row.target ? row.revenue / row.target : 0),
+        comparable ? formatRupiahShort(row.target) : "—",
+        comparable && row.target > 0
+          ? formatPercent(row.revenue / row.target)
+          : "—",
       ]),
     });
     y = getLastY(doc) + 20;
@@ -233,12 +254,14 @@ function exportReportPdf(
       startY: y,
       theme: "grid",
       styles: { fontSize: 9, cellPadding: 5 },
-      head: [["Sales", "Revenue", "Target", "Achievement", "Open", "Overdue"]],
+      head: [
+        ["Sales", "Nilai SO", "Target", "Pencapaian SO", "Open", "Overdue"],
+      ],
       body: dashboardExportSalesPerformance(context).map((r) => [
         r.member.name,
         formatRupiahShort(r.revenue),
-        formatRupiahShort(r.target),
-        formatPercent(r.pct),
+        comparable ? formatRupiahShort(r.target) : "—",
+        comparable && r.target > 0 ? formatPercent(r.pct) : "—",
         String(r.openTasks),
         String(r.overdue),
       ]),
@@ -268,7 +291,7 @@ function exportReportPdf(
       startY: y,
       theme: "grid",
       styles: { fontSize: 9, cellPadding: 5 },
-      head: [["#", "Client", "Revenue"]],
+      head: [["#", "Client", "Nilai SO"]],
       body: dashboardExportTopCustomers(context, 10).map((r, i) => [
         String(i + 1),
         r.client.name,

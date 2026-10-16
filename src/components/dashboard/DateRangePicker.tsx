@@ -19,6 +19,7 @@ export type PeriodRange = { from: Date; to: Date };
 type Props = {
   value: PeriodRange;
   onChange: (range: PeriodRange) => void;
+  affectsReport?: boolean;
 };
 
 const PRESETS: Array<{ label: string; range: () => PeriodRange }> = [
@@ -49,7 +50,11 @@ const PRESETS: Array<{ label: string; range: () => PeriodRange }> = [
   },
 ];
 
-export function DateRangePicker({ value, onChange }: Props) {
+export function DateRangePicker({
+  value,
+  onChange,
+  affectsReport = false,
+}: Props) {
   const isMobile = useIsMobile();
   const [open, setOpen] = React.useState(false);
   const [draft, setDraft] = React.useState<RdpDateRange | undefined>({
@@ -73,11 +78,15 @@ export function DateRangePicker({ value, onChange }: Props) {
           variant="outline"
           size="sm"
           className={cn("h-8 gap-1.5 font-normal text-xs")}
-          title="Periode ini hanya mengatur rentang data untuk Export PDF/CSV/Excel, tidak mengubah angka KPI di layar"
+          title={
+            affectsReport
+              ? "Periode mengatur Nilai SO pada laporan dan export."
+              : "Periode ini hanya mengatur rentang data untuk Export PDF/CSV/Excel, tidak mengubah angka KPI di layar"
+          }
         >
           <CalendarIcon className="h-3.5 w-3.5" />
           <span className="whitespace-normal text-left tabular-nums">
-            Periode Export: {label}
+            {affectsReport ? "Periode laporan" : "Periode Export"}: {label}
           </span>
         </Button>
       </PopoverTrigger>
@@ -88,8 +97,9 @@ export function DateRangePicker({ value, onChange }: Props) {
               Preset
             </span>
             <span className="px-2 pb-1 text-[10px] leading-snug text-muted-foreground">
-              Mengatur rentang untuk Export saja, KPI di layar tetap YTD / bulan
-              berjalan.
+              {affectsReport
+                ? "Mengatur Nilai SO pada laporan dan export. Snapshot operasional tetap kondisi saat ini."
+                : "Mengatur rentang untuk Export saja, KPI di layar tetap YTD / bulan berjalan."}
             </span>
             {PRESETS.map((p) => (
               <Button
