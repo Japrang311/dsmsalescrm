@@ -85,6 +85,7 @@ function exportReportPdf(
 
   let y = 96;
   const snapshot = context.reportSnapshot;
+  const forecast = snapshot?.forecast;
   const comparable = snapshot?.context.targetComparable ?? true;
   doc.setTextColor(MUTED.r, MUTED.g, MUTED.b);
   doc.text(
@@ -128,6 +129,29 @@ function exportReportPdf(
           ? `Target ${formatRupiahShort(tgt)} · ${formatPercent(rev / tgt)}`
           : `— · ${snapshot?.targetReason ?? "Target tidak tersedia"}`,
       ],
+      ...(forecast?.snapshotMode === "current" &&
+      forecast.openPipelineValue !== null &&
+      forecast.forecastValue !== null
+        ? [
+            [
+              "Pipeline terbobot (periode)",
+              formatRupiahShort(forecast.openPipelineValue),
+              `Snapshot saat ini · as of ${formatDateShort(forecast.asOfDate)}`,
+            ],
+            [
+              "Forecast Nilai SO (periode)",
+              formatRupiahShort(forecast.forecastValue),
+              "Nilai SO + pipeline open bertanggal × bobot tahap tetap",
+            ],
+          ]
+        : [
+            [
+              "Forecast Nilai SO (periode)",
+              "—",
+              snapshot?.forecastUnavailableReason ??
+                "Forecast historis tidak tersedia; pipeline hanya snapshot saat ini",
+            ],
+          ]),
       ["Nilai SO PPN", formatRupiahShort(tax.ppn), "Termasuk pajak"],
       ["Nilai SO Non-PPN", formatRupiahShort(tax.nonPpn), "Tanpa pajak"],
       [
@@ -171,6 +195,40 @@ function exportReportPdf(
     ],
   });
   y = getLastY(doc) + 20;
+
+  if (forecast?.snapshotMode === "current") {
+    y = section(
+      doc,
+      `Forecast Drilldown (${forecast.page.totalCount}) · snapshot ${formatDateShort(forecast.asOfDate)}`,
+      y,
+    );
+    if (forecast.items.length === 0) {
+      doc.setFont("helvetica", "italic");
+      doc.setFontSize(9);
+      doc.setTextColor(MUTED.r, MUTED.g, MUTED.b);
+      doc.text("Tidak ada quotation open untuk scope ini.", MARGIN_X, y);
+      y += 22;
+    } else {
+      autoTable(doc, {
+        ...tableDefaults(),
+        startY: y,
+        theme: "striped",
+        styles: { fontSize: 8, cellPadding: 4 },
+        head: [
+          ["Quotation", "Client", "Stage", "Expected", "Bobot", "Kontribusi"],
+        ],
+        body: forecast.items.map((item) => [
+          item.quotationNumber,
+          item.clientName,
+          item.stage,
+          item.expectedCloseDate ?? "Belum dijadwalkan",
+          formatPercent(item.weight),
+          item.contributes ? formatRupiahShort(item.weightedValue) : "—",
+        ]),
+      });
+      y = getLastY(doc) + 20;
+    }
+  }
 
   // ---- Nilai SO trend ----
   y = section(doc, "Monthly Nilai SO vs Target (dalam periode)", y);

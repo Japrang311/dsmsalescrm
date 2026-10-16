@@ -381,6 +381,23 @@ test("sales can manually link released Sales Orders and Closed Won Quotations fr
 
   const fromSalesOrder = await createUnlinkedPair("SO");
   const fromQuotation = await createUnlinkedPair("QUO");
+  const backlogBefore = await sales.rpc("crm_won_without_so_backlog");
+  expect(backlogBefore.error).toBeNull();
+  const monthFrom = `${documentDate.slice(0, 7)}-01`;
+  const monthTo = new Date(
+    Date.UTC(
+      Number(documentDate.slice(0, 4)),
+      Number(documentDate.slice(5, 7)),
+      0,
+    ),
+  )
+    .toISOString()
+    .slice(0, 10);
+  const forecastBefore = await sales.rpc("crm_forecast_snapshot", {
+    p_from: monthFrom,
+    p_to: monthTo,
+  });
+  expect(forecastBefore.error).toBeNull();
 
   await signIn(page, USERS.sales);
   await page.goto(`/sales-orders/${fromSalesOrder.salesOrder.id}`);
@@ -438,6 +455,124 @@ test("sales can manually link released Sales Orders and Closed Won Quotations fr
     new RegExp(`/sales-orders/${fromQuotation.salesOrder.id}$`),
   );
 
+  await expect
+    .poll(async () => {
+      const refreshed = await sales.rpc("crm_won_without_so_backlog");
+      expect(refreshed.error).toBeNull();
+      return refreshed.data.totals.exceptionCount;
+    })
+    .toBe(backlogBefore.data.totals.exceptionCount - 2);
+  const forecastAfter = await sales.rpc("crm_forecast_snapshot", {
+    p_from: monthFrom,
+    p_to: monthTo,
+  });
+  expect(forecastAfter.error).toBeNull();
+  expect(forecastAfter.data.forecastValue).toBe(
+    forecastBefore.data.forecastValue,
+  );
+
+  await page.goto("/dashboard");
+  const dashboardBacklog = page.getByRole("region", {
+    name: "Backlog Won tanpa Sales Order",
+  });
+  await expect(dashboardBacklog).toHaveAttribute(
+    "data-won-backlog-count",
+    String(backlogBefore.data.totals.exceptionCount - 2),
+  );
+
+  expectNoConsoleIssues(consoleIssues);
+});
+
+test("creating an SO from a Closed Won card clears the exact backlog after reload", async ({
+  page,
+}) => {
+  const consoleIssues = collectConsoleIssues(page);
+  const sales = await authenticatedSupabaseClient(USERS.sales);
+  const documentDate = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jakarta",
+  }).format(new Date());
+  const productName = uniqueToken("E2E Won backlog create");
+  const { data: quotation, error: quotationError } = await sales.rpc(
+    "create_quotation",
+    {
+      p_client_id: NUR_CLIENT_ID,
+      p_document_date: documentDate,
+      p_client_address: null,
+      p_stage: "Closed Won",
+      p_so_number: null,
+      p_note: "Browser verification for Won backlog create flow",
+      p_items: [
+        {
+          productName,
+          description: `${productName} description`,
+          qty: 1,
+          uom: "Unit",
+          unitPrice: 567890,
+        },
+      ],
+      p_next_action: "Create linked Sales Order",
+      p_next_action_date: tomorrowIsoDate(),
+    },
+  );
+  expect(quotationError).toBeNull();
+  const backlogBefore = await sales.rpc("crm_won_without_so_backlog", {
+    p_document_ids: [quotation.id],
+  });
+  expect(backlogBefore.error).toBeNull();
+  expect(backlogBefore.data.requestedStates[0].status).toBe("missing");
+
+  await signIn(page, USERS.sales);
+  await page.goto("/pipeline");
+  const closedWonColumn = page
+    .getByTestId("pipeline-column")
+    .filter({ hasText: "Closed Won" });
+  const quotationCard = closedWonColumn
+    .getByTestId("pipeline-card")
+    .filter({ hasText: productName });
+  await expect(quotationCard.getByText(/SO belum dibuat/)).toBeVisible();
+  await quotationCard.getByRole("button", { name: "Buat SO" }).click();
+
+  const dialog = page.getByRole("dialog", { name: "Record Sales Order" });
+  await expect(
+    dialog.getByText(quotation.quotation_number, { exact: false }),
+  ).toBeVisible();
+  const soNumber = `E2E-WON-SO-${Date.now()}`;
+  await dialog.getByLabel("Nomor SO").fill(soNumber);
+  await dialog.getByLabel("Nomor PO Customer").fill(`E2E-WON-PO-${Date.now()}`);
+  await dialog.getByLabel("Nama Product item 1").fill(productName);
+  await dialog
+    .getByLabel("Description item 1")
+    .fill("Created from Closed Won backlog browser flow");
+  await dialog.getByLabel("Unit Price item 1").fill("567890");
+  await dialog.getByRole("button", { name: "Simpan Sales Order" }).click();
+  await expect(page.getByText("Sales Order dicatat")).toBeVisible();
+  await expect(quotationCard.getByText("SO released")).toBeVisible();
+
+  await page.reload();
+  const refreshedCard = page
+    .getByTestId("pipeline-column")
+    .filter({ hasText: "Closed Won" })
+    .getByTestId("pipeline-card")
+    .filter({ hasText: productName });
+  await expect(refreshedCard.getByText("SO released")).toBeVisible();
+  await expect(refreshedCard.getByText(soNumber)).toBeVisible();
+  await expect(refreshedCard.getByText(/SO belum dibuat/)).toHaveCount(0);
+
+  await expect
+    .poll(async () => {
+      const refreshed = await sales.rpc("crm_won_without_so_backlog", {
+        p_document_ids: [quotation.id],
+      });
+      expect(refreshed.error).toBeNull();
+      return refreshed.data.requestedStates[0]?.status;
+    })
+    .toBe("linked");
+  const backlogAfter = await sales.rpc("crm_won_without_so_backlog");
+  expect(backlogAfter.error).toBeNull();
+  expect(backlogAfter.data.totals.exceptionCount).toBe(
+    backlogBefore.data.totals.exceptionCount - 1,
+  );
+
   expectNoConsoleIssues(consoleIssues);
 });
 
@@ -492,6 +627,88 @@ test("sales can log commercial follow-up that survives reload", async ({
 
   await page.reload();
   await expect(page.getByText(followUpNote)).toBeVisible();
+
+  expectNoConsoleIssues(consoleIssues);
+});
+
+test("quotation Commit transition requires Expected Close and revision confirms it", async ({
+  page,
+}) => {
+  const consoleIssues = collectConsoleIssues(page);
+  const quotationProduct = uniqueToken("E2E expected close quotation");
+  const initialExpectedClose = "2099-12-31";
+  const revisedExpectedClose = "2099-12-30";
+
+  await signIn(page, USERS.sales);
+  await page.goto(`/clients/${NUR_CLIENT_ID}`);
+  await page.getByRole("button", { name: /Add Quotation/ }).click();
+  const quotationDialog = page.getByRole("dialog", { name: "Buat Quotation" });
+  await quotationDialog
+    .getByLabel("Next Action")
+    .fill("Prepare Commit expected close E2E");
+  await quotationDialog.getByLabel("Tanggal Follow-up").fill(tomorrowIsoDate());
+  await quotationDialog
+    .getByLabel("Nama Product item 1")
+    .fill(quotationProduct);
+  await quotationDialog
+    .getByLabel("Description item 1")
+    .fill(`${quotationProduct} detail`);
+  await quotationDialog.getByLabel("Unit Price item 1").fill("444444");
+  await quotationDialog
+    .getByRole("button", { name: "Simpan Quotation" })
+    .click();
+  await expect(page.getByText("Quotation dibuat")).toBeVisible();
+
+  await page.goto("/pipeline");
+  const quotesSentColumn = page
+    .getByTestId("pipeline-column")
+    .filter({ hasText: "Quotes Sent" });
+  await quotesSentColumn
+    .getByTestId("pipeline-card")
+    .filter({ hasText: quotationProduct })
+    .click();
+
+  await page.getByTestId("pipeline-drawer-stage-select").click();
+  await page.getByRole("option", { name: "Commit" }).click();
+  await page.getByRole("button", { name: "Simpan perubahan" }).click();
+  await expect(
+    page.getByText("Expected Close wajib saat masuk Commit"),
+  ).toBeVisible();
+
+  await page.getByLabel("Expected Close").fill(initialExpectedClose);
+  await page.getByRole("button", { name: "Simpan perubahan" }).click();
+  await expect(page.getByText("Pipeline card diperbarui")).toBeVisible();
+
+  await page.goto("/quotations");
+  await page
+    .getByPlaceholder("Cari klien, project, no. dokumen…")
+    .fill(quotationProduct);
+  const quotationRow = page
+    .getByRole("link", { name: /Buka detail/ })
+    .filter({ hasText: quotationProduct });
+  await expect(quotationRow).toBeVisible();
+  await quotationRow.click();
+  await expect(page.locator("#detail-expected-close")).toHaveValue(
+    initialExpectedClose,
+  );
+
+  await page.getByRole("button", { name: "Buat Revisi" }).click();
+  const revisionDialog = page.getByRole("dialog", {
+    name: "Buat Revisi Quotation",
+  });
+  await expect(revisionDialog.getByLabel("Expected Close")).toHaveValue(
+    initialExpectedClose,
+  );
+  await revisionDialog.getByLabel("Expected Close").fill(revisedExpectedClose);
+  await revisionDialog
+    .getByLabel("Next Action")
+    .fill("Follow up revised quotation E2E");
+  await revisionDialog.getByLabel("Tanggal Follow-up").fill(tomorrowIsoDate());
+  await revisionDialog.getByRole("button", { name: "Buat Revisi" }).click();
+  await expect(page.getByText("Revisi Quotation dibuat")).toBeVisible();
+  await expect(page.locator("#detail-expected-close")).toHaveValue(
+    revisedExpectedClose,
+  );
 
   expectNoConsoleIssues(consoleIssues);
 });

@@ -26,6 +26,7 @@ export function toCommercialItem(
     quotationBaseNumber: document.quotationBaseNumber ?? undefined,
     quotationRevision: document.quotationRevision,
     quotationExpiredDate: document.quotationExpiredDate ?? undefined,
+    expectedCloseDate: document.expectedCloseDate ?? undefined,
     clientAddress: document.clientAddress ?? undefined,
     note: document.note ?? undefined,
     lostReason: document.lostReason ?? undefined,

@@ -20,7 +20,7 @@ import {
 } from "@/lib/export-csv";
 
 import { useRole, ROLE_LABEL } from "@/context/role-context-core";
-import { CURRENT_MONTH } from "@/lib/domain";
+import { CURRENT_MONTH, CURRENT_YEAR, NOW, toLocalIsoDate } from "@/lib/domain";
 import {
   monthlyTargetValue,
   taskCounts,
@@ -30,7 +30,13 @@ import { useDashboardData } from "@/hooks/use-dashboard-data";
 import { useEntryState } from "@/hooks/use-entry-state";
 import { getSalesOrdersMetrics } from "@/lib/data/sales-orders-metrics";
 import { getPipelineMetrics } from "@/lib/data/pipeline-metrics";
-import { formatPercentValue, formatRupiahShort } from "@/lib/format";
+import { getForecastSnapshot } from "@/lib/data/forecast-snapshot";
+import { getWonBacklog, wonBacklogQueryKey } from "@/lib/data/won-backlog";
+import {
+  formatDateTime,
+  formatPercentValue,
+  formatRupiahShort,
+} from "@/lib/format";
 
 import { AiSummaryCard } from "@/components/dashboard/AiSummaryCard";
 import {
@@ -46,7 +52,6 @@ import {
 } from "@/components/dashboard/DateRangePicker";
 import { CalendarIncompleteWarning } from "@/components/tasks/CalendarIncompleteWarning";
 import { useState } from "react";
-import { NOW, CURRENT_YEAR } from "@/lib/domain";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -127,9 +132,24 @@ function DashboardPage() {
     queryFn: () => getPipelineMetrics(),
     enabled: authReady,
   });
+  const dashboardForecastQuery = useQuery({
+    queryKey: ["forecast", "dashboard-month", CURRENT_YEAR, CURRENT_MONTH],
+    queryFn: () =>
+      getForecastSnapshot({
+        from: toLocalIsoDate(new Date(CURRENT_YEAR, CURRENT_MONTH - 1, 1)),
+        to: toLocalIsoDate(new Date(CURRENT_YEAR, CURRENT_MONTH, 0)),
+      }),
+    enabled: authReady,
+  });
+  const wonBacklogQuery = useQuery({
+    queryKey: wonBacklogQueryKey(),
+    queryFn: () => getWonBacklog({}, { limit: 5 }),
+    enabled: authReady,
+  });
   const ytdMetrics = ytdMetricsQuery.data;
   const monthMetrics = monthMetricsQuery.data;
   const pipelineMetrics = pipelineMetricsQuery.data;
+  const dashboardForecast = dashboardForecastQuery.data;
 
   // Reporting period (drives the PDF export). Default: Year to date.
   const [period, setPeriod] = useEntryState<PeriodRange>("dashboard.period", {
@@ -260,7 +280,8 @@ function DashboardPage() {
   const metricsLoading =
     ytdMetricsQuery.isLoading ||
     monthMetricsQuery.isLoading ||
-    pipelineMetricsQuery.isLoading;
+    pipelineMetricsQuery.isLoading ||
+    dashboardForecastQuery.isLoading;
 
   // Ordered by how much each number demands action today: overdue work first,
   // reporting figures last.
@@ -517,6 +538,146 @@ function DashboardPage() {
           activeCi={activeCi}
         />
       )}
+
+      <section
+        aria-label="Forecast bulan ini"
+        className="rounded-xl border bg-card p-4"
+        data-forecast-value={dashboardForecast?.forecastValue ?? undefined}
+      >
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <h2 className="text-sm font-semibold">Forecast {monthName}</h2>
+            <p className="text-xs text-muted-foreground">
+              Nilai SO bulan ini + pipeline open bertanggal bulan ini × bobot
+              tahap tetap.
+            </p>
+          </div>
+          {dashboardForecast?.snapshotMode === "current" && (
+            <span className="rounded-full border px-2 py-1 text-[11px] font-medium">
+              Snapshot saat ini · {formatDateTime(dashboardForecast.fetchedAt)}
+            </span>
+          )}
+        </div>
+        {dashboardForecastQuery.isError ? (
+          <p role="alert" className="mt-3 text-sm">
+            Forecast gagal dimuat; nilai belum dapat dipastikan.
+          </p>
+        ) : dashboardForecast?.snapshotMode === "current" &&
+          dashboardForecast.openPipelineValue !== null &&
+          dashboardForecast.forecastValue !== null ? (
+          <div className="mt-3 grid gap-3 sm:grid-cols-3">
+            <div>
+              <p className="text-xs text-muted-foreground">Nilai SO</p>
+              <p className="font-semibold tabular-nums">
+                {formatRupiahShort(dashboardForecast.salesOrderValue)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Pipeline terbobot</p>
+              <p className="font-semibold tabular-nums">
+                {formatRupiahShort(dashboardForecast.openPipelineValue)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Forecast</p>
+              <p className="font-semibold tabular-nums">
+                {formatRupiahShort(dashboardForecast.forecastValue)}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <p role="status" className="mt-3 text-sm text-muted-foreground">
+            Memuat forecast bulan ini…
+          </p>
+        )}
+      </section>
+
+      <section
+        aria-label="Backlog Won tanpa Sales Order"
+        className="rounded-xl border bg-card p-4"
+        data-won-backlog-count={
+          wonBacklogQuery.data?.totals.exceptionCount ?? undefined
+        }
+      >
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <h2 className="text-sm font-semibold">Backlog Won tanpa SO</h2>
+            <p className="text-xs text-muted-foreground">
+              Closed Won yang belum memiliki SO aktif. Nilai ini tidak masuk ke
+              forecast.
+            </p>
+          </div>
+          {wonBacklogQuery.data && (
+            <span className="rounded-full border px-2 py-1 text-[11px] font-medium">
+              Snapshot saat ini ·{" "}
+              {formatDateTime(wonBacklogQuery.data.fetchedAt)}
+            </span>
+          )}
+        </div>
+        {wonBacklogQuery.isError ? (
+          <p role="alert" className="mt-3 text-sm">
+            Backlog gagal dimuat; jumlah Won tanpa SO belum dapat dipastikan.
+          </p>
+        ) : wonBacklogQuery.isPending ? (
+          <p role="status" className="mt-3 text-sm text-muted-foreground">
+            Memuat backlog Won tanpa SO…
+          </p>
+        ) : wonBacklogQuery.data ? (
+          <div className="mt-3 space-y-3">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div>
+                <p className="text-xs text-muted-foreground">Total exception</p>
+                <p className="font-semibold tabular-nums">
+                  {wonBacklogQuery.data.totals.exceptionCount} ·{" "}
+                  {formatRupiahShort(
+                    wonBacklogQuery.data.totals.exceptionValue,
+                  )}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Belum ada link</p>
+                <p className="font-semibold tabular-nums">
+                  {wonBacklogQuery.data.totals.missingCount} ·{" "}
+                  {formatRupiahShort(wonBacklogQuery.data.totals.missingValue)}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Link SO dihapus</p>
+                <p className="font-semibold tabular-nums">
+                  {wonBacklogQuery.data.totals.deletedLinkCount} ·{" "}
+                  {formatRupiahShort(
+                    wonBacklogQuery.data.totals.deletedLinkValue,
+                  )}
+                </p>
+              </div>
+            </div>
+            {wonBacklogQuery.data.items.length > 0 && (
+              <ul className="divide-y rounded-lg border">
+                {wonBacklogQuery.data.items.map((item) => (
+                  <li
+                    key={item.documentId}
+                    className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm"
+                  >
+                    <span>
+                      <span className="font-medium">
+                        {item.quotationNumber ?? "Quotation"}
+                      </span>{" "}
+                      <span className="text-muted-foreground">
+                        · {item.clientName}
+                      </span>
+                    </span>
+                    <span className="text-xs font-medium">
+                      {item.status === "deleted_link"
+                        ? "Review SO dihapus"
+                        : "Buat atau link SO"}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        ) : null}
+      </section>
 
       {/* Caveat on the figures above, so it sits with them rather than
           outranking them at the top of the page. */}

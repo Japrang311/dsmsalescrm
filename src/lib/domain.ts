@@ -93,6 +93,7 @@ export type CommercialItem = {
   quotationBaseNumber?: string;
   quotationRevision?: number;
   quotationExpiredDate?: string;
+  expectedCloseDate?: string;
   clientAddress?: string;
   note?: string;
   lostReason?: QuotationLostReason;

@@ -26,6 +26,13 @@ test("Reports export uses the same exact scoped snapshot shown by Reports", asyn
       /Nilai order berbayar yang tercatat, bukan konfirmasi pembayaran diterima/,
     ),
   ).toBeVisible();
+  const forecastSection = page.getByRole("region", {
+    name: "Forecast Nilai SO",
+  });
+  await expect(forecastSection.getByText("Snapshot saat ini")).toBeVisible();
+  await expect(
+    forecastSection.getByText(/Bobot tahap adalah asumsi tetap/),
+  ).toBeVisible();
 
   const exportButton = page.getByRole("button", { name: "Export" });
   await expect(exportButton).toBeEnabled({ timeout: 30_000 });
@@ -57,8 +64,52 @@ test("Reports export uses the same exact scoped snapshot shown by Reports", asyn
   });
   expect(error).toBeNull();
   expect(valueFor("Nilai SO exact")).toBe(data.total);
+  const { data: forecast, error: forecastError } = await manager.rpc(
+    "crm_forecast_snapshot",
+    {
+      p_from: valueFor("Periode dari"),
+      p_to: valueFor("Periode sampai"),
+      p_owner_id: null,
+      p_client_id: null,
+      p_limit: 100,
+      p_offset: 0,
+    },
+  );
+  expect(forecastError).toBeNull();
+  expect(valueFor("Forecast mode")).toBe("current");
+  expect(valueFor("Pipeline terbobot exact")).toBe(forecast.openPipelineValue);
+  expect(valueFor("Forecast exact")).toBe(forecast.forecastValue);
+  await expect(forecastSection).toHaveAttribute(
+    "data-forecast-value",
+    String(forecast.forecastValue),
+  );
   await expect(
     page.getByText(String(valueFor("Snapshot")), { exact: false }),
+  ).toBeVisible();
+
+  const pdfDownloadPromise = page.waitForEvent("download");
+  await exportButton.click();
+  await page.getByRole("menuitem", { name: "PDF" }).click();
+  const pdfDownload = await pdfDownloadPromise;
+  const pdfPath = await pdfDownload.path();
+  expect(pdfPath).toBeTruthy();
+  expect((await readFile(pdfPath!)).subarray(0, 5).toString()).toBe("%PDF-");
+
+  await page.getByRole("button", { name: /Periode laporan/ }).click();
+  await page.getByRole("button", { name: "Bulan lalu" }).click();
+  await expect(
+    forecastSection.getByText(/Forecast historis tidak tersedia/),
+  ).toBeVisible();
+  await expect(forecastSection.getByText("Snapshot saat ini")).toHaveCount(0);
+
+  await page.goto("/dashboard");
+  const dashboardForecast = page.getByRole("region", {
+    name: "Forecast bulan ini",
+  });
+  await expect(dashboardForecast.getByText(/Snapshot saat ini/)).toBeVisible();
+  await expect(dashboardForecast.getByText("Pipeline terbobot")).toBeVisible();
+  await expect(
+    dashboardForecast.getByText("Forecast", { exact: true }),
   ).toBeVisible();
 
   expectNoConsoleIssues(consoleIssues);

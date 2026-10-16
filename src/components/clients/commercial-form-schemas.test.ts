@@ -56,6 +56,30 @@ describe("Phase 11 commercial form schemas", () => {
     ).toBe(false);
   });
 
+  test("Quotation requires Expected Close only when entering Commit", () => {
+    const base = {
+      documentDate: "2026-07-19",
+      note: "",
+      lineItems: [paidItem],
+      nextAction: "Follow up",
+      nextActionDate: "2026-07-26",
+    };
+
+    expect(
+      quotationSchema.safeParse({ ...base, stage: "Hot Prospect" }).success,
+    ).toBe(true);
+    expect(
+      quotationSchema.safeParse({ ...base, stage: "Commit" }).success,
+    ).toBe(false);
+    expect(
+      quotationSchema.safeParse({
+        ...base,
+        stage: "Commit",
+        expectedCloseDate: "2026-08-15",
+      }).success,
+    ).toBe(true);
+  });
+
   test("paid SO requires customer PO and positive item prices", () => {
     const schema = buildSalesOrderSchema(false);
     expect(

@@ -22,6 +22,7 @@ import {
 } from "@/lib/data/commercial-items";
 import {
   deleteCommercialDocument,
+  setQuotationExpectedCloseDate,
   updateCommercialDocumentLineItem,
   transitionCommercialStage,
 } from "@/lib/data/commercial-documents";
@@ -160,6 +161,9 @@ export function CommercialDetailPage({
   const [quotationExpiredDate, setQuotationExpiredDate] = useState(
     item?.quotationExpiredDate ?? "",
   );
+  const [expectedCloseDate, setExpectedCloseDate] = useState(
+    item?.expectedCloseDate ?? "",
+  );
   const [note, setNote] = useState(item?.note ?? "");
   const [lineEdits, setLineEdits] = useState<Record<string, LineItemEdit>>({});
   const [priceReasonType, setPriceReasonType] = useState<string>("");
@@ -190,6 +194,7 @@ export function CommercialDetailPage({
     setQuotationNumber(item.quotationNumber ?? "");
     setQuotationDate(item.documentDate ?? "");
     setQuotationExpiredDate(item.quotationExpiredDate ?? "");
+    setExpectedCloseDate(item.expectedCloseDate ?? "");
     setNote(item.note ?? "");
     setLineEdits(
       Object.fromEntries(
@@ -302,7 +307,11 @@ export function CommercialDetailPage({
     const normalizedQuotation = quotationNumber.trim();
     const normalizedQuotationDate = quotationDate.trim();
     const normalizedExpiredDate = quotationExpiredDate.trim();
+    const normalizedExpectedCloseDate = expectedCloseDate.trim();
     const normalizedNote = note.trim();
+    const expectedCloseChanged =
+      item.type === "Quotation" &&
+      normalizedExpectedCloseDate !== (item.expectedCloseDate ?? "");
     const reasonPatch = activeLostReasonPatch({
       type: item.type,
       stage,
@@ -408,8 +417,16 @@ export function CommercialDetailPage({
       }
     }
 
-    if (!stageChanged && changes.length === 0) {
+    if (!stageChanged && changes.length === 0 && !expectedCloseChanged) {
       toast.info("Tidak ada perubahan");
+      return;
+    }
+    if (
+      item.type === "Quotation" &&
+      stage === "Commit" &&
+      !normalizedExpectedCloseDate
+    ) {
+      toast.error("Expected Close wajib saat masuk Commit");
       return;
     }
     if (hasPriceChanges && !priceReasonType) {
@@ -452,6 +469,15 @@ export function CommercialDetailPage({
     }
 
     try {
+      if (expectedCloseChanged) {
+        await setQuotationExpectedCloseDate({
+          documentId: item.id,
+          expectedUpdatedAt: item.updatedAt,
+          requestId: crypto.randomUUID(),
+          expectedCloseDate: normalizedExpectedCloseDate || null,
+          reason: "Updated from commercial detail",
+        });
+      }
       if (stageChanged) {
         const command = buildExplicitFollowUpCommand(
           taskMode === "existing_task"
@@ -584,7 +610,7 @@ export function CommercialDetailPage({
       toast.success("Perubahan tersimpan", {
         description: stageChanged
           ? `Stage → ${stage}${changes.length > 0 ? ` · ${changes.length} field lain` : ""}`
-          : `${changes.length} field diperbarui`,
+          : `${changes.length + (expectedCloseChanged ? 1 : 0)} field diperbarui`,
       });
     } catch (error) {
       toast.error("Gagal menyimpan perubahan", {
@@ -662,6 +688,8 @@ export function CommercialDetailPage({
           setQuotationDate={setQuotationDate}
           quotationExpiredDate={quotationExpiredDate}
           setQuotationExpiredDate={setQuotationExpiredDate}
+          expectedCloseDate={expectedCloseDate}
+          setExpectedCloseDate={setExpectedCloseDate}
           quotationNumber={quotationNumber}
           setQuotationNumber={setQuotationNumber}
           note={note}

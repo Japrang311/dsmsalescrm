@@ -238,6 +238,7 @@ export function exportExecutiveReportXlsx(
   const wb = XLSX.utils.book_new();
 
   const snapshot = context.reportSnapshot;
+  const forecast = snapshot?.forecast;
   const comparable = snapshot?.context.targetComparable ?? true;
   if (snapshot)
     XLSX.utils.book_append_sheet(
@@ -255,9 +256,66 @@ export function exportExecutiveReportXlsx(
         ["Target comparable", comparable ? "Ya" : "Tidak"],
         ["Alasan target", snapshot.targetReason ?? "—"],
         ["Nilai SO exact", snapshot.metrics.total],
+        [
+          "Forecast mode",
+          forecast?.snapshotMode ??
+            (snapshot.forecastUnavailableReason ? "unavailable" : "not_loaded"),
+        ],
+        ["Forecast as of", forecast?.asOfDate ?? "—"],
+        ["Forecast snapshot", forecast?.fetchedAt ?? "—"],
+        ["Pipeline terbobot exact", forecast?.openPipelineValue ?? null],
+        ["Forecast exact", forecast?.forecastValue ?? null],
+        ["Forecast drilldown rows exported", forecast?.items.length ?? 0],
+        ["Forecast drilldown total", forecast?.page.totalCount ?? 0],
+        [
+          "Forecast unavailable reason",
+          snapshot.forecastUnavailableReason ?? "—",
+        ],
       ]),
       "Metadata",
     );
+
+  const forecastRows =
+    forecast?.snapshotMode === "current"
+      ? forecast.items.map((item) => ({
+          quotation: item.quotationNumber,
+          client: item.clientName,
+          owner: item.ownerName,
+          stage: item.stage,
+          expectedCloseDate: item.expectedCloseDate ?? "",
+          bucket: item.bucket,
+          totalValue: item.totalValue,
+          weight: item.weight,
+          weightedValue: item.weightedValue,
+          contributes: item.contributes ? "Ya" : "Tidak",
+        }))
+      : [];
+  if (forecast?.snapshotMode === "current") {
+    XLSX.utils.book_append_sheet(
+      wb,
+      buildSheet(
+        [
+          { header: "Quotation", key: "quotation", width: 22 },
+          { header: "Client", key: "client", width: 28 },
+          { header: "Owner", key: "owner", width: 22 },
+          { header: "Stage", key: "stage", width: 20 },
+          { header: "Expected Close", key: "expectedCloseDate", width: 16 },
+          { header: "Bucket", key: "bucket", width: 14 },
+          { header: "Nilai", key: "totalValue", type: "idr", width: 18 },
+          { header: "Bobot", key: "weight", type: "pct", width: 12 },
+          {
+            header: "Nilai Terbobot",
+            key: "weightedValue",
+            type: "idr",
+            width: 18,
+          },
+          { header: "Masuk Forecast", key: "contributes", width: 16 },
+        ],
+        forecastRows,
+      ),
+      "Forecast Drilldown",
+    );
+  }
 
   const summaryRows = [
     {
@@ -448,6 +506,7 @@ export function exportExecutiveReportXlsx(
     salesRows.length +
     topCustomerRows.length +
     followUpRows.length +
+    forecastRows.length +
     stage4RowCount
   );
 }

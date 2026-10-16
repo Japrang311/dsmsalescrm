@@ -20,7 +20,7 @@ import {
   riskAlerts,
   taskCounts,
 } from "@/lib/data/dashboard-selectors";
-import { forecastValue } from "@/lib/data/commercial-stages";
+import { getForecastSnapshot } from "@/lib/data/forecast-snapshot";
 import { useDashboardData } from "@/hooks/use-dashboard-data";
 import { useEntryState } from "@/hooks/use-entry-state";
 import {
@@ -163,6 +163,28 @@ function ReportsPage() {
   // filter bar still narrows KPI totals above (date-range-aware), but the
   // trend/top-customers RPCs use the range's end year as a whole.
   const scope = metricScope(filters);
+  const forecastUnavailableReason =
+    scope.taxType || scope.soType || scope.source
+      ? "Forecast tidak tersedia untuk filter Pajak, Tipe SO, atau Source karena quotation tidak memiliki dimensi yang sebanding."
+      : undefined;
+  const forecastQuery = useQuery({
+    queryKey: [
+      "forecast",
+      "reports",
+      scope.from,
+      scope.to,
+      scope.ownerId,
+      scope.clientId,
+    ],
+    queryFn: () =>
+      getForecastSnapshot({
+        from: scope.from,
+        to: scope.to,
+        ownerId: scope.ownerId,
+        clientId: scope.clientId,
+      }),
+    enabled: authReady && !forecastUnavailableReason,
+  });
   const periodTargetsQuery = useQuery({
     queryKey: ["targets", "reports-period", scope.from, scope.to],
     queryFn: () => listPeriodTargets(scope),
@@ -267,22 +289,6 @@ function ReportsPage() {
     ],
     [totals],
   );
-
-  // Forecast: achievement + weighted pipeline value per the seven weighted
-  // stages (PRD §7) — Closed Won is already realized revenue counted in
-  // `totals.revenue`, Closed Lost contributes nothing.
-  const forecast = useMemo(() => {
-    const pipeline = commercial.reduce((s, ci) => {
-      if (ci.stage === "Closed Won" || ci.stage === "Closed Lost") return s;
-      return s + (forecastValue(ci.estimatedValue, ci.stage) ?? 0);
-    }, 0);
-    return {
-      achievement: totals.revenue,
-      pipeline,
-      total: totals.revenue + pipeline,
-      target: yearTargetTotal,
-    };
-  }, [commercial, totals.revenue, yearTargetTotal]);
 
   const funnel = useMemo(() => quotationFunnel(allItems), [allItems]);
   const openQuotationValue = useMemo(
@@ -424,6 +430,8 @@ function ReportsPage() {
             metrics: metricsQuery.data,
             target: yearTargetTotal,
             targetReason: comparison.reason,
+            forecast: forecastQuery.data,
+            forecastUnavailableReason,
             trend: monthlyTrend.map((row) => ({
               ...row,
               achievement: row.target > 0 ? row.revenue / row.target : 0,
@@ -455,6 +463,8 @@ function ReportsPage() {
       comparison.comparable,
       comparison.reason,
       yearTargetTotal,
+      forecastQuery.data,
+      forecastUnavailableReason,
       monthlyTrend,
       salesPerf,
     ],
@@ -570,7 +580,11 @@ function ReportsPage() {
       stageFunnelQuery,
       stageDwellQuery,
       analyticsCoverageQuery,
-    ].every((query) => query.isSuccess && !query.isFetching) && !hasError;
+    ].every((query) => query.isSuccess && !query.isFetching) &&
+    (forecastUnavailableReason
+      ? true
+      : forecastQuery.isSuccess && !forecastQuery.isFetching) &&
+    !hasError;
 
   return (
     <PageContainer>
@@ -675,7 +689,12 @@ function ReportsPage() {
         <ReportsForecastSection
           totalRevenue={totals.revenue}
           sourceBreakdown={sourceBreakdown}
-          forecast={forecast}
+          snapshot={forecastQuery.data}
+          target={yearTargetTotal}
+          targetComparable={comparison.comparable}
+          unavailableReason={forecastUnavailableReason}
+          isLoading={forecastQuery.isLoading}
+          isError={forecastQuery.isError}
         />
       </Suspense>
 

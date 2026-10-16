@@ -46,7 +46,10 @@ import {
 } from "@/lib/domain";
 import { updateClientStatus } from "@/lib/data/clients";
 import { describeCommercialItemChanges } from "@/lib/data/commercial-items";
-import { transitionCommercialStage } from "@/lib/data/commercial-documents";
+import {
+  setQuotationExpectedCloseDate,
+  transitionCommercialStage,
+} from "@/lib/data/commercial-documents";
 import {
   linkSalesOrderToQuotation,
   listSalesOrders,
@@ -116,6 +119,7 @@ const FIELD_LABEL: Record<string, string> = {
   ownerId: "Owner",
   lostReason: "Alasan closed lost",
   lostReasonDetail: "Detail alasan",
+  expectedCloseDate: "Expected Close",
 };
 
 export function PipelineCardDrawer({
@@ -181,6 +185,9 @@ export function PipelineCardDrawer({
   const [stage, setStage] = useState(currentStage);
   const [nextDate, setNextDate] = useState(currentNext ?? "");
   const [nextAction, setNextAction] = useState("");
+  const [expectedCloseDate, setExpectedCloseDate] = useState(
+    item?.expectedCloseDate ?? "",
+  );
   const [taskMode, setTaskMode] = useState<"existing_task" | "create_task">(
     "create_task",
   );
@@ -202,6 +209,7 @@ export function PipelineCardDrawer({
     setStage(currentStage);
     setNextDate(currentNext ?? "");
     setNextAction(`Follow-up stage ${currentStage}`);
+    setExpectedCloseDate(item.expectedCloseDate ?? "");
     const activeTasks = activeCommercialTasks(tasks, item.id);
     setTaskMode(activeTasks.length > 0 ? "existing_task" : "create_task");
     setTaskId(activeTasks[0]?.id ?? "");
@@ -294,6 +302,7 @@ export function PipelineCardDrawer({
 
   const dirty =
     stage !== currentStage ||
+    expectedCloseDate !== (item.expectedCloseDate ?? "") ||
     (nextDate || "") !== (currentNext ?? "") ||
     (isLostReasonTracked(item.type, stage) &&
       ((lostReason || null) !== (item.lostReason ?? null) ||
@@ -323,6 +332,19 @@ export function PipelineCardDrawer({
     const changes: { field: string; from?: string; to?: string }[] = [];
     if (stage !== currentStage)
       changes.push({ field: "stage", from: currentStage, to: stage });
+    const expectedCloseChanged =
+      expectedCloseDate !== (item.expectedCloseDate ?? "");
+    if (expectedCloseChanged) {
+      changes.push({
+        field: "expectedCloseDate",
+        from: item.expectedCloseDate,
+        to: expectedCloseDate || undefined,
+      });
+    }
+    if (item.type === "Quotation" && stage === "Commit" && !expectedCloseDate) {
+      toast.error("Expected Close wajib saat masuk Commit");
+      return;
+    }
     const lostReasonError = validateQuotationLostReason({
       type: item.type,
       stage,
@@ -360,6 +382,22 @@ export function PipelineCardDrawer({
 
     if (changes.length === 0) return;
     try {
+      if (item.type === "Quotation" && expectedCloseChanged) {
+        await setQuotationExpectedCloseDate({
+          documentId: item.id,
+          expectedUpdatedAt: item.updatedAt,
+          requestId: crypto.randomUUID(),
+          expectedCloseDate: expectedCloseDate || null,
+          reason: "Updated from Pipeline card drawer",
+        });
+      }
+      if (changes.length === 1 && expectedCloseChanged) {
+        await invalidateCommercialStageQueries(queryClient);
+        toast.success("Pipeline card diperbarui", {
+          description: FIELD_LABEL.expectedCloseDate,
+        });
+        return;
+      }
       if (!nd) {
         throw new Error("Tanggal next action wajib untuk progress Task");
       }
@@ -532,6 +570,25 @@ export function PipelineCardDrawer({
               </div>
             </div>
 
+            {item.type === "Quotation" && (
+              <div className="flex flex-col gap-1 sm:col-span-2">
+                <Label htmlFor="drawer-expected-close" className="text-[11px]">
+                  Expected Close{stage === "Commit" ? " *" : ""}
+                </Label>
+                <Input
+                  id="drawer-expected-close"
+                  type="date"
+                  value={expectedCloseDate}
+                  disabled={!canEdit}
+                  onChange={(event) => setExpectedCloseDate(event.target.value)}
+                  className="h-8 text-xs"
+                />
+                <p className="text-[10px] text-muted-foreground">
+                  Perkiraan PO/closing; bukan expiry atau next action date.
+                </p>
+              </div>
+            )}
+
             <div className="flex flex-col gap-1 sm:col-span-2">
               <Label className="text-[11px]">Next action date</Label>
               <Input
@@ -632,6 +689,7 @@ export function PipelineCardDrawer({
                 onClick={() => {
                   setStage(currentStage);
                   setNextDate(currentNext ?? "");
+                  setExpectedCloseDate(item.expectedCloseDate ?? "");
                   setLostReason(item.lostReason ?? "");
                   setLostReasonDetail(item.lostReasonDetail ?? "");
                   setLostReasonDialogOpen(false);

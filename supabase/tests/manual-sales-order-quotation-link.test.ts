@@ -46,6 +46,7 @@ async function createQuotation(input: {
       quotation_number: number,
       quotation_base_number: number,
       stage: input.stage ?? "Closed Won",
+      expected_close_date: input.stage === "Commit" ? "2098-10-31" : null,
       is_current_revision: input.current ?? true,
       deleted_at: input.deleted ? new Date().toISOString() : null,
       deleted_by: input.deleted ? input.ownerId : null,

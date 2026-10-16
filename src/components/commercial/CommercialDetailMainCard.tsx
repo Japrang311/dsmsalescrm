@@ -64,6 +64,8 @@ export function CommercialDetailMainCard({
   setQuotationDate,
   quotationExpiredDate,
   setQuotationExpiredDate,
+  expectedCloseDate,
+  setExpectedCloseDate,
   quotationNumber,
   setQuotationNumber,
   note,
@@ -110,6 +112,8 @@ export function CommercialDetailMainCard({
   setQuotationDate: (value: string) => void;
   quotationExpiredDate: string;
   setQuotationExpiredDate: (value: string) => void;
+  expectedCloseDate: string;
+  setExpectedCloseDate: (value: string) => void;
   quotationNumber: string;
   setQuotationNumber: (value: string) => void;
   note: string;
@@ -264,6 +268,35 @@ export function CommercialDetailMainCard({
                 <span className="text-sm">
                   {item.quotationExpiredDate
                     ? formatDateShort(item.quotationExpiredDate)
+                    : "—"}
+                </span>
+              )}
+            </InfoCell>
+          )}
+          {item.type === "Quotation" && (
+            <InfoCell
+              icon={<Calendar className="h-3.5 w-3.5" />}
+              label={stage === "Commit" ? "Expected Close *" : "Expected Close"}
+            >
+              {canEdit ? (
+                <div className="grid gap-1">
+                  <Input
+                    id="detail-expected-close"
+                    type="date"
+                    value={expectedCloseDate}
+                    onChange={(event) =>
+                      setExpectedCloseDate(event.target.value)
+                    }
+                    className="h-8 text-xs"
+                  />
+                  <span className="text-[10px] text-muted-foreground">
+                    Perkiraan PO/closing, bukan expiry.
+                  </span>
+                </div>
+              ) : (
+                <span className="text-sm">
+                  {item.expectedCloseDate
+                    ? formatDateShort(item.expectedCloseDate)
                     : "—"}
                 </span>
               )}

@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { ArrowRight } from "lucide-react";
 import {
   Dialog,
@@ -27,6 +29,9 @@ import {
 } from "@/lib/domain";
 import { activeCommercialTasks } from "@/lib/data/task-relations";
 import { QUOTATION_LOST_REASONS } from "@/lib/data/quotation-lost-reasons";
+import { setQuotationExpectedCloseDate } from "@/lib/data/commercial-documents";
+import { invalidateCommercialStageQueries } from "@/lib/query-invalidation";
+import { getErrorMessage } from "@/lib/utils";
 
 function addDaysISO(base: string | Date, days: number): string {
   const d = new Date(base);
@@ -85,6 +90,49 @@ export function PipelineStageMoveDialog({
   onCancel,
   onConfirm,
 }: Props) {
+  const queryClient = useQueryClient();
+  const [expectedCloseDate, setExpectedCloseDate] = useState("");
+  const [expectedCloseError, setExpectedCloseError] = useState("");
+  const [savingExpectedClose, setSavingExpectedClose] = useState(false);
+  const requiresExpectedClose =
+    pendingMove?.toStage === "Commit" && pendingMoveItem?.type === "Quotation";
+
+  useEffect(() => {
+    setExpectedCloseDate(pendingMoveItem?.expectedCloseDate ?? "");
+    setExpectedCloseError("");
+  }, [pendingMove?.itemId, pendingMoveItem?.expectedCloseDate]);
+
+  async function handleConfirm() {
+    if (!pendingMove || !pendingMoveItem) return;
+    if (requiresExpectedClose && !expectedCloseDate) {
+      setExpectedCloseError("Expected Close wajib saat masuk Commit");
+      return;
+    }
+
+    setExpectedCloseError("");
+    setSavingExpectedClose(true);
+    try {
+      if (
+        pendingMoveItem.type === "Quotation" &&
+        expectedCloseDate !== (pendingMoveItem.expectedCloseDate ?? "")
+      ) {
+        await setQuotationExpectedCloseDate({
+          documentId: pendingMoveItem.id,
+          expectedUpdatedAt: pendingMoveItem.updatedAt,
+          requestId: crypto.randomUUID(),
+          expectedCloseDate: expectedCloseDate || null,
+          reason: "Set during Pipeline stage transition",
+        });
+        await invalidateCommercialStageQueries(queryClient);
+      }
+      onConfirm();
+    } catch (error) {
+      setExpectedCloseError(getErrorMessage(error));
+    } finally {
+      setSavingExpectedClose(false);
+    }
+  }
+
   return (
     <Dialog open={pendingMove !== null} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
@@ -123,6 +171,32 @@ export function PipelineStageMoveDialog({
                 placeholder="cth. Kirim revisi quotation"
               />
             </div>
+            {pendingMoveItem?.type === "Quotation" && (
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="pipeline-expected-close" className="text-xs">
+                  Expected Close{requiresExpectedClose ? " *" : ""}
+                </Label>
+                <Input
+                  id="pipeline-expected-close"
+                  type="date"
+                  value={expectedCloseDate}
+                  onChange={(event) => {
+                    setExpectedCloseDate(event.target.value);
+                    setExpectedCloseError("");
+                  }}
+                  aria-invalid={Boolean(expectedCloseError)}
+                  className="h-9 text-sm"
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Perkiraan tanggal PO/closing, terpisah dari next action date.
+                </p>
+                {expectedCloseError && (
+                  <p className="text-xs text-destructive" role="alert">
+                    {expectedCloseError}
+                  </p>
+                )}
+              </div>
+            )}
 
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="next-action-date" className="text-xs">
@@ -251,7 +325,12 @@ export function PipelineStageMoveDialog({
           <Button variant="ghost" onClick={onCancel}>
             Batal
           </Button>
-          <Button onClick={onConfirm}>Konfirmasi</Button>
+          <Button
+            onClick={() => void handleConfirm()}
+            disabled={savingExpectedClose}
+          >
+            {savingExpectedClose ? "Menyimpan..." : "Konfirmasi"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

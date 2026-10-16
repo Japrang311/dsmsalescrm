@@ -15,6 +15,7 @@ import {
   listCommercialDocuments,
   listCommercialDocumentsPage,
   reviseQuotation,
+  setQuotationExpectedCloseDate,
   transitionCommercialStage,
   updateCommercialDocument,
 } from "./commercial-documents";
@@ -136,7 +137,8 @@ describe("normalized commercial document adapter", () => {
       clientId,
       documentDate: "2095-01-15",
       clientAddress: "Plant A",
-      stage: "Quotes Sent",
+      stage: "Commit",
+      expectedCloseDate: "2095-02-15",
       note: "Adapter base",
       items: [
         {
@@ -152,11 +154,13 @@ describe("normalized commercial document adapter", () => {
     });
     expect(created.quotationNumber).toMatch(/^DSM-95QUO-\d{4}$/);
     expect(created.items[0]?.lineTotal).toBe(10000);
+    expect(created.expectedCloseDate).toBe("2095-02-15");
 
     const revised = await reviseQuotation(created.id, {
       documentDate: "2095-01-16",
       clientAddress: "Plant B",
       note: "Adapter rev",
+      expectedCloseDate: "2095-02-20",
       items: [
         {
           productName: "Bracket Rev",
@@ -171,6 +175,7 @@ describe("normalized commercial document adapter", () => {
     expect(revised.quotationNumber).toBe(`${created.quotationNumber}_REV.1`);
     expect(revised.supersedesDocumentId).toBe(created.id);
     expect(revised.isCurrentRevision).toBe(true);
+    expect(revised.expectedCloseDate).toBe("2095-02-20");
     await expect(deleteCommercialDocument(created.id)).rejects.toThrow(
       "Quotation ini tidak dapat dihapus karena sudah memiliki revisi yang lebih baru.",
     );
@@ -315,6 +320,60 @@ describe("normalized commercial document adapter", () => {
 
     const updated = await getCommercialDocument(created.id);
     expect(updated?.stage).toBe("Hot Prospect");
+    await supabase.auth.signOut();
+  });
+
+  test("setQuotationExpectedCloseDate() maps the versioned command and result", async () => {
+    const authClient = await signInAs(fixtures.sales);
+    const session = (await authClient.auth.getSession()).data.session!;
+    await supabase.auth.setSession({
+      access_token: session.access_token,
+      refresh_token: session.refresh_token,
+    });
+
+    const created = await createQuotation({
+      clientId,
+      documentDate: "2095-04-11",
+      stage: "Hot Prospect",
+      items: [
+        {
+          productName: "Expected close adapter item",
+          qty: 1,
+          uom: "Unit",
+          unitPrice: 35_000,
+        },
+      ],
+      nextAction: "Confirm expected PO date",
+      nextActionDate: "2095-04-12",
+    });
+
+    const result = await setQuotationExpectedCloseDate({
+      documentId: created.id,
+      expectedUpdatedAt: created.updatedAt,
+      requestId: crypto.randomUUID(),
+      expectedCloseDate: "2095-05-15",
+      reason: "Procurement schedule confirmed",
+    });
+
+    expect(result.document.id).toBe(created.id);
+    expect(result.document.expectedCloseDate).toBe("2095-05-15");
+    expect(result.document.updatedAt).not.toBe(created.updatedAt);
+    expect(result.eventId).toBeTruthy();
+
+    const revised = await reviseQuotation(created.id, {
+      documentDate: "2095-04-12",
+      items: [
+        {
+          productName: "Expected close revision item",
+          qty: 1,
+          uom: "Unit",
+          unitPrice: 36_000,
+        },
+      ],
+      nextAction: "Confirm revised quotation",
+      nextActionDate: "2095-04-13",
+    });
+    expect(revised.expectedCloseDate).toBe("2095-05-15");
     await supabase.auth.signOut();
   });
 

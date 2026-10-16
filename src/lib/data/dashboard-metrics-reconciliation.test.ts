@@ -127,6 +127,7 @@ beforeAll(async () => {
       quotation_number: `QUO-RECON-${crypto.randomUUID()}`,
       quotation_base_number: `QUO-RECON-${crypto.randomUUID()}`,
       stage: "Commit",
+      expected_close_date: isoDate(NOW),
       is_current_revision: true,
     })
     .select("id")

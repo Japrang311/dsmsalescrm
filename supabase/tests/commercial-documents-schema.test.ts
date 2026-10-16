@@ -84,6 +84,7 @@ const EXPECTED_TABLES: Record<string, ExpectedTable> = {
       supersedes_document_id: { dataType: "uuid", nullable: true },
       source_rfq_document_id: { dataType: "uuid", nullable: true },
       quotation_expired_date: { dataType: "date", nullable: true },
+      expected_close_date: { dataType: "date", nullable: true },
       stage: { dataType: "text", nullable: false },
       client_address: { dataType: "text", nullable: true },
       so_number: { dataType: "text", nullable: true },

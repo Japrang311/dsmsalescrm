@@ -30,21 +30,32 @@ const paidLineItemsSchema = z
     });
   });
 
-export const quotationSchema = z.object({
-  documentDate: z.string().min(10, "Date wajib diisi"),
-  stage: z.enum([
-    "Quotes Sent",
-    "Negotiation",
-    "Hot Prospect",
-    "Commit",
-    "Closed Won",
-    "Closed Lost",
-  ]),
-  note: z.string().trim().max(1000).optional(),
-  lineItems: paidLineItemsSchema,
-  nextAction: z.string().trim().min(1, "Next Action wajib diisi").max(500),
-  nextActionDate: z.string().min(10, "Tanggal Follow-up wajib diisi"),
-});
+export const quotationSchema = z
+  .object({
+    documentDate: z.string().min(10, "Date wajib diisi"),
+    expectedCloseDate: z.string().optional(),
+    stage: z.enum([
+      "Quotes Sent",
+      "Negotiation",
+      "Hot Prospect",
+      "Commit",
+      "Closed Won",
+      "Closed Lost",
+    ]),
+    note: z.string().trim().max(1000).optional(),
+    lineItems: paidLineItemsSchema,
+    nextAction: z.string().trim().min(1, "Next Action wajib diisi").max(500),
+    nextActionDate: z.string().min(10, "Tanggal Follow-up wajib diisi"),
+  })
+  .superRefine((value, context) => {
+    if (value.stage === "Commit" && !value.expectedCloseDate) {
+      context.addIssue({
+        code: "custom",
+        path: ["expectedCloseDate"],
+        message: "Expected Close wajib saat masuk Commit",
+      });
+    }
+  });
 
 export const prototypeRequestSchema = z.object({
   documentDate: z.string().min(10, "Date wajib diisi"),

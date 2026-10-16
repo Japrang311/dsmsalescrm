@@ -131,6 +131,7 @@ export function CreateQuotationDialog(props: SharedProps) {
     resolver: zodResolver(quotationSchema),
     defaultValues: {
       documentDate: todayIso(),
+      expectedCloseDate: "",
       stage: "Quotes Sent",
       note: "",
       lineItems: [emptyLineItem],
@@ -151,6 +152,7 @@ export function CreateQuotationDialog(props: SharedProps) {
         clientId,
         documentDate: v.documentDate,
         stage: v.stage,
+        expectedCloseDate: v.expectedCloseDate || undefined,
         note: v.note,
         items: v.lineItems,
         nextAction: v.nextAction,
@@ -223,6 +225,18 @@ export function CreateQuotationDialog(props: SharedProps) {
                 options={[...WEIGHTED_STAGES]}
               />
             </div>
+            <div className="rounded-md border bg-muted/20 p-3">
+              <FieldText
+                label="Expected Close"
+                type="date"
+                reg={form.register("expectedCloseDate")}
+                error={msg(form.formState.errors, "expectedCloseDate")}
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                Ekspektasi PO/closing; berbeda dari tanggal expired dan tanggal
+                follow-up. Wajib saat stage Commit.
+              </p>
+            </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <FieldText
                 label="Next Action"
@@ -287,6 +301,7 @@ export function ReviseQuotationDialog({
     resolver: zodResolver(quotationSchema),
     defaultValues: {
       documentDate: todayIso(),
+      expectedCloseDate: document.expectedCloseDate ?? "",
       stage: "Quotes Sent",
       note: document.note ?? "",
       lineItems:
@@ -313,6 +328,7 @@ export function ReviseQuotationDialog({
       const revised = await reviseQuotation(document.id, {
         documentDate: value.documentDate,
         note: value.note,
+        expectedCloseDate: value.expectedCloseDate || null,
         items: value.lineItems,
         nextAction: value.nextAction,
         nextActionDate: value.nextActionDate,
@@ -369,6 +385,18 @@ export function ReviseQuotationDialog({
                   reg={form.register("note")}
                   error={msg(form.formState.errors, "note")}
                 />
+              </div>
+              <div className="rounded-md border bg-muted/20 p-3">
+                <FieldText
+                  label="Expected Close"
+                  type="date"
+                  reg={form.register("expectedCloseDate")}
+                  error={msg(form.formState.errors, "expectedCloseDate")}
+                />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Konfirmasi atau sesuaikan ekspektasi PO/closing untuk revisi
+                  baru. Kosongkan bila belum dijadwalkan.
+                </p>
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <FieldText

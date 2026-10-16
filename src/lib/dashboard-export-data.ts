@@ -10,6 +10,7 @@ import type {
 import type { TargetsByMember } from "@/lib/data/targets";
 import type { MetricContext } from "@/lib/report-metric-scope";
 import type { ReportMetricSnapshot } from "@/lib/data/sales-performance-metrics";
+import type { ForecastSnapshot } from "@/lib/data/forecast-snapshot";
 import {
   activeCommercialCount,
   monthlyRevenueTrendInRange,
@@ -71,6 +72,8 @@ export type DashboardExportContext = {
     metrics: ReportMetricSnapshot;
     target: number;
     targetReason: string | null;
+    forecast?: ForecastSnapshot;
+    forecastUnavailableReason?: string;
     trend: ReturnType<typeof monthlyRevenueTrendInRange>;
     performance: ReturnType<typeof salesPerformanceInRange>;
   };

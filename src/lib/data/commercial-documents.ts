@@ -47,6 +47,7 @@ export type CommercialDocumentWithItems = {
   isCurrentRevision: boolean;
   supersedesDocumentId: string | null;
   quotationExpiredDate: string | null;
+  expectedCloseDate: string | null;
   stage: string;
   clientAddress: string | null;
   soNumber: string | null;
@@ -86,6 +87,7 @@ type CommercialDocumentRow = {
   is_current_revision: boolean;
   supersedes_document_id: string | null;
   quotation_expired_date: string | null;
+  expected_close_date: string | null;
   stage: string;
   client_address: string | null;
   so_number: string | null;
@@ -135,6 +137,7 @@ function toDocument(row: CommercialDocumentRow): CommercialDocumentWithItems {
     isCurrentRevision: row.is_current_revision,
     supersedesDocumentId: row.supersedes_document_id,
     quotationExpiredDate: row.quotation_expired_date,
+    expectedCloseDate: row.expected_close_date,
     stage: row.stage,
     clientAddress: row.client_address,
     soNumber: row.so_number,
@@ -304,6 +307,7 @@ export type CreateQuotationInput = {
   documentDate: string;
   clientAddress?: string;
   stage?: string;
+  expectedCloseDate?: string;
   soNumber?: string;
   note?: string;
   items: LineItemInput[];
@@ -319,6 +323,7 @@ export async function createQuotation(
     p_document_date: input.documentDate,
     p_client_address: input.clientAddress ?? null,
     p_stage: input.stage ?? "Quotes Sent",
+    p_expected_close_date: input.expectedCloseDate || null,
     p_so_number: input.soNumber ?? null,
     p_note: input.note ?? null,
     p_items: input.items,
@@ -334,6 +339,7 @@ export type ReviseQuotationInput = {
   clientAddress?: string;
   soNumber?: string;
   note?: string;
+  expectedCloseDate?: string | null;
   items: LineItemInput[];
   nextAction: string;
   nextActionDate: string;
@@ -352,6 +358,11 @@ export async function reviseQuotation(
     p_items: input.items,
     p_next_action: input.nextAction,
     p_next_action_date: input.nextActionDate,
+    p_expected_close_date: input.expectedCloseDate ?? null,
+    p_expected_close_confirmed: Object.prototype.hasOwnProperty.call(
+      input,
+      "expectedCloseDate",
+    ),
   });
   if (error) throw error;
   return toDocument(data as CommercialDocumentRow);
@@ -518,5 +529,44 @@ export async function transitionCommercialStage(
     workflowStatus: row.workflow_status,
     dueState: row.due_state,
     calendarIncomplete: row.calendar_incomplete,
+  };
+}
+
+export type SetQuotationExpectedCloseDateInput = {
+  documentId: string;
+  expectedUpdatedAt: string;
+  requestId: string;
+  expectedCloseDate: string | null;
+  reason?: string | null;
+};
+
+export type SetQuotationExpectedCloseDateResult = {
+  document: CommercialDocumentWithItems;
+  eventId: string | null;
+};
+
+type SetQuotationExpectedCloseDateRow = {
+  record: CommercialDocumentRow;
+  eventId: string | null;
+};
+
+export async function setQuotationExpectedCloseDate(
+  input: SetQuotationExpectedCloseDateInput,
+): Promise<SetQuotationExpectedCloseDateResult> {
+  const { data, error } = await supabase.rpc(
+    "set_quotation_expected_close_date",
+    {
+      p_document_id: input.documentId,
+      p_expected_updated_at: input.expectedUpdatedAt,
+      p_request_id: input.requestId,
+      p_expected_close_date: input.expectedCloseDate,
+      p_reason: input.reason?.trim() || null,
+    },
+  );
+  if (error) throw error;
+  const result = data as SetQuotationExpectedCloseDateRow;
+  return {
+    document: toDocument(result.record),
+    eventId: result.eventId,
   };
 }

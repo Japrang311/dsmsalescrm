@@ -56,6 +56,7 @@ import {
   validateQuotationLostReason,
 } from "@/lib/data/quotation-lost-reasons";
 import { getErrorMessage } from "@/lib/utils";
+import { getWonBacklog, wonBacklogQueryKey } from "@/lib/data/won-backlog";
 import { invalidateCommercialStageQueries } from "@/lib/query-invalidation";
 import { listQueryKey } from "@/lib/pagination-contracts";
 import { useRealtimeSync } from "@/hooks/use-realtime-sync";
@@ -320,47 +321,57 @@ function PipelineBoardPage({ role }: { role: Role }) {
     [filteredLoadedIds, stageQueries],
   );
 
-  // Live derived flag, not a stored status: a Closed Won Quotation counts as
-  // "SO belum dibuat" only while no Sales Order references it as source —
-  // it resolves itself automatically once an SO is created through any path.
-  const linkedQuotationIds = useMemo(
+  const wonQuotationIds = useMemo(
     () =>
-      new Set(
-        allSalesOrders
-          .map((so) => so.sourceCommercialDocumentId)
-          .filter((id): id is string => !!id),
-      ),
-    [allSalesOrders],
+      allLoadedItems
+        .filter(
+          (item) => item.type === "Quotation" && item.stage === "Closed Won",
+        )
+        .map((item) => item.id),
+    [allLoadedItems],
   );
+  const wonBacklogScope = useMemo(
+    () => ({
+      ownerId: filters.ownerId,
+      clientStatus: filters.clientStatus as
+        import("@/lib/domain").ClientStatus | undefined,
+      documentIds: wonQuotationIds,
+    }),
+    [filters.clientStatus, filters.ownerId, wonQuotationIds],
+  );
+  const wonBacklogQuery = useQuery({
+    queryKey: wonBacklogQueryKey(wonBacklogScope),
+    queryFn: () => getWonBacklog(wonBacklogScope),
+    enabled: authReady,
+  });
+  const wonBacklog = wonBacklogQuery.data;
   const linkedSalesOrderByQuotationId = useMemo(
     () =>
       new Map(
-        allSalesOrders.flatMap((salesOrder) =>
-          salesOrder.sourceCommercialDocumentId
+        (wonBacklog?.requestedStates ?? []).flatMap((state) =>
+          state.status === "linked" &&
+          state.salesOrderId &&
+          state.salesOrderNumber
             ? [
                 [
-                  salesOrder.sourceCommercialDocumentId,
-                  { id: salesOrder.id, soNumber: salesOrder.soNumber },
+                  state.documentId,
+                  { id: state.salesOrderId, soNumber: state.salesOrderNumber },
                 ] as const,
               ]
             : [],
         ),
       ),
-    [allSalesOrders],
+    [wonBacklog?.requestedStates],
   );
-  const pendingSoItemIds = useMemo(() => {
-    if (salesOrdersQuery.isError) return new Set<string>();
-    return new Set(
-      allLoadedItems
-        .filter(
-          (it) =>
-            it.stage === "Closed Won" &&
-            it.type === "Quotation" &&
-            !linkedQuotationIds.has(it.id),
-        )
-        .map((it) => it.id),
-    );
-  }, [allLoadedItems, linkedQuotationIds, salesOrdersQuery.isError]);
+  const pendingSoItemIds = useMemo(
+    () =>
+      new Set(
+        (wonBacklog?.requestedStates ?? [])
+          .filter((state) => state.status === "missing")
+          .map((state) => state.documentId),
+      ),
+    [wonBacklog?.requestedStates],
+  );
 
   function openCreateSoForItem(itemId: string) {
     const item = allLoadedItems.find((i) => i.id === itemId);
@@ -617,6 +628,41 @@ function PipelineBoardPage({ role }: { role: Role }) {
         salesTeam={salesTeam}
       />
 
+      <section
+        aria-label="Backlog Won tanpa Sales Order"
+        className="rounded-xl border bg-card p-4"
+      >
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <h2 className="text-sm font-semibold">Backlog Won tanpa SO</h2>
+            <p className="text-xs text-muted-foreground">
+              Exception terpisah; tidak ditambahkan ke forecast.
+            </p>
+          </div>
+          {wonBacklog && (
+            <p className="text-sm font-semibold tabular-nums">
+              {wonBacklog.totals.exceptionCount} quotation ·{" "}
+              {formatRupiahShort(wonBacklog.totals.exceptionValue)}
+            </p>
+          )}
+        </div>
+        {wonBacklogQuery.isError ? (
+          <p role="alert" className="mt-2 text-xs text-destructive">
+            Status link SO tidak dapat dimuat; kartu tidak dianggap unlinked.
+          </p>
+        ) : wonBacklogQuery.isPending ? (
+          <p role="status" className="mt-2 text-xs text-muted-foreground">
+            Memuat status link Sales Order…
+          </p>
+        ) : wonBacklog && wonBacklog.totals.deletedLinkCount > 0 ? (
+          <p className="mt-2 rounded-md border border-destructive/30 bg-destructive/5 p-2 text-xs text-destructive">
+            {wonBacklog.totals.deletedLinkCount} quotation terhubung ke SO yang
+            dihapus dan perlu direview atau dipulihkan; sistem tidak akan
+            membuat SO kedua otomatis.
+          </p>
+        ) : null}
+      </section>
+
       {/* Analytics */}
       {pipelineView === "analytics" && (
         <PipelineAnalytics
@@ -651,7 +697,9 @@ function PipelineBoardPage({ role }: { role: Role }) {
           onLoadMore={(stage: CommercialStage) => loadMore(stage)}
           onCardClick={setDrawerItemId}
           pendingSoItemIds={pendingSoItemIds}
-          salesOrderLinksUnavailable={salesOrdersQuery.isError}
+          salesOrderLinksUnavailable={
+            wonBacklogQuery.isPending || wonBacklogQuery.isError
+          }
           canMutateSalesOrders={role !== "executive"}
           onCreateSoForItem={openCreateSoForItem}
           linkedSalesOrderByItemId={linkedSalesOrderByQuotationId}
