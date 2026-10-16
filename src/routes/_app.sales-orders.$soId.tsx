@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { createContext, useContext, useMemo, useRef, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
   ArrowLeft,
@@ -55,17 +55,65 @@ import {
   updateSalesOrderHeader,
   updateSalesOrderItem,
   updateSalesOrderTax,
+  deleteSalesOrderItem,
+  type SalesOrderDocument,
   type SalesOrderLineItem,
 } from "@/lib/data/sales-orders";
 import { SoftDeleteAction } from "@/components/commercial/SoftDeleteAction";
 import { canManageSoftDeletedRecord } from "@/components/commercial/soft-delete-controls";
 import { searchClients } from "@/lib/data/clients";
 import type { Uom } from "@/lib/data/document-numbering";
-import {
-  getCurrentActorId,
-  listSalesOrderTaxHistory,
-  logActivity,
-} from "@/lib/data/activity-log";
+import { listSalesOrderTaxHistory } from "@/lib/data/activity-log";
+import { SalesOrderCorrectionHistory } from "@/components/commercial/SalesOrderCorrectionHistory";
+
+const CorrectionContext = createContext({
+  salesOrderId: "",
+  expectedUpdatedAt: "",
+  linked: false,
+});
+function useCorrectionDraft() {
+  const queryClient = useQueryClient();
+  const current = useContext(CorrectionContext);
+  const version = useRef(current.expectedUpdatedAt);
+  const pending = useRef({ signature: "", requestId: "" });
+  return {
+    linked: current.linked,
+    async reload() {
+      await queryClient.invalidateQueries({ queryKey: ["sales-orders"] });
+      const rows = queryClient.getQueryData<SalesOrderDocument[]>([
+        "sales-orders",
+        "all",
+      ]);
+      const latest = rows?.find((row) => row.id === current.salesOrderId);
+      if (latest) {
+        version.current = latest.updatedAt;
+        pending.current = { signature: "", requestId: "" };
+        toast.info(
+          "Versi terbaru dimuat; draft tetap tersedia. Periksa kembali sebelum menyimpan.",
+        );
+      }
+    },
+    begin() {
+      version.current = current.expectedUpdatedAt;
+      pending.current = { signature: "", requestId: "" };
+    },
+    options(payload: unknown, reason: string) {
+      const signature = JSON.stringify({
+        payload,
+        reason,
+        version: version.current,
+      });
+      if (signature !== pending.current.signature)
+        pending.current = { signature, requestId: crypto.randomUUID() };
+      return {
+        salesOrderId: current.salesOrderId,
+        expectedUpdatedAt: version.current,
+        requestId: pending.current.requestId,
+        reason,
+      };
+    },
+  };
+}
 import {
   formatDateShort,
   formatDateTime,
@@ -157,258 +205,269 @@ function SalesOrderDetail() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={backToList}>
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <div className="flex-1">
-          <div className="flex items-center gap-2">
-            <Receipt className="h-5 w-5 text-primary" />
-            <h1 className="font-mono text-xl font-semibold">{so.soNumber}</h1>
-            <Badge variant="outline">{so.type}</Badge>
-            <Badge variant="secondary">{so.numberMode}</Badge>
-            {foc && (
-              <Badge className="bg-warning/10 text-warning hover:bg-warning/10">
-                FOC
-              </Badge>
-            )}
-          </div>
-          <p className="text-sm text-muted-foreground">
-            Referensi Sales Order · dicatat {formatDateShort(so.date)}
-          </p>
-        </div>
-        {canEditOwnSo && (
-          <div className="flex items-center gap-2">
-            <SoftDeleteAction
-              label={`Sales Order ${so.soNumber}`}
-              onDelete={() => deleteOrder(so.id)}
-              onDeleted={() => {
-                toast.success("Sales Order dihapus");
-                navigate({ to: "/sales-orders" });
-              }}
-            />
-            <EditSalesOrderHeaderDialog
-              soId={so.id}
-              soNumber={so.soNumber}
-              clientId={so.clientId}
-              ownerId={so.ownerId}
-              customerPoNumber={so.customerPoNumber}
-              customerPoDate={so.customerPoDate}
-              date={so.date}
-              canEditOwner={role === "manager" || role === "super_admin"}
-            />
-          </div>
-        )}
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card className="md:col-span-2">
-          <CardContent className="grid gap-4 p-4">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Cell label="Klien">
-                {client ? (
-                  <Link
-                    to="/clients/$clientId"
-                    params={{ clientId: client.id }}
-                    className="text-sm font-medium hover:text-primary"
-                  >
-                    {client.name}
-                  </Link>
-                ) : (
-                  "—"
-                )}
-                {client && (
-                  <div className="mt-1">
-                    <StatusBadge status={client.status} />
-                  </div>
-                )}
-              </Cell>
-              <Cell label="Sales Owner">{owner?.name ?? "—"}</Cell>
-              <Cell label="Source revenue">
-                <Badge variant="secondary" className="text-[11px]">
-                  {so.source}
+    <CorrectionContext.Provider
+      value={{
+        salesOrderId: so.id,
+        expectedUpdatedAt: so.updatedAt,
+        linked: Boolean(so.sourceCommercialDocumentId),
+      }}
+    >
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={backToList}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <Receipt className="h-5 w-5 text-primary" />
+              <h1 className="font-mono text-xl font-semibold">{so.soNumber}</h1>
+              <Badge variant="outline">{so.type}</Badge>
+              <Badge variant="secondary">{so.numberMode}</Badge>
+              {foc && (
+                <Badge className="bg-warning/10 text-warning hover:bg-warning/10">
+                  FOC
                 </Badge>
-              </Cell>
-              <TaxCell
-                foc={foc}
-                soId={so.id}
-                ownerId={so.ownerId}
-                clientId={so.clientId}
-                current={effectiveTax}
-                canEdit={canEditTax}
+              )}
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Referensi Sales Order · dicatat {formatDateShort(so.date)}
+            </p>
+          </div>
+          {canEditOwnSo && (
+            <div className="flex items-center gap-2">
+              <SoftDeleteAction
+                label={`Sales Order ${so.soNumber}`}
+                onDelete={() => deleteOrder(so.id)}
+                onDeleted={() => {
+                  toast.success("Sales Order dihapus");
+                  navigate({ to: "/sales-orders" });
+                }}
               />
-              <Cell label="Tanggal SO">{formatDateShort(so.date)}</Cell>
-              <Cell label="Customer PO">
-                <span className="font-mono text-xs">
-                  {so.customerPoNumber ?? "—"}
-                </span>
-              </Cell>
-              <Cell label="Tanggal PO Customer">
-                {so.customerPoDate ? formatDateShort(so.customerPoDate) : "—"}
-              </Cell>
-              <Cell label="Tipe SO">
-                {so.type}
-                {so.prototypeStatus ? ` · ${so.prototypeStatus}` : ""}
-              </Cell>
-              <Cell label="Jumlah item">{so.items.length}</Cell>
-              {so.sourceCommercialDocumentId && (
-                <Cell label="Dari Quotation">
-                  {sourceQuotation ? (
+              <EditSalesOrderHeaderDialog
+                soId={so.id}
+                soNumber={so.soNumber}
+                clientId={so.clientId}
+                ownerId={so.ownerId}
+                customerPoNumber={so.customerPoNumber}
+                customerPoDate={so.customerPoDate}
+                date={so.date}
+                canEditOwner={false}
+              />
+            </div>
+          )}
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-3">
+          <Card className="md:col-span-2">
+            <CardContent className="grid gap-4 p-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Cell label="Klien">
+                  {client ? (
                     <Link
-                      to="/quotations/$id"
-                      params={{ id: sourceQuotation.id }}
-                      className="font-mono text-xs hover:text-primary"
+                      to="/clients/$clientId"
+                      params={{ clientId: client.id }}
+                      className="text-sm font-medium hover:text-primary"
                     >
-                      {sourceQuotation.quotationNumber}
+                      {client.name}
                     </Link>
                   ) : (
-                    <span className="text-xs text-muted-foreground">—</span>
+                    "—"
+                  )}
+                  {client && (
+                    <div className="mt-1">
+                      <StatusBadge status={client.status} />
+                    </div>
                   )}
                 </Cell>
-              )}
-              {so.backdateReason && (
-                <Cell label="Alasan Backdate">{so.backdateReason}</Cell>
-              )}
-            </div>
-
-            <Separator />
-
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Nilai
-              </p>
-              <p className="mt-1 text-2xl font-semibold tabular-nums">
-                {foc ? "Rp0" : formatRupiahFull(so.value ?? 0)}
-                {!foc && (so.value ?? 0) >= 1_000_000 && (
-                  <span className="ml-2 text-sm font-normal text-muted-foreground">
-                    ({formatRupiahShort(so.value ?? 0)})
+                <Cell label="Sales Owner">{owner?.name ?? "—"}</Cell>
+                <Cell label="Source revenue">
+                  <Badge variant="secondary" className="text-[11px]">
+                    {so.source}
+                  </Badge>
+                </Cell>
+                <TaxCell
+                  foc={foc}
+                  soId={so.id}
+                  ownerId={so.ownerId}
+                  clientId={so.clientId}
+                  current={effectiveTax}
+                  canEdit={canEditTax}
+                />
+                <Cell label="Tanggal SO">{formatDateShort(so.date)}</Cell>
+                <Cell label="Customer PO">
+                  <span className="font-mono text-xs">
+                    {so.customerPoNumber ?? "—"}
                   </span>
+                </Cell>
+                <Cell label="Tanggal PO Customer">
+                  {so.customerPoDate ? formatDateShort(so.customerPoDate) : "—"}
+                </Cell>
+                <Cell label="Tipe SO">
+                  {so.type}
+                  {so.prototypeStatus ? ` · ${so.prototypeStatus}` : ""}
+                </Cell>
+                <Cell label="Jumlah item">{so.items.length}</Cell>
+                {so.sourceCommercialDocumentId && (
+                  <Cell label="Dari Quotation">
+                    {sourceQuotation ? (
+                      <Link
+                        to="/quotations/$id"
+                        params={{ id: sourceQuotation.id }}
+                        className="font-mono text-xs hover:text-primary"
+                      >
+                        {sourceQuotation.quotationNumber}
+                      </Link>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
+                  </Cell>
                 )}
-              </p>
-              <p className="mt-1 text-[11px] text-muted-foreground">
-                {foc
-                  ? "SO Prototype FOC tidak berkontribusi ke revenue dan achievement."
-                  : "Kontribusi 100% ke revenue pada periode SO."}
-              </p>
-            </div>
+                {so.backdateReason && (
+                  <Cell label="Alasan Backdate">{so.backdateReason}</Cell>
+                )}
+              </div>
 
-            <Separator />
+              <Separator />
 
-            <SalesOrderItemsTable
-              soId={so.id}
-              soNumber={so.soNumber}
-              clientId={so.clientId}
-              ownerId={so.ownerId}
-              items={so.items}
-              showMoney={!foc}
-              canEdit={canEditOwnSo}
-            />
-          </CardContent>
-        </Card>
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Nilai
+                </p>
+                <p className="mt-1 text-2xl font-semibold tabular-nums">
+                  {foc ? "Rp0" : formatRupiahFull(so.value ?? 0)}
+                  {!foc && (so.value ?? 0) >= 1_000_000 && (
+                    <span className="ml-2 text-sm font-normal text-muted-foreground">
+                      ({formatRupiahShort(so.value ?? 0)})
+                    </span>
+                  )}
+                </p>
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  {foc
+                    ? "SO Prototype FOC tidak berkontribusi ke revenue dan achievement."
+                    : "Kontribusi 100% ke revenue pada periode SO."}
+                </p>
+              </div>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Linked Commercial Items
-              </p>
-              {canEditOwnSo && !so.sourceCommercialDocumentId && !hasError && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-8 px-2 text-xs"
-                  onClick={() => setLinkQuotationOpen(true)}
-                >
-                  <Link2 className="mr-1 h-3.5 w-3.5" />
-                  Link Quotation
-                </Button>
-              )}
-            </div>
-            {linkedItems.length === 0 ? (
-              <p className="text-xs text-muted-foreground">
-                {hasError
-                  ? "Data hubungan Commercial Item tidak dapat dimuat."
-                  : "Tidak ada item pipeline yang direferensikan ke SO ini."}
-              </p>
-            ) : (
-              <ul className="flex flex-col gap-1.5">
-                {linkedItems.map((it) => (
-                  <li key={it.id}>
-                    <Link
-                      to="/quotations/$id"
-                      params={{ id: it.id }}
-                      className="block rounded-md border bg-muted/30 p-2 text-xs hover:border-primary/40"
+              <Separator />
+
+              <SalesOrderItemsTable
+                soId={so.id}
+                soNumber={so.soNumber}
+                clientId={so.clientId}
+                ownerId={so.ownerId}
+                items={so.items}
+                showMoney={!foc}
+                canEdit={canEditOwnSo}
+              />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Linked Commercial Items
+                </p>
+                {canEditOwnSo &&
+                  !so.sourceCommercialDocumentId &&
+                  !hasError && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 px-2 text-xs"
+                      onClick={() => setLinkQuotationOpen(true)}
                     >
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="min-w-0 truncate font-medium">
-                          {it.quotationNumber ??
-                            it.projectName ??
-                            it.description}
-                        </span>
-                        <Badge variant="outline" className="text-[10px]">
-                          {it.type}
-                        </Badge>
-                      </div>
-                      <div className="mt-1 text-[11px] text-muted-foreground">
-                        {it.stage}
-                      </div>
-                    </Link>
+                      <Link2 className="mr-1 h-3.5 w-3.5" />
+                      Link Quotation
+                    </Button>
+                  )}
+              </div>
+              {linkedItems.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  {hasError
+                    ? "Data hubungan Commercial Item tidak dapat dimuat."
+                    : "Tidak ada item pipeline yang direferensikan ke SO ini."}
+                </p>
+              ) : (
+                <ul className="flex flex-col gap-1.5">
+                  {linkedItems.map((it) => (
+                    <li key={it.id}>
+                      <Link
+                        to="/quotations/$id"
+                        params={{ id: it.id }}
+                        className="block rounded-md border bg-muted/30 p-2 text-xs hover:border-primary/40"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="min-w-0 truncate font-medium">
+                            {it.quotationNumber ??
+                              it.projectName ??
+                              it.description}
+                          </span>
+                          <Badge variant="outline" className="text-[10px]">
+                            {it.type}
+                          </Badge>
+                        </div>
+                        <div className="mt-1 text-[11px] text-muted-foreground">
+                          {it.stage}
+                        </div>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {audit.length > 0 && (
+          <Card>
+            <CardContent className="p-4">
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Riwayat perubahan pajak
+              </p>
+              <ul className="flex flex-col gap-2">
+                {audit.map((a) => (
+                  <li
+                    key={a.id}
+                    className="flex flex-col gap-0.5 rounded-md border bg-muted/30 p-2 text-xs"
+                  >
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <Badge variant="outline" className="text-[10px]">
+                        {a.from}
+                      </Badge>
+                      <span className="text-muted-foreground">→</span>
+                      <Badge className="bg-primary/10 text-primary hover:bg-primary/10 text-[10px]">
+                        {a.to}
+                      </Badge>
+                      <span className="ml-auto text-[11px] text-muted-foreground">
+                        {formatDateTime(a.at)}
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-muted-foreground">
+                      oleh {a.byUserName} · {ROLE_LABEL[a.byRole]}
+                      {a.note ? ` — "${a.note}"` : ""}
+                    </div>
                   </li>
                 ))}
               </ul>
-            )}
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
+
+        <SalesOrderCorrectionHistory id={so.id} owners={ownersById} />
+        {canEditOwnSo && !so.sourceCommercialDocumentId && (
+          <LinkSalesOrderQuotationDialog
+            mode="sales-order"
+            open={linkQuotationOpen}
+            onOpenChange={setLinkQuotationOpen}
+            salesOrder={so}
+            quotations={items}
+            allSalesOrders={orders}
+          />
+        )}
       </div>
-
-      {audit.length > 0 && (
-        <Card>
-          <CardContent className="p-4">
-            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Riwayat perubahan pajak
-            </p>
-            <ul className="flex flex-col gap-2">
-              {audit.map((a) => (
-                <li
-                  key={a.id}
-                  className="flex flex-col gap-0.5 rounded-md border bg-muted/30 p-2 text-xs"
-                >
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <Badge variant="outline" className="text-[10px]">
-                      {a.from}
-                    </Badge>
-                    <span className="text-muted-foreground">→</span>
-                    <Badge className="bg-primary/10 text-primary hover:bg-primary/10 text-[10px]">
-                      {a.to}
-                    </Badge>
-                    <span className="ml-auto text-[11px] text-muted-foreground">
-                      {formatDateTime(a.at)}
-                    </span>
-                  </div>
-                  <div className="text-[11px] text-muted-foreground">
-                    oleh {a.byUserName} · {ROLE_LABEL[a.byRole]}
-                    {a.note ? ` — "${a.note}"` : ""}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
-      )}
-
-      {canEditOwnSo && !so.sourceCommercialDocumentId && (
-        <LinkSalesOrderQuotationDialog
-          mode="sales-order"
-          open={linkQuotationOpen}
-          onOpenChange={setLinkQuotationOpen}
-          salesOrder={so}
-          quotations={items}
-          allSalesOrders={orders}
-        />
-      )}
-    </div>
+    </CorrectionContext.Provider>
   );
 }
 
@@ -439,6 +498,8 @@ function EditSalesOrderHeaderDialog({
   date: string;
   canEditOwner: boolean;
 }) {
+  const correction = useCorrectionDraft();
+  const [reason, setReason] = useState("");
   const queryClient = useQueryClient();
   const { ownersById } = useDashboardData();
   const [open, setOpen] = useState(false);
@@ -461,6 +522,8 @@ function EditSalesOrderHeaderDialog({
   );
 
   function openDialog() {
+    correction.begin();
+    setReason("");
     setDraftClientId(clientId);
     setDraftOwnerId(ownerId);
     setDraftSoNumber(soNumber);
@@ -480,37 +543,19 @@ function EditSalesOrderHeaderDialog({
     setSaving(true);
     try {
       const newOwnerId = canEditOwner ? draftOwnerId : ownerId;
-      await updateSalesOrderHeader(soId, {
+      const headerPatch = {
         soNumber: nextSoNumber,
         clientId: draftClientId,
         ownerId: newOwnerId,
         customerPoNumber: draftPo,
         customerPoDate: draftPoDate || null,
         date: draftDate,
-      });
-
-      const actorId = await getCurrentActorId();
-      if (actorId) {
-        const changes: string[] = [];
-        if (nextSoNumber !== soNumber)
-          changes.push(`Nomor SO ${soNumber} → ${nextSoNumber}`);
-        if (draftClientId !== clientId) changes.push("Klien diubah");
-        if (newOwnerId !== ownerId) changes.push("Sales Owner diubah");
-        if (draftPo !== (customerPoNumber ?? ""))
-          changes.push("Customer PO diubah");
-        if (draftPoDate !== (customerPoDate ?? ""))
-          changes.push("Tanggal PO Customer diubah");
-        if (draftDate !== date) changes.push(`Tanggal ${date} → ${draftDate}`);
-        await logActivity({
-          kind: "sales_order_header_change",
-          ownerId: newOwnerId,
-          actorId,
-          clientId: draftClientId,
-          salesOrderId: soId,
-          title: `Detail SO ${nextSoNumber} diperbarui`,
-          detail: changes.length ? changes.join("; ") : undefined,
-        });
-      }
+      };
+      await updateSalesOrderHeader(
+        soId,
+        headerPatch,
+        correction.options(headerPatch, reason),
+      );
 
       await queryClient.invalidateQueries({ queryKey: ["sales-orders"] });
       await queryClient.invalidateQueries({ queryKey: ["clients"] });
@@ -555,11 +600,17 @@ function EditSalesOrderHeaderDialog({
                 className="font-mono"
               />
             </div>
-            <ClientPickerField
-              clients={searchableClients}
-              value={draftClientId}
-              onChange={setDraftClientId}
-            />
+            {correction.linked ? (
+              <p className="text-sm">
+                Klien terkunci karena SO terhubung ke Quotation.
+              </p>
+            ) : (
+              <ClientPickerField
+                clients={searchableClients}
+                value={draftClientId}
+                onChange={setDraftClientId}
+              />
+            )}
             <div>
               <Label>Sales Owner</Label>
               {canEditOwner ? (
@@ -617,11 +668,23 @@ function EditSalesOrderHeaderDialog({
               />
             </div>
           </div>
+          <Label htmlFor="so-correction-reason">Alasan koreksi</Label>
+          <Input
+            id="so-correction-reason"
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+          />
           <DialogFooter>
+            <Button variant="outline" onClick={() => void correction.reload()}>
+              Muat versi terbaru
+            </Button>
             <Button variant="ghost" onClick={() => setOpen(false)}>
               Batal
             </Button>
-            <Button onClick={() => void save()} disabled={saving}>
+            <Button
+              onClick={() => void save()}
+              disabled={saving || !reason.trim()}
+            >
               {saving ? "Menyimpan…" : "Simpan"}
             </Button>
           </DialogFooter>
@@ -638,8 +701,8 @@ function EditSalesOrderHeaderDialog({
 function TaxCell({
   foc,
   soId,
-  ownerId,
-  clientId,
+  ownerId: _ownerId,
+  clientId: _clientId,
   current,
   canEdit,
 }: {
@@ -650,6 +713,7 @@ function TaxCell({
   current: "PPN" | "Non-PPN" | undefined;
   canEdit: boolean;
 }) {
+  const correction = useCorrectionDraft();
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<"PPN" | "Non-PPN">(current ?? "PPN");
@@ -711,6 +775,7 @@ function TaxCell({
             size="sm"
             className="h-7 gap-1 px-2 text-xs"
             onClick={() => {
+              correction.begin();
               setDraft(current ?? "PPN");
               setNote("");
               setEditing(true);
@@ -742,7 +807,7 @@ function TaxCell({
         </Select>
         <div className="space-y-1">
           <Label className="text-[11px] text-muted-foreground">
-            Catatan (opsional)
+            Alasan koreksi (wajib)
           </Label>
           <Input
             value={note}
@@ -752,30 +817,22 @@ function TaxCell({
           />
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" onClick={() => void correction.reload()}>
+            Muat versi terbaru
+          </Button>
           <Button
             size="sm"
             className="h-7 text-xs"
-            disabled={!changed || saving}
+            disabled={!changed || saving || !note.trim()}
             onClick={() => {
               void (async () => {
                 setSaving(true);
                 try {
-                  await updateSalesOrderTax(soId, draft);
-                  const actorId = await getCurrentActorId();
-                  if (actorId) {
-                    const detail = note.trim()
-                      ? `${current ?? "—"} → ${draft}\n${note.trim()}`
-                      : `${current ?? "—"} → ${draft}`;
-                    await logActivity({
-                      kind: "sales_order_tax_change",
-                      ownerId,
-                      actorId,
-                      clientId,
-                      salesOrderId: soId,
-                      title: `Pajak SO diubah ke ${draft}`,
-                      detail,
-                    });
-                  }
+                  await updateSalesOrderTax(
+                    soId,
+                    draft,
+                    correction.options({ taxType: draft }, note),
+                  );
                   await queryClient.invalidateQueries({
                     queryKey: ["sales-orders"],
                   });
@@ -920,9 +977,9 @@ const UOM_OPTIONS: Uom[] = ["Unit", "Pcs", "Set", "Lot"];
 
 function NewSalesOrderItemRow({
   soId,
-  soNumber,
-  clientId,
-  ownerId,
+  soNumber: _soNumber,
+  clientId: _clientId,
+  ownerId: _ownerId,
   linePosition,
   showMoney,
   onCancel,
@@ -937,6 +994,8 @@ function NewSalesOrderItemRow({
   onCancel: () => void;
   onSaved: () => void;
 }) {
+  const correction = useCorrectionDraft();
+  const [reason, setReason] = useState("");
   const queryClient = useQueryClient();
   const [productName, setProductName] = useState("");
   const [description, setDescription] = useState("");
@@ -964,7 +1023,7 @@ function NewSalesOrderItemRow({
 
     setSaving(true);
     try {
-      await addSalesOrderItem({
+      const itemInput = {
         salesOrderId: soId,
         linePosition,
         productName: cleanProductName,
@@ -972,20 +1031,8 @@ function NewSalesOrderItemRow({
         qty: qtyNum,
         uom,
         unitPrice: priceNum,
-      });
-
-      const actorId = await getCurrentActorId();
-      if (actorId) {
-        await logActivity({
-          kind: "sales_order_item_change",
-          ownerId,
-          actorId,
-          clientId,
-          salesOrderId: soId,
-          title: `Item baru ditambahkan ke SO ${soNumber}`,
-          detail: cleanProductName,
-        });
-      }
+      };
+      await addSalesOrderItem(itemInput, correction.options(itemInput, reason));
 
       await queryClient.invalidateQueries({ queryKey: ["sales-orders"] });
       await queryClient.invalidateQueries({ queryKey: ["activity-log"] });
@@ -1009,6 +1056,12 @@ function NewSalesOrderItemRow({
           onChange={(e) => setProductName(e.target.value)}
           className="h-8 min-w-[140px] text-xs"
           placeholder="Nama Product"
+        />
+        <Input
+          aria-label="Alasan tambah item"
+          placeholder="Alasan koreksi"
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
         />
       </TableCell>
       <TableCell>
@@ -1066,10 +1119,17 @@ function NewSalesOrderItemRow({
           <Button
             size="icon"
             className="h-7 w-7"
-            disabled={saving}
+            disabled={saving || !reason.trim()}
             onClick={() => void save()}
           >
             <Check className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void correction.reload()}
+          >
+            Muat versi terbaru
           </Button>
           <Button
             variant="ghost"
@@ -1087,10 +1147,10 @@ function NewSalesOrderItemRow({
 }
 
 function SalesOrderItemRow({
-  soId,
-  soNumber,
-  clientId,
-  ownerId,
+  soId: _soId,
+  soNumber: _soNumber,
+  clientId: _clientId,
+  ownerId: _ownerId,
   item,
   showMoney,
   canEdit,
@@ -1103,6 +1163,8 @@ function SalesOrderItemRow({
   showMoney: boolean;
   canEdit: boolean;
 }) {
+  const correction = useCorrectionDraft();
+  const [reason, setReason] = useState("");
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
   const [productName, setProductName] = useState(item.productName ?? "");
@@ -1113,6 +1175,8 @@ function SalesOrderItemRow({
   const [saving, setSaving] = useState(false);
 
   function startEdit() {
+    correction.begin();
+    setReason("");
     setProductName(item.productName ?? "");
     setDescription(item.description ?? "");
     setQty(String(item.qty ?? ""));
@@ -1134,26 +1198,18 @@ function SalesOrderItemRow({
     }
     setSaving(true);
     try {
-      await updateSalesOrderItem(item.id, {
+      const itemInput = {
         productName: productName.trim() || null,
         description: description.trim() || null,
         qty: qtyNum,
         uom,
         unitPrice: priceNum,
-      });
-
-      const actorId = await getCurrentActorId();
-      if (actorId) {
-        await logActivity({
-          kind: "sales_order_item_change",
-          ownerId,
-          actorId,
-          clientId,
-          salesOrderId: soId,
-          title: `Item pada SO ${soNumber} diperbarui`,
-          detail: `${item.productName ?? "Item"} → ${productName.trim() || "—"}`,
-        });
-      }
+      };
+      await updateSalesOrderItem(
+        item.id,
+        itemInput,
+        correction.options(itemInput, reason),
+      );
 
       await queryClient.invalidateQueries({ queryKey: ["sales-orders"] });
       await queryClient.invalidateQueries({ queryKey: ["activity-log"] });
@@ -1215,6 +1271,12 @@ function SalesOrderItemRow({
           className="h-8 min-w-[140px] text-xs"
           placeholder="Nama Product"
         />
+        <Input
+          aria-label="Alasan koreksi item"
+          placeholder="Alasan koreksi"
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+        />
       </TableCell>
       <TableCell>
         <Input
@@ -1271,10 +1333,49 @@ function SalesOrderItemRow({
           <Button
             size="icon"
             className="h-7 w-7"
-            disabled={saving}
+            disabled={saving || !reason.trim()}
             onClick={() => void save()}
           >
             <Check className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void correction.reload()}
+          >
+            Muat versi terbaru
+          </Button>
+          <Button
+            variant="destructive"
+            size="sm"
+            disabled={saving || !reason.trim()}
+            onClick={() => {
+              void (async () => {
+                setSaving(true);
+                try {
+                  await deleteSalesOrderItem(
+                    item.id,
+                    correction.options({ delete: item.id }, reason),
+                  );
+                  await queryClient.invalidateQueries({
+                    queryKey: ["sales-orders"],
+                  });
+                  await queryClient.invalidateQueries({
+                    queryKey: ["activity-log"],
+                  });
+                  toast.success("Item dihapus");
+                  setEditing(false);
+                } catch (error) {
+                  toast.error("Gagal menghapus item", {
+                    description: getErrorMessage(error),
+                  });
+                } finally {
+                  setSaving(false);
+                }
+              })();
+            }}
+          >
+            Hapus item
           </Button>
           <Button
             variant="ghost"

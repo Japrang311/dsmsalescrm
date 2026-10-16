@@ -28,10 +28,10 @@ test("login protects the app and dashboard export downloads a CSV", async ({
 
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export", exact: true }).click();
-  // "Monthly revenue vs target" appears once under the CSV heading and again
+  // "Nilai SO bulanan vs target" appears once under CSV and again
   // under Excel; the CSV entry is first in the menu.
   await page
-    .getByRole("menuitem", { name: "Monthly revenue vs target" })
+    .getByRole("menuitem", { name: "Nilai SO bulanan vs target" })
     .first()
     .click();
   const download = await downloadPromise;
@@ -384,15 +384,19 @@ test("sales can manually link released Sales Orders and Closed Won Quotations fr
 
   await signIn(page, USERS.sales);
   await page.goto(`/sales-orders/${fromSalesOrder.salesOrder.id}`);
-  await page.getByRole("button", { name: "Hubungkan Quotation" }).click();
+  await page
+    .getByRole("button", { name: /Link Quotation|Hubungkan Quotation/ })
+    .click();
   const quotationDialog = page.getByRole("dialog", {
-    name: "Hubungkan Quotation",
+    name: "Link Quotation",
   });
   await quotationDialog
-    .getByText(fromSalesOrder.quotation.quotation_number)
+    .getByRole("radio", {
+      name: new RegExp(fromSalesOrder.quotation.quotation_number),
+    })
     .click();
   await quotationDialog
-    .getByRole("button", { name: "Hubungkan", exact: true })
+    .getByRole("button", { name: "Link", exact: true })
     .click();
   await expect(
     page.getByText("Quotation dan Sales Order terhubung"),
@@ -411,13 +415,17 @@ test("sales can manually link released Sales Orders and Closed Won Quotations fr
   const quotationCard = closedWonColumn
     .getByTestId("pipeline-card")
     .filter({ hasText: fromQuotation.productName });
-  await quotationCard.getByRole("button", { name: "Hubungkan SO" }).click();
+  await quotationCard
+    .getByRole("button", { name: /Link SO|Hubungkan SO/ })
+    .click();
   const salesOrderDialog = page.getByRole("dialog", {
-    name: "Hubungkan Sales Order",
+    name: "Link Sales Order",
   });
-  await salesOrderDialog.getByText(fromQuotation.soNumber).click();
   await salesOrderDialog
-    .getByRole("button", { name: "Hubungkan", exact: true })
+    .getByRole("radio", { name: new RegExp(fromQuotation.soNumber) })
+    .click();
+  await salesOrderDialog
+    .getByRole("button", { name: "Link", exact: true })
     .click();
   await expect(
     page.getByText("Quotation dan Sales Order terhubung"),

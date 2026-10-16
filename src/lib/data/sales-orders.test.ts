@@ -109,15 +109,23 @@ describe("normalized Sales Order adapter", () => {
       2,
     );
 
-    const addedItem = await addSalesOrderItem({
-      salesOrderId: created.id,
-      linePosition: 3,
-      productName: "Added correction item",
-      description: "Added after SO was created",
-      qty: 2,
-      uom: "Pcs",
-      unitPrice: 7_500,
-    });
+    const addedItem = await addSalesOrderItem(
+      {
+        salesOrderId: created.id,
+        linePosition: 3,
+        productName: "Added correction item",
+        description: "Added after SO was created",
+        qty: 2,
+        uom: "Pcs",
+        unitPrice: 7_500,
+      },
+      {
+        salesOrderId: created.id,
+        expectedUpdatedAt: created.updatedAt,
+        requestId: crypto.randomUUID(),
+        reason: "Synthetic adapter correction",
+      },
+    );
     expect(addedItem).toMatchObject({
       salesOrderId: created.id,
       productName: "Added correction item",
@@ -364,14 +372,32 @@ describe("normalized Sales Order adapter", () => {
     });
     expect(withDate.customerPoDate).toBe("2096-05-20");
 
-    const updated = await updateSalesOrderHeader(created.id, {
-      customerPoDate: "2096-05-25",
-    });
+    const updated = await updateSalesOrderHeader(
+      created.id,
+      {
+        customerPoDate: "2096-05-25",
+      },
+      {
+        salesOrderId: created.id,
+        expectedUpdatedAt: created.updatedAt,
+        requestId: crypto.randomUUID(),
+        reason: "Synthetic PO date correction",
+      },
+    );
     expect(updated.customerPoDate).toBe("2096-05-25");
 
-    const cleared = await updateSalesOrderHeader(created.id, {
-      customerPoDate: null,
-    });
+    const cleared = await updateSalesOrderHeader(
+      created.id,
+      {
+        customerPoDate: null,
+      },
+      {
+        salesOrderId: created.id,
+        expectedUpdatedAt: updated.updatedAt,
+        requestId: crypto.randomUUID(),
+        reason: "Synthetic PO date correction",
+      },
+    );
     expect(cleared.customerPoDate).toBeNull();
     await supabase.auth.signOut();
   });

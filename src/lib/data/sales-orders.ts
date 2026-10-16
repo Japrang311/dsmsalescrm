@@ -351,15 +351,63 @@ export async function linkSalesOrderToQuotation(input: {
 export async function updateSalesOrderTax(
   id: string,
   taxType: TaxType,
+  command: SalesOrderCorrection,
 ): Promise<SalesOrderDocument> {
-  const { data, error } = await supabase
-    .from("sales_orders")
-    .update({ tax_type: taxType })
-    .eq("id", id)
-    .select("*, sales_order_items(*)")
-    .single();
-  if (error) throw error;
-  return toSalesOrder(data as SalesOrderRow);
+  return correctHeader(id, { tax_type: taxType }, command);
+}
+
+export type SalesOrderCorrection = {
+  expectedUpdatedAt: string;
+  requestId: string;
+  reason: string;
+  salesOrderId: string;
+};
+
+function correctionError(error: { message?: string }): Error {
+  if (error.message?.includes("STALE_VERSION"))
+    return new Error(
+      "Data SO sudah berubah. Draft Anda tetap tersedia. Muat ulang data lalu buka ulang editor untuk memakai versi terbaru.",
+    );
+  if (error.message?.includes("LINKED_CLIENT_IMMUTABLE"))
+    return new Error("Klien SO yang sudah terhubung ke Quotation terkunci.");
+  if (error.message?.includes("CORRECTION_REASON_REQUIRED"))
+    return new Error("Alasan koreksi wajib diisi.");
+  return new Error(error.message ?? "Koreksi Sales Order gagal");
+}
+
+async function correctHeader(
+  id: string,
+  patch: Record<string, unknown>,
+  command: SalesOrderCorrection,
+): Promise<SalesOrderDocument> {
+  const { data, error } = await supabase.rpc("correct_sales_order_header", {
+    p_id: id,
+    p_patch: patch,
+    p_expected_updated_at: command.expectedUpdatedAt,
+    p_request_id: command.requestId,
+    p_reason: command.reason,
+  });
+  if (error) throw correctionError(error);
+  return toSalesOrder(data.record as SalesOrderRow);
+}
+
+async function correctItem(
+  operation: "add" | "update" | "delete",
+  itemId: string | null,
+  input: UpdateSalesOrderItemInput | Record<string, never>,
+  command: SalesOrderCorrection,
+): Promise<SalesOrderDocument> {
+  const { data, error } = await supabase.rpc("correct_sales_order_item", {
+    p_id: command.salesOrderId,
+    p_expected_updated_at: command.expectedUpdatedAt,
+    p_request_id: command.requestId,
+    p_operation: operation,
+    p_item_id: itemId,
+    p_item: input,
+    p_reason: command.reason,
+  });
+  if (error) throw correctionError(error);
+  return toSalesOrder(data.record as SalesOrderRow);
 }
 
 export type UpdateSalesOrderHeaderInput = Partial<{
@@ -379,6 +427,7 @@ export type UpdateSalesOrderHeaderInput = Partial<{
 export async function updateSalesOrderHeader(
   id: string,
   patch: UpdateSalesOrderHeaderInput,
+  command: SalesOrderCorrection,
 ): Promise<SalesOrderDocument> {
   const row: Record<string, string | null> = {};
   if (patch.soNumber !== undefined) row.so_number = patch.soNumber.trim();
@@ -390,14 +439,7 @@ export async function updateSalesOrderHeader(
     row.customer_po_date = patch.customerPoDate;
   if (patch.date !== undefined) row.date = patch.date;
 
-  const { data, error } = await supabase
-    .from("sales_orders")
-    .update(row)
-    .eq("id", id)
-    .select("*, sales_order_items(*)")
-    .single();
-  if (error) throw error;
-  return toSalesOrder(data as SalesOrderRow);
+  return correctHeader(id, row, command);
 }
 
 export type UpdateSalesOrderItemInput = {
@@ -424,38 +466,23 @@ export type AddSalesOrderItemInput = UpdateSalesOrderItemInput & {
 export async function updateSalesOrderItem(
   itemId: string,
   input: UpdateSalesOrderItemInput,
+  command: SalesOrderCorrection,
 ): Promise<void> {
-  const { error } = await supabase
-    .from("sales_order_items")
-    .update({
-      product_name: input.productName,
-      description: input.description,
-      qty: input.qty,
-      uom: input.uom,
-      unit_price: input.unitPrice,
-      line_total: input.unitPrice === null ? null : input.qty * input.unitPrice,
-    })
-    .eq("id", itemId);
-  if (error) throw error;
+  await correctItem("update", itemId, input, command);
 }
 
 export async function addSalesOrderItem(
   input: AddSalesOrderItemInput,
+  command: SalesOrderCorrection,
 ): Promise<SalesOrderLineItem> {
-  const { data, error } = await supabase
-    .from("sales_order_items")
-    .insert({
-      sales_order_id: input.salesOrderId,
-      product_name: input.productName,
-      description: input.description,
-      qty: input.qty,
-      uom: input.uom,
-      unit_price: input.unitPrice,
-      line_total: input.unitPrice === null ? null : input.qty * input.unitPrice,
-      line_position: input.linePosition,
-    })
-    .select("*")
-    .single();
-  if (error) throw error;
-  return toLineItem(data as SalesOrderItemRow);
+  const { salesOrderId: _parent, linePosition: _position, ...item } = input;
+  const result = await correctItem("add", null, item, command);
+  return result.items[result.items.length - 1];
+}
+
+export async function deleteSalesOrderItem(
+  itemId: string,
+  command: SalesOrderCorrection,
+): Promise<void> {
+  await correctItem("delete", itemId, {}, command);
 }

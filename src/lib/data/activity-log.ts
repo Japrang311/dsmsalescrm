@@ -1,6 +1,46 @@
 import { supabase } from "@/lib/supabase";
 import type { ClientStatus } from "@/lib/domain";
 import type { Role } from "@/lib/domain";
+import { z } from "zod";
+
+export type SalesOrderCorrectionAudit = {
+  id: string;
+  actor_id: string;
+  owner_id: string;
+  title: string;
+  detail: string | null;
+  created_at: string;
+  event_data: {
+    before: Record<string, unknown> | null;
+    after: Record<string, unknown> | null;
+    reason: string | null;
+    request_id: string;
+  } | null;
+};
+export async function listSalesOrderCorrections(
+  id: string,
+  cursor?: { at: string; id: string },
+): Promise<SalesOrderCorrectionAudit[]> {
+  z.string().uuid().parse(id);
+  let query = supabase
+    .from("activity_log")
+    .select("id,actor_id,owner_id,title,detail,created_at,event_data")
+    .eq("sales_order_id", id)
+    .in("kind", ["sales_order_header_change", "sales_order_item_change"])
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(50);
+  if (cursor) {
+    z.string().uuid().parse(cursor.id);
+    z.string().datetime({ offset: true }).parse(cursor.at);
+    query = query.or(
+      `created_at.lt.${cursor.at},and(created_at.eq.${cursor.at},id.lt.${cursor.id})`,
+    );
+  }
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data ?? []) as SalesOrderCorrectionAudit[];
+}
 
 export type ActivityKind =
   | "client_created"

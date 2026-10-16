@@ -65,7 +65,8 @@ async function runSql(sqlText: string): Promise<void> {
     [
       "docker",
       "exec",
-      "supabase_db_DSM_SALES_WEB_APP_V2",
+      process.env.LOCAL_SUPABASE_DB_CONTAINER ??
+        "supabase_db_DSM_SALES_WEB_APP_V2",
       "psql",
       "-U",
       "postgres",

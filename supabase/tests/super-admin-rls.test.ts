@@ -410,8 +410,14 @@ describe("complete four-role operation matrix", () => {
           .update(supportedUpdateFor(table))
           .eq("id", ownInsert!.id)
           .select("id");
-        if (ownUpdateError) throw ownUpdateError;
-        expect(ownUpdate).toEqual([{ id: ownInsert!.id }]);
+        if (table === "sales_orders")
+          expect(ownUpdateError?.message).toContain(
+            "SALES_ORDER_COMMAND_REQUIRED",
+          );
+        else {
+          if (ownUpdateError) throw ownUpdateError;
+          expect(ownUpdate).toEqual([{ id: ownInsert!.id }]);
+        }
 
         const { data: otherUpdate, error: otherUpdateError } = await salesClient
           .from(table)
@@ -478,8 +484,14 @@ describe("complete four-role operation matrix", () => {
           .update(supportedUpdateFor(table))
           .eq("id", data!.id)
           .select("id");
-        if (updateError) throw updateError;
-        expect(updated).toEqual([{ id: data!.id }]);
+        if (table === "sales_orders")
+          expect(updateError?.message).toContain(
+            "SALES_ORDER_COMMAND_REQUIRED",
+          );
+        else {
+          if (updateError) throw updateError;
+          expect(updated).toEqual([{ id: data!.id }]);
+        }
       }
     }
 
@@ -641,7 +653,7 @@ describe("complete four-role operation matrix", () => {
   // executive still can't update sales_orders at all. Uses a fresh
   // throwaway row (not fixtureRows.salesOrder) so later tests in this file
   // that assume the shared fixture's owner never changes aren't affected.
-  test("sales_orders owner_id: sales cannot reassign to someone else; manager/super_admin can; executive cannot update at all", async () => {
+  test("sales_orders owner_id: direct reassignment requires the explicit transfer workflow", async () => {
     const roleUsers = getFixtures();
     const adminInsert = await adminClient
       .from("sales_orders")
@@ -685,8 +697,9 @@ describe("complete four-role operation matrix", () => {
       .update({ owner_id: roleUsers.manager.id })
       .eq("id", soId)
       .select("owner_id");
-    expect(managerAttempt.error).toBeNull();
-    expect(managerAttempt.data).toEqual([{ owner_id: roleUsers.manager.id }]);
+    expect(managerAttempt.error?.message).toContain(
+      "SALES_ORDER_COMMAND_REQUIRED",
+    );
   });
 });
 
@@ -991,7 +1004,7 @@ describe("active Super Admin supported business writes", () => {
     ]);
   });
 
-  test("can insert and update a sales order without changing its owner", async () => {
+  test("can insert a sales order but direct correction requires the atomic command", async () => {
     const roleUsers = getFixtures();
     const fixtureRows = getRows();
     const client = await signInAs(roleUsers.super_admin);
@@ -1017,10 +1030,8 @@ describe("active Super Admin supported business writes", () => {
       .update({ tax_type: "Non-PPN" })
       .eq("id", fixtureRows.salesOrder)
       .select("id, owner_id");
-    expect(updateError).toBeNull();
-    expect(updated).toEqual([
-      { id: fixtureRows.salesOrder, owner_id: roleUsers.sales.id },
-    ]);
+    expect(updateError?.message).toContain("SALES_ORDER_COMMAND_REQUIRED");
+    expect(updated).toBeNull();
   });
 
   test("can insert an append-only follow-up log", async () => {

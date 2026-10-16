@@ -195,7 +195,9 @@ beforeAll(async () => {
     {
       label: "linked-no-po",
       so_number: `SO-S4-NOPO-${crypto.randomUUID()}`,
-      source_commercial_document_id: documentIds.lostReason,
+      // Valid current Won lineage; historical quotation/SO attribution may
+      // differ after ownership transfers. Missing PO date is the exclusion.
+      source_commercial_document_id: documentIds.otherOwner,
       customer_po_date: null,
       date: "2026-01-25",
     },
