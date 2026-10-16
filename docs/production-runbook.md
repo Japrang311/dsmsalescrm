@@ -56,10 +56,31 @@ Database changes are the only truly dangerous class of change, because rollback 
 
 - Never run `supabase db push`, `apply_migration`, or raw SQL against `qhtfixgbcpcitokeryxb` while
   an incident is open. Stabilise first.
-- Recovery from a bad migration on the Free plan means restoring from a backup — that is a data-loss
-  event measured in hours. Treat every migration to production as one-way.
+- **Do not assume a production backup exists from this document.** The live plan,
+  backup inventory, retention, and available recovery controls must be read from
+  the Supabase project with separately authorized access before a migration.
+- Recovery from a bad migration may require a restore and may lose changes after
+  the recovery point. Until a production drill measures it, both data loss and
+  recovery time are **unverified**. Treat every migration to production as one-way.
 - Before any future migration: apply it locally (`bunx supabase db reset`), run `bun run test`, and
   only then push. Migrations should ship on their own commit, never mixed with UI changes.
+
+### Backup/restore gate before a production migration
+
+1. Record the live project plan, backup inventory, retention, newest usable
+   recovery point, and Storage usage without exposing credentials or customer data.
+2. Create the approved backup using the live project's actual mechanism.
+3. Restore into an isolated target—never into the production database—and record
+   start/end timestamps, failures, and retries.
+4. Reconcile schema objects and table row counts, then verify Auth users and any
+   Storage metadata **and file payloads** used by the project.
+5. Calculate measured RPO and RTO against D07. If either cannot be measured or
+   misses the target, stop the production migration.
+
+A local synthetic drill was completed on 16 October 2026; it validates the drill
+procedure only. It does not prove the production project's backup inventory,
+retention, RPO, RTO, or recoverability. See
+`docs/reports/2026-10-16-crm-local-restore-drill.md`.
 
 ## Communication
 
