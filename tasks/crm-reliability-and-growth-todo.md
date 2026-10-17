@@ -60,7 +60,7 @@ Checkbox hanya boleh selesai jika evidence dicatat, bukan karena kode ditulis.
 - [x] 12b Signal list UI — verified local + browser; lihat evidence ledger.
 - [x] 13 Follow-up dari exception — verified local + browser; lihat evidence ledger.
 - [x] 14 Snooze dan feedback — verified local + browser; lihat evidence ledger.
-- [ ] 15 Cadence repeat-order.
+- [x] 15 Cadence repeat-order — verified local; lihat evidence ledger.
 - [ ] 16 Repeat signal pada antrean/client.
 - [ ] 17 Pilot dan evaluasi.
 - [ ] Gate C: AC15–20 lulus dan hasil pilot direview.
@@ -113,6 +113,7 @@ Released, Deferred. Blocker harus menjelaskan kebutuhan untuk melanjutkan.
 | 12b Signal list UI                | Verified local | Tidak dibuat | 15 targeted + full 776 pass; state, grouping, count, adapter, lint/typecheck/build lulus                     | 17 Chromium pass; RPC/UI, Tasks/Dashboard, Sales/Executive, keyboard, mobile lulus | Fresh reset lokal; remote tidak dilakukan     | [Task 12b](../docs/reports/2026-10-17-crm-task-12b-verification.md)               |
 | 13 Follow-up dari exception       | Verified local | Tidak dibuat | 31 targeted + full 783 pass; RLS/direct API, concurrency, replay, rollback, role/ownership lulus             | Open-record-reload lulus; final full 18 pass tanpa retry                           | Migration hanya lokal; remote tidak dilakukan | [Task 13](../docs/reports/2026-10-17-crm-task-13-verification.md)                 |
 | 14 Snooze dan feedback            | Verified local | Task 14 commit | 31 targeted + full 793 pass; RLS/direct bypass, forged rule, concurrency, retry, rollback, transfer lulus | Snooze/reload/resurface/feedback/reconcile lulus; full 19 pass tanpa retry | Dua migration hanya lokal; remote ditahan | [Task 14](../docs/reports/2026-10-17-crm-task-14-verification.md) |
+| 15 Cadence repeat-order            | Verified local | Belum dibuat | 15 targeted + full 808 pass; D05 median/window, exclusion, DB-helper reconciliation, role/transfer lulus | Tidak relevan; UI/browser menjadi Task 16 | Fresh reset lokal; remote tidak dilakukan | [Task 15](../docs/reports/2026-10-17-crm-task-15-verification.md) |
 | 18 Backup/restore                 | Blocked        | Tidak dibuat | DB/Auth/Storage synthetic restore dan reconciliation lulus lokal                                             | Tidak relevan                                                                      | Live inventory/restore tidak diizinkan        | [Restore drill](../docs/reports/2026-10-16-crm-local-restore-drill.md)            |
 
 ## Release checklist per slice
