@@ -56,12 +56,14 @@ Database changes are the only truly dangerous class of change, because rollback 
 
 - Never run `supabase db push`, `apply_migration`, or raw SQL against `qhtfixgbcpcitokeryxb` while
   an incident is open. Stabilise first.
-- **Do not assume a production backup exists from this document.** The live plan,
-  backup inventory, retention, and available recovery controls must be read from
-  the Supabase project with separately authorized access before a migration.
-- Recovery from a bad migration may require a restore and may lose changes after
-  the recovery point. Until a production drill measures it, both data loss and
-  recovery time are **unverified**. Treat every migration to production as one-way.
+- Production snapshot release `f928e21` dibuat dan diuji pada 18 Oktober 2026.
+  Lokasi serta checksum ada pada manifest privat owner-only di luar repository;
+  lihat laporan Task 18. Jangan menganggap snapshot ini memenuhi backup berkala
+  setelah recovery point tersebut menua.
+- Recovery from a bad migration may require restore dan kehilangan perubahan
+  setelah recovery point. Drill 18 Oktober mengukur data load sekitar 0,69 detik
+  dan upper bound snapshot sampai rekonsiliasi kurang dari 18 menit; angka ini
+  bukan jaminan untuk volume atau kondisi insiden berikutnya.
 - Before any future migration: apply it locally (`bunx supabase db reset`), run `bun run test`, and
   only then push. Migrations should ship on their own commit, never mixed with UI changes.
 
@@ -77,10 +79,11 @@ Database changes are the only truly dangerous class of change, because rollback 
 5. Calculate measured RPO and RTO against D07. If either cannot be measured or
    misses the target, stop the production migration.
 
-A local synthetic drill was completed on 16 October 2026; it validates the drill
-procedure only. It does not prove the production project's backup inventory,
-retention, RPO, RTO, or recoverability. See
-`docs/reports/2026-10-16-crm-local-restore-drill.md`.
+A local synthetic drill was completed on 16 October 2026. Production snapshot
+dan isolated restore selesai pada 18 Oktober 2026; lihat
+`docs/reports/2026-10-18-crm-task-18-production-restore-and-release.md`. Supabase
+Free plan tetap tidak memberi bukti automation backup harian, sehingga setiap
+migration berikutnya wajib membuat recovery point baru dan mengulang drill.
 
 ## Communication
 
