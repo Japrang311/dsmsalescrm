@@ -43,7 +43,24 @@ const itemSchema = z.object({
   ageDays: integer.nullable(),
   thresholdDays: integer.nullable(),
   totalValue: numeric.nullable(),
+  latestFeedback: z.enum(["relevant", "not_relevant"]).nullable(),
+  feedbackReason: z.string().nullable(),
+  feedbackRuleVersion: z.literal("d06-v1").nullable(),
   sourceHref: z.string().startsWith("/quotations/"),
+});
+
+const actionResultSchema = z.object({
+  id: z.string().uuid(),
+  entityId: z.string().uuid(),
+  ruleId,
+  ownerId: z.string().uuid(),
+  actorId: z.string().uuid(),
+  actionType: z.enum(["snooze", "feedback"]),
+  reason: z.string().min(1),
+  snoozedUntil: nullableDate,
+  feedback: z.enum(["relevant", "not_relevant"]).nullable(),
+  ruleVersion: z.literal("d06-v1"),
+  createdAt: z.string(),
 });
 
 const snapshotSchema = z.object({
@@ -54,6 +71,7 @@ const snapshotSchema = z.object({
     activeCount: integer,
     dataInsufficientCount: integer,
     incompleteEvidenceCount: integer,
+    snoozedCount: integer,
     byRule: z.record(ruleId, integer),
   }),
   page: z.object({
@@ -67,6 +85,17 @@ const snapshotSchema = z.object({
 export type ActionSignalsSnapshot = z.infer<typeof snapshotSchema>;
 export type ActionSignalCursor = z.infer<typeof cursorSchema>;
 export type ActionSignalItem = z.infer<typeof itemSchema>;
+export type ActionSignalActionResult = z.infer<typeof actionResultSchema>;
+
+export type ActionSignalActionInput = {
+  requestId: string;
+  entityId: string;
+  ruleId: CrmSignalRuleId;
+  reason: string;
+} & (
+  | { actionType: "snooze"; snoozedUntil: string }
+  | { actionType: "feedback"; feedback: "relevant" | "not_relevant" }
+);
 
 export type ActionSignalScope = {
   ownerId?: string;
@@ -124,6 +153,12 @@ export function normalizeActionSignalsSnapshot(
   return snapshot;
 }
 
+export function normalizeActionSignalActionResult(
+  input: unknown,
+): ActionSignalActionResult {
+  return actionResultSchema.parse(input);
+}
+
 export function actionSignalsQueryKey(scope: ActionSignalScope = {}) {
   return [
     "crm-action-signals",
@@ -149,4 +184,25 @@ export async function getActionSignals(
   if (error) throw error;
   if (!data) throw new Error("Antrean exception tidak tersedia");
   return normalizeActionSignalsSnapshot(data);
+}
+
+export async function recordActionSignalAction(
+  input: ActionSignalActionInput,
+): Promise<ActionSignalActionResult> {
+  const { data, error } = await supabase.rpc(
+    "record_crm_action_signal_action",
+    {
+      p_request_id: input.requestId,
+      p_entity_id: input.entityId,
+      p_rule_id: input.ruleId,
+      p_action_type: input.actionType,
+      p_reason: input.reason.trim(),
+      p_snoozed_until:
+        input.actionType === "snooze" ? input.snoozedUntil : null,
+      p_feedback: input.actionType === "feedback" ? input.feedback : null,
+    },
+  );
+  if (error) throw error;
+  if (!data) throw new Error("Aksi sinyal tidak menghasilkan bukti simpan");
+  return normalizeActionSignalActionResult(data);
 }

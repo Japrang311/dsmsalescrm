@@ -85,6 +85,7 @@ const signalSnapshot: ActionSignalsSnapshot = {
     activeCount: 2,
     dataInsufficientCount: 1,
     incompleteEvidenceCount: 1,
+    snoozedCount: 2,
     byRule: {
       won_without_so: 0,
       expected_close_overdue: 1,
@@ -113,6 +114,9 @@ const signalSnapshot: ActionSignalsSnapshot = {
       ageDays: 1,
       thresholdDays: null,
       totalValue: 125_000_000,
+      latestFeedback: "not_relevant",
+      feedbackReason: "Tanggal masih administratif",
+      feedbackRuleVersion: "d06-v1",
       sourceHref: "/quotations/00000000-0000-4000-8000-000000000001",
     },
     {
@@ -133,6 +137,9 @@ const signalSnapshot: ActionSignalsSnapshot = {
       ageDays: 0,
       thresholdDays: 7,
       totalValue: 125_000_000,
+      latestFeedback: null,
+      feedbackReason: null,
+      feedbackRuleVersion: null,
       sourceHref: "/quotations/00000000-0000-4000-8000-000000000001",
     },
     {
@@ -153,6 +160,9 @@ const signalSnapshot: ActionSignalsSnapshot = {
       ageDays: null,
       thresholdDays: 14,
       totalValue: null,
+      latestFeedback: null,
+      feedbackReason: null,
+      feedbackRuleVersion: null,
       sourceHref: "/quotations/00000000-0000-4000-8000-000000000002",
     },
   ],
@@ -260,6 +270,10 @@ describe("Precision operational presentation", () => {
     expect(html).toContain("Data belum cukup");
     expect(html).toContain("Buka quotation");
     expect(html).toContain("3 sinyal");
+    expect(html).toContain("2 sinyal ditunda");
+    expect(html).toContain("Tidak relevan");
+    expect(html).toContain("Tanggal masih administratif");
+    expect(html).toContain("Tunda / feedback");
     expect(html).toContain("2 quotation dimuat");
   });
   test("action queue distinguishes loading, error, empty, aggregate-only, and pagination states", () => {

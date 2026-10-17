@@ -1,6 +1,7 @@
 import { AlertTriangle, ArrowRight, ListChecks, PhoneCall } from "lucide-react";
 
 import { LogCommercialFollowUpDialog } from "@/components/commercial/LogCommercialFollowUpDialog";
+import { ActionSignalActionDialog } from "@/components/tasks/ActionSignalActionDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -104,6 +105,9 @@ export function ActionSignalList({
               {snapshot.totals.totalCount} sinyal
             </p>
             {!aggregateOnly ? <p>{groups.length} quotation dimuat</p> : null}
+            {snapshot.totals.snoozedCount > 0 ? (
+              <p>{snapshot.totals.snoozedCount} sinyal ditunda</p>
+            ) : null}
           </div>
         ) : null}
       </header>
@@ -226,10 +230,26 @@ export function ActionSignalList({
                             Data belum cukup
                           </Badge>
                         ) : null}
+                        {signal.latestFeedback ? (
+                          <Badge variant="secondary">
+                            {signal.latestFeedback === "relevant"
+                              ? "Relevan"
+                              : "Tidak relevan"}
+                          </Badge>
+                        ) : null}
+                        <ActionSignalActionDialog
+                          signal={signal}
+                          clientName={group.clientName}
+                        />
                       </div>
                       <p className="mt-1 text-muted-foreground">
                         {signal.reason}
                       </p>
+                      {signal.feedbackReason ? (
+                        <p className="mt-1 text-muted-foreground">
+                          Feedback: {signal.feedbackReason}
+                        </p>
+                      ) : null}
                       {!compact && signal.dueDate ? (
                         <p className="mt-1 text-muted-foreground">
                           Tanggal prioritas {formatDateShort(signal.dueDate)}

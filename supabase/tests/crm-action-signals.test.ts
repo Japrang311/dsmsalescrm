@@ -348,6 +348,7 @@ describe("crm_action_signals", () => {
       activeCount: 8,
       dataInsufficientCount: 1,
       incompleteEvidenceCount: 2,
+      snoozedCount: 0,
       byRule: {
         won_without_so: 2,
         expected_close_overdue: 4,

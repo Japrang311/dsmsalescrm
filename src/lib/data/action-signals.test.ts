@@ -3,7 +3,10 @@ import {
   evaluateCrmSignalCandidate,
   type CrmSignalCandidate,
 } from "../crm-signal-rules";
-import { normalizeActionSignalsSnapshot } from "./action-signals";
+import {
+  normalizeActionSignalActionResult,
+  normalizeActionSignalsSnapshot,
+} from "./action-signals";
 
 const baseCandidate: CrmSignalCandidate = {
   entityId: "00000000-0000-4000-8000-000000000001",
@@ -94,6 +97,7 @@ describe("action signal adapter", () => {
         activeCount: 1,
         dataInsufficientCount: 0,
         incompleteEvidenceCount: 0,
+        snoozedCount: 2,
         byRule: { won_without_so: 1 },
       },
       page: { limit: 1, returnedCount: 1 },
@@ -124,13 +128,40 @@ describe("action signal adapter", () => {
           ageDays: 2,
           thresholdDays: null,
           totalValue: "1250000",
+          latestFeedback: "not_relevant",
+          feedbackReason: "Tanggal administratif",
+          feedbackRuleVersion: "d06-v1",
           sourceHref: "/quotations/00000000-0000-4000-8000-000000000001",
         },
       ],
     });
 
     expect(snapshot.items[0].totalValue).toBe(1_250_000);
+    expect(snapshot.totals.snoozedCount).toBe(2);
+    expect(snapshot.items[0].latestFeedback).toBe("not_relevant");
     expect(snapshot.nextCursor?.value).toBe(1_250_000);
+  });
+
+  test("normalizes the persisted action command receipt", () => {
+    expect(
+      normalizeActionSignalActionResult({
+        id: "00000000-0000-4000-8000-000000000010",
+        entityId: "00000000-0000-4000-8000-000000000001",
+        ruleId: "expected_close_overdue",
+        ownerId: "00000000-0000-4000-8000-000000000003",
+        actorId: "00000000-0000-4000-8000-000000000004",
+        actionType: "snooze",
+        reason: "Menunggu keputusan",
+        snoozedUntil: "2026-10-20",
+        feedback: null,
+        ruleVersion: "d06-v1",
+        createdAt: "2026-10-17T01:00:00Z",
+      }),
+    ).toMatchObject({
+      actionType: "snooze",
+      snoozedUntil: "2026-10-20",
+      ruleVersion: "d06-v1",
+    });
   });
 
   test("rejects totals or rule priorities that do not reconcile", () => {
@@ -143,6 +174,7 @@ describe("action signal adapter", () => {
           activeCount: 1,
           dataInsufficientCount: 0,
           incompleteEvidenceCount: 0,
+          snoozedCount: 0,
           byRule: { won_without_so: 1 },
         },
         page: { limit: 50, returnedCount: 1 },
@@ -166,6 +198,9 @@ describe("action signal adapter", () => {
             ageDays: 2,
             thresholdDays: null,
             totalValue: 1_250_000,
+            latestFeedback: null,
+            feedbackReason: null,
+            feedbackRuleVersion: null,
             sourceHref: "/quotations/00000000-0000-4000-8000-000000000001",
           },
         ],

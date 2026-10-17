@@ -1,6 +1,6 @@
 # Checklist — CRM Reliability and Growth
 
-Tanggal: 17 Oktober 2026 · Status: **Gate A dan Gate B verified local; Task 12a–13 verified local; Task 14 belum dimulai; gate produksi blocked Task 18 remote**.
+Tanggal: 17 Oktober 2026 · Status: **Gate A dan Gate B verified local; Task 12a–14 verified local; Task 15 belum dimulai; gate produksi blocked Task 18 remote**.
 
 [Spec](../specs/crm-reliability-and-growth.md) ·
 [Plan dan acceptance per task](crm-reliability-and-growth-plan.md)
@@ -59,7 +59,7 @@ Checkbox hanya boleh selesai jika evidence dicatat, bukan karena kode ditulis.
 - [x] 12a Signal rules/aggregate — verified local; lihat evidence ledger.
 - [x] 12b Signal list UI — verified local + browser; lihat evidence ledger.
 - [x] 13 Follow-up dari exception — verified local + browser; lihat evidence ledger.
-- [ ] 14 Snooze dan feedback.
+- [x] 14 Snooze dan feedback — verified local + browser; lihat evidence ledger.
 - [ ] 15 Cadence repeat-order.
 - [ ] 16 Repeat signal pada antrean/client.
 - [ ] 17 Pilot dan evaluasi.
@@ -112,6 +112,7 @@ Released, Deferred. Blocker harus menjelaskan kebutuhan untuk melanjutkan.
 | 12a Signal rules/aggregate        | Verified local | Tidak dibuat | 12 targeted + full 774 pass; cutoff, dedupe, RLS, exact count, tie cursor, invalid cursor, performance lulus | Tidak relevan; UI/browser menjadi Task 12b                                         | Fresh reset lokal; remote tidak dilakukan     | [Task 12a](../docs/reports/2026-10-17-crm-task-12a-verification.md)               |
 | 12b Signal list UI                | Verified local | Tidak dibuat | 15 targeted + full 776 pass; state, grouping, count, adapter, lint/typecheck/build lulus                     | 17 Chromium pass; RPC/UI, Tasks/Dashboard, Sales/Executive, keyboard, mobile lulus | Fresh reset lokal; remote tidak dilakukan     | [Task 12b](../docs/reports/2026-10-17-crm-task-12b-verification.md)               |
 | 13 Follow-up dari exception       | Verified local | Tidak dibuat | 31 targeted + full 783 pass; RLS/direct API, concurrency, replay, rollback, role/ownership lulus             | Open-record-reload lulus; final full 18 pass tanpa retry                           | Migration hanya lokal; remote tidak dilakukan | [Task 13](../docs/reports/2026-10-17-crm-task-13-verification.md)                 |
+| 14 Snooze dan feedback            | Verified local | Task 14 commit | 31 targeted + full 793 pass; RLS/direct bypass, forged rule, concurrency, retry, rollback, transfer lulus | Snooze/reload/resurface/feedback/reconcile lulus; full 19 pass tanpa retry | Dua migration hanya lokal; remote ditahan | [Task 14](../docs/reports/2026-10-17-crm-task-14-verification.md) |
 | 18 Backup/restore                 | Blocked        | Tidak dibuat | DB/Auth/Storage synthetic restore dan reconciliation lulus lokal                                             | Tidak relevan                                                                      | Live inventory/restore tidak diizinkan        | [Restore drill](../docs/reports/2026-10-16-crm-local-restore-drill.md)            |
 
 ## Release checklist per slice

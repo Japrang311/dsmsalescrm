@@ -173,6 +173,143 @@ test("action queue reconciles local RPC data across Tasks, Dashboard, roles, key
   expectNoConsoleIssues(consoleIssues);
 });
 
+test("sales can snooze a signal, resurface it with progress, and persist feedback", async ({
+  page,
+}) => {
+  const consoleIssues = collectConsoleIssues(page);
+  const sales = await authenticatedSupabaseClient(USERS.sales);
+  const quotationNumber = `QT-SIGNAL-ACTION-${Date.now()}`;
+  const todayJakarta = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jakarta",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+  const [year, month, day] = todayJakarta.split("-").map(Number);
+  const yesterday = new Date(Date.UTC(year, month - 1, day - 1))
+    .toISOString()
+    .slice(0, 10);
+
+  const { data: quotation, error: quotationError } = await sales
+    .from("commercial_documents")
+    .insert({
+      client_id: NUR_CLIENT_ID,
+      owner_id: USER_IDS.sales,
+      type: "Quotation",
+      source_flow: "RFQ / New Product",
+      document_date: yesterday,
+      quotation_number: quotationNumber,
+      quotation_base_number: quotationNumber,
+      quotation_revision: 0,
+      is_current_revision: true,
+      stage: "Negotiation",
+      expected_close_date: yesterday,
+    })
+    .select("id")
+    .single();
+  expect(quotationError).toBeNull();
+
+  const before = await sales.rpc("crm_action_signals", {
+    p_as_of: null,
+    p_owner_id: null,
+    p_client_status: null,
+    p_limit: 100,
+    p_after: null,
+  });
+  expect(before.error).toBeNull();
+  const snoozedBefore = before.data.totals.snoozedCount as number;
+
+  await signIn(page, USERS.sales);
+  await page.goto("/tasks");
+  const queue = page.getByRole("region", { name: "Antrean tindakan" });
+  const quotationRow = queue.locator("li").filter({ hasText: quotationNumber });
+  const overdueSignal = quotationRow
+    .locator("li")
+    .filter({ hasText: "Expected close lewat" });
+  await expect(overdueSignal).toBeVisible();
+  await overdueSignal.getByRole("button", { name: "Tunda / feedback" }).click();
+
+  let dialog = page.getByRole("dialog", { name: "Tindak lanjuti sinyal" });
+  await dialog.getByLabel("Ditunda sampai (inklusif)").fill(tomorrowIsoDate());
+  await dialog.getByLabel("Alasan").fill("Menunggu keputusan pelanggan E2E");
+  await dialog.getByRole("button", { name: "Simpan aksi" }).click();
+  await expect(page.getByText("Sinyal ditunda", { exact: true })).toBeVisible();
+  await expect(
+    queue.getByText(`${snoozedBefore + 1} sinyal ditunda`),
+  ).toBeVisible();
+  await expect(overdueSignal).toHaveCount(0);
+
+  await page.reload();
+  await expect(
+    queue.getByText(`${snoozedBefore + 1} sinyal ditunda`),
+  ).toBeVisible();
+  await expect(
+    queue
+      .locator("li")
+      .filter({ hasText: quotationNumber })
+      .locator("li")
+      .filter({ hasText: "Expected close lewat" }),
+  ).toHaveCount(0);
+
+  const { error: progressError } = await sales.from("follow_up_logs").insert({
+    client_id: NUR_CLIENT_ID,
+    commercial_document_id: quotation.id,
+    owner_id: USER_IDS.sales,
+    fu_date: todayJakarta,
+    method: "Phone",
+    result: "Interested",
+    notes: "E2E material progress resurfaces snoozed signal",
+  });
+  expect(progressError).toBeNull();
+
+  await page.reload();
+  const resurfacedSignal = queue
+    .locator("li")
+    .filter({ hasText: quotationNumber })
+    .locator("li")
+    .filter({ hasText: "Expected close lewat" });
+  await expect(resurfacedSignal).toBeVisible();
+  await resurfacedSignal
+    .getByRole("button", { name: "Tunda / feedback" })
+    .click();
+  dialog = page.getByRole("dialog", { name: "Tindak lanjuti sinyal" });
+  await dialog.getByLabel("Aksi").click();
+  await page.getByRole("option", { name: "Tidak relevan" }).click();
+  await dialog.getByLabel("Alasan").fill("Tanggal administratif E2E");
+  await dialog.getByRole("button", { name: "Simpan aksi" }).click();
+  await expect(page.getByText("Feedback tersimpan")).toBeVisible();
+
+  await page.reload();
+  await expect(resurfacedSignal.getByText("Tidak relevan")).toBeVisible();
+  await expect(
+    resurfacedSignal.getByText("Feedback: Tanggal administratif E2E"),
+  ).toBeVisible();
+
+  const { data: actions, error: actionsError } = await sales
+    .from("crm_action_signal_actions")
+    .select("action_type, reason, feedback, snoozed_until")
+    .eq("entity_id", quotation.id)
+    .eq("rule_id", "expected_close_overdue")
+    .order("created_at", { ascending: true });
+  expect(actionsError).toBeNull();
+  expect(actions).toEqual([
+    {
+      action_type: "snooze",
+      reason: "Menunggu keputusan pelanggan E2E",
+      feedback: null,
+      snoozed_until: tomorrowIsoDate(),
+    },
+    {
+      action_type: "feedback",
+      reason: "Tanggal administratif E2E",
+      feedback: "not_relevant",
+      snoozed_until: null,
+    },
+  ]);
+
+  expectNoConsoleIssues(consoleIssues);
+});
+
 test("sales records an exception follow-up and reuses its active Task after reload", async ({
   page,
 }) => {
