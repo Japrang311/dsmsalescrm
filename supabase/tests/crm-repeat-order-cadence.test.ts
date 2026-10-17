@@ -1,3 +1,4 @@
+import { SQL } from "bun";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { createClient } from "@supabase/supabase-js";
 import {
@@ -17,12 +18,14 @@ import {
 const ANON_KEY =
   process.env.SUPABASE_ANON_KEY ??
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0";
+const db = new SQL("postgresql://postgres:postgres@127.0.0.1:54322/postgres");
 const asOfDate = "2026-11-20";
 
 let users: RoleFixtureUsers;
 const clientIds: string[] = [];
 const salesOrderIds: string[] = [];
 const authOnlyUserIds: string[] = [];
+const feedbackIds: string[] = [];
 let salesCadenceClientId: string;
 let insufficientClientId: string;
 let seasonalClientId: string;
@@ -179,6 +182,12 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  if (feedbackIds.length > 0) {
+    await adminClient
+      .from("crm_repeat_order_feedback")
+      .delete()
+      .in("id", feedbackIds);
+  }
   await adminClient.from("sales_orders").delete().in("id", salesOrderIds);
   await adminClient.from("clients").delete().in("id", clientIds);
   for (const id of authOnlyUserIds) {
@@ -329,6 +338,159 @@ describe("crm_repeat_order_cadence", () => {
     );
     expect(executiveResult.data.items).toEqual([]);
     expect(executiveResult.data.page.returnedCount).toBe(0);
+  });
+
+  test("filters one client exactly without exposing a different owner", async () => {
+    const caller = await signInAs(users.sales);
+    const owned = await caller.rpc("crm_repeat_order_cadence", {
+      p_as_of: asOfDate,
+      p_client_id: salesCadenceClientId,
+      p_limit: 1,
+      p_offset: 0,
+    });
+    expect(owned.error).toBeNull();
+    expect(owned.data.totals.candidateCount).toBe(1);
+    expect(owned.data.items).toHaveLength(1);
+    expect(owned.data.items[0].clientId).toBe(salesCadenceClientId);
+
+    const crossOwner = await caller.rpc("crm_repeat_order_cadence", {
+      p_as_of: asOfDate,
+      p_client_id: seasonalClientId,
+      p_limit: 1,
+      p_offset: 0,
+    });
+    expect(crossOwner.error).toBeNull();
+    expect(crossOwner.data.totals.candidateCount).toBe(0);
+    expect(crossOwner.data.items).toEqual([]);
+  });
+
+  test("stores idempotent owner-scoped D05 feedback and annotates the signal", async () => {
+    const caller = await signInAs(users.sales);
+    const requestId = crypto.randomUUID();
+    const input = {
+      p_request_id: requestId,
+      p_client_id: salesCadenceClientId,
+      p_feedback: "relevant",
+      p_reason: "Cadence sesuai pola pembelian fixture",
+      p_as_of: asOfDate,
+    };
+    const [left, right] = await Promise.all([
+      caller.rpc("record_crm_repeat_order_feedback", input),
+      caller.rpc("record_crm_repeat_order_feedback", input),
+    ]);
+    expect(left.error).toBeNull();
+    expect(right.error).toBeNull();
+    expect(right.data).toEqual(left.data);
+    feedbackIds.push(left.data.id);
+
+    const snapshot = await caller.rpc("crm_repeat_order_cadence", {
+      p_as_of: asOfDate,
+      p_client_id: salesCadenceClientId,
+      p_limit: 1,
+      p_offset: 0,
+    });
+    expect(snapshot.error).toBeNull();
+    expect(snapshot.data.items[0]).toMatchObject({
+      clientId: salesCadenceClientId,
+      latestFeedback: "relevant",
+      feedbackReason: "Cadence sesuai pola pembelian fixture",
+      feedbackRuleVersion: "d05-v1",
+    });
+
+    const mismatch = await caller.rpc("record_crm_repeat_order_feedback", {
+      ...input,
+      p_feedback: "not_relevant",
+    });
+    expect(mismatch.error?.message).toContain("REQUEST_PAYLOAD_MISMATCH");
+
+    const direct = await caller.from("crm_repeat_order_feedback").insert({
+      client_id: salesCadenceClientId,
+      owner_id: users.sales.id,
+      actor_id: users.sales.id,
+      feedback: "relevant",
+      reason: "Direct API must fail",
+      request_id: crypto.randomUUID(),
+    });
+    expect(direct.error).toBeDefined();
+  });
+
+  test("rejects feedback from Executive, another owner, or a non-overdue cadence", async () => {
+    const executive = await signInAs(users.executive);
+    const executiveResult = await executive.rpc(
+      "record_crm_repeat_order_feedback",
+      {
+        p_request_id: crypto.randomUUID(),
+        p_client_id: salesCadenceClientId,
+        p_feedback: "relevant",
+        p_reason: "Executive cannot mutate",
+        p_as_of: asOfDate,
+      },
+    );
+    expect(executiveResult.error?.message).toContain(
+      "ACTIVE_MUTATING_ROLE_REQUIRED",
+    );
+
+    const caller = await signInAs(users.sales);
+    const crossOwner = await caller.rpc("record_crm_repeat_order_feedback", {
+      p_request_id: crypto.randomUUID(),
+      p_client_id: seasonalClientId,
+      p_feedback: "not_relevant",
+      p_reason: "Must not cross owner",
+      p_as_of: asOfDate,
+    });
+    expect(crossOwner.error?.message).toContain("CLIENT_OWNERSHIP_REQUIRED");
+
+    const notOverdue = await caller.rpc("record_crm_repeat_order_feedback", {
+      p_request_id: crypto.randomUUID(),
+      p_client_id: insufficientClientId,
+      p_feedback: "not_relevant",
+      p_reason: "Insufficient data is not a risk signal",
+      p_as_of: asOfDate,
+    });
+    expect(notOverdue.error?.message).toContain(
+      "REPEAT_ORDER_SIGNAL_NOT_OVERDUE",
+    );
+  });
+
+  test("rolls back feedback when persistence fails", async () => {
+    const caller = await signInAs(users.sales);
+    const requestId = crypto.randomUUID();
+    try {
+      await db`
+        create or replace function private.zzz_fail_repeat_order_feedback()
+        returns trigger language plpgsql set search_path = '' as $$
+        begin
+          if new.reason = 'FORCE_REPEAT_FEEDBACK_ROLLBACK' then
+            raise exception 'forced repeat feedback failure';
+          end if;
+          return new;
+        end $$
+      `;
+      await db`
+        create trigger zzz_fail_repeat_order_feedback
+        before insert on public.crm_repeat_order_feedback
+        for each row execute function private.zzz_fail_repeat_order_feedback()
+      `;
+
+      const failed = await caller.rpc("record_crm_repeat_order_feedback", {
+        p_request_id: requestId,
+        p_client_id: salesCadenceClientId,
+        p_feedback: "not_relevant",
+        p_reason: "FORCE_REPEAT_FEEDBACK_ROLLBACK",
+        p_as_of: asOfDate,
+      });
+      expect(failed.error?.message).toContain("forced repeat feedback failure");
+
+      const stored = await adminClient
+        .from("crm_repeat_order_feedback")
+        .select("id")
+        .eq("request_id", requestId);
+      expect(stored.error).toBeNull();
+      expect(stored.data).toEqual([]);
+    } finally {
+      await db`drop trigger if exists zzz_fail_repeat_order_feedback on public.crm_repeat_order_feedback`;
+      await db`drop function if exists private.zzz_fail_repeat_order_feedback()`;
+    }
   });
 
   test("excludes Dormant by default but permits an explicit status review", async () => {

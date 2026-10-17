@@ -39,6 +39,14 @@ export function activeCommercialTasks(
   return commercialRelatedTasks(tasks, commercialItemId).filter(isActiveTask);
 }
 
+export function reusableClientTask(
+  tasks: Task[],
+  clientId: string,
+): Task | undefined {
+  const activeTasks = activeClientTasks(tasks, clientId);
+  return activeTasks.length === 1 ? activeTasks[0] : undefined;
+}
+
 export function reusableCommercialTask(
   tasks: Task[],
   commercialItemId: string,

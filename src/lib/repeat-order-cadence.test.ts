@@ -3,7 +3,11 @@ import {
   REPEAT_ORDER_RULE_VERSION,
   evaluateRepeatOrderCadence,
 } from "./repeat-order-cadence";
-import { normalizeRepeatOrderSnapshot } from "./data/repeat-order-cadence";
+import {
+  normalizeRepeatOrderFeedbackResult,
+  normalizeRepeatOrderSnapshot,
+  repeatOrderQueryKey,
+} from "./data/repeat-order-cadence";
 
 describe("repeat-order cadence D05", () => {
   test("deduplicates order dates and excludes dates outside the 365-day window", () => {
@@ -194,6 +198,9 @@ describe("repeat-order cadence adapter", () => {
           state: "overdue",
           reason:
             "Terlambat 7 hari: 52 hari sejak order terakhir, melewati ambang 45 hari.",
+          latestFeedback: "relevant",
+          feedbackReason: "Cadence sesuai pola pembelian",
+          feedbackRuleVersion: "d05-v1",
           sourceHref: "/clients/00000000-0000-4000-8000-000000000001",
         },
       ],
@@ -203,6 +210,44 @@ describe("repeat-order cadence adapter", () => {
       medianIntervalDays: 30,
       overdueThresholdDays: 45,
       overdueByDays: 7,
+      latestFeedback: "relevant",
+      feedbackReason: "Cadence sesuai pola pembelian",
+      feedbackRuleVersion: "d05-v1",
+    });
+  });
+
+  test("includes an exact client filter in the cache key", () => {
+    expect(
+      repeatOrderQueryKey({
+        ownerId: "00000000-0000-4000-8000-000000000002",
+        clientId: "00000000-0000-4000-8000-000000000001",
+      }),
+    ).toEqual([
+      "crm-repeat-order-cadence",
+      {
+        ownerId: "00000000-0000-4000-8000-000000000002",
+        clientStatus: null,
+        clientId: "00000000-0000-4000-8000-000000000001",
+      },
+    ]);
+  });
+
+  test("normalizes an idempotent D05 feedback result", () => {
+    expect(
+      normalizeRepeatOrderFeedbackResult({
+        id: "00000000-0000-4000-8000-000000000010",
+        clientId: "00000000-0000-4000-8000-000000000001",
+        ownerId: "00000000-0000-4000-8000-000000000002",
+        actorId: "00000000-0000-4000-8000-000000000003",
+        feedback: "not_relevant",
+        reason: "Pola proyek musiman",
+        ruleVersion: "d05-v1",
+        createdAt: "2026-10-17T08:00:00Z",
+      }),
+    ).toMatchObject({
+      feedback: "not_relevant",
+      reason: "Pola proyek musiman",
+      ruleVersion: "d05-v1",
     });
   });
 

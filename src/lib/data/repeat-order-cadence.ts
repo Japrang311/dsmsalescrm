@@ -42,7 +42,24 @@ const itemSchema = z.object({
   overdueByDays: nullableNumeric,
   state: z.enum(["overdue", "on_cadence", "data_insufficient"]),
   reason: z.string().min(1),
+  latestFeedback: z.enum(["relevant", "not_relevant"]).nullable().default(null),
+  feedbackReason: z.string().nullable().default(null),
+  feedbackRuleVersion: z
+    .literal(REPEAT_ORDER_RULE_VERSION)
+    .nullable()
+    .default(null),
   sourceHref: z.string().startsWith("/clients/"),
+});
+
+const feedbackResultSchema = z.object({
+  id: z.string().uuid(),
+  clientId: z.string().uuid(),
+  ownerId: z.string().uuid(),
+  actorId: z.string().uuid(),
+  feedback: z.enum(["relevant", "not_relevant"]),
+  reason: z.string().min(1),
+  ruleVersion: z.literal(REPEAT_ORDER_RULE_VERSION),
+  createdAt: z.string(),
 });
 
 const snapshotSchema = z.object({
@@ -72,10 +89,20 @@ const snapshotSchema = z.object({
 
 export type RepeatOrderSnapshot = z.infer<typeof snapshotSchema>;
 export type RepeatOrderCadenceItem = z.infer<typeof itemSchema>;
+export type RepeatOrderFeedbackResult = z.infer<typeof feedbackResultSchema>;
 
 export type RepeatOrderScope = {
   ownerId?: string;
   clientStatus?: ClientStatus;
+  clientId?: string;
+};
+
+export type RepeatOrderFeedbackInput = {
+  requestId: string;
+  clientId: string;
+  feedback: "relevant" | "not_relevant";
+  reason: string;
+  asOfDate?: string;
 };
 
 function closeEnough(left: number, right: number): boolean {
@@ -166,6 +193,7 @@ export function repeatOrderQueryKey(scope: RepeatOrderScope = {}) {
     {
       ownerId: scope.ownerId ?? null,
       clientStatus: scope.clientStatus ?? null,
+      clientId: scope.clientId ?? null,
     },
   ] as const;
 }
@@ -179,10 +207,36 @@ export async function getRepeatOrderCadence(
     p_as_of: asOfDate ?? null,
     p_owner_id: scope.ownerId ?? null,
     p_client_status: scope.clientStatus ?? null,
+    p_client_id: scope.clientId ?? null,
     p_limit: page.limit ?? 50,
     p_offset: page.offset ?? 0,
   });
   if (error) throw error;
   if (!data) throw new Error("Cadence repeat-order tidak tersedia");
   return normalizeRepeatOrderSnapshot(data);
+}
+
+export function normalizeRepeatOrderFeedbackResult(
+  input: unknown,
+): RepeatOrderFeedbackResult {
+  return feedbackResultSchema.parse(input);
+}
+
+export async function recordRepeatOrderFeedback(
+  input: RepeatOrderFeedbackInput,
+): Promise<RepeatOrderFeedbackResult> {
+  const { data, error } = await supabase.rpc(
+    "record_crm_repeat_order_feedback",
+    {
+      p_request_id: input.requestId,
+      p_client_id: input.clientId,
+      p_feedback: input.feedback,
+      p_reason: input.reason.trim(),
+      p_as_of: input.asOfDate ?? null,
+    },
+  );
+  if (error) throw error;
+  if (!data)
+    throw new Error("Feedback repeat-order tidak menghasilkan bukti simpan");
+  return normalizeRepeatOrderFeedbackResult(data);
 }

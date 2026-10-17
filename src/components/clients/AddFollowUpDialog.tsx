@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -34,7 +34,10 @@ import {
   type FollowUpResult,
 } from "@/lib/data/follow-ups";
 import { listTasks } from "@/lib/data/tasks";
-import { activeClientTasks } from "@/lib/data/task-relations";
+import {
+  activeClientTasks,
+  reusableClientTask,
+} from "@/lib/data/task-relations";
 import { buildExplicitFollowUpCommand } from "@/lib/follow-up-command";
 import { useClientResolution } from "./use-client-resolution";
 import { ClientPickerField } from "./ClientPicker";
@@ -52,24 +55,32 @@ const RESULTS: FollowUpResult[] = [
   "Follow-up Later",
 ];
 
-const schema = z.object({
-  method: z.enum(METHODS),
-  result: z.enum(RESULTS as [FollowUpResult, ...FollowUpResult[]]),
-  fuDate: z.string().min(4, { message: "Tanggal wajib diisi" }),
-  notes: z
-    .string()
-    .trim()
-    .min(4, { message: "Catatan minimal 4 karakter" })
-    .max(400, { message: "Catatan maks 400 karakter" }),
-  taskMode: z.enum(["existing_task", "create_task"]),
-  taskId: z.string().optional(),
-  nextAction: z
-    .string()
-    .trim()
-    .min(4, { message: "Next action minimal 4 karakter" })
-    .max(160, { message: "Next action maks 160 karakter" }),
-  nextActionDate: z.string().min(4, { message: "Tanggal next action wajib" }),
-});
+const schema = z
+  .object({
+    method: z.enum(METHODS),
+    result: z.enum(RESULTS as [FollowUpResult, ...FollowUpResult[]]),
+    fuDate: z.string().min(4, { message: "Tanggal wajib diisi" }),
+    notes: z
+      .string()
+      .trim()
+      .min(4, { message: "Catatan minimal 4 karakter" })
+      .max(400, { message: "Catatan maks 400 karakter" }),
+    taskMode: z.enum(["existing_task", "create_task"]),
+    taskId: z.string().optional(),
+    nextAction: z
+      .string()
+      .trim()
+      .min(4, { message: "Next action minimal 4 karakter" })
+      .max(160, { message: "Next action maks 160 karakter" }),
+    nextActionDate: z.string().min(4, { message: "Tanggal next action wajib" }),
+  })
+  .refine(
+    (value) => value.taskMode !== "existing_task" || Boolean(value.taskId),
+    {
+      path: ["taskId"],
+      message: "Pilih Task aktif",
+    },
+  );
 
 type FollowUpValues = z.infer<typeof schema>;
 
@@ -80,6 +91,7 @@ export function AddFollowUpDialog({
   trigger,
   open: controlledOpen,
   onOpenChange,
+  preferExistingTask = false,
 }: {
   clientId?: string;
   clientName?: string;
@@ -87,6 +99,7 @@ export function AddFollowUpDialog({
   trigger?: ReactNode;
   open?: boolean;
   onOpenChange?: (o: boolean) => void;
+  preferExistingTask?: boolean;
 }) {
   const [uncontrolled, setUncontrolled] = useState(false);
   const open = controlledOpen ?? uncontrolled;
@@ -112,6 +125,7 @@ export function AddFollowUpDialog({
     control,
     watch,
     reset,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<FollowUpValues>({
     resolver: zodResolver(schema),
@@ -127,7 +141,7 @@ export function AddFollowUpDialog({
     },
   });
   const taskMode = watch("taskMode");
-  const { data: tasks = [] } = useQuery({
+  const { data: tasks = [], isFetched: tasksFetched } = useQuery({
     queryKey: ["tasks", "all"],
     queryFn: listTasks,
     enabled: open && Boolean(resolvedClientId),
@@ -135,6 +149,24 @@ export function AddFollowUpDialog({
   const activeTasks = resolvedClientId
     ? activeClientTasks(tasks, resolvedClientId)
     : [];
+  const reusableTask = resolvedClientId
+    ? reusableClientTask(tasks, resolvedClientId)
+    : undefined;
+
+  useEffect(() => {
+    if (!open || !preferExistingTask || !tasksFetched) return;
+    if (activeTasks.length > 0) {
+      setValue("taskMode", "existing_task");
+      setValue("taskId", reusableTask?.id ?? "");
+    }
+  }, [
+    activeTasks.length,
+    open,
+    preferExistingTask,
+    reusableTask?.id,
+    setValue,
+    tasksFetched,
+  ]);
 
   const onSubmit = handleSubmit(async (v) => {
     if (!resolvedClientId || !resolvedOwnerId) return;
@@ -274,7 +306,7 @@ export function AddFollowUpDialog({
               name="taskMode"
               render={({ field }) => (
                 <Select value={field.value} onValueChange={field.onChange}>
-                  <SelectTrigger>
+                  <SelectTrigger aria-label="Task yang diprogress">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -295,7 +327,7 @@ export function AddFollowUpDialog({
                 name="taskId"
                 render={({ field }) => (
                   <Select value={field.value} onValueChange={field.onChange}>
-                    <SelectTrigger>
+                    <SelectTrigger aria-label="Pilih Task aktif">
                       <SelectValue placeholder="Pilih Task aktif" />
                     </SelectTrigger>
                     <SelectContent>
@@ -308,6 +340,11 @@ export function AddFollowUpDialog({
                   </Select>
                 )}
               />
+            )}
+            {errors.taskId && (
+              <p className="text-xs text-destructive">
+                {errors.taskId.message}
+              </p>
             )}
             <div className="grid gap-2 md:grid-cols-2">
               <div>

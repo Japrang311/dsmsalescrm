@@ -83,12 +83,17 @@ import { TaskDetailDrawer } from "@/components/tasks/TaskDetailDrawer";
 import { CreateTaskDialog } from "@/components/tasks/CreateTaskDialog";
 import { CalendarIncompleteWarning } from "@/components/tasks/CalendarIncompleteWarning";
 import { ActionSignalList } from "@/components/tasks/ActionSignalList";
+import { RepeatOrderSignalList } from "@/components/repeat-orders/RepeatOrderSignalList";
 import {
   actionSignalsQueryKey,
   getActionSignals,
   type ActionSignalCursor,
   type ActionSignalsSnapshot,
 } from "@/lib/data/action-signals";
+import {
+  getRepeatOrderCadence,
+  repeatOrderQueryKey,
+} from "@/lib/data/repeat-order-cadence";
 import {
   TaskHistorySection,
   TasksAgendaView,
@@ -246,6 +251,26 @@ function TasksInboxPage() {
       nextCursor: pages.at(-1)?.nextCursor ?? null,
     };
   }, [actionSignalsQuery.data]);
+  const repeatOrderQuery = useInfiniteQuery({
+    queryKey: [...repeatOrderQueryKey(signalScope), "pages"],
+    queryFn: ({ pageParam }: { pageParam: number }) =>
+      getRepeatOrderCadence(signalScope, { limit: 25, offset: pageParam }),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage) => {
+      if (role === "executive" || lastPage.page.returnedCount === 0) {
+        return undefined;
+      }
+      const nextOffset = lastPage.page.offset + lastPage.page.returnedCount;
+      return nextOffset < lastPage.page.totalCount ? nextOffset : undefined;
+    },
+    enabled: authReady,
+  });
+  const repeatOrderPages = repeatOrderQuery.data?.pages;
+  const repeatOrderTotals = repeatOrderPages?.[0]?.totals;
+  const repeatOrderItems = useMemo(
+    () => repeatOrderPages?.flatMap((page) => page.items) ?? [],
+    [repeatOrderPages],
+  );
 
   // "Waiting PO" quick action -> Commit stage move. Stage 4 Task 4.3: this
   // used to write stage + an unstructured activity_log row directly,
@@ -675,6 +700,19 @@ function TasksInboxPage() {
         aggregateOnly={role === "executive"}
         onRetry={() => void actionSignalsQuery.refetch()}
         onLoadMore={() => void actionSignalsQuery.fetchNextPage()}
+      />
+
+      <RepeatOrderSignalList
+        totals={repeatOrderTotals}
+        items={repeatOrderItems}
+        isLoading={repeatOrderQuery.isPending}
+        isError={repeatOrderQuery.isError}
+        isFetchingNextPage={repeatOrderQuery.isFetchingNextPage}
+        hasNextPage={Boolean(repeatOrderQuery.hasNextPage)}
+        aggregateOnly={role === "executive"}
+        canMutate={canEdit}
+        onRetry={() => void repeatOrderQuery.refetch()}
+        onLoadMore={() => void repeatOrderQuery.fetchNextPage()}
       />
 
       <div

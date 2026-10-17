@@ -42,6 +42,10 @@ import { ClientRevenueTab } from "@/components/clients/ClientRevenueTab";
 import { useState } from "react";
 import type { ClientStatus } from "@/lib/domain";
 import { PageSkeleton } from "@/components/layout/PageSkeleton";
+import {
+  getRepeatOrderCadence,
+  repeatOrderQueryKey,
+} from "@/lib/data/repeat-order-cadence";
 
 export const Route = createFileRoute("/_app/clients/$clientId")({
   head: () => ({ meta: [{ title: "Client · DSM Sales Execution" }] }),
@@ -88,6 +92,18 @@ function ClientProfilePage() {
     queryKey: ["profiles", "sales-team"],
     queryFn: listSalesTeamProfiles,
     enabled: authReady && (role === "manager" || role === "super_admin"),
+  });
+  const repeatOrderScope = {
+    clientId,
+    clientStatus:
+      client?.status === "Dormant" || client?.status === "Lost"
+        ? client.status
+        : undefined,
+  };
+  const repeatOrderQuery = useQuery({
+    queryKey: repeatOrderQueryKey(repeatOrderScope),
+    queryFn: () => getRepeatOrderCadence(repeatOrderScope, { limit: 1 }),
+    enabled: authReady && Boolean(client),
   });
 
   const revenue = clientRevenueMetrics(salesOrders, clientId);
@@ -198,6 +214,10 @@ function ClientProfilePage() {
             owners={owners}
             upcomingActions={upcomingActions}
             setActiveTab={setActiveTab}
+            repeatOrderSnapshot={repeatOrderQuery.data}
+            repeatOrderLoading={repeatOrderQuery.isPending}
+            repeatOrderError={repeatOrderQuery.isError}
+            repeatOrderAggregateOnly={role === "executive"}
           />
         </TabsContent>
 

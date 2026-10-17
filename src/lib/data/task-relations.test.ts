@@ -5,6 +5,7 @@ import {
   activeCommercialTasks,
   clientRelatedTasks,
   commercialRelatedTasks,
+  reusableClientTask,
   reusableCommercialTask,
 } from "@/lib/data/task-relations";
 
@@ -101,6 +102,29 @@ describe("task relation selectors", () => {
           }),
         ],
         "commercial-1",
+      ),
+    ).toBeUndefined();
+  });
+
+  test("reuses only an unambiguous active client Task", () => {
+    const oneActive = [
+      task({ id: "active-client", clientId: "client-1" }),
+      task({
+        id: "done-client",
+        clientId: "client-1",
+        workflowStatus: "Done",
+        dueState: null,
+      }),
+    ];
+
+    expect(reusableClientTask(oneActive, "client-1")?.id).toBe("active-client");
+    expect(
+      reusableClientTask(
+        [
+          ...oneActive,
+          task({ id: "second-active-client", clientId: "client-1" }),
+        ],
+        "client-1",
       ),
     ).toBeUndefined();
   });

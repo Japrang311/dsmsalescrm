@@ -33,6 +33,8 @@ import type {
   clientRevenueMetrics as clientRevenueMetricsFn,
   clientCommercialMetrics as clientCommercialMetricsFn,
 } from "@/lib/data/dashboard-selectors";
+import type { RepeatOrderSnapshot } from "@/lib/data/repeat-order-cadence";
+import { RepeatOrderSummary } from "@/components/repeat-orders/RepeatOrderSummary";
 
 type ClientRevenueMetrics = ReturnType<typeof clientRevenueMetricsFn>;
 type ClientCommercialMetrics = ReturnType<typeof clientCommercialMetricsFn>;
@@ -47,6 +49,10 @@ export function ClientOverviewTab({
   owners,
   upcomingActions,
   setActiveTab,
+  repeatOrderSnapshot,
+  repeatOrderLoading,
+  repeatOrderError,
+  repeatOrderAggregateOnly,
 }: {
   client: Client;
   revenue: ClientRevenueMetrics;
@@ -57,6 +63,10 @@ export function ClientOverviewTab({
   owners: OwnerLookup;
   upcomingActions: Task[];
   setActiveTab: (tab: string) => void;
+  repeatOrderSnapshot?: RepeatOrderSnapshot;
+  repeatOrderLoading: boolean;
+  repeatOrderError: boolean;
+  repeatOrderAggregateOnly: boolean;
 }) {
   return (
     <div className="mt-4 space-y-4">
@@ -137,6 +147,17 @@ export function ClientOverviewTab({
           onClick={() => setActiveTab("orders")}
         />
       </div>
+
+      <RepeatOrderSummary
+        item={repeatOrderSnapshot?.items[0]}
+        isLoading={repeatOrderLoading}
+        isError={repeatOrderError}
+        aggregateOnly={repeatOrderAggregateOnly}
+        aggregateCandidateCount={
+          repeatOrderSnapshot?.totals.candidateCount ?? 0
+        }
+        canMutate={canEditStatus}
+      />
 
       <ClientInfoCard
         client={client}
