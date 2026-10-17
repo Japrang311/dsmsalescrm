@@ -38,3 +38,11 @@ export function activeCommercialTasks(
 ): Task[] {
   return commercialRelatedTasks(tasks, commercialItemId).filter(isActiveTask);
 }
+
+export function reusableCommercialTask(
+  tasks: Task[],
+  commercialItemId: string,
+): Task | undefined {
+  const activeTasks = activeCommercialTasks(tasks, commercialItemId);
+  return activeTasks.length === 1 ? activeTasks[0] : undefined;
+}

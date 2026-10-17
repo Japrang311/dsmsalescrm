@@ -5,6 +5,7 @@ import {
   activeCommercialTasks,
   clientRelatedTasks,
   commercialRelatedTasks,
+  reusableCommercialTask,
 } from "@/lib/data/task-relations";
 
 const baseTask: Task = {
@@ -70,5 +71,37 @@ describe("task relation selectors", () => {
       "active",
     ]);
     expect(activeCommercialTasks(rows, "missing")).toEqual([]);
+  });
+
+  test("reuses only an unambiguous active commercial Task", () => {
+    const oneActive = [
+      task({
+        id: "active-commercial",
+        commercialDocumentId: "commercial-1",
+      }),
+      task({
+        id: "done-commercial",
+        commercialDocumentId: "commercial-1",
+        workflowStatus: "Done",
+        dueState: null,
+      }),
+    ];
+
+    expect(reusableCommercialTask(oneActive, "commercial-1")?.id).toBe(
+      "active-commercial",
+    );
+
+    expect(
+      reusableCommercialTask(
+        [
+          ...oneActive,
+          task({
+            id: "second-active-commercial",
+            commercialDocumentId: "commercial-1",
+          }),
+        ],
+        "commercial-1",
+      ),
+    ).toBeUndefined();
   });
 });

@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -31,8 +31,12 @@ import { Separator } from "@/components/ui/separator";
 import { toLocalIsoDate, type CommercialItem } from "@/lib/domain";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { listTasks } from "@/lib/data/tasks";
-import { activeCommercialTasks } from "@/lib/data/task-relations";
 import {
+  activeCommercialTasks,
+  reusableCommercialTask,
+} from "@/lib/data/task-relations";
+import {
+  recordCommercialExceptionFollowUp,
   recordCommercialFollowUp,
   type FollowUpResult,
 } from "@/lib/data/follow-ups";
@@ -73,6 +77,10 @@ const schema = z
   .refine((v) => Boolean(v.nextFuDate), {
     path: ["nextFuDate"],
     message: "Tanggal next action wajib",
+  })
+  .refine((v) => v.taskMode !== "existing_task" || Boolean(v.taskId), {
+    path: ["taskId"],
+    message: "Pilih Task aktif",
   });
 
 type FormValues = z.infer<typeof schema>;
@@ -83,14 +91,17 @@ export function LogCommercialFollowUpDialog({
   trigger,
   open: controlledOpen,
   onOpenChange,
+  fromActionSignal = false,
 }: {
-  item: CommercialItem;
+  item: Pick<CommercialItem, "id" | "type" | "description">;
   clientName: string;
   trigger?: ReactNode;
   open?: boolean;
   onOpenChange?: (o: boolean) => void;
+  fromActionSignal?: boolean;
 }) {
   const [uncontrolled, setUncontrolled] = useState(false);
+  const requestIdRef = useRef("");
   const open = controlledOpen ?? uncontrolled;
   const setOpen = (o: boolean) => {
     if (onOpenChange) onOpenChange(o);
@@ -105,6 +116,7 @@ export function LogCommercialFollowUpDialog({
     control,
     watch,
     reset,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -122,6 +134,7 @@ export function LogCommercialFollowUpDialog({
 
   useEffect(() => {
     if (open) {
+      requestIdRef.current = crypto.randomUUID();
       reset({
         fuDate: today,
         method: "Phone",
@@ -139,12 +152,28 @@ export function LogCommercialFollowUpDialog({
   const taskMode = watch("taskMode");
 
   const queryClient = useQueryClient();
-  const { data: tasks = [] } = useQuery({
+  const { data: tasks = [], isFetched: tasksFetched } = useQuery({
     queryKey: ["tasks", "all"],
     queryFn: listTasks,
     enabled: open,
   });
   const activeTasks = activeCommercialTasks(tasks, item.id);
+  const reusableTask = reusableCommercialTask(tasks, item.id);
+
+  useEffect(() => {
+    if (!open || !fromActionSignal || !tasksFetched) return;
+    if (activeTasks.length > 0) {
+      setValue("taskMode", "existing_task");
+      setValue("taskId", reusableTask?.id ?? "");
+    }
+  }, [
+    activeTasks.length,
+    fromActionSignal,
+    open,
+    reusableTask?.id,
+    setValue,
+    tasksFetched,
+  ]);
 
   const onSubmit = handleSubmit(async (v) => {
     try {
@@ -167,11 +196,35 @@ export function LogCommercialFollowUpDialog({
           fuDate: v.fuDate,
         },
       );
-      await recordCommercialFollowUp({
-        commercialDocumentId: item.id,
-        ...command,
-      });
+      if (fromActionSignal) {
+        await recordCommercialExceptionFollowUp({
+          requestId: requestIdRef.current || crypto.randomUUID(),
+          commercialDocumentId: item.id,
+          preferredTaskId:
+            v.taskMode === "existing_task" ? v.taskId : undefined,
+          createTaskTitle:
+            v.nextAction?.trim() || `Follow-up · ${item.type} — ${clientName}`,
+          taskDueDate: v.nextFuDate ?? "",
+          nextAction: command.nextAction,
+          nextActionDate: command.nextActionDate,
+          note: command.note,
+          method: command.method,
+          result: command.result,
+          fuDate: command.fuDate,
+          workflowStatusTarget: command.workflowStatusTarget,
+        });
+      } else {
+        await recordCommercialFollowUp({
+          commercialDocumentId: item.id,
+          ...command,
+        });
+      }
       await invalidateFollowUpQueries(queryClient);
+      if (fromActionSignal) {
+        await queryClient.invalidateQueries({
+          queryKey: ["crm-action-signals"],
+        });
+      }
       toast.success("Follow-up tercatat", {
         description: `${clientName} · ${item.type} · ${v.result} · Task diprogress`,
       });
@@ -327,7 +380,11 @@ export function LogCommercialFollowUpDialog({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="create_task">Buat Task baru</SelectItem>
+                    {!fromActionSignal || activeTasks.length === 0 ? (
+                      <SelectItem value="create_task">
+                        Buat Task baru
+                      </SelectItem>
+                    ) : null}
                     <SelectItem
                       value="existing_task"
                       disabled={activeTasks.length === 0}

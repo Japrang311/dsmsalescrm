@@ -163,6 +163,15 @@ export type RecordCommercialFollowUpInput = RecordFollowUpCommandInput & {
   commercialDocumentId: string;
 };
 
+export type RecordCommercialExceptionFollowUpInput =
+  RecordFollowUpCommandInput & {
+    requestId: string;
+    commercialDocumentId: string;
+    preferredTaskId?: string;
+    createTaskTitle: string;
+    taskDueDate: string;
+  };
+
 export type RecordFollowUpCommandResult = {
   taskId: string;
   followUpLogId: string;
@@ -232,4 +241,28 @@ export async function recordCommercialFollowUp(
   });
   if (error) throw error;
   return toRecordFollowUpCommandResult(data![0]);
+}
+
+export async function recordCommercialExceptionFollowUp(
+  input: RecordCommercialExceptionFollowUpInput,
+): Promise<RecordFollowUpCommandResult> {
+  const { data, error } = await supabase.rpc(
+    "record_commercial_exception_follow_up",
+    {
+      p_request_id: input.requestId,
+      p_commercial_document_id: input.commercialDocumentId,
+      p_preferred_task_id: input.preferredTaskId ?? null,
+      p_create_task_title: input.createTaskTitle,
+      p_task_due_date: input.taskDueDate,
+      p_next_action: input.nextAction,
+      p_next_action_date: input.nextActionDate,
+      p_note: input.note ?? null,
+      p_method: input.method ?? "Phone",
+      p_result: input.result ?? "Progress Update",
+      p_fu_date: input.fuDate ?? null,
+      p_workflow_status_target: input.workflowStatusTarget ?? "In Progress",
+    },
+  );
+  if (error) throw error;
+  return toRecordFollowUpCommandResult(data);
 }

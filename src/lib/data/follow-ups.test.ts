@@ -14,6 +14,7 @@ import {
   listFollowUpsForClient,
   listFollowUpsForCommercialDocument,
   recordClientFollowUp,
+  recordCommercialExceptionFollowUp,
   recordCommercialFollowUp,
 } from "./follow-ups";
 import { supabase } from "@/lib/supabase";
@@ -195,6 +196,58 @@ describe("src/lib/data/follow-ups.ts", () => {
       .single();
     expect(task?.commercial_document_id).toBe(commercialDocumentId);
     expect(task?.next_action).toBe("Confirm quotation feedback");
+
+    await supabase.auth.signOut();
+  });
+
+  test("recordCommercialExceptionFollowUp() preserves its request ID across a replay", async () => {
+    const { data: task, error: taskError } = await adminClient
+      .from("tasks")
+      .insert({
+        client_id: clientId,
+        commercial_document_id: commercialDocumentId,
+        owner_id: fixtures.sales.id,
+        title: "Preferred exception Task",
+        due_date: "2026-08-07",
+        method: "Phone",
+        category: "Follow-Up",
+      })
+      .select("id")
+      .single();
+    if (taskError) throw taskError;
+    createdTaskIds.push(task.id);
+
+    const fixtureClient = await signInAs(fixtures.sales);
+    const session = (await fixtureClient.auth.getSession()).data.session!;
+    await supabase.auth.setSession({
+      access_token: session.access_token,
+      refresh_token: session.refresh_token,
+    });
+
+    const requestId = crypto.randomUUID();
+    const input = {
+      requestId,
+      commercialDocumentId,
+      preferredTaskId: task.id,
+      createTaskTitle: "Exception fallback Task",
+      taskDueDate: "2026-08-07",
+      nextAction: "Confirm exception outcome",
+      nextActionDate: "2026-08-08",
+      note: "Adapter exception follow-up",
+      method: "Phone" as const,
+      result: "Interested" as const,
+      fuDate: "2026-08-05",
+      workflowStatusTarget: "In Progress" as const,
+    };
+
+    const first = await recordCommercialExceptionFollowUp(input);
+    const replay = await recordCommercialExceptionFollowUp(input);
+
+    createdFollowUpIds.push(first.followUpLogId);
+    createdActivityIds.push(first.activityLogId);
+    expect(first.taskId).toBe(task.id);
+    expect(first.createdTask).toBe(false);
+    expect(replay).toEqual(first);
 
     await supabase.auth.signOut();
   });

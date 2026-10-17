@@ -173,6 +173,101 @@ test("action queue reconciles local RPC data across Tasks, Dashboard, roles, key
   expectNoConsoleIssues(consoleIssues);
 });
 
+test("sales records an exception follow-up and reuses its active Task after reload", async ({
+  page,
+}) => {
+  const consoleIssues = collectConsoleIssues(page);
+  const sales = await authenticatedSupabaseClient(USERS.sales);
+  const token = uniqueToken("E2E exception follow-up");
+  const quotationNumber = `QT-EX-${Date.now()}`;
+  const todayJakarta = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jakarta",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+
+  const { data: quotation, error: quotationError } = await sales
+    .from("commercial_documents")
+    .insert({
+      client_id: NUR_CLIENT_ID,
+      owner_id: USER_IDS.sales,
+      type: "Quotation",
+      source_flow: "RFQ / New Product",
+      document_date: todayJakarta,
+      quotation_number: quotationNumber,
+      quotation_base_number: quotationNumber,
+      quotation_revision: 0,
+      is_current_revision: true,
+      stage: "Negotiation",
+      quotation_expired_date: todayJakarta,
+    })
+    .select("id")
+    .single();
+  expect(quotationError).toBeNull();
+
+  const { data: existingTask, error: taskError } = await sales
+    .from("tasks")
+    .insert({
+      client_id: NUR_CLIENT_ID,
+      commercial_document_id: quotation.id,
+      owner_id: USER_IDS.sales,
+      title: token,
+      due_date: tomorrowIsoDate(),
+      method: "Phone",
+      category: "Follow-Up",
+    })
+    .select("id")
+    .single();
+  expect(taskError).toBeNull();
+
+  await signIn(page, USERS.sales);
+  await page.goto("/tasks");
+  const queue = page.getByRole("region", { name: "Antrean tindakan" });
+  const exceptionRow = queue.locator("li").filter({
+    hasText: quotationNumber,
+  });
+  await expect(exceptionRow).toBeVisible();
+  await exceptionRow.getByRole("button", { name: "Catat follow-up" }).click();
+
+  const dialog = page.getByRole("dialog", {
+    name: /Log Follow-Up · Quotation/,
+  });
+  await expect(dialog.getByText(quotationNumber)).toBeVisible();
+  await expect(
+    dialog.getByRole("combobox", { name: "Pilih Task aktif" }),
+  ).toContainText(token);
+  await dialog.getByLabel("Next action").fill("Konfirmasi keputusan quotation");
+  await dialog.getByLabel("Tanggal next FU").fill(tomorrowIsoDate());
+  await dialog.getByLabel("Catatan").fill(token);
+  await dialog.getByRole("button", { name: "Simpan Follow-Up" }).click();
+  await expect(page.getByText("Follow-up tercatat")).toBeVisible();
+
+  await page.reload();
+  await expect(
+    queue.locator("li").filter({ hasText: quotationNumber }),
+  ).toHaveCount(1);
+
+  const { count: taskCount, error: taskCountError } = await sales
+    .from("tasks")
+    .select("id", { count: "exact", head: true })
+    .eq("commercial_document_id", quotation.id)
+    .eq("archived", false)
+    .not("workflow_status", "in", '("Done","Cancelled")');
+  expect(taskCountError).toBeNull();
+  expect(taskCount).toBe(1);
+
+  const { data: followUps, error: followUpError } = await sales
+    .from("follow_up_logs")
+    .select("task_id, notes")
+    .eq("commercial_document_id", quotation.id)
+    .eq("notes", token);
+  expect(followUpError).toBeNull();
+  expect(followUps).toEqual([{ task_id: existingTask.id, notes: token }]);
+
+  expectNoConsoleIssues(consoleIssues);
+});
+
 test("sales can record a client follow-up that survives reload", async ({
   page,
 }) => {

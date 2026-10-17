@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
+import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   PipelineBoard,
   type PipelineColumnData,
@@ -8,6 +10,14 @@ import { DashboardOverview } from "@/components/dashboard/DashboardOverview";
 import { ActionSignalList } from "@/components/tasks/ActionSignalList";
 import type { CommercialItem } from "@/lib/domain";
 import type { ActionSignalsSnapshot } from "@/lib/data/action-signals";
+
+function renderWithQueryClient(node: ReactNode) {
+  return renderToStaticMarkup(
+    <QueryClientProvider client={new QueryClient()}>
+      {node}
+    </QueryClientProvider>,
+  );
+}
 
 const quotation: CommercialItem = {
   id: "quote-preview",
@@ -240,7 +250,7 @@ describe("Precision operational presentation", () => {
     expect(html).toContain("Menunggu PO");
   });
   test("action queue groups rules by entity and keeps reasons, priority, source, and insufficient data visible", () => {
-    const html = renderToStaticMarkup(
+    const html = renderWithQueryClient(
       <ActionSignalList snapshot={signalSnapshot} />,
     );
     expect(html.match(/PT Fixture Utama/g)).toHaveLength(1);
@@ -253,22 +263,22 @@ describe("Precision operational presentation", () => {
     expect(html).toContain("2 quotation dimuat");
   });
   test("action queue distinguishes loading, error, empty, aggregate-only, and pagination states", () => {
-    expect(renderToStaticMarkup(<ActionSignalList isLoading />)).toContain(
+    expect(renderWithQueryClient(<ActionSignalList isLoading />)).toContain(
       "Memuat antrean tindakan",
     );
     expect(
-      renderToStaticMarkup(<ActionSignalList isError onRetry={() => {}} />),
+      renderWithQueryClient(<ActionSignalList isError onRetry={() => {}} />),
     ).toContain("Antrean tindakan gagal dimuat");
-    expect(renderToStaticMarkup(<ActionSignalList />)).toContain(
+    expect(renderWithQueryClient(<ActionSignalList />)).toContain(
       "Tidak ada exception aktif",
     );
     expect(
-      renderToStaticMarkup(
+      renderWithQueryClient(
         <ActionSignalList snapshot={signalSnapshot} aggregateOnly />,
       ),
     ).toContain("Detail dibatasi untuk role Executive");
     expect(
-      renderToStaticMarkup(
+      renderWithQueryClient(
         <ActionSignalList
           snapshot={signalSnapshot}
           hasNextPage
@@ -278,7 +288,7 @@ describe("Precision operational presentation", () => {
       ),
     ).toContain("Muat lebih banyak");
     expect(
-      renderToStaticMarkup(
+      renderWithQueryClient(
         <ActionSignalList
           snapshot={signalSnapshot}
           compact

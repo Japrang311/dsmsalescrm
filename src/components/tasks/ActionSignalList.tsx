@@ -1,5 +1,6 @@
-import { AlertTriangle, ArrowRight, ListChecks } from "lucide-react";
+import { AlertTriangle, ArrowRight, ListChecks, PhoneCall } from "lucide-react";
 
+import { LogCommercialFollowUpDialog } from "@/components/commercial/LogCommercialFollowUpDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -175,16 +176,34 @@ export function ActionSignalList({
                         : formatRupiahShort(group.totalValue)}
                     </p>
                   </div>
-                  <Button
-                    asChild
-                    variant="outline"
-                    size="sm"
-                    className="h-8 shrink-0 self-start"
-                  >
-                    <a href={group.sourceHref}>
-                      Buka quotation <ArrowRight className="ml-1 h-3.5 w-3.5" />
-                    </a>
-                  </Button>
+                  <div className="flex shrink-0 flex-wrap gap-2 self-start">
+                    <LogCommercialFollowUpDialog
+                      item={{
+                        id: group.entityId,
+                        type: "Quotation",
+                        description: group.quotationNumber ?? "Quotation",
+                      }}
+                      clientName={group.clientName}
+                      fromActionSignal
+                      trigger={
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-8"
+                        >
+                          <PhoneCall className="mr-1 h-3.5 w-3.5" /> Catat
+                          follow-up
+                        </Button>
+                      }
+                    />
+                    <Button asChild variant="outline" size="sm" className="h-8">
+                      <a href={group.sourceHref}>
+                        Buka quotation{" "}
+                        <ArrowRight className="ml-1 h-3.5 w-3.5" />
+                      </a>
+                    </Button>
+                  </div>
                 </div>
                 <ul className="mt-3 space-y-2">
                   {group.signals.map((signal) => (
