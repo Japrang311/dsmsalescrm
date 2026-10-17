@@ -30,7 +30,11 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { useRole } from "@/context/role-context-core";
 import { NOW, toLocalIsoDate } from "@/lib/domain";
 import { useEntryState } from "@/hooks/use-entry-state";
@@ -78,6 +82,13 @@ import {
 import { TaskDetailDrawer } from "@/components/tasks/TaskDetailDrawer";
 import { CreateTaskDialog } from "@/components/tasks/CreateTaskDialog";
 import { CalendarIncompleteWarning } from "@/components/tasks/CalendarIncompleteWarning";
+import { ActionSignalList } from "@/components/tasks/ActionSignalList";
+import {
+  actionSignalsQueryKey,
+  getActionSignals,
+  type ActionSignalCursor,
+  type ActionSignalsSnapshot,
+} from "@/lib/data/action-signals";
 import {
   TaskHistorySection,
   TasksAgendaView,
@@ -210,6 +221,31 @@ function TasksInboxPage() {
   );
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const signalScope = useMemo(
+    () => ({
+      ownerId: role !== "sales" && ownerId !== "all" ? ownerId : undefined,
+    }),
+    [ownerId, role],
+  );
+  const actionSignalsQuery = useInfiniteQuery({
+    queryKey: [...actionSignalsQueryKey(signalScope), "pages"],
+    queryFn: ({ pageParam }: { pageParam: ActionSignalCursor | null }) =>
+      getActionSignals(signalScope, { limit: 25, after: pageParam }),
+    initialPageParam: null as ActionSignalCursor | null,
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
+    enabled: authReady,
+  });
+  const actionSignalsSnapshot = useMemo<
+    ActionSignalsSnapshot | undefined
+  >(() => {
+    const pages = actionSignalsQuery.data?.pages;
+    if (!pages?.length) return undefined;
+    return {
+      ...pages[0],
+      items: pages.flatMap((page) => page.items),
+      nextCursor: pages.at(-1)?.nextCursor ?? null,
+    };
+  }, [actionSignalsQuery.data]);
 
   // "Waiting PO" quick action -> Commit stage move. Stage 4 Task 4.3: this
   // used to write stage + an unstructured activity_log row directly,
@@ -629,6 +665,17 @@ function TasksInboxPage() {
       </header>
 
       <CalendarIncompleteWarning tasks={activeTasks} />
+
+      <ActionSignalList
+        snapshot={actionSignalsSnapshot}
+        isLoading={actionSignalsQuery.isPending}
+        isError={actionSignalsQuery.isError}
+        isFetchingNextPage={actionSignalsQuery.isFetchingNextPage}
+        hasNextPage={Boolean(actionSignalsQuery.hasNextPage)}
+        aggregateOnly={role === "executive"}
+        onRetry={() => void actionSignalsQuery.refetch()}
+        onLoadMore={() => void actionSignalsQuery.fetchNextPage()}
+      />
 
       <div
         role="group"

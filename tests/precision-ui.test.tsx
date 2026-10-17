@@ -5,7 +5,9 @@ import {
   type PipelineColumnData,
 } from "@/components/pipeline/PipelineBoard";
 import { DashboardOverview } from "@/components/dashboard/DashboardOverview";
+import { ActionSignalList } from "@/components/tasks/ActionSignalList";
 import type { CommercialItem } from "@/lib/domain";
+import type { ActionSignalsSnapshot } from "@/lib/data/action-signals";
 
 const quotation: CommercialItem = {
   id: "quote-preview",
@@ -63,6 +65,87 @@ const props = {
   linkedSalesOrderByItemId: new Map<string, { id: string; soNumber: string }>(),
   onLinkSoForItem: () => {},
   onOpenSalesOrder: () => {},
+};
+
+const signalSnapshot: ActionSignalsSnapshot = {
+  asOfDate: "2026-10-17",
+  fetchedAt: "2026-10-17T01:00:00Z",
+  totals: {
+    totalCount: 3,
+    activeCount: 2,
+    dataInsufficientCount: 1,
+    incompleteEvidenceCount: 1,
+    byRule: {
+      won_without_so: 0,
+      expected_close_overdue: 1,
+      quotation_expiry_due: 1,
+      deal_stagnant: 1,
+    },
+  },
+  page: { limit: 25, returnedCount: 3 },
+  nextCursor: null,
+  items: [
+    {
+      entityId: "00000000-0000-4000-8000-000000000001",
+      clientId: "00000000-0000-4000-8000-000000000011",
+      clientName: "PT Fixture Utama",
+      ownerId: "00000000-0000-4000-8000-000000000021",
+      ownerName: "Nur Iman",
+      quotationNumber: "DSM-26QUO001",
+      stage: "Negotiation",
+      ruleId: "expected_close_overdue",
+      state: "active",
+      dataState: "complete",
+      priority: 1,
+      reason: "Expected close lewat 1 hari.",
+      baseDate: "2026-10-16",
+      dueDate: "2026-10-16",
+      ageDays: 1,
+      thresholdDays: null,
+      totalValue: 125_000_000,
+      sourceHref: "/quotations/00000000-0000-4000-8000-000000000001",
+    },
+    {
+      entityId: "00000000-0000-4000-8000-000000000001",
+      clientId: "00000000-0000-4000-8000-000000000011",
+      clientName: "PT Fixture Utama",
+      ownerId: "00000000-0000-4000-8000-000000000021",
+      ownerName: "Nur Iman",
+      quotationNumber: "DSM-26QUO001",
+      stage: "Negotiation",
+      ruleId: "quotation_expiry_due",
+      state: "active",
+      dataState: "complete",
+      priority: 2,
+      reason: "Quotation kedaluwarsa dalam 7 hari.",
+      baseDate: "2026-10-24",
+      dueDate: "2026-10-24",
+      ageDays: 0,
+      thresholdDays: 7,
+      totalValue: 125_000_000,
+      sourceHref: "/quotations/00000000-0000-4000-8000-000000000001",
+    },
+    {
+      entityId: "00000000-0000-4000-8000-000000000002",
+      clientId: "00000000-0000-4000-8000-000000000012",
+      clientName: "PT Data Lama",
+      ownerId: "00000000-0000-4000-8000-000000000021",
+      ownerName: "Nur Iman",
+      quotationNumber: "DSM-26QUO002",
+      stage: "Hot Prospect",
+      ruleId: "deal_stagnant",
+      state: "data_insufficient",
+      dataState: "data_insufficient",
+      priority: 4,
+      reason: "Data belum cukup: belum ada stage event atau follow-up valid.",
+      baseDate: null,
+      dueDate: null,
+      ageDays: null,
+      thresholdDays: 14,
+      totalValue: null,
+      sourceHref: "/quotations/00000000-0000-4000-8000-000000000002",
+    },
+  ],
 };
 
 describe("Precision operational presentation", () => {
@@ -155,5 +238,53 @@ describe("Precision operational presentation", () => {
     expect(html).toContain("25% dari target setahun");
     expect(html).toContain("12 item aktif di seluruh pipeline");
     expect(html).toContain("Menunggu PO");
+  });
+  test("action queue groups rules by entity and keeps reasons, priority, source, and insufficient data visible", () => {
+    const html = renderToStaticMarkup(
+      <ActionSignalList snapshot={signalSnapshot} />,
+    );
+    expect(html.match(/PT Fixture Utama/g)).toHaveLength(1);
+    expect(html).toContain("Expected close lewat");
+    expect(html).toContain("Quotation hampir kedaluwarsa");
+    expect(html).toContain("Prioritas 1");
+    expect(html).toContain("Data belum cukup");
+    expect(html).toContain("Buka quotation");
+    expect(html).toContain("3 sinyal");
+    expect(html).toContain("2 quotation dimuat");
+  });
+  test("action queue distinguishes loading, error, empty, aggregate-only, and pagination states", () => {
+    expect(renderToStaticMarkup(<ActionSignalList isLoading />)).toContain(
+      "Memuat antrean tindakan",
+    );
+    expect(
+      renderToStaticMarkup(<ActionSignalList isError onRetry={() => {}} />),
+    ).toContain("Antrean tindakan gagal dimuat");
+    expect(renderToStaticMarkup(<ActionSignalList />)).toContain(
+      "Tidak ada exception aktif",
+    );
+    expect(
+      renderToStaticMarkup(
+        <ActionSignalList snapshot={signalSnapshot} aggregateOnly />,
+      ),
+    ).toContain("Detail dibatasi untuk role Executive");
+    expect(
+      renderToStaticMarkup(
+        <ActionSignalList
+          snapshot={signalSnapshot}
+          hasNextPage
+          onLoadMore={() => {}}
+          showAllHref="/tasks"
+        />,
+      ),
+    ).toContain("Muat lebih banyak");
+    expect(
+      renderToStaticMarkup(
+        <ActionSignalList
+          snapshot={signalSnapshot}
+          compact
+          showAllHref="/tasks"
+        />,
+      ),
+    ).toContain("Lihat antrean lengkap");
   });
 });

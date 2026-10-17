@@ -81,11 +81,94 @@ test("Tasks inbox renders agenda, calendar, and history modes", async ({
 
   await page.getByRole("radio", { name: /Kalender/ }).click();
   await expect(page.getByRole("button", { name: "Hari ini" })).toBeVisible();
-  await expect(page.getByText("Sen")).toBeVisible();
+  await expect(page.getByText("Sen", { exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: /COMPLETED/i }).click();
   await expect(page.getByRole("radio", { name: /Agenda/ })).toBeChecked();
   await expect(page.getByRole("radio", { name: /Kalender/ })).toBeDisabled();
+
+  expectNoConsoleIssues(consoleIssues);
+});
+
+test("action queue reconciles local RPC data across Tasks, Dashboard, roles, keyboard, and mobile", async ({
+  page,
+}) => {
+  const consoleIssues = collectConsoleIssues(page);
+  const sales = await authenticatedSupabaseClient(USERS.sales);
+  const { data, error } = await sales.rpc("crm_action_signals", {
+    p_as_of: null,
+    p_owner_id: null,
+    p_client_status: null,
+    p_limit: 25,
+    p_after: null,
+  });
+  expect(error).toBeNull();
+  expect(data).toBeTruthy();
+
+  const snapshot = data as {
+    totals: { totalCount: number };
+    items: Array<{
+      clientName: string;
+      reason: string;
+      sourceHref: string;
+    }>;
+  };
+  expect(snapshot.totals.totalCount).toBeGreaterThan(0);
+  expect(snapshot.items.length).toBeGreaterThan(0);
+  const firstSignal = snapshot.items[0];
+
+  await signIn(page, USERS.sales);
+  await page.goto("/tasks");
+  const tasksQueue = page.getByRole("region", { name: "Antrean tindakan" });
+  await expect(tasksQueue).toBeVisible();
+  await expect(tasksQueue).toHaveAttribute(
+    "data-action-signal-count",
+    String(snapshot.totals.totalCount),
+  );
+  await expect(
+    tasksQueue.getByText(firstSignal.clientName).first(),
+  ).toBeVisible();
+  await expect(tasksQueue.getByText(firstSignal.reason).first()).toBeVisible();
+
+  await page.setViewportSize({ width: 320, height: 720 });
+  await expect(tasksQueue).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+
+  const sourceLink = tasksQueue
+    .getByRole("link", { name: /Buka quotation/ })
+    .first();
+  await sourceLink.focus();
+  await expect(sourceLink).toBeFocused();
+  await sourceLink.press("Enter");
+  await expect(page).toHaveURL(new RegExp(`${firstSignal.sourceHref}$`));
+
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto("/dashboard");
+  const dashboardQueue = page.getByRole("region", {
+    name: "Antrean tindakan",
+  });
+  await expect(dashboardQueue).toBeVisible();
+  await expect(
+    dashboardQueue.getByRole("link", { name: "Lihat antrean lengkap" }),
+  ).toHaveAttribute("href", "/tasks");
+
+  await page.context().clearCookies();
+  await signIn(page, USERS.executive);
+  await page.goto("/tasks");
+  const executiveQueue = page.getByRole("region", {
+    name: "Antrean tindakan",
+  });
+  await expect(executiveQueue.getByText(/sinyal aktif/)).toBeVisible();
+  await expect(
+    executiveQueue.getByText(/Detail dibatasi untuk role Executive/),
+  ).toBeVisible();
+  await expect(
+    executiveQueue.getByRole("link", { name: /Buka quotation/ }),
+  ).toHaveCount(0);
 
   expectNoConsoleIssues(consoleIssues);
 });

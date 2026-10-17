@@ -33,6 +33,10 @@ import { getPipelineMetrics } from "@/lib/data/pipeline-metrics";
 import { getForecastSnapshot } from "@/lib/data/forecast-snapshot";
 import { getWonBacklog, wonBacklogQueryKey } from "@/lib/data/won-backlog";
 import {
+  actionSignalsQueryKey,
+  getActionSignals,
+} from "@/lib/data/action-signals";
+import {
   formatDateTime,
   formatPercentValue,
   formatRupiahShort,
@@ -51,6 +55,7 @@ import {
   type PeriodRange,
 } from "@/components/dashboard/DateRangePicker";
 import { CalendarIncompleteWarning } from "@/components/tasks/CalendarIncompleteWarning";
+import { ActionSignalList } from "@/components/tasks/ActionSignalList";
 import { useState } from "react";
 import { toast } from "sonner";
 import {
@@ -144,6 +149,11 @@ function DashboardPage() {
   const wonBacklogQuery = useQuery({
     queryKey: wonBacklogQueryKey(),
     queryFn: () => getWonBacklog({}, { limit: 5 }),
+    enabled: authReady,
+  });
+  const actionSignalsQuery = useQuery({
+    queryKey: [...actionSignalsQueryKey(), "dashboard"],
+    queryFn: () => getActionSignals({}, { limit: 5 }),
     enabled: authReady,
   });
   const ytdMetrics = ytdMetricsQuery.data;
@@ -678,6 +688,16 @@ function DashboardPage() {
           </div>
         ) : null}
       </section>
+
+      <ActionSignalList
+        snapshot={actionSignalsQuery.data}
+        isLoading={actionSignalsQuery.isPending}
+        isError={actionSignalsQuery.isError}
+        aggregateOnly={role === "executive"}
+        compact
+        showAllHref="/tasks"
+        onRetry={() => void actionSignalsQuery.refetch()}
+      />
 
       {/* Caveat on the figures above, so it sits with them rather than
           outranking them at the top of the page. */}
