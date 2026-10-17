@@ -118,6 +118,12 @@ function randomDateWithinDays(daysBack: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+function dateDaysFromToday(daysForward: number): string {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() + daysForward);
+  return d.toISOString().slice(0, 10);
+}
+
 function pad(n: number, width: number): string {
   return String(n).padStart(width, "0");
 }
@@ -179,6 +185,7 @@ async function main() {
     stage: string;
     quotation_number: string;
     document_date: string;
+    expected_close_date: string | null;
   }[] = [];
   const docItemRows: Record<string, unknown>[] = [];
   let docSeq = 0;
@@ -197,6 +204,7 @@ async function main() {
         stage,
         quotation_number: quotationNumber,
         document_date: date,
+        expected_close_date: stage === "Commit" ? dateDaysFromToday(30) : null,
       });
       const itemCount = 1 + Math.floor(Math.random() * 3);
       for (let p = 1; p <= itemCount; p += 1) {
@@ -225,6 +233,7 @@ async function main() {
       type: "Quotation",
       source_flow: "Existing / Repeat Order",
       document_date: r.document_date,
+      expected_close_date: r.expected_close_date,
       quotation_number: r.quotation_number,
       quotation_base_number: r.quotation_number,
       quotation_revision: 0,
