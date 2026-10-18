@@ -2,7 +2,10 @@ import { createServerFn } from "@tanstack/react-start";
 import { createClient } from "@supabase/supabase-js";
 import { APICallError, generateText } from "ai";
 import { canUseAiSummary } from "@/lib/ai/access";
-import { buildSummaryPrompt } from "@/lib/ai/summary-prompt";
+import {
+  AI_SUMMARY_MAX_OUTPUT_TOKENS,
+  buildSummaryPrompt,
+} from "@/lib/ai/summary-prompt";
 import type { SummaryAudience, SummaryFacts } from "@/lib/ai/summary-facts";
 
 export type AiSummaryResult =
@@ -146,6 +149,7 @@ export const generateAiSummary = createServerFn({ method: "POST" })
         model: "anthropic/claude-sonnet-4.6",
         system,
         prompt,
+        maxOutputTokens: AI_SUMMARY_MAX_OUTPUT_TOKENS,
         providerOptions: {
           gateway: {
             models: ["openai/gpt-5.4"],

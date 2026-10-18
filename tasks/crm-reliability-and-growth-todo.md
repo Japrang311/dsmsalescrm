@@ -66,7 +66,8 @@ Checkbox hanya boleh selesai jika evidence dicatat, bukan karena kode ditulis.
 - [ ] Gate C: AC15–20 lulus dan hasil pilot direview.
 - [x] 18 Backup/restore drill — production snapshot, isolated restore, Auth/Storage/schema/data reconciliation dan RTO release diverifikasi.
 - [ ] 19 UX dan refactor terarah.
-- [ ] 20 AI output evaluation; tidak menghalangi core CRM jika ekspansi AI ditunda.
+- [ ] 20 AI output evaluation — release-v3 29/30 otomatis dan manual; satu
+      salah-pasangan figure, AC23 gagal, ekspansi AI HOLD.
 - [ ] 21 Handoff, dokumen lama, backlog.
 - [ ] Gate D: operasional dan handoff selesai sesuai scope yang disetujui.
 
@@ -117,6 +118,7 @@ Released, Deferred. Blocker harus menjelaskan kebutuhan untuk melanjutkan.
 | 16 Repeat signal/client           | Verified local | `f928e21`      | 26 targeted + full 815 pass; RLS/direct bypass, concurrency, retry, rollback, Task reuse dan feedback lulus  | Targeted lulus; full Chromium serial 20/20, count/client/insufficient/owner boundary lulus | Fresh reset lokal; remote tidak dilakukan      | [Task 16](../docs/reports/2026-10-17-crm-task-16-verification.md)                             |
 | 17 Pilot repeat-order             | In progress    | Belum dibuat   | 5 targeted + full 820 pass; production cohort 29 candidate/0 overdue dibekukan untuk 19–30 Okt               | Manager production: 46 candidate/1 overdue, Tasks render, console bersih                   | `d05-v1` released; review Sales belum tersedia | [Task 17 readiness](../docs/reports/2026-10-18-crm-task-17-pilot-readiness.md)                |
 | 18 Backup/restore + release       | Released       | `f928e21`      | Production snapshot restored isolated; counts/checksums/Auth/Storage reconcile; pre-release full 820 pass    | Authenticated read-only smoke Dashboard/Clients/Tasks/SO/Reports; export unverified        | 12 migration applied; Vercel deployment Ready  | [Task 18 / release](../docs/reports/2026-10-18-crm-task-18-production-restore-and-release.md) |
+| 20 AI output evaluation           | In progress    | Belum dibuat   | release-v3 otomatis/manual 29/30; full 831 pass; AC23 gagal karena salah-pasangan figure                     | Tidak relevan untuk runner; card runtime tidak diuji                                       | release-v3 USD 0,212418; ekspansi AI HOLD      | [Task 20](../docs/reports/2026-10-18-crm-task-20-ai-output-evaluation.md)                     |
 
 ## Release checklist per slice
 
